@@ -8,7 +8,6 @@ package objabi
 
 const (
 	STACKSYSTEM = 0
-	StackSystem = STACKSYSTEM
 	StackBig    = 4096
 	StackSmall  = 128
 )
@@ -17,9 +16,19 @@ const (
 	StackPreempt = -1314 // 0xfff...fade
 )
 
+var StackGuard, StackLimit, StackSystem int
+
 // Initialize StackGuard and StackLimit according to target system.
-var StackGuard = 880*stackGuardMultiplier() + StackSystem
-var StackLimit = StackGuard - StackSystem - StackSmall
+func init() {
+	if GOOS == "noos" && GOARCH == "thumb" {
+		StackSystem = 27 * 4
+		StackGuard = 440 + StackSystem
+	} else {
+		StackSystem = STACKSYSTEM
+		StackGuard = 880*stackGuardMultiplier() + StackSystem
+	}
+	StackLimit = StackGuard - StackSystem - StackSmall
+}
 
 // stackGuardMultiplier returns a multiplier to apply to the default
 // stack guard size. Larger multipliers are used for non-optimized

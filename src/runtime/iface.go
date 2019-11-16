@@ -10,7 +10,7 @@ import (
 	"unsafe"
 )
 
-const itabInitSize = 512
+const itabInitSize = 512 * (1 - _MCU)
 
 var (
 	itabLock      mutex                               // lock for accessing itab table
@@ -239,6 +239,11 @@ imethods:
 
 func itabsinit() {
 	lock(&itabLock)
+	if _MCU != 0 {
+		// allocate starter table, it will fit into two 256-byte pages
+		itabTable = (*itabTableType)(mallocgc((2+126)*sys.PtrSize, nil, true))
+		itabTable.size = 126
+	}
 	for _, md := range activeModules() {
 		for _, i := range md.itablinks {
 			itabAdd(i)
@@ -517,6 +522,7 @@ func iterate_itabs(fn func(*itab)) {
 }
 
 // staticbytes is used to avoid convT2E for byte-sized values.
+// TODO(md): consider changing to string to save RAM (MCU)
 var staticbytes = [...]byte{
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 	0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,

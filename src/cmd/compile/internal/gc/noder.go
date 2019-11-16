@@ -1534,6 +1534,9 @@ func (p *noder) pragma(pos syntax.Pos, text string) syntax.Pragma {
 		if !compiling_runtime && prag&runtimePragmas != 0 {
 			p.error(syntax.Error{Pos: pos, Msg: fmt.Sprintf("//%s only allowed in runtime", verb)})
 		}
+		if prag == Interrupthandler {
+			prag |= Nosplit | Nowritebarrierrec | Nowritebarrier
+		}
 		if prag == 0 && !allowedStdPragmas[verb] && compiling_std {
 			p.error(syntax.Error{Pos: pos, Msg: fmt.Sprintf("//%s is not allowed in the standard library", verb)})
 		}

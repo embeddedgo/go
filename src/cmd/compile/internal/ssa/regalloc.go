@@ -596,7 +596,8 @@ func (s *regAllocState) init(f *Func) {
 			// Leaf functions don't save/restore the link register.
 			s.allocatable &^= 1 << uint(s.f.Config.LinkReg)
 		}
-		if s.f.Config.arch == "arm" && objabi.GOARM == 5 {
+		if s.f.Config.arch == "arm" && objabi.GOARM == 5 || s.f.Config.arch == "thumb" && objabi.GOARM&0xF != 0xD {
+			// TODO: handle 32-bit FPU (GOARCH=thumb GOARM=0x7F)
 			// On ARMv5 we insert softfloat calls at each FP instruction.
 			// This clobbers LR almost everywhere. Disable allocating LR
 			// on ARMv5.
@@ -607,7 +608,7 @@ func (s *regAllocState) init(f *Func) {
 		switch s.f.Config.arch {
 		case "amd64":
 			s.allocatable &^= 1 << 15 // R15
-		case "arm":
+		case "arm", "thumb":
 			s.allocatable &^= 1 << 9 // R9
 		case "ppc64le": // R2 already reserved.
 			// nothing to do

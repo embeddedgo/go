@@ -44,7 +44,7 @@ type semaRoot struct {
 }
 
 // Prime to not correlate with any user patterns.
-const semTabSize = 251
+const semTabSize = 251*(1-_MCU) + 31*_MCU
 
 var semtable [semTabSize]struct {
 	root semaRoot

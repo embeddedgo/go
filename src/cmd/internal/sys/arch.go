@@ -21,6 +21,7 @@ const (
 	MIPS64
 	PPC64
 	S390X
+	Thumb
 	Wasm
 )
 
@@ -161,6 +162,16 @@ var ArchS390X = &Arch{
 	MinLC:     2,
 }
 
+var ArchThumb = &Arch{
+	Name:      "thumb",
+	Family:    Thumb,
+	ByteOrder: binary.LittleEndian,
+	PtrSize:   4,
+	RegSize:   4,
+	MinLC:     2,
+}
+
+
 var ArchWasm = &Arch{
 	Name:      "wasm",
 	Family:    Wasm,
@@ -183,5 +194,6 @@ var Archs = [...]*Arch{
 	ArchPPC64,
 	ArchPPC64LE,
 	ArchS390X,
+	ArchThumb,
 	ArchWasm,
 }

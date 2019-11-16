@@ -87,6 +87,7 @@ var (
 	asmArchPpc64    = asmArch{name: "ppc64", bigEndian: true, stack: "R1", lr: true}
 	asmArchPpc64LE  = asmArch{name: "ppc64le", bigEndian: false, stack: "R1", lr: true}
 	asmArchS390X    = asmArch{name: "s390x", bigEndian: true, stack: "R15", lr: true}
+	asmArchThumb    = asmArch{name: "thumb", bigEndian: false, stack: "R13", lr: true}
 	asmArchWasm     = asmArch{name: "wasm", bigEndian: false, stack: "SP", lr: false}
 
 	arches = []*asmArch{
@@ -102,6 +103,7 @@ var (
 		&asmArchPpc64,
 		&asmArchPpc64LE,
 		&asmArchS390X,
+		&asmArchThumb,
 		&asmArchWasm,
 	}
 )
@@ -312,7 +314,7 @@ Files:
 				continue
 			}
 
-			if strings.Contains(line, ", "+archDef.stack) || strings.Contains(line, ",\t"+archDef.stack) || strings.Contains(line, "NOP "+archDef.stack) || strings.Contains(line, "NOP\t"+archDef.stack) {
+			if strings.Contains(line, ", "+archDef.stack) || strings.Contains(line, ",\t"+archDef.stack) || (strings.Contains(line, "NOP") && strings.Contains(line, archDef.stack)) {
 				wroteSP = true
 				continue
 			}

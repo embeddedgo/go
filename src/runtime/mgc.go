@@ -137,12 +137,12 @@ import (
 const (
 	_DebugGC         = 0
 	_ConcurrentSweep = true
-	_FinBlockSize    = 4 * 1024
+	_FinBlockSize    = 4*1024*(1-_MCU) + 1024*_MCU
 
 	// sweepMinHeapDistance is a lower bound on the heap distance
 	// (in bytes) reserved for concurrent sweeping between GC
 	// cycles.
-	sweepMinHeapDistance = 1024 * 1024
+	sweepMinHeapDistance = 1024*1024*(1-_MCU) + 1024*_MCU
 )
 
 // heapminimum is the minimum heap size at which to trigger GC.
@@ -160,7 +160,7 @@ const (
 var heapminimum uint64 = defaultHeapMinimum
 
 // defaultHeapMinimum is the value of heapminimum for GOGC==100.
-const defaultHeapMinimum = 4 << 20
+const defaultHeapMinimum = 4<<20*(1-_MCU) + 8<<10*_MCU
 
 // Initialized from $GOGC.  GOGC=off means no GC.
 var gcpercent int32
@@ -197,7 +197,11 @@ func readgogc() int32 {
 	if n, ok := atoi32(p); ok {
 		return n
 	}
-	return 100
+	if _MCU != 0 {
+		return 25
+	} else {
+		return 100
+	}
 }
 
 // gcenable is called after the bulk of the runtime initialization,
@@ -420,8 +424,8 @@ func (c *gcControllerState) startCycle() {
 	// GOGC. Assist is proportional to this distance, so enforce a
 	// minimum distance, even if it means going over the GOGC goal
 	// by a tiny bit.
-	if memstats.next_gc < memstats.heap_live+1024*1024 {
-		memstats.next_gc = memstats.heap_live + 1024*1024
+	if memstats.next_gc < memstats.heap_live+1024*1024*(1-_MCU)+1024*_MCU {
+		memstats.next_gc = memstats.heap_live + 1024*1024*(1-_MCU) + 1024*_MCU
 	}
 
 	// Compute the background mark utilization goal. In general,
@@ -1758,10 +1762,17 @@ func gcMarkTermination(nextTriggerRatio float64) {
 			}
 			print(string(fmtNSAsMS(sbuf[:], uint64(ns))))
 		}
-		print(" ms cpu, ",
-			work.heap0>>20, "->", work.heap1>>20, "->", work.heap2>>20, " MB, ",
-			work.heapGoal>>20, " MB goal, ",
-			work.maxprocs, " P")
+		if _MCU == 0 {
+			print(" ms cpu, ",
+				work.heap0>>20, "->", work.heap1>>20, "->", work.heap2>>20, " MB, ",
+				work.heapGoal>>20, " MB goal, ",
+				work.maxprocs, " P")
+		} else {
+			print(" ms cpu, ",
+				work.heap0>>10, "->", work.heap1>>10, "->", work.heap2>>10, " KB, ",
+				work.heapGoal>>10, " KB goal, ",
+				work.maxprocs, " P")
+		}
 		if work.userForced {
 			print(" (forced)")
 		}

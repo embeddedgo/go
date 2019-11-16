@@ -12,6 +12,7 @@ import (
 	"cmd/internal/obj/mips"
 	"cmd/internal/obj/ppc64"
 	"cmd/internal/obj/s390x"
+	"cmd/internal/obj/thumb"
 	"cmd/internal/obj/wasm"
 	"cmd/internal/obj/x86"
 	"fmt"
@@ -89,6 +90,8 @@ func Set(GOARCH string) *Arch {
 		a := archS390x()
 		a.LinkArch = &s390x.Links390x
 		return a
+	case "thumb":
+		return archThumb()
 	case "wasm":
 		return archWasm()
 	}
@@ -586,6 +589,82 @@ func archS390x() *Arch {
 		RegisterPrefix: registerPrefix,
 		RegisterNumber: s390xRegisterNumber,
 		IsJump:         jumpS390x,
+	}
+}
+
+func archThumb() *Arch {
+	register := make(map[string]int16)
+	// Create maps for easy lookup of instruction names etc.
+	// Note that there is no list of names as there is for x86.
+	for i := thumb.REG_R0; i < thumb.REG_FPSCR; i++ {
+		register[obj.Rconv(i)] = int16(i)
+	}
+	// Avoid unintentionally clobbering g using R10.
+	delete(register, "R10")
+	register["g"] = thumb.REG_R10
+	for i := 0; i < 16; i++ {
+		register[fmt.Sprintf("C%d", i)] = int16(i)
+	}
+
+	// Pseudo-registers.
+	register["SB"] = RSB
+	register["FP"] = RFP
+	register["PC"] = RPC
+	register["SP"] = RSP
+	registerPrefix := map[string]bool{
+		"F": true,
+		"R": true,
+	}
+
+	// special operands for DMB/DSB/ISB instructions
+	register["MB_SY"] = thumb.REG_MB_SY
+	register["MB_ST"] = thumb.REG_MB_ST
+	register["MB_ISH"] = thumb.REG_MB_ISH
+	register["MB_ISHST"] = thumb.REG_MB_ISHST
+	register["MB_NSH"] = thumb.REG_MB_NSH
+	register["MB_NSHST"] = thumb.REG_MB_NSHST
+	register["MB_OSH"] = thumb.REG_MB_OSH
+	register["MB_OSHST"] = thumb.REG_MB_OSHST
+
+	// secial operands for IT instuction
+	register["EQ"] = thumb.REG_EQ
+	register["NE"] = thumb.REG_NE
+	register["HS"] = thumb.REG_HS
+	register["CS"] = thumb.REG_HS
+	register["LO"] = thumb.REG_LO
+	register["CC"] = thumb.REG_LO
+	register["MI"] = thumb.REG_MI
+	register["PL"] = thumb.REG_PL
+	register["VS"] = thumb.REG_VS
+	register["VC"] = thumb.REG_VC
+	register["HI"] = thumb.REG_HI
+	register["LS"] = thumb.REG_LS
+	register["GE"] = thumb.REG_GE
+	register["LT"] = thumb.REG_LT
+	register["GT"] = thumb.REG_GT
+	register["LE"] = thumb.REG_LE
+	register["AL"] = thumb.REG_AL
+
+	instructions := make(map[string]obj.As)
+	for i, s := range obj.Anames {
+		instructions[s] = obj.As(i)
+	}
+	for i, s := range thumb.Anames {
+		if obj.As(i) >= obj.A_ARCHSPECIFIC {
+			instructions[s] = obj.As(i) + obj.ABaseThumb
+		}
+	}
+	// Annoying aliases.
+	instructions["B"] = obj.AJMP
+	instructions["BL"] = obj.ACALL
+
+	return &Arch{
+		LinkArch:       &thumb.Link,
+		Instructions:   instructions,
+		Register:       register,
+		RegisterPrefix: registerPrefix,
+		RegisterNumber: thumbRegisterNumber,
+		IsJump:         jumpThumb,
 	}
 }
 

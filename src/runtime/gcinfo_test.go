@@ -171,7 +171,7 @@ type BigStruct struct {
 
 func infoBigStruct() []byte {
 	switch runtime.GOARCH {
-	case "386", "arm", "mips", "mipsle":
+	case "386", "arm", "thumb", "mips", "mipsle":
 		return []byte{
 			typePointer,                                                // q *int
 			typeScalar, typeScalar, typeScalar, typeScalar, typeScalar, // w byte; e [17]byte

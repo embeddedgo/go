@@ -48,6 +48,7 @@ var bootstrapDirs = []string{
 	"cmd/compile/internal/s390x",
 	"cmd/compile/internal/ssa",
 	"cmd/compile/internal/syntax",
+	"cmd/compile/internal/thumb",
 	"cmd/compile/internal/x86",
 	"cmd/compile/internal/wasm",
 	"cmd/internal/bio",
@@ -61,6 +62,7 @@ var bootstrapDirs = []string{
 	"cmd/internal/obj/mips",
 	"cmd/internal/obj/ppc64",
 	"cmd/internal/obj/s390x",
+	"cmd/internal/obj/thumb",
 	"cmd/internal/obj/x86",
 	"cmd/internal/obj/wasm",
 	"cmd/internal/src",
@@ -80,6 +82,7 @@ var bootstrapDirs = []string{
 	"cmd/link/internal/ppc64",
 	"cmd/link/internal/s390x",
 	"cmd/link/internal/sym",
+	"cmd/link/internal/thumb",
 	"cmd/link/internal/x86",
 	"compress/flate",
 	"compress/zlib",
@@ -109,6 +112,8 @@ var ignorePrefixes = []string{
 var ignoreSuffixes = []string{
 	"_arm64.s",
 	"_arm64.go",
+	"_thumb.s",
+	"_thumb.go",
 	"_wasm.s",
 	"_wasm.go",
 }

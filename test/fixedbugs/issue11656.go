@@ -45,19 +45,22 @@ func f(n int) {
 	if n > 0 {
 		f(n - 1)
 	}
-	var f struct {
-		x uintptr
-	}
+	ill := make([]byte, 64)
+	var f struct{ x uintptr }
+	f.x = uintptr(unsafe.Pointer(&ill[0]))
+	ptr := (*uintptr)(unsafe.Pointer(&f))
 
 	// We want to force an illegal instruction, to get a crash
 	// at a PC value != 0.
 	// Not all systems make the data section non-executable.
-	ill := make([]byte, 64)
 	switch runtime.GOARCH {
 	case "386", "amd64":
 		binary.LittleEndian.PutUint16(ill, 0x0b0f) // ud2
 	case "arm":
 		binary.LittleEndian.PutUint32(ill, 0xe7f000f0) // no name, but permanently undefined
+	case "thumb":
+		*ptr++
+		binary.LittleEndian.PutUint16(ill, 0xde00) // UDF #0
 	case "arm64":
 		binary.LittleEndian.PutUint32(ill, 0xd4207d00) // brk #1000
 	case "ppc64":
@@ -74,7 +77,6 @@ func f(n int) {
 		// Just leave it as 0 and hope for the best.
 	}
 
-	f.x = uintptr(unsafe.Pointer(&ill[0]))
-	fn := *(*func())(unsafe.Pointer(&f))
+	fn := *(*func())(unsafe.Pointer(&ptr))
 	fn()
 }

@@ -26,7 +26,7 @@ func bytes(s string) (ret []byte) {
 var (
 	// printBacklog is a circular buffer of messages written with the builtin
 	// print* functions, for use in postmortem analysis of core dumps.
-	printBacklog      [512]byte
+	printBacklog      [512 - 256*_MCU]byte
 	printBacklogIndex int
 )
 
@@ -196,7 +196,7 @@ func printcomplex(c complex128) {
 }
 
 func printuint(v uint64) {
-	var buf [100]byte
+	var buf [24]byte
 	i := len(buf)
 	for i--; i > 0; i-- {
 		buf[i] = byte(v%10 + '0')
@@ -218,7 +218,7 @@ func printint(v int64) {
 
 func printhex(v uint64) {
 	const dig = "0123456789abcdef"
-	var buf [100]byte
+	var buf [20]byte
 	i := len(buf)
 	for i--; i > 0; i-- {
 		buf[i] = dig[v%16]

@@ -499,7 +499,7 @@ func (f *peFile) addInitArray(ctxt *Link) *peSection {
 	ctxt.Out.SeekSet(int64(sect.pointerToRawData))
 	sect.checkOffset(ctxt.Out.Offset())
 
-	init_entry := ctxt.Syms.Lookup(*flagEntrySymbol, 0)
+	init_entry := ctxt.Syms.Lookup(*FlagEntrySymbol, 0)
 	addr := uint64(init_entry.Value) - init_entry.Sect.Vaddr
 	switch objabi.GOARCH {
 	case "386", "arm":

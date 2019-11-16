@@ -36,7 +36,7 @@ type timer struct {
 //
 // The current value is a compromise between memory usage and performance
 // that should cover the majority of GOMAXPROCS values used in the wild.
-const timersLen = 64
+const timersLen = 64*(1-_MCU) + 8*_MCU
 
 // timers contains "per-P" timer heaps.
 //

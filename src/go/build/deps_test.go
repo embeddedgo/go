@@ -36,9 +36,9 @@ var pkgDeps = map[string][]string{
 	// L0 is the lowest level, core, nearly unavoidable packages.
 	"errors":                  {"runtime", "internal/reflectlite"},
 	"io":                      {"errors", "sync", "sync/atomic"},
-	"runtime":                 {"unsafe", "runtime/internal/atomic", "runtime/internal/sys", "runtime/internal/math", "internal/cpu", "internal/bytealg"},
+	"runtime":                 {"unsafe", "runtime/internal/atomic", "runtime/internal/sys", "runtime/internal/math", "internal/cpu", "internal/cpu/cortexm", "internal/cpu/cortexm/nvic", "internal/cpu/cortexm/scb", "internal/cpu/cortexm/scid", "internal/cpu/cortexm/debug/itm", "internal/bytealg", "embedded/mmio"},
 	"runtime/internal/sys":    {},
-	"runtime/internal/atomic": {"unsafe", "internal/cpu"},
+	"runtime/internal/atomic": {"unsafe", "internal/cpu", "runtime/internal/sys"},
 	"runtime/internal/math":   {"runtime/internal/sys"},
 	"internal/race":           {"runtime", "unsafe"},
 	"sync":                    {"internal/race", "runtime", "sync/atomic", "unsafe"},
@@ -450,6 +450,22 @@ var pkgDeps = map[string][]string{
 	"net/http/pprof":    {"L4", "OS", "html/template", "net/http", "runtime/pprof", "runtime/trace"},
 	"net/rpc":           {"L4", "NET", "encoding/gob", "html/template", "net/http", "go/token"},
 	"net/rpc/jsonrpc":   {"L4", "NET", "encoding/json", "net/rpc"},
+
+	// Embedded programming
+	"internal/cpu/cortexm/acc":       {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/bitband":   {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/cmt":       {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/fpu":       {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/mpu":       {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/nvic":      {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/pft":       {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/scb":       {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/scid":      {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/systick":   {"unsafe", "embedded/mmio"},
+	"internal/cpu/cortexm/debug/itm": {"unsafe", "embedded/mmio"},
+	"embedded/mmio":                  {"unsafe"},
+	"embedded/arch/cortexm/systim":   {"unsafe", "embedded/mmio", "internal/cpu/cortexm", "internal/cpu/cortexm/scb", "internal/cpu/cortexm/systick"},
+	"embedded/rtos":                  {"unsafe", "errors", "sync"},
 }
 
 // isMacro reports whether p is a package dependency macro

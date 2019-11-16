@@ -139,7 +139,7 @@ func cheapComputableIndex(width int64) bool {
 	// but the architecture supports it.
 	case sys.PPC64, sys.S390X:
 		return width == 1
-	case sys.AMD64, sys.I386, sys.ARM64, sys.ARM:
+	case sys.AMD64, sys.I386, sys.ARM64, sys.ARM, sys.Thumb:
 		switch width {
 		case 1, 2, 4, 8:
 			return true

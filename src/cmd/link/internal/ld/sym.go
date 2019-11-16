@@ -80,6 +80,7 @@ func (ctxt *Link) computeTLSOffset() {
 		objabi.Hnetbsd,
 		objabi.Hopenbsd,
 		objabi.Hdragonfly,
+		objabi.Hnoos,
 		objabi.Hsolaris:
 		ctxt.Tlsoffset = -1 * ctxt.Arch.PtrSize
 

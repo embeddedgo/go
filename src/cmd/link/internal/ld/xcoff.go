@@ -1195,7 +1195,7 @@ func (ctxt *Link) doxcoff() {
 	}
 
 	// Add entry point to .loader symbols.
-	ep := ctxt.Syms.ROLookup(*flagEntrySymbol, 0)
+	ep := ctxt.Syms.ROLookup(*FlagEntrySymbol, 0)
 	if !ep.Attr.Reachable() {
 		Exitf("wrong entry point")
 	}
@@ -1298,7 +1298,7 @@ func (f *xcoffFile) writeLdrScn(ctxt *Link, globalOff uint64) {
 	off := hdr.Lrldoff                                // current offset is the same of reloc offset
 
 	/* Reloc */
-	ep := ctxt.Syms.ROLookup(*flagEntrySymbol, 0)
+	ep := ctxt.Syms.ROLookup(*FlagEntrySymbol, 0)
 	ldr := &XcoffLdRel64{
 		Lvaddr:  uint64(ep.Value),
 		Lrtype:  0x3F00,
@@ -1461,7 +1461,7 @@ func (f *xcoffFile) writeFileHeader(ctxt *Link) {
 		f.xahdr.Ovstamp = 1 // based on dump -o
 		f.xahdr.Omagic = 0x10b
 		copy(f.xahdr.Omodtype[:], "1L")
-		entry := ctxt.Syms.ROLookup(*flagEntrySymbol, 0)
+		entry := ctxt.Syms.ROLookup(*FlagEntrySymbol, 0)
 		f.xahdr.Oentry = uint64(entry.Value)
 		f.xahdr.Osnentry = f.getXCOFFscnum(entry.Sect)
 		toc := ctxt.Syms.ROLookup("TOC", 0)

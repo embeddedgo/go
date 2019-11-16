@@ -65,10 +65,11 @@ const (
 	// to each stack below the usual guard area for OS-specific
 	// purposes like signal handling. Used on Windows, Plan 9,
 	// and iOS because they do not use a separate stack.
-	_StackSystem = sys.GoosWindows*512*sys.PtrSize + sys.GoosPlan9*512 + sys.GoosDarwin*sys.GoarchArm*1024 + sys.GoosDarwin*sys.GoarchArm64*1024
+	// Used on ARMv7M due to register stacking at exception entry.
+	_StackSystem = sys.GoosWindows*512*sys.PtrSize + sys.GoosPlan9*512 + sys.GoosDarwin*sys.GoarchArm*1024 + sys.GoosDarwin*sys.GoarchArm64*1024 + _ARMv7M*27*4
 
 	// The minimum size of stack used by Go code
-	_StackMin = 2048
+	_StackMin = 2048*(1-_MCU) + 512*_MCU // actual round2(_StackMin+_StackSystem) - _StackSystem
 
 	// The minimum stack size to allocate.
 	// The hackery here rounds FixedStack0 up to a power of 2.
@@ -90,7 +91,7 @@ const (
 
 	// The stack guard is a pointer this many bytes above the
 	// bottom of the stack.
-	_StackGuard = 880*sys.StackGuardMultiplier + _StackSystem
+	_StackGuard = 880*sys.StackGuardMultiplier*(1-_ARMv7M) + 440*_ARMv7M + _StackSystem
 
 	// After a stack split check the SP is allowed to be this
 	// many bytes below the stack guard. This saves an instruction

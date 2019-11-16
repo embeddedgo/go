@@ -275,7 +275,7 @@ TestCases:
 		case "ppc64", "ppc64le":
 			ptrSize = 8
 			fmt.Fprintf(&buf, "#define REGISTER (CTR)\n")
-		case "arm":
+		case "arm", "thumb":
 			fmt.Fprintf(&buf, "#define REGISTER (R0)\n")
 		case "arm64":
 			ptrSize = 8

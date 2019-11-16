@@ -38,6 +38,7 @@ package sym
 type Segment struct {
 	Rwx      uint8  // permission as usual unix bits (5 = r-x etc)
 	Vaddr    uint64 // virtual address
+	Laddr    uint64 // load address
 	Length   uint64 // length in memory
 	Fileoff  uint64 // file offset
 	Filelen  uint64 // length on disk
@@ -50,6 +51,7 @@ type Section struct {
 	Align   int32
 	Name    string
 	Vaddr   uint64
+	Laddr   uint64 
 	Length  uint64
 	Seg     *Segment
 	Elfsect interface{} // an *ld.ElfShdr

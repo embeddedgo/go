@@ -1548,6 +1548,8 @@ func (p *Package) gccMachine() []string {
 		return []string{"-mabi=64"}
 	case "mips", "mipsle":
 		return []string{"-mabi=32"}
+	case "thumb":
+		return []string{"-mthumb"}
 	}
 	return nil
 }

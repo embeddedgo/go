@@ -630,8 +630,17 @@ func (r *Reloc) String(insnOffset uint64) string {
 	delta := r.Offset - int64(insnOffset)
 	s := fmt.Sprintf("[%d:%d]%s", delta, delta+r.Size, r.Type)
 	if r.Sym.Name != "" {
-		if r.Add != 0 {
-			return fmt.Sprintf("%s:%s+%d", s, r.Sym.Name, r.Add)
+		if add := r.Add; add != 0 {
+			if r.Type == objabi.R_CALLARM {
+				if uint64(add)>>32 == 0 {
+					// arm
+					add = add << (32 + 8) >> (32 + 6)
+				} else {
+					// thumb
+					add = int64(int32(add))
+				}
+			}
+			return fmt.Sprintf("%s:%s%+d", s, r.Sym.Name, add)
 		}
 		return fmt.Sprintf("%s:%s", s, r.Sym.Name)
 	}

@@ -51,4 +51,7 @@ const (
 	// Function is the top of the call stack. Call stack unwinders should stop
 	// at this function.
 	TOPFRAME = 2048
+
+	// Generate interrupt handler prologue / epilogue.
+	ISR = 4096
 )

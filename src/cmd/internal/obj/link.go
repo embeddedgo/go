@@ -370,6 +370,7 @@ const (
 	ABaseARM64
 	ABaseMIPS
 	ABaseS390X
+	ABaseThumb
 	ABaseWasm
 
 	AllowedOpCodes = 1 << 11            // The number of opcodes available for any given architecture.
@@ -453,7 +454,7 @@ const (
 )
 
 // Attribute is a set of symbol attributes.
-type Attribute uint16
+type Attribute uint32
 
 const (
 	AttrDuplicateOK Attribute = 1 << iota
@@ -494,6 +495,9 @@ const (
 	// keep unwinding beyond this frame.
 	AttrTopFrame
 
+	// Generate an interrupt entry/exit prologue/epilogue.
+	AttrISR
+
 	// attrABIBase is the value at which the ABI is encoded in
 	// Attribute. This must be last; all bits after this are
 	// assumed to be an ABI value.
@@ -517,6 +521,7 @@ func (a Attribute) NoFrame() bool       { return a&AttrNoFrame != 0 }
 func (a Attribute) Static() bool        { return a&AttrStatic != 0 }
 func (a Attribute) WasInlined() bool    { return a&AttrWasInlined != 0 }
 func (a Attribute) TopFrame() bool      { return a&AttrTopFrame != 0 }
+func (a Attribute) ISR() bool           { return a&AttrISR != 0 }
 
 func (a *Attribute) Set(flag Attribute, value bool) {
 	if value {

@@ -190,7 +190,7 @@ linux_amd64)
 	mksysnum="./mksysnum_linux.pl $unistd_h"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
 	;;
-linux_arm)
+linux_arm|linux_thumb)
 	mkerrors="$mkerrors"
 	mksyscall="./mksyscall.pl -l32 -arm"
 	mksysnum="curl -s 'http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/plain/arch/arm/include/uapi/asm/unistd.h' | ./mksysnum_linux.pl -"

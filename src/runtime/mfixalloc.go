@@ -77,8 +77,19 @@ func (f *fixalloc) alloc() unsafe.Pointer {
 		return v
 	}
 	if uintptr(f.nchunk) < f.size {
-		f.chunk = uintptr(persistentalloc(_FixAllocChunk, 0, f.stat))
-		f.nchunk = _FixAllocChunk
+		if _MCU != 0 {
+			nchunk := f.size
+			if nchunk == unsafe.Sizeof(mspan{}) {
+				nchunk *= 16 // five 256 byte pages for 80 byte mspan
+			} else {
+				nchunk *= 2
+			}
+			f.nchunk = uint32(nchunk)
+			f.chunk = uintptr(persistentalloc(nchunk, 0, f.stat))
+		} else {
+			f.chunk = uintptr(persistentalloc(_FixAllocChunk, 0, f.stat))
+			f.nchunk = _FixAllocChunk
+		}
 	}
 
 	v := unsafe.Pointer(f.chunk)

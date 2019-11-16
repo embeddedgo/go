@@ -15,3 +15,4 @@ func setMaxStack(int) int
 func setGCPercent(int32) int32
 func setPanicOnFault(bool) bool
 func setMaxThreads(int) int
+func setGCTrace(int32)

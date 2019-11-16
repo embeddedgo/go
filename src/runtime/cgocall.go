@@ -77,6 +77,8 @@
 // _cgoexp_GoF immediately returns to crosscall2, which restores the
 // callee-save registers for gcc and returns to GoF, which returns to f.
 
+// +build !noos
+
 package runtime
 
 import (

@@ -144,6 +144,9 @@ func putelfsym(ctxt *Link, x *sym.Symbol, s string, t SymbolType, addr int64, go
 	if ctxt.LinkMode == LinkExternal && elfshnum != SHN_UNDEF {
 		addr -= int64(xo.Sect.Vaddr)
 	}
+	if ctxt.Arch.Family == sys.Thumb && typ == STT_FUNC {
+		addr |= 1
+	}
 	other := STV_DEFAULT
 	if x.Attr.VisibilityHidden() {
 		// TODO(mwhudson): We only set AttrVisibilityHidden in ldelf, i.e. when
@@ -331,7 +334,7 @@ func (ctxt *Link) symtab() {
 		for _, s := range ctxt.Syms.Allsym {
 			// Create a new entry in the .init_array section that points to the
 			// library initializer function.
-			if s.Name == *flagEntrySymbol && ctxt.HeadType != objabi.Haix {
+			if s.Name == *FlagEntrySymbol && ctxt.HeadType != objabi.Haix {
 				addinitarrdata(ctxt, s)
 			}
 		}

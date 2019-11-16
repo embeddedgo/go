@@ -10,6 +10,8 @@
 // trace is captured for most events.
 // See https://golang.org/s/go15trace for more info.
 
+// +build !noos
+
 package runtime
 
 import (

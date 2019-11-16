@@ -122,6 +122,8 @@ func main() {
 	// they look nicer in the stack overflow failure message.
 	if sys.PtrSize == 8 {
 		maxstacksize = 1000000000
+	} else if _MCU != 0 {
+		maxstacksize = 16000
 	} else {
 		maxstacksize = 250000000
 	}
@@ -410,10 +412,28 @@ func releaseSudog(s *sudog) {
 // for the same function (because there are actually multiple copies of
 // the same function in the address space). To be safe, don't use the
 // results of this function in any == expression. It is only safe to
-// use the result as an address at which to start executing code.
+// use the result as an address at which to start executing code. For some
+// architectures (eg. thumb) it can differ from address returned by funcAddr.
 //go:nosplit
 func funcPC(f interface{}) uintptr {
 	return **(**uintptr)(add(unsafe.Pointer(&f), sys.PtrSize))
+}
+
+// funcAddr returns the address of the function f in memory.
+// It assumes that f is a func value. Otherwise the behavior is undefined.
+// CAREFUL: In programs with plugins, funcPC can return different values
+// for the same function (because there are actually multiple copies of
+// the same function in the address space). To be safe, don't use the
+// results of this function in any == expression. It is only safe to
+// use the result as an address at which to start executing code. For some
+// architectures (eg. thumb) it can differ from address returned by funcPC.
+//go:nosplit
+func funcAddr(f interface{}) uintptr {
+	fpc := **(**uintptr)(add(unsafe.Pointer(&f), sys.PtrSize))
+	if GOARCH == "thumb" {
+		fpc &^= 1
+	}
+	return fpc
 }
 
 // called from assembly
@@ -1239,7 +1259,7 @@ func mexit(osStack bool) {
 	g := getg()
 	m := g.m
 
-	if m == &m0 {
+	if m == &m0 && _MCU == 0 {
 		// This is the main thread. Just wedge it.
 		//
 		// On Linux, exiting the main thread puts the process
@@ -1478,7 +1498,15 @@ func allocm(_p_ *p, fn func()) *m {
 				continue
 			}
 			stackfree(freem.g0.stack)
+			cleanm := freem
 			freem = freem.freelink
+			if cleanm == &m0 {
+				// ensure nothing will hang on m0
+				cleanm.g0 = nil
+				cleanm.curg = nil
+				cleanm.freelink = nil
+				// TODO: can we zero allink? any other pointer fields?
+			}
 		}
 		sched.freem = newList
 		unlock(&sched.lock)
@@ -1492,6 +1520,8 @@ func allocm(_p_ *p, fn func()) *m {
 	// Windows and Plan 9 will layout sched stack on OS stack.
 	if iscgo || GOOS == "solaris" || GOOS == "illumos" || GOOS == "windows" || GOOS == "plan9" || GOOS == "darwin" {
 		mp.g0 = malg(-1)
+	} else if _MCU != 0 {
+		mp.g0 = malg(2 * _FixedStack)
 	} else {
 		mp.g0 = malg(8192 * sys.StackGuardMultiplier)
 	}
@@ -3418,9 +3448,9 @@ func gfput(_p_ *p, gp *g) {
 
 	_p_.gFree.push(gp)
 	_p_.gFree.n++
-	if _p_.gFree.n >= 64 {
+	if _p_.gFree.n >= 64-59*_MCU {
 		lock(&sched.gFree.lock)
-		for _p_.gFree.n >= 32 {
+		for _p_.gFree.n >= 32-29*_MCU {
 			_p_.gFree.n--
 			gp = _p_.gFree.pop()
 			if gp.stack.lo == 0 {
@@ -3441,7 +3471,7 @@ retry:
 	if _p_.gFree.empty() && (!sched.gFree.stack.empty() || !sched.gFree.noStack.empty()) {
 		lock(&sched.gFree.lock)
 		// Move a batch of free Gs to the P.
-		for _p_.gFree.n < 32 {
+		for _p_.gFree.n < 32-29*_MCU {
 			// Prefer Gs with stacks.
 			gp := sched.gFree.stack.pop()
 			if gp == nil {
@@ -4862,7 +4892,7 @@ func runqget(_p_ *p) (gp *g, inheritTime bool) {
 // Batch is a ring buffer starting at batchHead.
 // Returns number of grabbed goroutines.
 // Can be executed by any P.
-func runqgrab(_p_ *p, batch *[256]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
+func runqgrab(_p_ *p, batch *[256*(1-_MCU) + 64*_MCU]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
 	for {
 		h := atomic.LoadAcq(&_p_.runqhead) // load-acquire, synchronize with other consumers
 		t := atomic.LoadAcq(&_p_.runqtail) // load-acquire, synchronize with the producer

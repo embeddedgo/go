@@ -126,7 +126,7 @@ func trampoline(ctxt *Link, s *sym.Symbol) {
 //
 // This is a performance-critical function for the linker; be careful
 // to avoid introducing unnecessary allocations in the main loop.
-func relocsym(ctxt *Link, s *sym.Symbol) {
+func relocsym(ctxt *Link, s *sym.Symbol, dwarf bool) {
 	if len(s.R) == 0 {
 		return
 	}
@@ -339,6 +339,10 @@ func relocsym(ctxt *Link, s *sym.Symbol) {
 			}
 
 			o = Symaddr(r.Sym) + r.Add
+
+			if !dwarf && ctxt.Arch.Family == sys.Thumb && r.Sym.Type == sym.STEXT {
+				o |= 1 // thumb function call address
+			}
 
 			// On amd64, 4-byte offsets will be sign-extended, so it is impossible to
 			// access more than 2GB of static data; fail at link time is better than
@@ -562,15 +566,14 @@ func (ctxt *Link) reloc() {
 	if ctxt.Debugvlog != 0 {
 		ctxt.Logf("%5.2f reloc\n", Cputime())
 	}
-
 	for _, s := range ctxt.Textp {
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, false)
 	}
 	for _, s := range datap {
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, false)
 	}
 	for _, s := range dwarfp {
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, true)
 	}
 }
 
@@ -1544,6 +1547,13 @@ func (ctxt *Link) dodata() {
 		ctxt.Syms.Lookup("runtime.types", 0).Sect = sect
 		ctxt.Syms.Lookup("runtime.etypes", 0).Sect = sect
 	}
+	if ctxt.HeadType == objabi.Hnoos {
+		ctxt.Syms.Lookup("runtime.ramstart", 0).Sect = sect
+		ctxt.Syms.Lookup("runtime.ramend", 0).Sect = sect
+		ctxt.Syms.Lookup("runtime.romdata", 0).Sect = sect
+		ctxt.Syms.Lookup("runtime.nodmastart", 0).Sect = sect
+		ctxt.Syms.Lookup("runtime.nodmaend", 0).Sect = sect
+	}
 	for _, symn := range sym.ReadOnly {
 		align := dataMaxAlign[symn]
 		if sect.Align < align {
@@ -2160,9 +2170,11 @@ func (ctxt *Link) address() []*sym.Segment {
 	order = append(order, &Segtext)
 	Segtext.Rwx = 05
 	Segtext.Vaddr = va
+	Segtext.Laddr = va
 	for _, s := range Segtext.Sections {
 		va = uint64(Rnd(int64(va), int64(s.Align)))
 		s.Vaddr = va
+		s.Laddr = va
 		va += s.Length
 	}
 
@@ -2190,9 +2202,11 @@ func (ctxt *Link) address() []*sym.Segment {
 		order = append(order, &Segrodata)
 		Segrodata.Rwx = 04
 		Segrodata.Vaddr = va
+		Segrodata.Laddr = va
 		for _, s := range Segrodata.Sections {
 			va = uint64(Rnd(int64(va), int64(s.Align)))
 			s.Vaddr = va
+			s.Laddr = va
 			va += s.Length
 		}
 
@@ -2210,9 +2224,11 @@ func (ctxt *Link) address() []*sym.Segment {
 		order = append(order, &Segrelrodata)
 		Segrelrodata.Rwx = 06
 		Segrelrodata.Vaddr = va
+		Segrelrodata.Laddr = va
 		for _, s := range Segrelrodata.Sections {
 			va = uint64(Rnd(int64(va), int64(s.Align)))
 			s.Vaddr = va
+			s.Laddr = va
 			va += s.Length
 		}
 
@@ -2220,15 +2236,30 @@ func (ctxt *Link) address() []*sym.Segment {
 	}
 
 	va = uint64(Rnd(int64(va), int64(*FlagRound)))
-	if ctxt.HeadType == objabi.Haix && len(Segrelrodata.Sections) == 0 {
-		// Data sections are moved to an unreachable segment
-		// to ensure that they are position-independent.
-		// Already done if relro sections exist.
-		va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
+	la := va
+	switch ctxt.HeadType {
+	case objabi.Haix:
+		if len(Segrelrodata.Sections) == 0 {
+			// Data sections are moved to an unreachable segment
+			// to ensure that they are position-independent.
+			// Already done if relro sections exist.
+			va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
+			la = va
+		}
+	case objabi.Hnoos:
+		va = RAM.Base
+		switch ctxt.Arch {
+		case sys.ArchThumb:
+			// Main stack on the lowest addresses so overflows can be detected
+			// even without MPU. Segdata.Laddr is set to main stack size (see
+			// ../thumb/asm.go:/Laddr = /)
+			va += Segdata.Laddr //
+		}
 	}
 	order = append(order, &Segdata)
 	Segdata.Rwx = 06
 	Segdata.Vaddr = va
+	Segdata.Laddr = la
 	var data *sym.Section
 	var noptr *sym.Section
 	var bss *sym.Section
@@ -2242,13 +2273,16 @@ func (ctxt *Link) address() []*sym.Segment {
 			vlen = int64(Segdata.Sections[i+1].Vaddr - s.Vaddr)
 		}
 		s.Vaddr = va
+		s.Laddr = la
 		va += uint64(vlen)
 		Segdata.Length = va - Segdata.Vaddr
 		if s.Name == ".data" {
 			data = s
+			la += uint64(vlen)
 		}
 		if s.Name == ".noptrdata" {
 			noptr = s
+			la += uint64(vlen)
 		}
 		if s.Name == ".bss" {
 			bss = s
@@ -2263,18 +2297,23 @@ func (ctxt *Link) address() []*sym.Segment {
 	Segdata.Filelen = bss.Vaddr - Segdata.Vaddr
 
 	va = uint64(Rnd(int64(va), int64(*FlagRound)))
+	la = uint64(Rnd(int64(la), int64(*FlagRound)))
 	order = append(order, &Segdwarf)
 	Segdwarf.Rwx = 06
 	Segdwarf.Vaddr = va
+	Segdwarf.Vaddr = la
 	for i, s := range Segdwarf.Sections {
 		vlen := int64(s.Length)
 		if i+1 < len(Segdwarf.Sections) {
 			vlen = int64(Segdwarf.Sections[i+1].Vaddr - s.Vaddr)
 		}
 		s.Vaddr = va
+		s.Laddr = la
 		va += uint64(vlen)
+		la += uint64(vlen)
 		if ctxt.HeadType == objabi.Hwindows {
 			va = uint64(Rnd(int64(va), PEFILEALIGN))
+			la = uint64(Rnd(int64(la), PEFILEALIGN))
 		}
 		Segdwarf.Length = va - Segdwarf.Vaddr
 	}
@@ -2370,6 +2409,14 @@ func (ctxt *Link) address() []*sym.Segment {
 	ctxt.xdefine("runtime.enoptrbss", sym.SNOPTRBSS, int64(noptrbss.Vaddr+noptrbss.Length))
 	ctxt.xdefine("runtime.end", sym.SBSS, int64(Segdata.Vaddr+Segdata.Length))
 
+	if ctxt.HeadType == objabi.Hnoos {
+		ctxt.xdefine("runtime.ramstart", sym.SRODATA, int64(RAM.Base))
+		ctxt.xdefine("runtime.ramend", sym.SRODATA, int64(RAM.Base+RAM.Size))
+		ctxt.xdefine("runtime.romdata", sym.SRODATA, int64(Segdata.Laddr))
+		ctxt.xdefine("runtime.nodmastart", sym.SRODATA, int64(NoDMA.Base))
+		ctxt.xdefine("runtime.nodmaend", sym.SRODATA, int64(NoDMA.Base+NoDMA.Size))
+	}
+
 	return order
 }
 
@@ -2450,7 +2497,7 @@ func compressSyms(ctxt *Link, syms []*sym.Symbol) []byte {
 			s.P = ctxt.relocbuf
 			s.Attr.Set(sym.AttrReadOnly, false)
 		}
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, true)
 		if _, err := z.Write(s.P); err != nil {
 			log.Fatalf("compression failed: %s", err)
 		}

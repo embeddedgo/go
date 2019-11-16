@@ -649,7 +649,7 @@ func Main(archInit func(*Arch)) {
 	// checking. This must happen before transformclosure.
 	// We'll do the final check after write barriers are
 	// inserted.
-	if compiling_runtime {
+	if compiling_runtime || Ctxt.Headtype == objabi.Hnoos {
 		nowritebarrierrecCheck = newNowritebarrierrecChecker()
 	}
 

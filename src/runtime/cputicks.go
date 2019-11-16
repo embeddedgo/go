@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // +build !arm
+// +build !thumb
 // +build !arm64
 // +build !mips64
 // +build !mips64le

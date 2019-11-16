@@ -34,6 +34,12 @@ func (p *Parser) append(prog *obj.Prog, cond string, doLabel bool) {
 				return
 			}
 
+		case sys.Thumb:
+			if !arch.ThumbConditionCodes(prog, cond) {
+				p.errorf("unrecognized condition code .%q", cond)
+				return
+			}
+
 		case sys.ARM64:
 			if !arch.ARM64Suffix(prog, cond) {
 				p.errorf("unrecognized suffix .%q", cond)
@@ -564,6 +570,18 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 				prog.Reg = p.getRegister(prog, op, &a[1])
 				break
 			}
+		} else if p.arch.Family == sys.Thumb {
+			if arch.IsThumbCMP(op) {
+				prog.From = a[0]
+				prog.Reg = p.getRegister(prog, op, &a[1])
+				break
+			}
+			// Strange special cases.
+			if arch.IsThumbFloatCmp(op) {
+				prog.From = a[0]
+				prog.Reg = p.getRegister(prog, op, &a[1])
+				break
+			}
 		} else if p.arch.Family == sys.ARM64 && arch.IsARM64CMP(op) {
 			prog.From = a[0]
 			prog.Reg = p.getRegister(prog, op, &a[1])
@@ -596,6 +614,29 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 				break
 			}
 			if arch.IsARMBFX(op) {
+				// a[0] and a[1] must be constants, a[2] must be a register
+				prog.From = a[0]
+				prog.SetFrom3(a[1])
+				prog.To = a[2]
+				break
+			}
+			// Otherwise the 2nd operand (a[1]) must be a register.
+			prog.From = a[0]
+			prog.Reg = p.getRegister(prog, op, &a[1])
+			prog.To = a[2]
+		case sys.Thumb:
+			// Special cases.
+			if arch.IsThumbSTREX(op) {
+				/*
+					STREX x, (y), z
+						from=(y) reg=x to=z
+				*/
+				prog.From = a[1]
+				prog.Reg = p.getRegister(prog, op, &a[0])
+				prog.To = a[2]
+				break
+			}
+			if arch.IsThumbBFX(op) {
 				// a[0] and a[1] must be constants, a[2] must be a register
 				prog.From = a[0]
 				prog.SetFrom3(a[1])
@@ -687,6 +728,29 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 				break
 			}
 			if arch.IsARMMULA(op) {
+				// All must be registers.
+				p.getRegister(prog, op, &a[0])
+				r1 := p.getRegister(prog, op, &a[1])
+				r2 := p.getRegister(prog, op, &a[2])
+				p.getRegister(prog, op, &a[3])
+				prog.From = a[0]
+				prog.To = a[3]
+				prog.To.Type = obj.TYPE_REGREG2
+				prog.To.Offset = int64(r2)
+				prog.Reg = r1
+				break
+			}
+		}
+		if p.arch.Family == sys.Thumb {
+			if arch.IsThumbBFX(op) {
+				// a[0] and a[1] must be constants, a[2] and a[3] must be registers
+				prog.From = a[0]
+				prog.SetFrom3(a[1])
+				prog.Reg = p.getRegister(prog, op, &a[2])
+				prog.To = a[3]
+				break
+			}
+			if arch.IsThumbMULA(op) {
 				// All must be registers.
 				p.getRegister(prog, op, &a[0])
 				r1 := p.getRegister(prog, op, &a[1])

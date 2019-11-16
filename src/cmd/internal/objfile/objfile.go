@@ -30,8 +30,9 @@ type File struct {
 }
 
 type Entry struct {
-	name string
-	raw  rawFile
+	name   string
+	raw    rawFile
+	gofile bool
 }
 
 // A Sym is a symbol defined in an executable file.

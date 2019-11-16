@@ -64,9 +64,9 @@ func (h ValHeap) Less(i, j int) bool {
 
 func (op Op) isLoweredGetClosurePtr() bool {
 	switch op {
-	case OpAMD64LoweredGetClosurePtr, OpPPC64LoweredGetClosurePtr, OpARMLoweredGetClosurePtr, OpARM64LoweredGetClosurePtr,
-		Op386LoweredGetClosurePtr, OpMIPS64LoweredGetClosurePtr, OpS390XLoweredGetClosurePtr, OpMIPSLoweredGetClosurePtr,
-		OpWasmLoweredGetClosurePtr:
+	case OpAMD64LoweredGetClosurePtr, OpPPC64LoweredGetClosurePtr, OpARMLoweredGetClosurePtr, OpThumbLoweredGetClosurePtr,
+		OpARM64LoweredGetClosurePtr,	Op386LoweredGetClosurePtr, OpMIPS64LoweredGetClosurePtr, OpS390XLoweredGetClosurePtr,
+		OpMIPSLoweredGetClosurePtr, OpWasmLoweredGetClosurePtr:
 		return true
 	}
 	return false
@@ -112,10 +112,10 @@ func schedule(f *Func) {
 				}
 				score[v.ID] = ScorePhi
 			case v.Op == OpAMD64LoweredNilCheck || v.Op == OpPPC64LoweredNilCheck ||
-				v.Op == OpARMLoweredNilCheck || v.Op == OpARM64LoweredNilCheck ||
-				v.Op == Op386LoweredNilCheck || v.Op == OpMIPS64LoweredNilCheck ||
-				v.Op == OpS390XLoweredNilCheck || v.Op == OpMIPSLoweredNilCheck ||
-				v.Op == OpWasmLoweredNilCheck:
+				v.Op == OpARMLoweredNilCheck || v.Op == OpThumbLoweredNilCheck ||
+				v.Op == OpARM64LoweredNilCheck || v.Op == Op386LoweredNilCheck ||
+				v.Op == OpMIPS64LoweredNilCheck || v.Op == OpS390XLoweredNilCheck ||
+				v.Op == OpMIPSLoweredNilCheck || v.Op == OpWasmLoweredNilCheck:
 				// Nil checks must come before loads from the same address.
 				score[v.ID] = ScoreNilCheck
 			case v.Op == OpPhi:

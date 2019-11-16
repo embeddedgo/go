@@ -1061,7 +1061,7 @@ func isInlinableMemmove(dst, src *Value, sz int64, c *Config) bool {
 		return sz <= 8
 	case "s390x":
 		return sz <= 8 || disjoint(dst, sz, src, sz)
-	case "arm", "mips", "mips64", "mipsle", "mips64le":
+	case "arm", "thumb", "mips", "mips64", "mipsle", "mips64le":
 		return sz <= 4
 	}
 	return false

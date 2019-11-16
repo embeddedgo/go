@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	_WorkbufSize = 2048 // in bytes; larger values result in less contention
+	_WorkbufSize = 2048*(1-_MCU) + _PageSize*_MCU // in bytes; larger values result in less contention
 
 	// workbufAlloc is the number of bytes to allocate at a time
 	// for new workbufs. This must be a multiple of pageSize and
@@ -19,7 +19,7 @@ const (
 	//
 	// Larger values reduce workbuf allocation overhead. Smaller
 	// values reduce heap fragmentation.
-	workbufAlloc = 32 << 10
+	workbufAlloc = 32<<10*(1-_MCU) + 2*_WorkbufSize*_MCU
 )
 
 // throwOnGCWork causes any operations that add pointers to a gcWork

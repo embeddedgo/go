@@ -1,0 +1,259 @@
+	0100 0100 dmmm mddd                       .ADD       Rm, Rdn         ; does not set flags
+	1010 1ddd uuuu uuuu                       .ADD       u8<<2, R13, Rd
+	1010 0ddd uuuu uuuu                       .ADD       u8<<2, R15, Rd
+
+	0001 100m mmnn nddd                       .ADD       Rm, Rn, Rd
+	0001 101m mmnn nddd                        SUB       Rm, Rn, Rd
+	1110 1011 000s nnnn  0uuu dddd uuvv mmmm  .ADD.s     Rm<v>u5, Rn, Rd
+	1110 1011 101s nnnn  0uuu dddd uuvv mmmm   SUB.s     Rm<v>u5, Rn, Rd
+	0001 110u uunn nddd                       .ADD       u3, Rn, Rd
+	0001 111u uunn nddd                        SUB       u3, Rn, Rd
+	0011 0ddd uuuu uuuu                       .ADD       u8, Rdn
+	0011 1ddd uuuu uuuu                        SUB       u8, Rdn
+	1011 0000 0uuu uuuu                       .ADD       u7<<2, R13
+	1011 0000 1uuu uuuu                        SUB       u7<<2, R13
+	1111 0u10 0000 nnnn  0uuu dddd uuuu uuuu  .ADD       u12, Rn, Rd
+	1111 0u10 1010 nnnn  0uuu dddd uuuu uuuu   SUB       u12, Rn, Rd
+	1111 0e01 000s nnnn  0eee dddd eeee eeee  .ADD.s     e32, Rn, Rd
+	1111 0e01 101s nnnn  0eee dddd eeee eeee   SUB.s     e32, Rn, Rd
+
+	0100 0000 00mm mddd                       .AND       Rm, Rdn
+	0100 0001 01mm mddd                        ADC       Rm, Rdn
+	0100 0011 10mm mddd                        BIC       Rm, Rdn
+	0100 0000 01mm mddd                        EOR       Rm, Rdn
+	0100 0011 00mm mddd                        ORR       Rm, Rdn
+	0100 0001 10mm mddd                        SBC       Rm, Rdn
+	0100 0011 01mm mddd                        MUL       Rm, Rdn
+	0100 0011 11mm mddd                        MVN       Rm, Rd
+
+	0100 0010 01nn nddd                       .RSB       $0, Rn, Rd
+
+	1110 1010 000s nnnn  0uuu dddd uuvv mmmm  .AND.s     Rm<v>u5, Rn, Rd
+	1110 1011 010s nnnn  0uuu dddd uuvv mmmm   ADC.s     Rm<v>u5, Rn, Rd
+	1110 1010 001s nnnn  0uuu dddd uuvv mmmm   BIC.s     Rm<v>u5, Rn, Rd
+	1110 1010 100s nnnn  0uuu dddd uuvv mmmm   EOR.s     Rm<v>u5, Rn, Rd
+	1110 1010 010s nnnn  0uuu dddd uuvv mmmm   ORR.s     Rm<v>u5, Rn, Rd
+	1110 1011 110s nnnn  0uuu dddd uuvv mmmm   RSB.s     Rm<v>u5, Rn, Rd
+	1110 1011 011s nnnn  0uuu dddd uuvv mmmm   SBC.s     Rm<v>u5, Rn, Rd
+	1110 1010 011s nnnn  0uuu dddd uuvv mmmm   ORN.s     Rm<v>u5, Rn, Rd
+	1111 0e00 000s nnnn  0eee dddd eeee eeee  .AND.s     e32, Rn, Rd
+	1111 0e01 010s nnnn  0eee dddd eeee eeee   ADC.s     e32, Rn, Rd
+	1111 0e00 001s nnnn  0eee dddd eeee eeee   BIC.s     e32, Rn, Rd
+	1111 0e00 100s nnnn  0eee dddd eeee eeee   EOR.s     e32, Rn, Rd
+	1111 0e00 010s nnnn  0eee dddd eeee eeee   ORR.s     e32, Rn, Rd
+	1111 0e01 110s nnnn  0eee dddd eeee eeee   RSB.s     e32, Rn, Rd
+	1111 0e01 011s nnnn  0eee dddd eeee eeee   SBC.s     e32, Rn, Rd
+	1111 0e00 011s nnnn  0eee dddd eeee eeee   ORN.s     e32, Rn, Rd
+
+	0100 0110 dmmm mddd                       .MOVW      Rm, Rd       ; preserves flags
+	0000 0000 00mm mddd                       .MOVW      Rm, Rd       ; not permitted in IT
+	000v vuuu uumm mddd                       .MOVW      Rm<v>u5, Rd  ; vv != 11
+	0100 0000 10mm mddd                       .MOVW      Rdn<<Rm, Rdn
+	0100 0000 11mm mddd                       .MOVW      Rdn>>Rm, Rdn
+	0100 0001 00mm mddd                       .MOVW      Rdn->Rm, Rdn
+	0100 0001 11mm mddd                       .MOVW      Rdn@>Rm, Rdn
+	1111 1010 0vvs nnnn  1111 dddd 0000 mmmm  .MOVW.s    Rn<v>Rm, Rd
+
+	0010 0ddd uuuu uuuu                       .MOVW      u8, Rd
+	1111 0y10 0100 uuuu  0zzz dddd zzzz zzzz  .MOVW      uyz16, Rd
+
+	1110 1010 011s 1111  0uuu dddd uuvv mmmm  .MVN.s     Rm<v>u5, Rd
+	1110 1010 010s 1111  0uuu dddd uuvv mmmm   MOVW.s    Rm<v>u5, Rd
+	1111 0e00 011s 1111  0eee dddd eeee eeee  .MVN.s     e32, Rd
+	1111 0e00 010s 1111  0eee dddd eeee eeee   MOVW.s    e32, Rd
+
+	1111 0y10 1100 uuuu  0zzz dddd zzzz zzzz  .MOVT      uyz16, Rd
+
+	1011 0010 00mm mddd	                      .MOVH      Rm, Rd  ; ARM SXTH
+	1011 0010 01mm mddd                        MOVB      Rm, Rd  ; ARM SXTB
+	1011 0010 10mm mddd                        MOVHU     Rm, Rd  ; ARM UXTH
+	1011 0010 11mm mddd                        MOVBU     Rm, Rd  ; ARM UXTB
+	1111 1010 0000 1111  1111 dddd 10rr mmmm  .MOVH      Rm@>rot, Rd  ; ARM SXTH
+	1111 1010 0100 1111  1111 dddd 10rr mmmm   MOVB      Rm@>rot, Rd  ; ARM SXTB
+	1111 1010 0001 1111  1111 dddd 10rr mmmm   MOVHU     Rm@>rot, Rd  ; ARM UXTH
+	1111 1010 0101 1111  1111 dddd 10rr mmmm   MOVBU     Rm@>rot, Rd  ; ARM UXTB
+
+	1111 0011 1110 1111  1000 dddd mmmm mmmm   MOVW      SYSm, Rd
+	1111 0011 1000 nnnn  1000 mm00 mmmm mmmm   MOVW      Rn, SYSm
+
+	1111 1011 0000 nnnn  1111 dddd 0000 mmmm  .MUL       Rm, Rn, Rd
+	1111 1011 1001 nnnn  1111 dddd 1111 mmmm   DIV       Rm, Rn, Rd
+	1111 1011 1011 nnnn  1111 dddd 1111 mmmm   DIVU      Rm, Rn, Rd
+
+	1111 1011 1000 nnnn  llll hhhh 0000 mmmm  .MULL      Rm, Rn, (Rdh, Rdl)
+	1111 1011 1010 nnnn  llll hhhh 0000 mmmm   MULLU     Rm, Rn, (Rdh, Rdl)
+	1111 1011 1100 nnnn  llll hhhh 0000 mmmm   MULAL     Rm, Rn, (Rdh, Rdl)  ; Rd+=int64(Rn)*int64(Rm)
+	1111 1011 1110 nnnn  llll hhhh 0000 mmmm   MULALU    Rm, Rn, (Rdh, Rdl)  ; Rd+=uint64(Rn)*uint64(Rm)
+
+	1111 1011 0000 nnnn  aaaa dddd 0000 mmmm  .MULA      Rm, Rn, Ra, Rd  ; Rd=Ra+Rn*Rm
+	1111 1011 0000 nnnn  aaaa dddd 0001 mmmm   MULS      Rm, Rn, Ra, Rd  ; Rd=Ra-Rn*Rm
+	1111 1011 0011 nnnn  aaaa dddd 0000 mmmm   MULAWB    Rm, Rn, Ra, Rd
+	1111 1011 0011 nnnn  aaaa dddd 0001 mmmm   MULAWT    Rm, Rn, Ra, Rd
+
+	1011 1010 00mm mddd                       .REV       Rm, Rd
+	1011 1010 01mm mddd                        REV16     Rm, Rd
+	1011 1010 11mm mddd                        REVSH     Rm, Rd
+
+	1111 1010 1011 mmmm  1111 dddd 1000 mmmm  .CLZ       Rm, Rd
+	1111 1010 1001 mmmm  1111 dddd 1000 mmmm   REV       Rm, Rd
+	1111 1010 1001 mmmm  1111 dddd 1001 mmmm   REV16     Rm, Rd
+	1111 1010 1001 mmmm  1111 dddd 1010 mmmm   RBIT      Rm, Rd
+	1111 1010 1001 mmmm  1111 dddd 1011 mmmm   REVSH     Rm, Rd
+
+	1111 1010 1010 nnnn  1111 dddd 1000 mmmm  .SEL       Rm, Rn, Rd  ; DSP extension
+
+	1111 0011 0100 nnnn  0uuu dddd uu0w wwww  .BFX       width, ulsb, Rn, Rd  ; wwww = width-1
+	1111 0011 1100 nnnn  0uuu dddd uu0w wwww   BFXU      width, ulsb, Rn, Rd  ; wwww = width-1
+	1111 0011 0110 nnnn  0uuu dddd uu0k kkkk   BFI       width, ulsb, Rn, Rd  ; kkkk = ulsb+width-1
+	1111 0011 0110 1111  0uuu dddd uu0k kkkk   BFC       width, ulsb, Rd      ; kkkk = ulsb+width-1
+
+	0100 0010 00mm mnnn                       .TST       Rm, Rn
+	0100 0010 10mm mnnn                        CMP       Rm, Rn
+	0100 0010 11mm mnnn                        CMN       Rm, Rn
+
+	0100 0101 nmmm mnnn                       .CMP       Rm, Rn
+	0010 1nnn uuuu uuuu                        CMP       u8, Rn
+
+	1110 1010 0001 nnnn  0uuu 1111 uuvv mmmm  .TST       Rm<v>u5, Rn
+	1110 1010 1001 nnnn  0uuu 1111 uuvv mmmm   TEQ       Rm<v>u5, Rn
+	1110 1011 0001 nnnn  0uuu 1111 uuvv mmmm   CMN       Rm<v>u5, Rn
+	1110 1011 1011 nnnn  0uuu 1111 uuvv mmmm   CMP       Rm<v>u5, Rn
+	1111 0e00 0001 nnnn  0eee 1111 eeee eeee  .TST       e32, Rn
+	1111 0e00 1001 nnnn  0eee 1111 eeee eeee   TEQ       e32, Rn
+	1111 0e01 0001 nnnn  0eee 1111 eeee eeee   CMN       e32, Rn
+	1111 0e01 1011 nnnn  0eee 1111 eeee eeee   CMP       e32, Rn
+
+	0110 1uuu uunn nttt                       .MOVW      u5<<2(Rn), Rt
+	1001 1ttt uuuu uuuu                       .MOVW      u8<<2(R13), Rt
+	0100 1ttt uuuu uuuu                       .MOVW      u8<<2(R15), Rt
+	1000 1uuu uunn nttt                       .MOVHU     u5<<1(Rn), Rt
+	0111 1uuu uunn nttt                       .MOVBU     u5(Rn), Rt
+
+	0110 0uuu uunn nttt                       .MOVW      Rt, u5<<2(Rn)
+	1001 0ttt uuuu uuuu                       .MOVW      Rt, u8<<2(R13)
+	1000 0uuu uunn nttt                       .MOVH      Rt, u5<<1(Rn)
+	0111 0uuu uunn nttt                       .MOVB      Rt, u5(Rn)
+
+	0101 100m mmnn nttt                       .MOVW      (Rn)(Rm), Rt
+	0101 111m mmnn nttt                        MOVH      (Rn)(Rm), Rt
+	0101 101m mmnn nttt                        MOVHU     (Rn)(Rm), Rt
+	0101 011m mmnn nttt                        MOVB      (Rn)(Rm), Rt
+	0101 110m mmnn nttt                        MOVBU     (Rn)(Rm), Rt
+	1111 1000 0101 nnnn  tttt 0000 00uu mmmm  .MOVW      (Rn)(Rm*1<<u2), Rt
+	1111 1001 0011 nnnn  tttt 0000 00uu mmmm   MOVH      (Rn)(Rm*1<<u2), Rt
+	1111 1000 0011 nnnn  tttt 0000 00uu mmmm   MOVHU     (Rn)(Rm*1<<u2), Rt
+	1111 1001 0001 nnnn  tttt 0000 00uu mmmm   MOVB      (Rn)(Rm*1<<u2), Rt
+	1111 1000 0001 nnnn  tttt 0000 00uu mmmm   MOVBU     (Rn)(Rm*1<<u2), Rt
+	1111 1000 ±101 1111  tttt uuuu uuuu uuuu  .MOVW      ±u12(R15), Rt
+	1111 1001 ±011 1111  tttt uuuu uuuu uuuu   MOVH      ±u12(R15), Rt
+	1111 1000 ±011 1111  tttt uuuu uuuu uuuu   MOVHU     ±u12(R15), Rt
+	1111 1001 ±001 1111  tttt uuuu uuuu uuuu   MOVB      ±u12(R15), Rt
+	1111 1000 ±001 1111  tttt uuuu uuuu uuuu   MOVBU     ±u12(R15), Rt
+	1111 1000 1101 nnnn  tttt uuuu uuuu uuuu  .MOVW      u12(Rn), Rt
+	1111 1001 1011 nnnn  tttt uuuu uuuu uuuu   MOVH      u12(Rn), Rt
+	1111 1000 1011 nnnn  tttt uuuu uuuu uuuu   MOVHU     u12(Rn), Rt
+	1111 1001 1001 nnnn  tttt uuuu uuuu uuuu   MOVB      u12(Rn), Rt
+	1111 1000 1001 nnnn  tttt uuuu uuuu uuuu   MOVBU     u12(Rn), Rt
+	1111 1000 0101 nnnn  tttt 1p±w uuuu uuuu  .MOVW.p.w  ±u8(Rn), Rt
+	1111 1001 0011 nnnn  tttt 1p±w uuuu uuuu   MOVH.p.w  ±u8(Rn), Rt
+	1111 1000 0011 nnnn  tttt 1p±w uuuu uuuu   MOVHU.p.w ±u8(Rn), Rt
+	1111 1001 0001 nnnn  tttt 1p±w uuuu uuuu   MOVB.p.w  ±u8(Rn), Rt
+	1111 1000 0001 nnnn  tttt 1p±w uuuu uuuu   MOVBU.p.w ±u8(Rn), Rt
+
+	0101 000m mmnn nttt                       .MOVW      Rt, (Rn)(Rm)
+	0101 001m mmnn nttt                        MOVH      Rt, (Rn)(Rm)
+	0101 010m mmnn nttt                        MOVB      Rt, (Rn)(Rm)
+	1111 1000 0100 nnnn  tttt 0000 00uu mmmm  .MOVW      Rt, (Rn)(Rm*1<<u2)
+	1111 1000 0010 nnnn  tttt 0000 00uu mmmm   MOVH      Rt, (Rn)(Rm*1<<u2)
+	1111 1000 0000 nnnn  tttt 0000 00uu mmmm   MOVB      Rt, (Rn)(Rm*1<<u2)
+	1111 1000 1100 nnnn  tttt uuuu uuuu uuuu  .MOVW      Rt, u12(Rn)
+	1111 1000 1010 nnnn  tttt uuuu uuuu uuuu   MOVH      Rt, u12(Rn)
+	1111 1000 1000 nnnn  tttt uuuu uuuu uuuu   MOVB      Rt, u12(Rn)
+	1111 1000 0100 nnnn  tttt 1p±w uuuu uuuu  .MOVW.p.w  Rt, ±u8(Rn)
+	1111 1000 0010 nnnn  tttt 1p±w uuuu uuuu   MOVH.p.w  Rt, ±u8(Rn)
+	1111 1000 0000 nnnn  tttt 1p±w uuuu uuuu   MOVB.p.w  Rt, ±u8(Rn)
+
+	1110 1110 1d11 0001  dddd 1010 11m0 mmmm  .SQRTF     Fm, Fd
+	1110 1110 1d11 0001  dddd 1011 11m0 mmmm   SQRTD     Fm, Fd
+
+	1110 1101 ±d01 nnnn  dddd 1010 uuuu uuuu  .MOVF      ±u8<<2(Rn), Fd
+	1110 1101 ±d01 nnnn  dddd 1011 uuuu uuuu   MOVD      ±u8<<2(Rn), Fd
+	1110 1101 ±d00 nnnn  dddd 1010 uuuu uuuu  .MOVF      Fd, ±u8<<2(Rn)
+	1110 1101 ±d00 nnnn  dddd 1011 uuuu uuuu   MOVD      Fd, ±u8<<2(Rn)
+	1110 1110 1d11 ffff  dddd 1010 0000 ffff  .MOVF      f8, Fd
+	1110 1110 1d11 ffff  dddd 1011 0000 ffff   MOVD      f8, Fd
+
+	1011 1111 cccc mmmm                       .ITmask    firstcond
+
+	1110 0iii iiii iiii                       .B         i11<<1   ; outside/last in IT
+
+	1011 00u1 uuuu unnn                       .CBZ       Rn, u6<<1  ; outside IT
+	1011 10u1 uuuu unnn                        CBNZ      Rn, u6<<1  ; outside IT
+
+	0100 0111 0mmm m000                       .B         (Rm)  ; ARM: BX Rm
+	0100 0111 1mmm m000                        BL        (Rm)  ; ARM: BLX Rm
+	1111 0jii iiii iiii  10j1 jiii iiii iiii  .B         ji24<<1  ; outside/last in IT
+	1111 0jii iiii iiii  11j1 jiii iiii iiii   BL        ji24<<1  ; outside/last in IT
+
+	1101 cccc iiii iiii                       .Bcond     i8<<1    ; outside IT
+	1111 0jcc ccii iiii  10j0 jiii iiii iiii  .Bcond     ji20<<1  ; outside IT
+
+	1110 1000 1101 nnnn  1111 0000 0000 mmmm  .TBB	     Rm, Rn
+	1110 1000 1101 nnnn  1111 0000 0001 mmmm   TBH	     Rm, Rn
+
+	1101 1111 uuuu uuuu                       .SWI       u8  ; SVC
+	1011 1110 uuuu uuuu                        BKPT      u8
+	1101 1110 uuuu uuuu                        UNDEF     u8
+
+	1011 010r rrrr rrrr                       .MOVM.DB.W reglist, (R13)  ; PUSH [R0-R7,R14]
+	1100 0nnn rrrr rrrr                       .MOVM.IA.W reglist, (Rn)
+	1110 1000 10w0 nnnn  0r0r rrrr rrrr rrrr  .MOVM.IA.w reglist, (Rn)
+	1110 1001 00w0 nnnn  0r0r rrrr rrrr rrrr  .MOVM.DB.w reglist, (Rn)   ; .W,n=13 -> PUSH
+
+	1011 110r rrrr rrrr                       .MOVM.IA.w (R13), reglist  ; POP [R0-R7,R14]
+	1100 1nnn rrrr rrrr                       .MOVM.IA.W (Rn), reglist
+	1110 1000 10w1 nnnn  rr0r rrrr rrrr rrrr  .MOVM.IA.w (Rn), reglist   ; .W,n=13 -> POP
+	1110 1001 00w1 nnnn  rr0r rrrr rrrr rrrr  .MOVM.DB.w (Rn), reglist
+
+	1110 1000 0101 nnnn  tttt 1111 uuuu uuuu  .LDREX     u8<<2(Rn), Rt
+	1110 1000 0100 nnnn  tttt dddd uuuu uuuu  .STREX     Rt, u8<<2(Rn), Rd
+
+	1110 1000 1101 nnnn  tttt 1111 0100 1111  .LDREXB    (Rn), Rt
+	1110 1000 1101 nnnn  tttt 1111 0101 1111   LDREXH    (Rn), Rt
+
+	1110 1000 1100 nnnn  tttt 1111 0100 dddd  .STREXB    Rt, (Rn), Rd
+	1110 1000 1100 nnnn  tttt 1111 0101 dddd   STREXH    Rt, (Rn), Rd
+
+	1011 1111 0000 0000  .NOP2
+	1011 1111 0001 0000   YIELD
+	1011 1111 0010 0000   WFE
+	1011 1111 0011 0000   WFI
+	1011 1111 0100 0000   SEV
+
+	1111 0011 1010 1111  1000 0000 0000 0000  .NOP4
+	1111 0011 1011 1111  1000 1111 0010 1111   CLREX
+
+	1111 0011 1011 1111  1000 1111 0100 oooo  .DSB       opt
+	1111 0011 1011 1111  1000 1111 0101 oooo   DMB       opt
+	1111 0011 1011 1111  1000 1111 0110 oooo   ISB       opt
+
+	1011 0110 0110 0010                        CPSIE     i       ; outside IT
+	1011 0110 0111 0010                        CPSID     i       ; outside IT
+
+--
+
+	1110 100p ±1w0 nnnn  aaaa bbbb uuuu uuuu   MOVW.p.w  (Rta, Rtb), ±u8<<2(Rn)
+	1110 100p ±1w1 nnnn  aaaa bbbb uuuu uuuu   MOVW.p.w  ±u8<<2(Rn), (Rta, Rtb)
+
+	1111 1010 1000 nnnn  1111 dddd 0000 mmmm   ADD8      Rm, Rn, Rd
+	1111 1010 1000 nnnn  1111 dddd 0100 mmmm   ADD8U     Rm, Rn, Rd
+	1111 1010 1001 nnnn  1111 dddd 0000 mmmm   ADD16     Rm, Rn, Rd
+	1111 1010 1001 nnnn  1111 dddd 0100 mmmm   ADD16U    Rm, Rn, Rd
+
+	1111 0011 1010 1111  1000 0000 0000 0000   NOP4
+	1111 0011 1010 1111  1000 0000 0000 0001   YIELD
+	1111 0011 1010 1111  1000 0000 0000 0010   WFE
+	1111 0011 1010 1111  1000 0000 0000 0011   WFI
+	1111 0011 1010 1111  1000 0000 0000 0100   SEV
+
+	1111 0111 1111 uuuu  1010 uuuu uuuu uuuu   UNDEF     u16

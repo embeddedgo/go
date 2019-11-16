@@ -133,6 +133,9 @@ const (
 	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
 	_64bit = 1 << (^uintptr(0) >> 63) / 2
 
+	_MCU    = sys.GoosNoos
+	_ARMv7M = sys.GoosNoos * sys.GoarchThumb
+
 	// Tiny allocator parameters, see "Tiny allocator" comment in malloc.go.
 	_TinySize      = 16
 	_TinySizeClass = int8(2)
@@ -140,7 +143,7 @@ const (
 	_FixAllocChunk = 16 << 10 // Chunk size for FixAlloc
 
 	// Per-P, per order stack segment cache size.
-	_StackCacheSize = 32 * 1024
+	_StackCacheSize = 32*1024*(1-_MCU) + 4*1024*_MCU
 
 	// Number of orders that get caching. Order 0 is FixedStack
 	// and each successive order is twice as large.
@@ -154,7 +157,8 @@ const (
 	//   windows/32       | 4KB        | 3
 	//   windows/64       | 8KB        | 2
 	//   plan9            | 4KB        | 3
-	_NumStackOrders = 4 - sys.PtrSize/4*sys.GoosWindows - 1*sys.GoosPlan9
+	//   MCU              | 1KB        | 2
+	_NumStackOrders = 4 - sys.PtrSize/4*sys.GoosWindows - 1*sys.GoosPlan9 - 2*_MCU
 
 	// heapAddrBits is the number of bits in a heap address. On
 	// amd64, addresses are sign-extended beyond heapAddrBits. On
@@ -207,7 +211,13 @@ const (
 	// we further limit it to 31 bits.
 	//
 	// WebAssembly currently has a limit of 4GB linear memory.
-	heapAddrBits = (_64bit*(1-sys.GoarchWasm)*(1-sys.GoosAix))*48 + (1-_64bit+sys.GoarchWasm)*(32-(sys.GoarchMips+sys.GoarchMipsle)) + 60*sys.GoosAix
+	//
+	// ARMv7-M defines 512MB SRAM region at 0x20000000 and 1GB External RAM
+	// region at 0x60000000. This limits the maximum value of memory address
+	// to 0x9FFFFFFF. arenaBaseOffset is used to offset addresses by
+	// -0x20000000 so all possible RAM fits into 2GB (offsetted). For now
+	// the supported address space is further limited to only 1 MB.
+	heapAddrBits = (_64bit*(1-sys.GoarchWasm)*(1-sys.GoosAix))*48 + (1-_64bit+sys.GoarchWasm)*(32-(sys.GoarchMips+sys.GoarchMipsle)-12*_ARMv7M) + 60*sys.GoosAix
 
 	// maxAlloc is the maximum size of an allocation. On 64-bit,
 	// it's theoretically possible to allocate 1<<heapAddrBits bytes. On
@@ -248,7 +258,7 @@ const (
 	// logHeapArenaBytes is log_2 of heapArenaBytes. For clarity,
 	// prefer using heapArenaBytes where possible (we need the
 	// constant to compute some other constants).
-	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoosAix)*(1-sys.GoarchWasm)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit) + (8+20)*sys.GoosAix + (2+20)*sys.GoarchWasm
+	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoosAix)*(1-sys.GoarchWasm)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit)*(1-_MCU) + 13*_MCU + (8+20)*sys.GoosAix + (2+20)*sys.GoarchWasm
 
 	// heapArenaBitmapBytes is the size of each heap arena's bitmap.
 	heapArenaBitmapBytes = heapArenaBytes / (sys.PtrSize * 8 / 2)
@@ -300,7 +310,9 @@ const (
 	//
 	// On other platforms, the user address space is contiguous
 	// and starts at 0, so no offset is necessary.
-	arenaBaseOffset uintptr = sys.GoarchAmd64 * (1 << 47)
+	//
+	// In case of ARMv7-M the SRAM region starts at 0x20000000.
+	arenaBaseOffset uintptr = sys.GoarchAmd64*(1<<47) + _ARMv7M*(1<<32-0x20000000)
 
 	// Max number of threads to run garbage collection.
 	// 2, 3, and 4 are all plausible maximums depending
@@ -521,6 +533,8 @@ func mallocinit() {
 			hint.addr = p
 			hint.next, mheap_.arenaHints = mheap_.arenaHints, hint
 		}
+	} else if _MCU == 1 {
+		mheap_.arena.init(sysReserveMaxArena())
 	} else {
 		// On a 32-bit machine, we're much more concerned
 		// about keeping the usable heap contiguous.
@@ -608,6 +622,9 @@ func (h *mheap) sysAlloc(n uintptr) (v unsafe.Pointer, size uintptr) {
 	if v != nil {
 		size = n
 		goto mapped
+	}
+	if _MCU != 0 {
+		return nil, 0
 	}
 
 	// Try to grow the heap at a hint address.
@@ -1283,6 +1300,10 @@ func persistentalloc(size, align uintptr, sysStat *uint64) unsafe.Pointer {
 // See issue 9174.
 //go:systemstack
 func persistentalloc1(size, align uintptr, sysStat *uint64) *notInHeap {
+	if _MCU != 0 {
+		return sysPersistentAlloc(size, align, sysStat)
+	}
+
 	const (
 		maxBlock = 64 << 10 // VM reservation granularity is 64K on windows
 	)

@@ -553,6 +553,16 @@ var genericOps = []opData{
 	{name: "AtomicAdd32Variant", argLength: 3, typ: "(UInt32,Mem)", hasSideEffects: true}, // Do *arg0 += arg1.  arg2=memory.  Returns sum and new memory.
 	{name: "AtomicAdd64Variant", argLength: 3, typ: "(UInt64,Mem)", hasSideEffects: true}, // Do *arg0 += arg1.  arg2=memory.  Returns sum and new memory.
 
+	// MMIO operations need for semantically inlining functions in embedded/mmio
+	// package. Both load and store operations on I/O memory can cause side effects.
+	{name: "MMIOLoad32", argLength: 2, typ: "(UInt32,Mem)", hasSideEffects: true},
+	{name: "MMIOLoad16", argLength: 2, typ: "(UInt16,Mem)", hasSideEffects: true},
+	{name: "MMIOLoad8", argLength: 2, typ: "(UInt8,Mem)", hasSideEffects: true},
+	{name: "MMIOStore32", argLength: 3, typ: "Mem", hasSideEffects: true},
+	{name: "MMIOStore16", argLength: 3, typ: "Mem", hasSideEffects: true},
+	{name: "MMIOStore8", argLength: 3, typ: "Mem", hasSideEffects: true},
+	{name: "MMIOMB", argLength: 1, typ: "Mem", hasSideEffects: true},
+
 	// Clobber experiment op
 	{name: "Clobber", argLength: 0, typ: "Void", aux: "SymOff", symEffect: "None"}, // write an invalid pointer value to the given pointer slot of a stack variable
 }

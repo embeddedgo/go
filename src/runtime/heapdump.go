@@ -9,6 +9,8 @@
 // The format of the dumped file is described at
 // https://golang.org/s/go15heapdump.
 
+// +build !noos
+
 package runtime
 
 import (
@@ -560,8 +562,8 @@ func dumpmemstats() {
 	dumpint(memstats.next_gc)
 	dumpint(memstats.last_gc_unix)
 	dumpint(memstats.pause_total_ns)
-	for i := 0; i < 256; i++ {
-		dumpint(memstats.pause_ns[i])
+	for _, ns := range memstats.pause_ns {
+		dumpint(ns)
 	}
 	dumpint(uint64(memstats.numgc))
 }

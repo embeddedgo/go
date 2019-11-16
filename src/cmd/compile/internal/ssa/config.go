@@ -245,6 +245,17 @@ func NewConfig(arch string, types Types, ctxt *obj.Link, optimize bool) *Config 
 		c.FPReg = framepointerRegARM
 		c.LinkReg = linkRegARM
 		c.hasGReg = true
+	case "thumb":
+		c.PtrSize = 4
+		c.RegSize = 4
+		c.lowerBlock = rewriteBlockThumb
+		c.lowerValue = rewriteValueThumb
+		c.registers = registersThumb[:]
+		c.gpRegMask = gpRegMaskThumb
+		c.fpRegMask = fpRegMaskThumb
+		c.FPReg = framepointerRegThumb
+		c.LinkReg = linkRegThumb
+		c.hasGReg = true
 	case "arm64":
 		c.PtrSize = 8
 		c.RegSize = 8

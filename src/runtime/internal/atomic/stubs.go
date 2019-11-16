@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // +build !wasm
+// +build !thumb
 
 package atomic
 

@@ -1066,5 +1066,5 @@ func shouldPushSigpanic(gp *g, pc, lr uintptr) bool {
 //
 //go:nosplit
 func isAbortPC(pc uintptr) bool {
-	return pc == funcPC(abort) || ((GOARCH == "arm" || GOARCH == "arm64") && pc == funcPC(abort)+sys.PCQuantum)
+	return pc == funcAddr(abort) || ((GOARCH == "arm" || GOARCH == "arm64" || GOARCH == "thumb") && pc == funcAddr(abort)+sys.PCQuantum)
 }

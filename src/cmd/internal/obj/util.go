@@ -282,7 +282,7 @@ func Dconv(p *Prog, a *Addr) string {
 		v := int(a.Offset)
 		ops := "<<>>->@>"
 		switch objabi.GOARCH {
-		case "arm":
+		case "arm", "thumb":
 			op := ops[((v>>5)&3)<<1:]
 			if v&(1<<4) != 0 {
 				str = fmt.Sprintf("R%d%c%cR%d", v&15, op[0], op[1], (v>>8)&15)
@@ -457,6 +457,7 @@ const (
 	RBaseARM64 = 8 * 1024  // range [8k, 13k)
 	RBaseMIPS  = 13 * 1024 // range [13k, 14k)
 	RBaseS390X = 14 * 1024 // range [14k, 15k)
+	RBaseThumb = 15 * 1024
 	RBaseWasm  = 16 * 1024
 )
 

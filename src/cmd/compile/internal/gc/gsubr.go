@@ -271,6 +271,9 @@ func (f *Func) initLSym(hasBody bool) {
 	if f.ReflectMethod() {
 		flag |= obj.REFLECTMETHOD
 	}
+	if f.Pragma&Interrupthandler != 0 {
+		flag |= obj.ISR
+	}
 
 	// Clumsy but important.
 	// See test/recover.go for test cases and src/reflect/value.go
