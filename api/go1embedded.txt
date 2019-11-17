@@ -1,0 +1,88 @@
+pkg embedded/mmio, method (*U16) Addr() uintptr
+pkg embedded/mmio, method (*U16) Bit(int) int
+pkg embedded/mmio, method (*U16) Bits(uint16) uint16
+pkg embedded/mmio, method (*U16) ClearBit(int)
+pkg embedded/mmio, method (*U16) ClearBits(uint16)
+pkg embedded/mmio, method (*U16) Load() uint16
+pkg embedded/mmio, method (*U16) SetBit(int)
+pkg embedded/mmio, method (*U16) SetBits(uint16)
+pkg embedded/mmio, method (*U16) Store(uint16)
+pkg embedded/mmio, method (*U16) StoreBit(int, int)
+pkg embedded/mmio, method (*U16) StoreBits(uint16, uint16)
+pkg embedded/mmio, method (*U32) Addr() uintptr
+pkg embedded/mmio, method (*U32) Bit(int) int
+pkg embedded/mmio, method (*U32) Bits(uint32) uint32
+pkg embedded/mmio, method (*U32) ClearBit(int)
+pkg embedded/mmio, method (*U32) ClearBits(uint32)
+pkg embedded/mmio, method (*U32) Load() uint32
+pkg embedded/mmio, method (*U32) SetBit(int)
+pkg embedded/mmio, method (*U32) SetBits(uint32)
+pkg embedded/mmio, method (*U32) Store(uint32)
+pkg embedded/mmio, method (*U32) StoreBit(int, int)
+pkg embedded/mmio, method (*U32) StoreBits(uint32, uint32)
+pkg embedded/mmio, method (*U8) Addr() uintptr
+pkg embedded/mmio, method (*U8) Bit(int) int
+pkg embedded/mmio, method (*U8) Bits(uint8) uint8
+pkg embedded/mmio, method (*U8) ClearBit(int)
+pkg embedded/mmio, method (*U8) ClearBits(uint8)
+pkg embedded/mmio, method (*U8) Load() uint8
+pkg embedded/mmio, method (*U8) SetBit(int)
+pkg embedded/mmio, method (*U8) SetBits(uint8)
+pkg embedded/mmio, method (*U8) Store(uint8)
+pkg embedded/mmio, method (*U8) StoreBit(int, int)
+pkg embedded/mmio, method (*U8) StoreBits(uint8, uint8)
+pkg embedded/mmio, method (UM16) Clear()
+pkg embedded/mmio, method (UM16) Load() uint16
+pkg embedded/mmio, method (UM16) Set()
+pkg embedded/mmio, method (UM16) Store(uint16)
+pkg embedded/mmio, method (UM32) Clear()
+pkg embedded/mmio, method (UM32) Load() uint32
+pkg embedded/mmio, method (UM32) Set()
+pkg embedded/mmio, method (UM32) Store(uint32)
+pkg embedded/mmio, method (UM8) Clear()
+pkg embedded/mmio, method (UM8) Load() uint8
+pkg embedded/mmio, method (UM8) Set()
+pkg embedded/mmio, method (UM8) Store(uint8)
+pkg embedded/mmio, type U16 struct
+pkg embedded/mmio, type U32 struct
+pkg embedded/mmio, type U8 struct
+pkg embedded/mmio, type UM16 struct
+pkg embedded/mmio, type UM16 struct, Mask uint16
+pkg embedded/mmio, type UM16 struct, R *U16
+pkg embedded/mmio, type UM32 struct
+pkg embedded/mmio, type UM32 struct, Mask uint32
+pkg embedded/mmio, type UM32 struct, R *U32
+pkg embedded/mmio, type UM8 struct
+pkg embedded/mmio, type UM8 struct, Mask uint8
+pkg embedded/mmio, type UM8 struct, R *U8
+pkg embedded/rtos, const IntPrioCurrent = 0
+pkg embedded/rtos, const IntPrioCurrent int
+pkg embedded/rtos, const IntPrioHigh = 0
+pkg embedded/rtos, const IntPrioHigh int
+pkg embedded/rtos, const IntPrioHighest = 0
+pkg embedded/rtos, const IntPrioHighest int
+pkg embedded/rtos, const IntPrioLow = 0
+pkg embedded/rtos, const IntPrioLow int
+pkg embedded/rtos, const IntPrioLowest = 0
+pkg embedded/rtos, const IntPrioLowest int
+pkg embedded/rtos, const IntPrioSysTimer = 0
+pkg embedded/rtos, const IntPrioSysTimer int
+pkg embedded/rtos, func Nanotime() int64
+pkg embedded/rtos, func SetPrivLevel(int) (int, error)
+pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64)) error
+pkg embedded/rtos, method (*Error) Error() string
+pkg embedded/rtos, method (*Note) Clear()
+pkg embedded/rtos, method (*Note) Sleep(int64) bool
+pkg embedded/rtos, method (*Note) Wakeup()
+pkg embedded/rtos, method (IRQ) Disable() error
+pkg embedded/rtos, method (IRQ) Enable(int) error
+pkg embedded/rtos, method (IRQ) Status() (bool, int, error)
+pkg embedded/rtos, type Error struct
+pkg embedded/rtos, type IRQ int
+pkg embedded/rtos, type Note struct
+pkg embedded/rtos, var ErrBadIntNumber *Error
+pkg embedded/rtos, var ErrBadIntPrio *Error
+pkg embedded/rtos, var ErrBadPrivLevel *Error
+pkg embedded/rtos, var ErrInsufPrivLevel *Error
+pkg embedded/rtos, var ErrNotSuppoted *Error
+pkg embedded/rtos, var ErrUknown *Error
