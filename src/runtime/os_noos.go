@@ -86,6 +86,7 @@ func osinit() {
 
 // syscalls not used by runtime
 
+func setwalltime(sec int64, nsec int32)
 func setprivlevel(newlevel int) (oldlevel, errno int)
 func irqenabled(irq int) (enabled, errno int)
 func setirqenabled(irq, enabled int) (errno int)

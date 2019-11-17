@@ -11,7 +11,8 @@
 #define SYS_osyield        6
 #define SYS_usleep         7
 #define SYS_walltime       8
-#define SYS_write          9
-#define SYS_setprivlevel  10
-#define SYS_irqctl        11
-#define SYS_NUM           12
+#define SYS_setwalltime    9
+#define SYS_write         10
+#define SYS_setprivlevel  11
+#define SYS_irqctl        12
+#define SYS_NUM           13

@@ -16,6 +16,7 @@ DATA runtime·syscalls+(SYS_futexwakeup*4)(SB)/4, $·sysfutexwakeup(SB)
 DATA runtime·syscalls+(SYS_osyield*4)(SB)/4, $·curcpuSchedule(SB)
 DATA runtime·syscalls+(SYS_usleep*4)(SB)/4, $·sysusleep(SB)
 DATA runtime·syscalls+(SYS_walltime*4)(SB)/4, $·syswalltime(SB)
+DATA runtime·syscalls+(SYS_setwalltime*4)(SB)/4, $·syssetwalltime(SB)
 DATA runtime·syscalls+(SYS_write*4)(SB)/4, $·syswrite(SB)
 DATA runtime·syscalls+(SYS_setprivlevel*4)(SB)/4, $·syssetprivlevel(SB)
 DATA runtime·syscalls+(SYS_irqctl*4)(SB)/4, $·sysirqctl(SB)
@@ -100,6 +101,14 @@ TEXT ·walltime(SB),NOSPLIT|NOFRAME,$0-12
 	MOVW  $SYS_walltime, R4
 	MOVW  $(0+4), R5
 	MOVW  $12, R6
+	SWI
+	RET
+
+// func setwalltime(sec int64, nsec int32)
+TEXT ·setwalltime(SB),NOSPLIT|NOFRAME,$0-12
+	MOVW  $SYS_setwalltime, R4
+	MOVW  $(12+4), R5
+	MOVW  $0, R6
 	SWI
 	RET
 
