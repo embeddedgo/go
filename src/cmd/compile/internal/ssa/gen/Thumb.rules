@@ -245,7 +245,7 @@
 (Store {t} ptr val mem) && t.(*types.Type).Size() == 4 && is32BitFloat(val.Type) -> (MOVFstore ptr val mem)
 (Store {t} ptr val mem) && t.(*types.Type).Size() == 8 && is64BitFloat(val.Type) -> (MOVDstore ptr val mem)
 
-// mmio intrinsic
+// mmio intrinsics
 (MMIOLoad8  ptr mem) -> (LoadOnce8 ptr mem)
 (MMIOLoad16 ptr mem) -> (LoadOnce16 ptr mem)
 (MMIOLoad32 ptr mem) -> (LoadOnce32 ptr mem)
@@ -408,6 +408,12 @@
 (MOVFload [off1] {sym} (SUBconst [off2] ptr) mem) -> (MOVFload [off1-off2] {sym} ptr mem)
 (MOVDload [off1] {sym} (ADDconst [off2] ptr) mem) -> (MOVDload [off1+off2] {sym} ptr mem)
 (MOVDload [off1] {sym} (SUBconst [off2] ptr) mem) -> (MOVDload [off1-off2] {sym} ptr mem)
+(LoadOnce8 [off1] {sym} (ADDconst [off2] ptr) mem) -> (LoadOnce8 [off1+off2] {sym} ptr mem)
+(LoadOnce8 [off1] {sym} (SUBconst [off2] ptr) mem) -> (LoadOnce8 [off1-off2] {sym} ptr mem)
+(LoadOnce16 [off1] {sym} (ADDconst [off2] ptr) mem) -> (LoadOnce16 [off1+off2] {sym} ptr mem)
+(LoadOnce16 [off1] {sym} (SUBconst [off2] ptr) mem) -> (LoadOnce16 [off1-off2] {sym} ptr mem)
+(LoadOnce32 [off1] {sym} (ADDconst [off2] ptr) mem) -> (LoadOnce32 [off1+off2] {sym} ptr mem)
+(LoadOnce32 [off1] {sym} (SUBconst [off2] ptr) mem) -> (LoadOnce32 [off1-off2] {sym} ptr mem)
 
 (MOVBstore [off1] {sym} (ADDconst [off2] ptr) val mem) -> (MOVBstore [off1+off2] {sym} ptr val mem)
 (MOVBstore [off1] {sym} (SUBconst [off2] ptr) val mem) -> (MOVBstore [off1-off2] {sym} ptr val mem)
@@ -419,6 +425,12 @@
 (MOVFstore [off1] {sym} (SUBconst [off2] ptr) val mem) -> (MOVFstore [off1-off2] {sym} ptr val mem)
 (MOVDstore [off1] {sym} (ADDconst [off2] ptr) val mem) -> (MOVDstore [off1+off2] {sym} ptr val mem)
 (MOVDstore [off1] {sym} (SUBconst [off2] ptr) val mem) -> (MOVDstore [off1-off2] {sym} ptr val mem)
+(StoreOnce8 [off1] {sym} (ADDconst [off2] ptr) val mem) -> (StoreOnce8 [off1+off2] {sym} ptr val mem)
+(StoreOnce8 [off1] {sym} (SUBconst [off2] ptr) val mem) -> (StoreOnce8 [off1-off2] {sym} ptr val mem)
+(StoreOnce16 [off1] {sym} (ADDconst [off2] ptr) val mem) -> (StoreOnce16 [off1+off2] {sym} ptr val mem)
+(StoreOnce16 [off1] {sym} (SUBconst [off2] ptr) val mem) -> (StoreOnce16 [off1-off2] {sym} ptr val mem)
+(StoreOnce32 [off1] {sym} (ADDconst [off2] ptr) val mem) -> (StoreOnce32 [off1+off2] {sym} ptr val mem)
+(StoreOnce32 [off1] {sym} (SUBconst [off2] ptr) val mem) -> (StoreOnce32 [off1-off2] {sym} ptr val mem)
 
 (MOVBload [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2) ->
 	(MOVBload [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
@@ -434,6 +446,12 @@
 	(MOVFload [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
 (MOVDload [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2) ->
 	(MOVDload [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
+(LoadOnce8 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2) ->
+	(LoadOnce8 [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
+(LoadOnce16 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2) ->
+	(LoadOnce16 [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
+(LoadOnce8 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2) ->
+	(LoadOnce8 [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
 
 (MOVBstore [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem) && canMergeSym(sym1,sym2) ->
 	(MOVBstore [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
@@ -445,6 +463,12 @@
 	(MOVFstore [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
 (MOVDstore [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem) && canMergeSym(sym1,sym2) ->
 	(MOVDstore [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
+(StoreOnce8 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem) && canMergeSym(sym1,sym2) ->
+	(StoreOnce8 [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
+(StoreOnce16 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem) && canMergeSym(sym1,sym2) ->
+	(StoreOnce16 [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
+(StoreOnce32 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem) && canMergeSym(sym1,sym2) ->
+	(StoreOnce32 [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
 
 // replace load from same location as preceding store with zero/sign extension (or copy in case of full width)
 (MOVBload [off] {sym} ptr (MOVBstore [off2] {sym2} ptr2 x _)) && sym == sym2 && off == off2 && isSamePtr(ptr, ptr2) -> (MOVBreg x)
@@ -1021,40 +1045,94 @@
 
 // use indexed loads and stores
 (MOVWload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVWloadidx ptr idx mem)
-(MOVWstore [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (MOVWstoreidx ptr idx val mem)
-(MOVWload [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (MOVWloadshiftLL ptr idx [c] mem)
-(MOVWstore [0] {sym} (ADDshiftLL ptr idx [c]) val mem) && sym == nil && c <= 3 -> (MOVWstoreshiftLL ptr idx [c] val mem)
-(MOVBUload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVBUloadidx ptr idx mem)
-(MOVBload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVBloadidx ptr idx mem)
-(MOVBstore [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (MOVBstoreidx ptr idx val mem)
-(MOVHUload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVHUloadidx ptr idx mem)
 (MOVHload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVHloadidx ptr idx mem)
+(MOVHUload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVHUloadidx ptr idx mem)
+(MOVBload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVBloadidx ptr idx mem)
+(MOVBUload [0] {sym} (ADD ptr idx) mem) && sym == nil -> (MOVBUloadidx ptr idx mem)
+(LoadOnce8 [0] {sym} (ADD ptr idx) mem) && sym == nil -> (LoadOnce8idx ptr idx mem)
+(LoadOnce16 [0] {sym} (ADD ptr idx) mem) && sym == nil -> (LoadOnce16idx ptr idx mem)
+(LoadOnce32 [0] {sym} (ADD ptr idx) mem) && sym == nil -> (LoadOnce32idx ptr idx  mem)
+
+(MOVWstore [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (MOVWstoreidx ptr idx val mem)
+(MOVBstore [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (MOVBstoreidx ptr idx val mem)
 (MOVHstore [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (MOVHstoreidx ptr idx val mem)
+(StoreOnce8 [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (StoreOnce8idx ptr idx val mem)
+(StoreOnce16 [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (StoreOnce16idx ptr idx val mem)
+(StoreOnce32 [0] {sym} (ADD ptr idx) val mem) && sym == nil -> (StoreOnce32idx ptr idx val mem)
+
+(MOVWload [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (MOVWloadshiftLL ptr idx [c] mem)
+(MOVHload [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (MOVHloadshiftLL ptr idx [c] mem)
+(MOVHUload [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (MOVHUloadshiftLL ptr idx [c] mem)
+(MOVBload [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (MOVBloadshiftLL ptr idx [c] mem)
+(MOVBUload [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (MOVBUloadshiftLL ptr idx [c] mem)
+(LoadOnce8 [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (LoadOnce8shiftLL ptr idx [c] mem)
+(LoadOnce16 [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (LoadOnce16shiftLL ptr idx [c] mem)
+(LoadOnce32 [0] {sym} (ADDshiftLL ptr idx [c]) mem) && sym == nil && c <= 3 -> (LoadOnce32shiftLL ptr idx [c] mem)
+
+(MOVWstore [0] {sym} (ADDshiftLL ptr idx [c]) val mem) && sym == nil && c <= 3 -> (MOVWstoreshiftLL ptr idx [c] val mem)
+(MOVHstore [0] {sym} (ADDshiftLL ptr idx [c]) val mem) && sym == nil && c <= 3 -> (MOVHstoreshiftLL ptr idx [c] val mem)
+(MOVBstore [0] {sym} (ADDshiftLL ptr idx [c]) val mem) && sym == nil && c <= 3 -> (MOVBstoreshiftLL ptr idx [c] val mem)
+(StoreOnce8 [0] {sym} (ADDshiftLL ptr idx [c]) val mem) && sym == nil && c <= 3 -> (StoreOnce8shiftLL ptr idx [c] val mem)
+(StoreOnce16 [0] {sym} (ADDshiftLL ptr idx [c]) val mem) && sym == nil && c <= 3 -> (StoreOnce16shiftLL ptr idx [c] val mem)
+(StoreOnce32 [0] {sym} (ADDshiftLL ptr idx [c]) val mem) && sym == nil && c <= 3 -> (StoreOnce32shiftLL ptr idx [c] val mem)
 
 // constant folding in indexed loads and stores
 (MOVWloadidx ptr (MOVWconst [c]) mem) -> (MOVWload [c] ptr mem)
 (MOVWloadidx (MOVWconst [c]) ptr mem) -> (MOVWload [c] ptr mem)
+(MOVHloadidx ptr (MOVWconst [c]) mem) -> (MOVHload [c] ptr mem)
+(MOVHloadidx (MOVWconst [c]) ptr mem) -> (MOVHload [c] ptr mem)
+(MOVHUloadidx ptr (MOVWconst [c]) mem) -> (MOVHUload [c] ptr mem)
+(MOVHUloadidx (MOVWconst [c]) ptr mem) -> (MOVHUload [c] ptr mem)
 (MOVBloadidx ptr (MOVWconst [c]) mem) -> (MOVBload [c] ptr mem)
 (MOVBloadidx (MOVWconst [c]) ptr mem) -> (MOVBload [c] ptr mem)
 (MOVBUloadidx ptr (MOVWconst [c]) mem) -> (MOVBUload [c] ptr mem)
 (MOVBUloadidx (MOVWconst [c]) ptr mem) -> (MOVBUload [c] ptr mem)
-(MOVHUloadidx ptr (MOVWconst [c]) mem) -> (MOVHUload [c] ptr mem)
-(MOVHUloadidx (MOVWconst [c]) ptr mem) -> (MOVHUload [c] ptr mem)
-(MOVHloadidx ptr (MOVWconst [c]) mem) -> (MOVHload [c] ptr mem)
-(MOVHloadidx (MOVWconst [c]) ptr mem) -> (MOVHload [c] ptr mem)
+(LoadOnce32idx ptr (MOVWconst [c]) mem) -> (LoadOnce32 [c] ptr mem)
+(LoadOnce32idx (MOVWconst [c]) ptr mem) -> (LoadOnce32 [c] ptr mem)
+(LoadOnce16idx ptr (MOVWconst [c]) mem) -> (LoadOnce16 [c] ptr mem)
+(LoadOnce16idx (MOVWconst [c]) ptr mem) -> (LoadOnce16 [c] ptr mem)
+(LoadOnce8idx ptr (MOVWconst [c]) mem) -> (LoadOnce8 [c] ptr mem)
+(LoadOnce8idx (MOVWconst [c]) ptr mem) -> (LoadOnce8 [c] ptr mem)
 
 (MOVWstoreidx ptr (MOVWconst [c]) val mem) -> (MOVWstore [c] ptr val mem)
 (MOVWstoreidx (MOVWconst [c]) ptr val mem) -> (MOVWstore [c] ptr val mem)
-(MOVBstoreidx ptr (MOVWconst [c]) val mem) -> (MOVBstore [c] ptr val mem)
-(MOVBstoreidx (MOVWconst [c]) ptr val mem) -> (MOVBstore [c] ptr val mem)
 (MOVHstoreidx ptr (MOVWconst [c]) val mem) -> (MOVHstore [c] ptr val mem)
 (MOVHstoreidx (MOVWconst [c]) ptr val mem) -> (MOVHstore [c] ptr val mem)
+(MOVBstoreidx ptr (MOVWconst [c]) val mem) -> (MOVBstore [c] ptr val mem)
+(MOVBstoreidx (MOVWconst [c]) ptr val mem) -> (MOVBstore [c] ptr val mem)
+(StoreOnce32idx ptr (MOVWconst [c]) val mem) -> (StoreOnce32 [c] ptr val mem)
+(StoreOnce32idx (MOVWconst [c]) ptr val mem) -> (StoreOnce32 [c] ptr val mem)
+(StoreOnce16idx ptr (MOVWconst [c]) val mem) -> (StoreOnce16 [c] ptr val mem)
+(StoreOnce16idx (MOVWconst [c]) ptr val mem) -> (StoreOnce16 [c] ptr val mem)
+(StoreOnce8idx ptr (MOVWconst [c]) val mem) -> (StoreOnce8 [c] ptr val mem)
+(StoreOnce8idx (MOVWconst [c]) ptr val mem) -> (StoreOnce8 [c] ptr val mem)
 
 (MOVWloadidx ptr (SLLconst idx [c]) mem) && c <= 3 -> (MOVWloadshiftLL ptr idx [c] mem)
 (MOVWloadidx (SLLconst idx [c]) ptr mem) && c <= 3 -> (MOVWloadshiftLL ptr idx [c] mem)
+(MOVHUloadidx ptr (SLLconst idx [c]) mem) && c <= 3 -> (MOVHUloadshiftLL ptr idx [c] mem)
+(MOVHUloadidx (SLLconst idx [c]) ptr mem) && c <= 3 -> (MOVHUloadshiftLL ptr idx [c] mem)
+(MOVHloadidx ptr (SLLconst idx [c]) mem) && c <= 3 -> (MOVHloadshiftLL ptr idx [c] mem)
+(MOVHloadidx (SLLconst idx [c]) ptr mem) && c <= 3 -> (MOVHloadshiftLL ptr idx [c] mem)
+(MOVBUloadidx ptr (SLLconst idx [c]) mem) && c <= 3 -> (MOVBUloadshiftLL ptr idx [c] mem)
+(MOVBUloadidx (SLLconst idx [c]) ptr mem) && c <= 3 -> (MOVBUloadshiftLL ptr idx [c] mem)
+(MOVBloadidx ptr (SLLconst idx [c]) mem) && c <= 3 -> (MOVBloadshiftLL ptr idx [c] mem)
+(MOVBloadidx (SLLconst idx [c]) ptr mem) && c <= 3 -> (MOVBloadshiftLL ptr idx [c] mem)
+(LoadOnce32idx ptr (SLLconst idx [c]) mem) && c <= 3 -> (LoadOnce32shiftLL ptr idx [c] mem)
+(LoadOnce16idx ptr (SLLconst idx [c]) mem) && c <= 3 -> (LoadOnce16shiftLL ptr idx [c] mem)
+(LoadOnce8idx ptr (SLLconst idx [c]) mem) && c <= 3 -> (LoadOnce8shiftLL ptr idx [c] mem)
 
 (MOVWstoreidx ptr (SLLconst idx [c]) val mem) && c <= 3 -> (MOVWstoreshiftLL ptr idx [c] val mem)
 (MOVWstoreidx (SLLconst idx [c]) ptr val mem) && c <= 3 -> (MOVWstoreshiftLL ptr idx [c] val mem)
+(MOVHstoreidx ptr (SLLconst idx [c]) val mem) && c <= 3 -> (MOVHstoreshiftLL ptr idx [c] val mem)
+(MOVHstoreidx (SLLconst idx [c]) ptr val mem) && c <= 3 -> (MOVHstoreshiftLL ptr idx [c] val mem)
+(MOVBstoreidx ptr (SLLconst idx [c]) val mem) && c <= 3 -> (MOVBstoreshiftLL ptr idx [c] val mem)
+(MOVBstoreidx (SLLconst idx [c]) ptr val mem) && c <= 3 -> (MOVBstoreshiftLL ptr idx [c] val mem)
+(StoreOnce32idx ptr (SLLconst idx [c]) val mem) && c <= 3 -> (StoreOnce32shiftLL ptr idx [c] val mem)
+(StoreOnce32idx (SLLconst idx [c]) ptr val mem) && c <= 3 -> (StoreOnce32shiftLL ptr idx [c] val mem)
+(StoreOnce16idx ptr (SLLconst idx [c]) val mem) && c <= 3 -> (StoreOnce16shiftLL ptr idx [c] val mem)
+(StoreOnce16idx (SLLconst idx [c]) ptr val mem) && c <= 3 -> (StoreOnce16shiftLL ptr idx [c] val mem)
+(StoreOnce8idx ptr (SLLconst idx [c]) val mem) && c <= 3 -> (StoreOnce8shiftLL ptr idx [c] val mem)
+(StoreOnce8idx (SLLconst idx [c]) ptr val mem) && c <= 3 -> (StoreOnce8shiftLL ptr idx [c] val mem)
 
 (MOVWloadshiftLL ptr (MOVWconst [c]) [d] mem) -> (MOVWload [int64(uint32(c)<<uint64(d))] ptr mem)
 

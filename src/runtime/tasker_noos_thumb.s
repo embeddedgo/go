@@ -50,7 +50,7 @@ TEXT ·curcpuSleep(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  $ICSR_ADDR, R0
 	MOVW  $ICSR_PENDSVCLR, R1
 	MOVW  R1, (R0)
-	DMB   // ensure clearing happens before reading something signaled by PendSV
+	DMB   // ensure clearing happens before reading something for what we woke
 	RET
 
 // Exception handlers

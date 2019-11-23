@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build noos
-
 package mmio
 
 // MB is a full memory barrier. It ensures that any memory access (normal or

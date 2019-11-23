@@ -24,6 +24,12 @@ package rtos
 //
 // The System Timer interrupt handler, if used, must run with IntPrioSysTimer
 // priority.
+//
+// SetSystemTimer is intended to be called only once, at the very beginning of
+// the system initialization. If you want to change the system timer
+// implementation at a later stage (which is discouraged) you must ensure a
+// continuity of time and that all gorutines that sleeeps using old setalarm
+// function will be wakeup.
 func SetSystemTimer(nanotime func() int64, setalarm func(ns int64)) error {
 	return setSystemTimer(nanotime, setalarm)
 }

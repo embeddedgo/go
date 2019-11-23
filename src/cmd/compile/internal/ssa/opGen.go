@@ -2248,15 +2248,21 @@ const (
 	OpThumbMOVFstore
 	OpThumbMOVDstore
 	OpThumbMOVWloadidx
-	OpThumbMOVWloadshiftLL
-	OpThumbMOVBUloadidx
-	OpThumbMOVBloadidx
-	OpThumbMOVHUloadidx
 	OpThumbMOVHloadidx
+	OpThumbMOVHUloadidx
+	OpThumbMOVBloadidx
+	OpThumbMOVBUloadidx
+	OpThumbMOVWloadshiftLL
+	OpThumbMOVHloadshiftLL
+	OpThumbMOVHUloadshiftLL
+	OpThumbMOVBloadshiftLL
+	OpThumbMOVBUloadshiftLL
 	OpThumbMOVWstoreidx
-	OpThumbMOVWstoreshiftLL
 	OpThumbMOVBstoreidx
 	OpThumbMOVHstoreidx
+	OpThumbMOVWstoreshiftLL
+	OpThumbMOVHstoreshiftLL
+	OpThumbMOVBstoreshiftLL
 	OpThumbMOVBreg
 	OpThumbMOVBUreg
 	OpThumbMOVHreg
@@ -2286,6 +2292,18 @@ const (
 	OpThumbStoreOnce16
 	OpThumbStoreOnce32
 	OpThumbDSB
+	OpThumbLoadOnce8idx
+	OpThumbLoadOnce16idx
+	OpThumbLoadOnce32idx
+	OpThumbStoreOnce8idx
+	OpThumbStoreOnce16idx
+	OpThumbStoreOnce32idx
+	OpThumbLoadOnce8shiftLL
+	OpThumbLoadOnce16shiftLL
+	OpThumbLoadOnce32shiftLL
+	OpThumbStoreOnce8shiftLL
+	OpThumbStoreOnce16shiftLL
+	OpThumbStoreOnce32shiftLL
 	OpThumbLoweredNilCheck
 	OpThumbEqual
 	OpThumbNotEqual
@@ -30296,38 +30314,9 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
-		name:    "MOVWloadshiftLL",
-		auxType: auxInt32,
-		argLen:  3,
-		asm:     thumb.AMOVW,
-		reg: regInfo{
-			inputs: []inputInfo{
-				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
-				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
-			},
-			outputs: []outputInfo{
-				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
-			},
-		},
-	},
-	{
-		name:   "MOVBUloadidx",
+		name:   "MOVHloadidx",
 		argLen: 3,
-		asm:    thumb.AMOVBU,
-		reg: regInfo{
-			inputs: []inputInfo{
-				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
-				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
-			},
-			outputs: []outputInfo{
-				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
-			},
-		},
-	},
-	{
-		name:   "MOVBloadidx",
-		argLen: 3,
-		asm:    thumb.AMOVB,
+		asm:    thumb.AMOVH,
 		reg: regInfo{
 			inputs: []inputInfo{
 				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
@@ -30353,9 +30342,98 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
-		name:   "MOVHloadidx",
+		name:   "MOVBloadidx",
 		argLen: 3,
-		asm:    thumb.AMOVH,
+		asm:    thumb.AMOVB,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:   "MOVBUloadidx",
+		argLen: 3,
+		asm:    thumb.AMOVBU,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "MOVWloadshiftLL",
+		auxType: auxInt32,
+		argLen:  3,
+		asm:     thumb.AMOVW,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "MOVHloadshiftLL",
+		auxType: auxInt32,
+		argLen:  3,
+		asm:     thumb.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "MOVHUloadshiftLL",
+		auxType: auxInt32,
+		argLen:  3,
+		asm:     thumb.AMOVHU,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "MOVBloadshiftLL",
+		auxType: auxInt32,
+		argLen:  3,
+		asm:     thumb.AMOVB,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "MOVBUloadshiftLL",
+		auxType: auxInt32,
+		argLen:  3,
+		asm:     thumb.AMOVBU,
 		reg: regInfo{
 			inputs: []inputInfo{
 				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
@@ -30370,19 +30448,6 @@ var opcodeTable = [...]opInfo{
 		name:   "MOVWstoreidx",
 		argLen: 4,
 		asm:    thumb.AMOVW,
-		reg: regInfo{
-			inputs: []inputInfo{
-				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
-				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
-				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
-			},
-		},
-	},
-	{
-		name:    "MOVWstoreshiftLL",
-		auxType: auxInt32,
-		argLen:  4,
-		asm:     thumb.AMOVW,
 		reg: regInfo{
 			inputs: []inputInfo{
 				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
@@ -30407,6 +30472,45 @@ var opcodeTable = [...]opInfo{
 		name:   "MOVHstoreidx",
 		argLen: 4,
 		asm:    thumb.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:    "MOVWstoreshiftLL",
+		auxType: auxInt32,
+		argLen:  4,
+		asm:     thumb.AMOVW,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:    "MOVHstoreshiftLL",
+		auxType: auxInt32,
+		argLen:  4,
+		asm:     thumb.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:    "MOVBstoreshiftLL",
+		auxType: auxInt32,
+		argLen:  4,
+		asm:     thumb.AMOVB,
 		reg: regInfo{
 			inputs: []inputInfo{
 				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
@@ -30717,6 +30821,7 @@ var opcodeTable = [...]opInfo{
 		name:           "LoadOnce8",
 		auxType:        auxSymOff,
 		argLen:         2,
+		faultOnNilArg0: true,
 		hasSideEffects: true,
 		symEffect:      SymRead,
 		asm:            thumb.AMOVBU,
@@ -30733,6 +30838,7 @@ var opcodeTable = [...]opInfo{
 		name:           "LoadOnce16",
 		auxType:        auxSymOff,
 		argLen:         2,
+		faultOnNilArg0: true,
 		hasSideEffects: true,
 		symEffect:      SymRead,
 		asm:            thumb.AMOVHU,
@@ -30749,6 +30855,7 @@ var opcodeTable = [...]opInfo{
 		name:           "LoadOnce32",
 		auxType:        auxSymOff,
 		argLen:         2,
+		faultOnNilArg0: true,
 		hasSideEffects: true,
 		symEffect:      SymRead,
 		asm:            thumb.AMOVW,
@@ -30765,6 +30872,7 @@ var opcodeTable = [...]opInfo{
 		name:           "StoreOnce8",
 		auxType:        auxSymOff,
 		argLen:         3,
+		faultOnNilArg0: true,
 		hasSideEffects: true,
 		symEffect:      SymWrite,
 		asm:            thumb.AMOVB,
@@ -30779,6 +30887,7 @@ var opcodeTable = [...]opInfo{
 		name:           "StoreOnce16",
 		auxType:        auxSymOff,
 		argLen:         3,
+		faultOnNilArg0: true,
 		hasSideEffects: true,
 		symEffect:      SymWrite,
 		asm:            thumb.AMOVH,
@@ -30793,6 +30902,7 @@ var opcodeTable = [...]opInfo{
 		name:           "StoreOnce32",
 		auxType:        auxSymOff,
 		argLen:         3,
+		faultOnNilArg0: true,
 		hasSideEffects: true,
 		symEffect:      SymWrite,
 		asm:            thumb.AMOVW,
@@ -30809,6 +30919,192 @@ var opcodeTable = [...]opInfo{
 		hasSideEffects: true,
 		asm:            thumb.ADSB,
 		reg:            regInfo{},
+	},
+	{
+		name:           "LoadOnce8idx",
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVB,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:           "LoadOnce16idx",
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:           "LoadOnce32idx",
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVW,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:           "StoreOnce8idx",
+		argLen:         4,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVB,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:           "StoreOnce16idx",
+		argLen:         4,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:           "StoreOnce32idx",
+		argLen:         4,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVW,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:           "LoadOnce8shiftLL",
+		auxType:        auxInt32,
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVB,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:           "LoadOnce16shiftLL",
+		auxType:        auxInt32,
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:           "LoadOnce32shiftLL",
+		auxType:        auxInt32,
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVW,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:           "StoreOnce8shiftLL",
+		auxType:        auxInt32,
+		argLen:         4,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVB,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:           "StoreOnce16shiftLL",
+		auxType:        auxInt32,
+		argLen:         4,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
+	},
+	{
+		name:           "StoreOnce32shiftLL",
+		auxType:        auxInt32,
+		argLen:         4,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            thumb.AMOVW,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{2, 24447},      // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{0, 4294999935}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 SP R14 SB
+			},
+		},
 	},
 	{
 		name:           "LoweredNilCheck",

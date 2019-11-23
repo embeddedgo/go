@@ -477,17 +477,16 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		if reg := v.Args[0].RegName(); reg != wantreg {
 			v.Fatalf("bad reg %s for symbol type %T, want %s", reg, v.Aux, wantreg)
 		}
-
-	case ssa.OpThumbMOVBload,
-		ssa.OpThumbMOVBUload,
+	case ssa.OpThumbMOVWload,
 		ssa.OpThumbMOVHload,
 		ssa.OpThumbMOVHUload,
-		ssa.OpThumbMOVWload,
-		ssa.OpThumbMOVFload,
+		ssa.OpThumbMOVBload,
+		ssa.OpThumbMOVBUload,
 		ssa.OpThumbMOVDload,
-		ssa.OpThumbLoadOnce8,
+		ssa.OpThumbMOVFload,
+		ssa.OpThumbLoadOnce32,
 		ssa.OpThumbLoadOnce16,
-		ssa.OpThumbLoadOnce32:
+		ssa.OpThumbLoadOnce8:
 		p := s.Prog(v.Op.Asm())
 		p.From.Type = obj.TYPE_MEM
 		p.From.Reg = v.Args[0].Reg()
@@ -498,24 +497,38 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		} else {
 			p.To.Reg = v.Reg()
 		}
-	case ssa.OpThumbMOVBstore,
+	case ssa.OpThumbMOVWstore,
 		ssa.OpThumbMOVHstore,
-		ssa.OpThumbMOVWstore,
-		ssa.OpThumbMOVFstore,
+		ssa.OpThumbMOVBstore,
 		ssa.OpThumbMOVDstore,
-		ssa.OpThumbStoreOnce8,
+		ssa.OpThumbMOVFstore,
+		ssa.OpThumbStoreOnce32,
 		ssa.OpThumbStoreOnce16,
-		ssa.OpThumbStoreOnce32:
+		ssa.OpThumbStoreOnce8:
 		p := s.Prog(v.Op.Asm())
 		p.From.Type = obj.TYPE_REG
 		p.From.Reg = v.Args[1].Reg()
 		p.To.Type = obj.TYPE_MEM
 		p.To.Reg = v.Args[0].Reg()
 		gc.AddAux(&p.To, v)
-	case ssa.OpThumbMOVWloadidx, ssa.OpThumbMOVBUloadidx, ssa.OpThumbMOVBloadidx, ssa.OpThumbMOVHUloadidx, ssa.OpThumbMOVHloadidx:
+	case ssa.OpThumbMOVWloadidx,
+		ssa.OpThumbMOVHUloadidx,
+		ssa.OpThumbMOVHloadidx,
+		ssa.OpThumbMOVBUloadidx,
+		ssa.OpThumbMOVBloadidx,
+		ssa.OpThumbLoadOnce32idx,
+		ssa.OpThumbLoadOnce16idx,
+		ssa.OpThumbLoadOnce8idx:
 		// this is just shift 0 bits
 		fallthrough
-	case ssa.OpThumbMOVWloadshiftLL:
+	case ssa.OpThumbMOVWloadshiftLL,
+		ssa.OpThumbMOVHUloadshiftLL,
+		ssa.OpThumbMOVHloadshiftLL,
+		ssa.OpThumbMOVBUloadshiftLL,
+		ssa.OpThumbMOVBloadshiftLL,
+		ssa.OpThumbLoadOnce32shiftLL,
+		ssa.OpThumbLoadOnce16shiftLL,
+		ssa.OpThumbLoadOnce8shiftLL:
 		var toreg int16
 		if _, ok := v.Block.Func.RegAlloc[v.ID].(ssa.LocPair); ok {
 			toreg = v.Reg0()
@@ -524,10 +537,20 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		}
 		p := genshift(s, v.Op.Asm(), 0, v.Args[1].Reg(), toreg, thumb.SHIFT_LL, v.AuxInt)
 		p.From.Reg = v.Args[0].Reg()
-	case ssa.OpThumbMOVWstoreidx, ssa.OpThumbMOVBstoreidx, ssa.OpThumbMOVHstoreidx:
+	case ssa.OpThumbMOVWstoreidx,
+		ssa.OpThumbMOVHstoreidx,
+		ssa.OpThumbMOVBstoreidx,
+		ssa.OpThumbStoreOnce32idx,
+		ssa.OpThumbStoreOnce16idx,
+		ssa.OpThumbStoreOnce8idx:
 		// this is just shift 0 bits
 		fallthrough
-	case ssa.OpThumbMOVWstoreshiftLL:
+	case ssa.OpThumbMOVWstoreshiftLL,
+		ssa.OpThumbMOVHstoreshiftLL,
+		ssa.OpThumbMOVBstoreshiftLL,
+		ssa.OpThumbStoreOnce32shiftLL,
+		ssa.OpThumbStoreOnce16shiftLL,
+		ssa.OpThumbStoreOnce8shiftLL:
 		p := s.Prog(v.Op.Asm())
 		p.From.Type = obj.TYPE_REG
 		p.From.Reg = v.Args[2].Reg()
@@ -638,13 +661,17 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Sym = gc.Duffcopy
 		p.To.Offset = v.AuxInt
 	case ssa.OpThumbLoweredNilCheck:
-		// Issue a load which will fault if arg is nil.
-		p := s.Prog(thumb.AMOVB)
-		p.From.Type = obj.TYPE_MEM
-		p.From.Reg = v.Args[0].Reg()
-		gc.AddAux(&p.From, v)
-		p.To.Type = obj.TYPE_REG
-		p.To.Reg = thumb.REGTMP
+		if objabi.GOOS == "noos" {
+			// BUG: see https://github.com/embeddedgo/go/issues/1
+		} else {
+			// Issue a load which will fault if arg is nil.
+			p := s.Prog(thumb.AMOVBU)
+			p.From.Type = obj.TYPE_MEM
+			p.From.Reg = v.Args[0].Reg()
+			gc.AddAux(&p.From, v)
+			p.To.Type = obj.TYPE_REG
+			p.To.Reg = thumb.REGTMP
+		}
 		if gc.Debug_checknil != 0 && v.Pos.Line() > 1 { // v.Pos.Line()==1 in generated wrappers
 			gc.Warnl(v.Pos, "generated nil check")
 		}

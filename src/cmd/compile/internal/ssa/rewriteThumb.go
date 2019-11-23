@@ -521,6 +521,18 @@ func rewriteValueThumb(v *Value) bool {
 		return rewriteValueThumb_OpThumbLessThan_0(v)
 	case OpThumbLessThanU:
 		return rewriteValueThumb_OpThumbLessThanU_0(v)
+	case OpThumbLoadOnce16:
+		return rewriteValueThumb_OpThumbLoadOnce16_0(v)
+	case OpThumbLoadOnce16idx:
+		return rewriteValueThumb_OpThumbLoadOnce16idx_0(v)
+	case OpThumbLoadOnce32:
+		return rewriteValueThumb_OpThumbLoadOnce32_0(v)
+	case OpThumbLoadOnce32idx:
+		return rewriteValueThumb_OpThumbLoadOnce32idx_0(v)
+	case OpThumbLoadOnce8:
+		return rewriteValueThumb_OpThumbLoadOnce8_0(v)
+	case OpThumbLoadOnce8idx:
+		return rewriteValueThumb_OpThumbLoadOnce8idx_0(v)
 	case OpThumbMOVBUload:
 		return rewriteValueThumb_OpThumbMOVBUload_0(v)
 	case OpThumbMOVBUloadidx:
@@ -675,6 +687,18 @@ func rewriteValueThumb(v *Value) bool {
 		return rewriteValueThumb_OpThumbSUBshiftRA_0(v)
 	case OpThumbSUBshiftRL:
 		return rewriteValueThumb_OpThumbSUBshiftRL_0(v)
+	case OpThumbStoreOnce16:
+		return rewriteValueThumb_OpThumbStoreOnce16_0(v)
+	case OpThumbStoreOnce16idx:
+		return rewriteValueThumb_OpThumbStoreOnce16idx_0(v)
+	case OpThumbStoreOnce32:
+		return rewriteValueThumb_OpThumbStoreOnce32_0(v)
+	case OpThumbStoreOnce32idx:
+		return rewriteValueThumb_OpThumbStoreOnce32idx_0(v)
+	case OpThumbStoreOnce8:
+		return rewriteValueThumb_OpThumbStoreOnce8_0(v)
+	case OpThumbStoreOnce8idx:
+		return rewriteValueThumb_OpThumbStoreOnce8idx_0(v)
 	case OpThumbTEQ:
 		return rewriteValueThumb_OpThumbTEQ_0(v)
 	case OpThumbTEQconst:
@@ -8865,6 +8889,534 @@ func rewriteValueThumb_OpThumbLessThanU_0(v *Value) bool {
 	}
 	return false
 }
+func rewriteValueThumb_OpThumbLoadOnce16_0(v *Value) bool {
+	// match: (LoadOnce16 [off1] {sym} (ADDconst [off2] ptr) mem)
+	// cond:
+	// result: (LoadOnce16 [off1+off2] {sym} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		v.reset(OpThumbLoadOnce16)
+		v.AuxInt = off1 + off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce16 [off1] {sym} (SUBconst [off2] ptr) mem)
+	// cond:
+	// result: (LoadOnce16 [off1-off2] {sym} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSUBconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		v.reset(OpThumbLoadOnce16)
+		v.AuxInt = off1 - off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce16 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem)
+	// cond: canMergeSym(sym1,sym2)
+	// result: (LoadOnce16 [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym1 := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWaddr {
+			break
+		}
+		off2 := v_0.AuxInt
+		sym2 := v_0.Aux
+		ptr := v_0.Args[0]
+		if !(canMergeSym(sym1, sym2)) {
+			break
+		}
+		v.reset(OpThumbLoadOnce16)
+		v.AuxInt = off1 + off2
+		v.Aux = mergeSym(sym1, sym2)
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce16 [0] {sym} (ADD ptr idx) mem)
+	// cond: sym == nil
+	// result: (LoadOnce16idx ptr idx mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADD {
+			break
+		}
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil) {
+			break
+		}
+		v.reset(OpThumbLoadOnce16idx)
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce16 [0] {sym} (ADDshiftLL ptr idx [c]) mem)
+	// cond: sym == nil && c <= 3
+	// result: (LoadOnce16shiftLL ptr idx [c] mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbLoadOnce16shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoadOnce16idx_0(v *Value) bool {
+	// match: (LoadOnce16idx ptr (MOVWconst [c]) mem)
+	// cond:
+	// result: (LoadOnce16 [c] ptr mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		v.reset(OpThumbLoadOnce16)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce16idx (MOVWconst [c]) ptr mem)
+	// cond:
+	// result: (LoadOnce16 [c] ptr mem)
+	for {
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_0.AuxInt
+		ptr := v.Args[1]
+		v.reset(OpThumbLoadOnce16)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce16idx ptr (SLLconst idx [c]) mem)
+	// cond: c <= 3
+	// result: (LoadOnce16shiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbLoadOnce16shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoadOnce32_0(v *Value) bool {
+	// match: (LoadOnce32 [off1] {sym} (ADDconst [off2] ptr) mem)
+	// cond:
+	// result: (LoadOnce32 [off1+off2] {sym} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		v.reset(OpThumbLoadOnce32)
+		v.AuxInt = off1 + off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce32 [off1] {sym} (SUBconst [off2] ptr) mem)
+	// cond:
+	// result: (LoadOnce32 [off1-off2] {sym} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSUBconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		v.reset(OpThumbLoadOnce32)
+		v.AuxInt = off1 - off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce32 [0] {sym} (ADD ptr idx) mem)
+	// cond: sym == nil
+	// result: (LoadOnce32idx ptr idx mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADD {
+			break
+		}
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil) {
+			break
+		}
+		v.reset(OpThumbLoadOnce32idx)
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce32 [0] {sym} (ADDshiftLL ptr idx [c]) mem)
+	// cond: sym == nil && c <= 3
+	// result: (LoadOnce32shiftLL ptr idx [c] mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbLoadOnce32shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoadOnce32idx_0(v *Value) bool {
+	// match: (LoadOnce32idx ptr (MOVWconst [c]) mem)
+	// cond:
+	// result: (LoadOnce32 [c] ptr mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		v.reset(OpThumbLoadOnce32)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce32idx (MOVWconst [c]) ptr mem)
+	// cond:
+	// result: (LoadOnce32 [c] ptr mem)
+	for {
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_0.AuxInt
+		ptr := v.Args[1]
+		v.reset(OpThumbLoadOnce32)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce32idx ptr (SLLconst idx [c]) mem)
+	// cond: c <= 3
+	// result: (LoadOnce32shiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbLoadOnce32shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoadOnce8_0(v *Value) bool {
+	// match: (LoadOnce8 [off1] {sym} (ADDconst [off2] ptr) mem)
+	// cond:
+	// result: (LoadOnce8 [off1+off2] {sym} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		v.reset(OpThumbLoadOnce8)
+		v.AuxInt = off1 + off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce8 [off1] {sym} (SUBconst [off2] ptr) mem)
+	// cond:
+	// result: (LoadOnce8 [off1-off2] {sym} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSUBconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		v.reset(OpThumbLoadOnce8)
+		v.AuxInt = off1 - off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce8 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem)
+	// cond: canMergeSym(sym1,sym2)
+	// result: (LoadOnce8 [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym1 := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWaddr {
+			break
+		}
+		off2 := v_0.AuxInt
+		sym2 := v_0.Aux
+		ptr := v_0.Args[0]
+		if !(canMergeSym(sym1, sym2)) {
+			break
+		}
+		v.reset(OpThumbLoadOnce8)
+		v.AuxInt = off1 + off2
+		v.Aux = mergeSym(sym1, sym2)
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce8 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) mem)
+	// cond: canMergeSym(sym1,sym2)
+	// result: (LoadOnce8 [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
+	for {
+		off1 := v.AuxInt
+		sym1 := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWaddr {
+			break
+		}
+		off2 := v_0.AuxInt
+		sym2 := v_0.Aux
+		ptr := v_0.Args[0]
+		if !(canMergeSym(sym1, sym2)) {
+			break
+		}
+		v.reset(OpThumbLoadOnce8)
+		v.AuxInt = off1 + off2
+		v.Aux = mergeSym(sym1, sym2)
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce8 [0] {sym} (ADD ptr idx) mem)
+	// cond: sym == nil
+	// result: (LoadOnce8idx ptr idx mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADD {
+			break
+		}
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil) {
+			break
+		}
+		v.reset(OpThumbLoadOnce8idx)
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce8 [0] {sym} (ADDshiftLL ptr idx [c]) mem)
+	// cond: sym == nil && c <= 3
+	// result: (LoadOnce8shiftLL ptr idx [c] mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbLoadOnce8shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoadOnce8idx_0(v *Value) bool {
+	// match: (LoadOnce8idx ptr (MOVWconst [c]) mem)
+	// cond:
+	// result: (LoadOnce8 [c] ptr mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		v.reset(OpThumbLoadOnce8)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce8idx (MOVWconst [c]) ptr mem)
+	// cond:
+	// result: (LoadOnce8 [c] ptr mem)
+	for {
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_0.AuxInt
+		ptr := v.Args[1]
+		v.reset(OpThumbLoadOnce8)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (LoadOnce8idx ptr (SLLconst idx [c]) mem)
+	// cond: c <= 3
+	// result: (LoadOnce8shiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbLoadOnce8shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
 func rewriteValueThumb_OpThumbMOVBUload_0(v *Value) bool {
 	// match: (MOVBUload [off1] {sym} (ADDconst [off2] ptr) mem)
 	// cond:
@@ -8978,6 +9530,32 @@ func rewriteValueThumb_OpThumbMOVBUload_0(v *Value) bool {
 		v.AddArg(mem)
 		return true
 	}
+	// match: (MOVBUload [0] {sym} (ADDshiftLL ptr idx [c]) mem)
+	// cond: sym == nil && c <= 3
+	// result: (MOVBUloadshiftLL ptr idx [c] mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBUloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
 	// match: (MOVBUload [off] {sym} (SB) _)
 	// cond: symIsRO(sym)
 	// result: (MOVWconst [int64(read8(sym, off))])
@@ -9054,6 +9632,50 @@ func rewriteValueThumb_OpThumbMOVBUloadidx_0(v *Value) bool {
 		v.reset(OpThumbMOVBUload)
 		v.AuxInt = c
 		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVBUloadidx ptr (SLLconst idx [c]) mem)
+	// cond: c <= 3
+	// result: (MOVBUloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBUloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVBUloadidx (SLLconst idx [c]) ptr mem)
+	// cond: c <= 3
+	// result: (MOVBUloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBUloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
 		v.AddArg(mem)
 		return true
 	}
@@ -9228,6 +9850,32 @@ func rewriteValueThumb_OpThumbMOVBload_0(v *Value) bool {
 		v.AddArg(mem)
 		return true
 	}
+	// match: (MOVBload [0] {sym} (ADDshiftLL ptr idx [c]) mem)
+	// cond: sym == nil && c <= 3
+	// result: (MOVBloadshiftLL ptr idx [c] mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
 	return false
 }
 func rewriteValueThumb_OpThumbMOVBloadidx_0(v *Value) bool {
@@ -9286,6 +9934,50 @@ func rewriteValueThumb_OpThumbMOVBloadidx_0(v *Value) bool {
 		v.reset(OpThumbMOVBload)
 		v.AuxInt = c
 		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVBloadidx ptr (SLLconst idx [c]) mem)
+	// cond: c <= 3
+	// result: (MOVBloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVBloadidx (SLLconst idx [c]) ptr mem)
+	// cond: c <= 3
+	// result: (MOVBloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
 		v.AddArg(mem)
 		return true
 	}
@@ -9531,6 +10223,34 @@ func rewriteValueThumb_OpThumbMOVBstore_0(v *Value) bool {
 		v.AddArg(mem)
 		return true
 	}
+	// match: (MOVBstore [0] {sym} (ADDshiftLL ptr idx [c]) val mem)
+	// cond: sym == nil && c <= 3
+	// result: (MOVBstoreshiftLL ptr idx [c] val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBstoreshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
 	return false
 }
 func rewriteValueThumb_OpThumbMOVBstoreidx_0(v *Value) bool {
@@ -9568,6 +10288,54 @@ func rewriteValueThumb_OpThumbMOVBstoreidx_0(v *Value) bool {
 		v.reset(OpThumbMOVBstore)
 		v.AuxInt = c
 		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVBstoreidx ptr (SLLconst idx [c]) val mem)
+	// cond: c <= 3
+	// result: (MOVBstoreshiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBstoreshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVBstoreidx (SLLconst idx [c]) ptr val mem)
+	// cond: c <= 3
+	// result: (MOVBstoreshiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVBstoreshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
 		v.AddArg(val)
 		v.AddArg(mem)
 		return true
@@ -10019,6 +10787,32 @@ func rewriteValueThumb_OpThumbMOVHUload_0(v *Value) bool {
 		v.AddArg(mem)
 		return true
 	}
+	// match: (MOVHUload [0] {sym} (ADDshiftLL ptr idx [c]) mem)
+	// cond: sym == nil && c <= 3
+	// result: (MOVHUloadshiftLL ptr idx [c] mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHUloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
 	// match: (MOVHUload [off] {sym} (SB) _)
 	// cond: symIsRO(sym)
 	// result: (MOVWconst [int64(read16(sym, off, config.BigEndian))])
@@ -10095,6 +10889,50 @@ func rewriteValueThumb_OpThumbMOVHUloadidx_0(v *Value) bool {
 		v.reset(OpThumbMOVHUload)
 		v.AuxInt = c
 		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVHUloadidx ptr (SLLconst idx [c]) mem)
+	// cond: c <= 3
+	// result: (MOVHUloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHUloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVHUloadidx (SLLconst idx [c]) ptr mem)
+	// cond: c <= 3
+	// result: (MOVHUloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHUloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
 		v.AddArg(mem)
 		return true
 	}
@@ -10294,6 +11132,32 @@ func rewriteValueThumb_OpThumbMOVHload_0(v *Value) bool {
 		v.AddArg(mem)
 		return true
 	}
+	// match: (MOVHload [0] {sym} (ADDshiftLL ptr idx [c]) mem)
+	// cond: sym == nil && c <= 3
+	// result: (MOVHloadshiftLL ptr idx [c] mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[1]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
 	return false
 }
 func rewriteValueThumb_OpThumbMOVHloadidx_0(v *Value) bool {
@@ -10352,6 +11216,50 @@ func rewriteValueThumb_OpThumbMOVHloadidx_0(v *Value) bool {
 		v.reset(OpThumbMOVHload)
 		v.AuxInt = c
 		v.AddArg(ptr)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVHloadidx ptr (SLLconst idx [c]) mem)
+	// cond: c <= 3
+	// result: (MOVHloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVHloadidx (SLLconst idx [c]) ptr mem)
+	// cond: c <= 3
+	// result: (MOVHloadshiftLL ptr idx [c] mem)
+	for {
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHloadshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
 		v.AddArg(mem)
 		return true
 	}
@@ -10605,6 +11513,34 @@ func rewriteValueThumb_OpThumbMOVHstore_0(v *Value) bool {
 		v.AddArg(mem)
 		return true
 	}
+	// match: (MOVHstore [0] {sym} (ADDshiftLL ptr idx [c]) val mem)
+	// cond: sym == nil && c <= 3
+	// result: (MOVHstoreshiftLL ptr idx [c] val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHstoreshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
 	return false
 }
 func rewriteValueThumb_OpThumbMOVHstoreidx_0(v *Value) bool {
@@ -10642,6 +11578,54 @@ func rewriteValueThumb_OpThumbMOVHstoreidx_0(v *Value) bool {
 		v.reset(OpThumbMOVHstore)
 		v.AuxInt = c
 		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVHstoreidx ptr (SLLconst idx [c]) val mem)
+	// cond: c <= 3
+	// result: (MOVHstoreshiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHstoreshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (MOVHstoreidx (SLLconst idx [c]) ptr val mem)
+	// cond: c <= 3
+	// result: (MOVHstoreshiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbMOVHstoreshiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
 		v.AddArg(val)
 		v.AddArg(mem)
 		return true
@@ -15234,6 +16218,654 @@ func rewriteValueThumb_OpThumbSUBshiftRL_0(v *Value) bool {
 		}
 		v.reset(OpThumbMOVWconst)
 		v.AuxInt = 0
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbStoreOnce16_0(v *Value) bool {
+	// match: (StoreOnce16 [off1] {sym} (ADDconst [off2] ptr) val mem)
+	// cond:
+	// result: (StoreOnce16 [off1+off2] {sym} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		v.reset(OpThumbStoreOnce16)
+		v.AuxInt = off1 + off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce16 [off1] {sym} (SUBconst [off2] ptr) val mem)
+	// cond:
+	// result: (StoreOnce16 [off1-off2] {sym} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSUBconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		v.reset(OpThumbStoreOnce16)
+		v.AuxInt = off1 - off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce16 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem)
+	// cond: canMergeSym(sym1,sym2)
+	// result: (StoreOnce16 [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym1 := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWaddr {
+			break
+		}
+		off2 := v_0.AuxInt
+		sym2 := v_0.Aux
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(canMergeSym(sym1, sym2)) {
+			break
+		}
+		v.reset(OpThumbStoreOnce16)
+		v.AuxInt = off1 + off2
+		v.Aux = mergeSym(sym1, sym2)
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce16 [0] {sym} (ADD ptr idx) val mem)
+	// cond: sym == nil
+	// result: (StoreOnce16idx ptr idx val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADD {
+			break
+		}
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil) {
+			break
+		}
+		v.reset(OpThumbStoreOnce16idx)
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce16 [0] {sym} (ADDshiftLL ptr idx [c]) val mem)
+	// cond: sym == nil && c <= 3
+	// result: (StoreOnce16shiftLL ptr idx [c] val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce16shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbStoreOnce16idx_0(v *Value) bool {
+	// match: (StoreOnce16idx ptr (MOVWconst [c]) val mem)
+	// cond:
+	// result: (StoreOnce16 [c] ptr val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		val := v.Args[2]
+		v.reset(OpThumbStoreOnce16)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce16idx (MOVWconst [c]) ptr val mem)
+	// cond:
+	// result: (StoreOnce16 [c] ptr val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_0.AuxInt
+		ptr := v.Args[1]
+		val := v.Args[2]
+		v.reset(OpThumbStoreOnce16)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce16idx ptr (SLLconst idx [c]) val mem)
+	// cond: c <= 3
+	// result: (StoreOnce16shiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce16shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce16idx (SLLconst idx [c]) ptr val mem)
+	// cond: c <= 3
+	// result: (StoreOnce16shiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce16shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbStoreOnce32_0(v *Value) bool {
+	// match: (StoreOnce32 [off1] {sym} (ADDconst [off2] ptr) val mem)
+	// cond:
+	// result: (StoreOnce32 [off1+off2] {sym} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		v.reset(OpThumbStoreOnce32)
+		v.AuxInt = off1 + off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce32 [off1] {sym} (SUBconst [off2] ptr) val mem)
+	// cond:
+	// result: (StoreOnce32 [off1-off2] {sym} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSUBconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		v.reset(OpThumbStoreOnce32)
+		v.AuxInt = off1 - off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce32 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem)
+	// cond: canMergeSym(sym1,sym2)
+	// result: (StoreOnce32 [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym1 := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWaddr {
+			break
+		}
+		off2 := v_0.AuxInt
+		sym2 := v_0.Aux
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(canMergeSym(sym1, sym2)) {
+			break
+		}
+		v.reset(OpThumbStoreOnce32)
+		v.AuxInt = off1 + off2
+		v.Aux = mergeSym(sym1, sym2)
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce32 [0] {sym} (ADD ptr idx) val mem)
+	// cond: sym == nil
+	// result: (StoreOnce32idx ptr idx val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADD {
+			break
+		}
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil) {
+			break
+		}
+		v.reset(OpThumbStoreOnce32idx)
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce32 [0] {sym} (ADDshiftLL ptr idx [c]) val mem)
+	// cond: sym == nil && c <= 3
+	// result: (StoreOnce32shiftLL ptr idx [c] val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce32shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbStoreOnce32idx_0(v *Value) bool {
+	// match: (StoreOnce32idx ptr (MOVWconst [c]) val mem)
+	// cond:
+	// result: (StoreOnce32 [c] ptr val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		val := v.Args[2]
+		v.reset(OpThumbStoreOnce32)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce32idx (MOVWconst [c]) ptr val mem)
+	// cond:
+	// result: (StoreOnce32 [c] ptr val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_0.AuxInt
+		ptr := v.Args[1]
+		val := v.Args[2]
+		v.reset(OpThumbStoreOnce32)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce32idx ptr (SLLconst idx [c]) val mem)
+	// cond: c <= 3
+	// result: (StoreOnce32shiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce32shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce32idx (SLLconst idx [c]) ptr val mem)
+	// cond: c <= 3
+	// result: (StoreOnce32shiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce32shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbStoreOnce8_0(v *Value) bool {
+	// match: (StoreOnce8 [off1] {sym} (ADDconst [off2] ptr) val mem)
+	// cond:
+	// result: (StoreOnce8 [off1+off2] {sym} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		v.reset(OpThumbStoreOnce8)
+		v.AuxInt = off1 + off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce8 [off1] {sym} (SUBconst [off2] ptr) val mem)
+	// cond:
+	// result: (StoreOnce8 [off1-off2] {sym} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSUBconst {
+			break
+		}
+		off2 := v_0.AuxInt
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		v.reset(OpThumbStoreOnce8)
+		v.AuxInt = off1 - off2
+		v.Aux = sym
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce8 [off1] {sym1} (MOVWaddr [off2] {sym2} ptr) val mem)
+	// cond: canMergeSym(sym1,sym2)
+	// result: (StoreOnce8 [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
+	for {
+		off1 := v.AuxInt
+		sym1 := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWaddr {
+			break
+		}
+		off2 := v_0.AuxInt
+		sym2 := v_0.Aux
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(canMergeSym(sym1, sym2)) {
+			break
+		}
+		v.reset(OpThumbStoreOnce8)
+		v.AuxInt = off1 + off2
+		v.Aux = mergeSym(sym1, sym2)
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce8 [0] {sym} (ADD ptr idx) val mem)
+	// cond: sym == nil
+	// result: (StoreOnce8idx ptr idx val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADD {
+			break
+		}
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil) {
+			break
+		}
+		v.reset(OpThumbStoreOnce8idx)
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce8 [0] {sym} (ADDshiftLL ptr idx [c]) val mem)
+	// cond: sym == nil && c <= 3
+	// result: (StoreOnce8shiftLL ptr idx [c] val mem)
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		sym := v.Aux
+		mem := v.Args[2]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbADDshiftLL {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[1]
+		ptr := v_0.Args[0]
+		val := v.Args[1]
+		if !(sym == nil && c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce8shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbStoreOnce8idx_0(v *Value) bool {
+	// match: (StoreOnce8idx ptr (MOVWconst [c]) val mem)
+	// cond:
+	// result: (StoreOnce8 [c] ptr val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		val := v.Args[2]
+		v.reset(OpThumbStoreOnce8)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce8idx (MOVWconst [c]) ptr val mem)
+	// cond:
+	// result: (StoreOnce8 [c] ptr val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_0.AuxInt
+		ptr := v.Args[1]
+		val := v.Args[2]
+		v.reset(OpThumbStoreOnce8)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce8idx ptr (SLLconst idx [c]) val mem)
+	// cond: c <= 3
+	// result: (StoreOnce8shiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		ptr := v.Args[0]
+		v_1 := v.Args[1]
+		if v_1.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_1.AuxInt
+		idx := v_1.Args[0]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce8shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (StoreOnce8idx (SLLconst idx [c]) ptr val mem)
+	// cond: c <= 3
+	// result: (StoreOnce8shiftLL ptr idx [c] val mem)
+	for {
+		mem := v.Args[3]
+		v_0 := v.Args[0]
+		if v_0.Op != OpThumbSLLconst {
+			break
+		}
+		c := v_0.AuxInt
+		idx := v_0.Args[0]
+		ptr := v.Args[1]
+		val := v.Args[2]
+		if !(c <= 3) {
+			break
+		}
+		v.reset(OpThumbStoreOnce8shiftLL)
+		v.AuxInt = c
+		v.AddArg(ptr)
+		v.AddArg(idx)
+		v.AddArg(val)
+		v.AddArg(mem)
 		return true
 	}
 	return false

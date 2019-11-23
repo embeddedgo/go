@@ -314,17 +314,23 @@ func init() {
 		{name: "MOVFstore", argLength: 3, reg: fpstore, aux: "SymOff", asm: "MOVF", typ: "Mem", faultOnNilArg0: true, symEffect: "Write"}, // store 4 bytes of arg1 to arg0 + auxInt + aux.  arg2=mem.
 		{name: "MOVDstore", argLength: 3, reg: fpstore, aux: "SymOff", asm: "MOVD", typ: "Mem", faultOnNilArg0: true, symEffect: "Write"}, // store 8 bytes of arg1 to arg0 + auxInt + aux.  arg2=mem.
 
-		{name: "MOVWloadidx", argLength: 3, reg: gp2load, asm: "MOVW", typ: "UInt32"},                   // load from arg0 + arg1. arg2=mem
-		{name: "MOVWloadshiftLL", argLength: 3, reg: gp2load, asm: "MOVW", aux: "Int32", typ: "UInt32"}, // load from arg0 + arg1<<auxInt. arg2=mem
-		{name: "MOVBUloadidx", argLength: 3, reg: gp2load, asm: "MOVBU", typ: "UInt8"},                  // load from arg0 + arg1. arg2=mem
-		{name: "MOVBloadidx", argLength: 3, reg: gp2load, asm: "MOVB", typ: "Int8"},                     // load from arg0 + arg1. arg2=mem
-		{name: "MOVHUloadidx", argLength: 3, reg: gp2load, asm: "MOVHU", typ: "UInt16"},                 // load from arg0 + arg1. arg2=mem
-		{name: "MOVHloadidx", argLength: 3, reg: gp2load, asm: "MOVH", typ: "Int16"},                    // load from arg0 + arg1. arg2=mem
+		{name: "MOVWloadidx", argLength: 3, reg: gp2load, asm: "MOVW", typ: "UInt32"},                     // load from arg0 + arg1. arg2=mem
+		{name: "MOVHloadidx", argLength: 3, reg: gp2load, asm: "MOVH", typ: "Int16"},                      // load from arg0 + arg1. arg2=mem
+		{name: "MOVHUloadidx", argLength: 3, reg: gp2load, asm: "MOVHU", typ: "UInt16"},                   // load from arg0 + arg1. arg2=mem
+		{name: "MOVBloadidx", argLength: 3, reg: gp2load, asm: "MOVB", typ: "Int8"},                       // load from arg0 + arg1. arg2=mem
+		{name: "MOVBUloadidx", argLength: 3, reg: gp2load, asm: "MOVBU", typ: "UInt8"},                    // load from arg0 + arg1. arg2=mem
+		{name: "MOVWloadshiftLL", argLength: 3, reg: gp2load, asm: "MOVW", aux: "Int32", typ: "UInt32"},   // load from arg0 + arg1<<auxInt. arg2=mem
+		{name: "MOVHloadshiftLL", argLength: 3, reg: gp2load, asm: "MOVH", aux: "Int32", typ: "Int16"},    // load from arg0 + arg1<<auxInt. arg2=mem
+		{name: "MOVHUloadshiftLL", argLength: 3, reg: gp2load, asm: "MOVHU", aux: "Int32", typ: "UInt16"}, // load from arg0 + arg1<<auxInt. arg2=mem
+		{name: "MOVBloadshiftLL", argLength: 3, reg: gp2load, asm: "MOVB", aux: "Int32", typ: "Int8"},     // load from arg0 + arg1<<auxInt. arg2=mem
+		{name: "MOVBUloadshiftLL", argLength: 3, reg: gp2load, asm: "MOVBU", aux: "Int32", typ: "UInt8"},  // load from arg0 + arg1<<auxInt. arg2=mem
 
 		{name: "MOVWstoreidx", argLength: 4, reg: gp2store, asm: "MOVW", typ: "Mem"},                   // store arg2 to arg0 + arg1. arg3=mem
-		{name: "MOVWstoreshiftLL", argLength: 4, reg: gp2store, asm: "MOVW", aux: "Int32", typ: "Mem"}, // store arg2 to arg0 + arg1<<auxInt. arg3=mem
 		{name: "MOVBstoreidx", argLength: 4, reg: gp2store, asm: "MOVB", typ: "Mem"},                   // store arg2 to arg0 + arg1. arg3=mem
 		{name: "MOVHstoreidx", argLength: 4, reg: gp2store, asm: "MOVH", typ: "Mem"},                   // store arg2 to arg0 + arg1. arg3=mem
+		{name: "MOVWstoreshiftLL", argLength: 4, reg: gp2store, asm: "MOVW", aux: "Int32", typ: "Mem"}, // store arg2 to arg0 + arg1<<auxInt. arg3=mem
+		{name: "MOVHstoreshiftLL", argLength: 4, reg: gp2store, asm: "MOVH", aux: "Int32", typ: "Mem"}, // store arg2 to arg0 + arg1<<auxInt. arg3=mem
+		{name: "MOVBstoreshiftLL", argLength: 4, reg: gp2store, asm: "MOVB", aux: "Int32", typ: "Mem"}, // store arg2 to arg0 + arg1<<auxInt. arg3=mem
 
 		{name: "MOVBreg", argLength: 1, reg: gp11, asm: "MOVBS"},  // move from arg0, sign-extended from byte
 		{name: "MOVBUreg", argLength: 1, reg: gp11, asm: "MOVBU"}, // move from arg0, unsign-extended from byte
@@ -355,13 +361,25 @@ func init() {
 		{name: "CALLclosure", argLength: 3, reg: regInfo{inputs: []regMask{gpsp, buildReg("R11"), 0}, clobbers: callerSave}, aux: "Int64", clobberFlags: true, call: true}, // call function via closure.  arg0=codeptr, arg1=closure, arg2=mem, auxint=argsize, returns mem
 		{name: "CALLinter", argLength: 2, reg: regInfo{inputs: []regMask{gp}, clobbers: callerSave}, aux: "Int64", clobberFlags: true, call: true},                         // call fn by pointer.  arg0=codeptr, arg1=mem, auxint=argsize, returns mem
 
-		{name: "LoadOnce8", argLength: 2, reg: gpload, aux: "SymOff", asm: "MOVBU", typ: "(UInt8,Mem)", symEffect: "Read", hasSideEffects: true},
-		{name: "LoadOnce16", argLength: 2, reg: gpload, aux: "SymOff", asm: "MOVHU", typ: "(UInt16,Mem)", symEffect: "Read", hasSideEffects: true},
-		{name: "LoadOnce32", argLength: 2, reg: gpload, aux: "SymOff", asm: "MOVW", typ: "(UInt32,Mem)", symEffect: "Read", hasSideEffects: true},
-		{name: "StoreOnce8", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVB", typ: "Mem", symEffect: "Write", hasSideEffects: true},
-		{name: "StoreOnce16", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVH", typ: "Mem", symEffect: "Write", hasSideEffects: true},
-		{name: "StoreOnce32", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVW", typ: "Mem", symEffect: "Write", hasSideEffects: true},
+		{name: "LoadOnce8", argLength: 2, reg: gpload, aux: "SymOff", asm: "MOVBU", typ: "(UInt8,Mem)", symEffect: "Read", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce16", argLength: 2, reg: gpload, aux: "SymOff", asm: "MOVHU", typ: "(UInt16,Mem)", symEffect: "Read", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce32", argLength: 2, reg: gpload, aux: "SymOff", asm: "MOVW", typ: "(UInt32,Mem)", symEffect: "Read", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce8", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVB", typ: "Mem", symEffect: "Write", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce16", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVH", typ: "Mem", symEffect: "Write", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce32", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVW", typ: "Mem", symEffect: "Write", hasSideEffects: true, faultOnNilArg0: true},
 		{name: "DSB", argLength: 1, typ: "Mem", asm: "DSB", hasSideEffects: true},
+		{name: "LoadOnce8idx", argLength: 3, reg: gp2load, asm: "MOVB", typ: "(UInt8,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce16idx", argLength: 3, reg: gp2load, asm: "MOVH", typ: "(UInt16,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce32idx", argLength: 3, reg: gp2load, asm: "MOVW", typ: "(UInt32,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce8idx", argLength: 4, reg: gp2store, asm: "MOVB", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce16idx", argLength: 4, reg: gp2store, asm: "MOVH", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce32idx", argLength: 4, reg: gp2store, asm: "MOVW", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce8shiftLL", argLength: 3, reg: gp2load, aux: "Int32", asm: "MOVB", typ: "(UInt8,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce16shiftLL", argLength: 3, reg: gp2load, aux: "Int32", asm: "MOVH", typ: "(UInt16,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce32shiftLL", argLength: 3, reg: gp2load, aux: "Int32", asm: "MOVW", typ: "(UInt32,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce8shiftLL", argLength: 4, reg: gp2store, aux: "Int32", asm: "MOVB", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce16shiftLL", argLength: 4, reg: gp2store, aux: "Int32", asm: "MOVH", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce32shiftLL", argLength: 4, reg: gp2store, aux: "Int32", asm: "MOVW", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
 
 		// pseudo-ops
 		{name: "LoweredNilCheck", argLength: 2, reg: regInfo{inputs: []regMask{gpg}}, nilCheck: true, faultOnNilArg0: true}, // panic if arg0 is nil.  arg1=mem.
