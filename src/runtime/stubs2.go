@@ -9,6 +9,7 @@
 // +build !js
 // +build !darwin
 // +build !aix
+// +build !noos
 
 package runtime
 

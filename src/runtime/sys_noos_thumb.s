@@ -14,7 +14,7 @@ DATA runtime·syscalls+(SYS_exitThread*4)(SB)/4, $·sysexitThread(SB)
 DATA runtime·syscalls+(SYS_futexsleep*4)(SB)/4, $·sysfutexsleep(SB)
 DATA runtime·syscalls+(SYS_futexwakeup*4)(SB)/4, $·sysfutexwakeup(SB)
 DATA runtime·syscalls+(SYS_osyield*4)(SB)/4, $·curcpuSchedule(SB)
-DATA runtime·syscalls+(SYS_usleep*4)(SB)/4, $·sysusleep(SB)
+DATA runtime·syscalls+(SYS_nanosleep*4)(SB)/4, $·sysnanosleep(SB)
 DATA runtime·syscalls+(SYS_walltime*4)(SB)/4, $·syswalltime(SB)
 DATA runtime·syscalls+(SYS_setwalltime*4)(SB)/4, $·syssetwalltime(SB)
 DATA runtime·syscalls+(SYS_write*4)(SB)/4, $·syswrite(SB)
@@ -88,10 +88,10 @@ TEXT ·publicationBarrier(SB),NOSPLIT|NOFRAME,$0-0
 	DMB  MB_ST
 	RET
 
-// func usleep(usec uint32)
-TEXT ·usleep(SB),NOSPLIT|NOFRAME,$0-4
-	MOVW  $SYS_usleep, R4
-	MOVW  $(4+4), R5
+// func nanosleep(ns int64)
+TEXT ·nanosleep(SB),NOSPLIT|NOFRAME,$0-8
+	MOVW  $SYS_nanosleep, R4
+	MOVW  $(8+4), R5
 	MOVW  $0, R6
 	SWI
 	RET

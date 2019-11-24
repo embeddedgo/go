@@ -9,7 +9,7 @@
 #define SYS_futexsleep     4
 #define SYS_futexwakeup    5
 #define SYS_osyield        6
-#define SYS_usleep         7
+#define SYS_nanosleep         7
 #define SYS_walltime       8
 #define SYS_setwalltime    9
 #define SYS_write         10

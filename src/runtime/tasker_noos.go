@@ -448,17 +448,16 @@ func sysfutexwakeup(addr *uint32, cnt uint32) {
 
 //go:nowritebarrierrec
 //go:nosplit
-func sysusleep(usec uint32) {
-	if usec == 0 {
-		return
+func sysnanosleep(ns int64) {
+	if uint64(ns) < 64 {
+		return // to short to sleep (64 ns selected arbitrary)
 	}
 	curcpuSavectx()
 	curcpu := getcpuctx()
 	m := curcpu.exe.ptr()
 	curcpu.exe = 0
-	deadline := curcpu.t.nanotime() + int64(usec)*1e3
 	msetkey(m, 0)
-	msetval(m, deadline)
+	msetval(m, curcpu.t.nanotime()+ns)
 	wt := &curcpu.waitingt
 	wt.lock()
 	wt.insertbyval(m)

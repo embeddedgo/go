@@ -4,6 +4,8 @@
 
 package runtime
 
+import "unsafe"
+
 const _NSIG = 0
 
 type gsignalStack struct{}
@@ -60,17 +62,10 @@ func setsystim(nanotime func() int64, setalarm func(ns int64)) {
 	setsystim1()
 }
 
-func setsystim1()
-
-func newosproc(mp *m)
-
-//go:noescape
-func futexsleep(addr *uint32, val uint32, ns int64)
-
-//go:noescape
-func futexwakeup(addr *uint32, cnt uint32)
-
-func osyield()
+//go:nosplit
+func usleep(usec uint32) {
+	nanosleep(int64(usec) * 1000)
+}
 
 //go:nosplit
 func getRandomData(r []byte) {
@@ -84,6 +79,23 @@ func osinit() {
 	physPageSize = _PageSize
 }
 
+func setsystim1()
+func newosproc(mp *m)
+func exit(code int32)
+func osyield()
+
+//go:noescape
+func write(fd uintptr, p unsafe.Pointer, n int32) int32
+
+//go:noescape
+func futexsleep(addr *uint32, val uint32, ns int64)
+
+//go:noescape
+func futexwakeup(addr *uint32, cnt uint32)
+
+//go:noescape
+func exitThread(wait *uint32)
+
 // syscalls not used by runtime
 
 func setwalltime(sec int64, nsec int32)
@@ -92,3 +104,4 @@ func irqenabled(irq int) (enabled, errno int)
 func setirqenabled(irq, enabled int) (errno int)
 func irqctl(irq, ctl int) (enabled, prio, errno int)
 func notelwakeup(n *notel)
+func nanosleep(ns int64)
