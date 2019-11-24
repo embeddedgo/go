@@ -89,7 +89,7 @@ func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 {
 	portena := mmio.UM32{&ITM.TER[fd>>5].U32, 1 << (fd & 31)}
 	s := (*[1 << 30]byte)(p)
 	for i := 0; i < int(n); {
-		for port.Bit(0) == 0 {
+		for port.LoadBit(0) == 0 {
 			if portena.Load() == 0 || itmena.Load() == 0 {
 				return n // do not block on disabled port/ITM
 			}

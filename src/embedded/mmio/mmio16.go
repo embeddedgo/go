@@ -34,7 +34,7 @@ func (r *U16) ClearBit(n int) {
 }
 
 // Bit returns the value of n-th bit in r (0 or 1).
-func (r *U16) Bit(n int) int {
+func (r *U16) LoadBit(n int) int {
 	return int(load16(&r.r)>>uint(n)) & 1
 }
 
@@ -47,7 +47,7 @@ func (r *U16) StoreBit(n, v int) {
 
 // Bits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
-func (r *U16) Bits(mask uint16) uint16 {
+func (r *U16) LoadBits(mask uint16) uint16 {
 	return load16(&r.r) & mask
 }
 
@@ -97,7 +97,7 @@ func (b UM16) Set() { b.R.SetBits(b.Mask) }
 func (b UM16) Clear() { b.R.ClearBits(b.Mask) }
 
 // Load returns the value of b.
-func (b UM16) Load() uint16 { return b.R.Bits(b.Mask) }
+func (b UM16) Load() uint16 { return b.R.LoadBits(b.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
 func (b UM16) Store(bits uint16) { b.R.StoreBits(b.Mask, bits) }

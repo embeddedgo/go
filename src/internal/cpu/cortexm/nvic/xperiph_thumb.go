@@ -35,12 +35,12 @@ type ISER uint32
 
 type RISER struct{ mmio.U32 }
 
-func (r *RISER) Bits(mask ISER) ISER    { return ISER(r.U32.Bits(uint32(mask))) }
-func (r *RISER) StoreBits(mask, b ISER) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RISER) SetBits(mask ISER)      { r.U32.SetBits(uint32(mask)) }
-func (r *RISER) ClearBits(mask ISER)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RISER) Load() ISER             { return ISER(r.U32.Load()) }
-func (r *RISER) Store(b ISER)           { r.U32.Store(uint32(b)) }
+func (r *RISER) LoadBits(mask ISER) ISER { return ISER(r.U32.LoadBits(uint32(mask))) }
+func (r *RISER) StoreBits(mask, b ISER)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RISER) SetBits(mask ISER)       { r.U32.SetBits(uint32(mask)) }
+func (r *RISER) ClearBits(mask ISER)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RISER) Load() ISER              { return ISER(r.U32.Load()) }
+func (r *RISER) Store(b ISER)            { r.U32.Store(uint32(b)) }
 
 type RMISER struct{ mmio.UM32 }
 
@@ -51,12 +51,12 @@ type ICER uint32
 
 type RICER struct{ mmio.U32 }
 
-func (r *RICER) Bits(mask ICER) ICER    { return ICER(r.U32.Bits(uint32(mask))) }
-func (r *RICER) StoreBits(mask, b ICER) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RICER) SetBits(mask ICER)      { r.U32.SetBits(uint32(mask)) }
-func (r *RICER) ClearBits(mask ICER)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RICER) Load() ICER             { return ICER(r.U32.Load()) }
-func (r *RICER) Store(b ICER)           { r.U32.Store(uint32(b)) }
+func (r *RICER) LoadBits(mask ICER) ICER { return ICER(r.U32.LoadBits(uint32(mask))) }
+func (r *RICER) StoreBits(mask, b ICER)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RICER) SetBits(mask ICER)       { r.U32.SetBits(uint32(mask)) }
+func (r *RICER) ClearBits(mask ICER)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RICER) Load() ICER              { return ICER(r.U32.Load()) }
+func (r *RICER) Store(b ICER)            { r.U32.Store(uint32(b)) }
 
 type RMICER struct{ mmio.UM32 }
 
@@ -67,12 +67,12 @@ type ISPR uint32
 
 type RISPR struct{ mmio.U32 }
 
-func (r *RISPR) Bits(mask ISPR) ISPR    { return ISPR(r.U32.Bits(uint32(mask))) }
-func (r *RISPR) StoreBits(mask, b ISPR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RISPR) SetBits(mask ISPR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RISPR) ClearBits(mask ISPR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RISPR) Load() ISPR             { return ISPR(r.U32.Load()) }
-func (r *RISPR) Store(b ISPR)           { r.U32.Store(uint32(b)) }
+func (r *RISPR) LoadBits(mask ISPR) ISPR { return ISPR(r.U32.LoadBits(uint32(mask))) }
+func (r *RISPR) StoreBits(mask, b ISPR)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RISPR) SetBits(mask ISPR)       { r.U32.SetBits(uint32(mask)) }
+func (r *RISPR) ClearBits(mask ISPR)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RISPR) Load() ISPR              { return ISPR(r.U32.Load()) }
+func (r *RISPR) Store(b ISPR)            { r.U32.Store(uint32(b)) }
 
 type RMISPR struct{ mmio.UM32 }
 
@@ -83,12 +83,12 @@ type ICPR uint32
 
 type RICPR struct{ mmio.U32 }
 
-func (r *RICPR) Bits(mask ICPR) ICPR    { return ICPR(r.U32.Bits(uint32(mask))) }
-func (r *RICPR) StoreBits(mask, b ICPR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RICPR) SetBits(mask ICPR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RICPR) ClearBits(mask ICPR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RICPR) Load() ICPR             { return ICPR(r.U32.Load()) }
-func (r *RICPR) Store(b ICPR)           { r.U32.Store(uint32(b)) }
+func (r *RICPR) LoadBits(mask ICPR) ICPR { return ICPR(r.U32.LoadBits(uint32(mask))) }
+func (r *RICPR) StoreBits(mask, b ICPR)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RICPR) SetBits(mask ICPR)       { r.U32.SetBits(uint32(mask)) }
+func (r *RICPR) ClearBits(mask ICPR)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RICPR) Load() ICPR              { return ICPR(r.U32.Load()) }
+func (r *RICPR) Store(b ICPR)            { r.U32.Store(uint32(b)) }
 
 type RMICPR struct{ mmio.UM32 }
 
@@ -99,12 +99,12 @@ type IABR uint32
 
 type RIABR struct{ mmio.U32 }
 
-func (r *RIABR) Bits(mask IABR) IABR    { return IABR(r.U32.Bits(uint32(mask))) }
-func (r *RIABR) StoreBits(mask, b IABR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RIABR) SetBits(mask IABR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RIABR) ClearBits(mask IABR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RIABR) Load() IABR             { return IABR(r.U32.Load()) }
-func (r *RIABR) Store(b IABR)           { r.U32.Store(uint32(b)) }
+func (r *RIABR) LoadBits(mask IABR) IABR { return IABR(r.U32.LoadBits(uint32(mask))) }
+func (r *RIABR) StoreBits(mask, b IABR)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RIABR) SetBits(mask IABR)       { r.U32.SetBits(uint32(mask)) }
+func (r *RIABR) ClearBits(mask IABR)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RIABR) Load() IABR              { return IABR(r.U32.Load()) }
+func (r *RIABR) Store(b IABR)            { r.U32.Store(uint32(b)) }
 
 type RMIABR struct{ mmio.UM32 }
 
@@ -115,12 +115,12 @@ type ITNS uint32
 
 type RITNS struct{ mmio.U32 }
 
-func (r *RITNS) Bits(mask ITNS) ITNS    { return ITNS(r.U32.Bits(uint32(mask))) }
-func (r *RITNS) StoreBits(mask, b ITNS) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RITNS) SetBits(mask ITNS)      { r.U32.SetBits(uint32(mask)) }
-func (r *RITNS) ClearBits(mask ITNS)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RITNS) Load() ITNS             { return ITNS(r.U32.Load()) }
-func (r *RITNS) Store(b ITNS)           { r.U32.Store(uint32(b)) }
+func (r *RITNS) LoadBits(mask ITNS) ITNS { return ITNS(r.U32.LoadBits(uint32(mask))) }
+func (r *RITNS) StoreBits(mask, b ITNS)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RITNS) SetBits(mask ITNS)       { r.U32.SetBits(uint32(mask)) }
+func (r *RITNS) ClearBits(mask ITNS)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RITNS) Load() ITNS              { return ITNS(r.U32.Load()) }
+func (r *RITNS) Store(b ITNS)            { r.U32.Store(uint32(b)) }
 
 type RMITNS struct{ mmio.UM32 }
 
@@ -131,7 +131,7 @@ type IPR uint8
 
 type RIPR struct{ mmio.U8 }
 
-func (r *RIPR) Bits(mask IPR) IPR     { return IPR(r.U8.Bits(uint8(mask))) }
+func (r *RIPR) LoadBits(mask IPR) IPR { return IPR(r.U8.LoadBits(uint8(mask))) }
 func (r *RIPR) StoreBits(mask, b IPR) { r.U8.StoreBits(uint8(mask), uint8(b)) }
 func (r *RIPR) SetBits(mask IPR)      { r.U8.SetBits(uint8(mask)) }
 func (r *RIPR) ClearBits(mask IPR)    { r.U8.ClearBits(uint8(mask)) }
@@ -147,12 +147,12 @@ type STIR uint32
 
 type RSTIR struct{ mmio.U32 }
 
-func (r *RSTIR) Bits(mask STIR) STIR    { return STIR(r.U32.Bits(uint32(mask))) }
-func (r *RSTIR) StoreBits(mask, b STIR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RSTIR) SetBits(mask STIR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RSTIR) ClearBits(mask STIR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RSTIR) Load() STIR             { return STIR(r.U32.Load()) }
-func (r *RSTIR) Store(b STIR)           { r.U32.Store(uint32(b)) }
+func (r *RSTIR) LoadBits(mask STIR) STIR { return STIR(r.U32.LoadBits(uint32(mask))) }
+func (r *RSTIR) StoreBits(mask, b STIR)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RSTIR) SetBits(mask STIR)       { r.U32.SetBits(uint32(mask)) }
+func (r *RSTIR) ClearBits(mask STIR)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RSTIR) Load() STIR              { return STIR(r.U32.Load()) }
+func (r *RSTIR) Store(b STIR)            { r.U32.Store(uint32(b)) }
 
 type RMSTIR struct{ mmio.UM32 }
 

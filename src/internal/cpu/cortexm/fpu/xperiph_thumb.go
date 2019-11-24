@@ -25,12 +25,12 @@ type CPACR uint32
 
 type RCPACR struct{ mmio.U32 }
 
-func (r *RCPACR) Bits(mask CPACR) CPACR   { return CPACR(r.U32.Bits(uint32(mask))) }
-func (r *RCPACR) StoreBits(mask, b CPACR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RCPACR) SetBits(mask CPACR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RCPACR) ClearBits(mask CPACR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RCPACR) Load() CPACR             { return CPACR(r.U32.Load()) }
-func (r *RCPACR) Store(b CPACR)           { r.U32.Store(uint32(b)) }
+func (r *RCPACR) LoadBits(mask CPACR) CPACR { return CPACR(r.U32.LoadBits(uint32(mask))) }
+func (r *RCPACR) StoreBits(mask, b CPACR)   { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RCPACR) SetBits(mask CPACR)        { r.U32.SetBits(uint32(mask)) }
+func (r *RCPACR) ClearBits(mask CPACR)      { r.U32.ClearBits(uint32(mask)) }
+func (r *RCPACR) Load() CPACR               { return CPACR(r.U32.Load()) }
+func (r *RCPACR) Store(b CPACR)             { r.U32.Store(uint32(b)) }
 
 type RMCPACR struct{ mmio.UM32 }
 
@@ -49,12 +49,12 @@ type FPCCR uint32
 
 type RFPCCR struct{ mmio.U32 }
 
-func (r *RFPCCR) Bits(mask FPCCR) FPCCR   { return FPCCR(r.U32.Bits(uint32(mask))) }
-func (r *RFPCCR) StoreBits(mask, b FPCCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RFPCCR) SetBits(mask FPCCR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RFPCCR) ClearBits(mask FPCCR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RFPCCR) Load() FPCCR             { return FPCCR(r.U32.Load()) }
-func (r *RFPCCR) Store(b FPCCR)           { r.U32.Store(uint32(b)) }
+func (r *RFPCCR) LoadBits(mask FPCCR) FPCCR { return FPCCR(r.U32.LoadBits(uint32(mask))) }
+func (r *RFPCCR) StoreBits(mask, b FPCCR)   { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RFPCCR) SetBits(mask FPCCR)        { r.U32.SetBits(uint32(mask)) }
+func (r *RFPCCR) ClearBits(mask FPCCR)      { r.U32.ClearBits(uint32(mask)) }
+func (r *RFPCCR) Load() FPCCR               { return FPCCR(r.U32.Load()) }
+func (r *RFPCCR) Store(b FPCCR)             { r.U32.Store(uint32(b)) }
 
 type RMFPCCR struct{ mmio.UM32 }
 
@@ -101,12 +101,12 @@ type FPCAR uint32
 
 type RFPCAR struct{ mmio.U32 }
 
-func (r *RFPCAR) Bits(mask FPCAR) FPCAR   { return FPCAR(r.U32.Bits(uint32(mask))) }
-func (r *RFPCAR) StoreBits(mask, b FPCAR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RFPCAR) SetBits(mask FPCAR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RFPCAR) ClearBits(mask FPCAR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RFPCAR) Load() FPCAR             { return FPCAR(r.U32.Load()) }
-func (r *RFPCAR) Store(b FPCAR)           { r.U32.Store(uint32(b)) }
+func (r *RFPCAR) LoadBits(mask FPCAR) FPCAR { return FPCAR(r.U32.LoadBits(uint32(mask))) }
+func (r *RFPCAR) StoreBits(mask, b FPCAR)   { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RFPCAR) SetBits(mask FPCAR)        { r.U32.SetBits(uint32(mask)) }
+func (r *RFPCAR) ClearBits(mask FPCAR)      { r.U32.ClearBits(uint32(mask)) }
+func (r *RFPCAR) Load() FPCAR               { return FPCAR(r.U32.Load()) }
+func (r *RFPCAR) Store(b FPCAR)             { r.U32.Store(uint32(b)) }
 
 type RMFPCAR struct{ mmio.UM32 }
 
@@ -121,12 +121,12 @@ type FPDSCR uint32
 
 type RFPDSCR struct{ mmio.U32 }
 
-func (r *RFPDSCR) Bits(mask FPDSCR) FPDSCR  { return FPDSCR(r.U32.Bits(uint32(mask))) }
-func (r *RFPDSCR) StoreBits(mask, b FPDSCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RFPDSCR) SetBits(mask FPDSCR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RFPDSCR) ClearBits(mask FPDSCR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RFPDSCR) Load() FPDSCR             { return FPDSCR(r.U32.Load()) }
-func (r *RFPDSCR) Store(b FPDSCR)           { r.U32.Store(uint32(b)) }
+func (r *RFPDSCR) LoadBits(mask FPDSCR) FPDSCR { return FPDSCR(r.U32.LoadBits(uint32(mask))) }
+func (r *RFPDSCR) StoreBits(mask, b FPDSCR)    { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RFPDSCR) SetBits(mask FPDSCR)         { r.U32.SetBits(uint32(mask)) }
+func (r *RFPDSCR) ClearBits(mask FPDSCR)       { r.U32.ClearBits(uint32(mask)) }
+func (r *RFPDSCR) Load() FPDSCR                { return FPDSCR(r.U32.Load()) }
+func (r *RFPDSCR) Store(b FPDSCR)              { r.U32.Store(uint32(b)) }
 
 type RMFPDSCR struct{ mmio.UM32 }
 

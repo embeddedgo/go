@@ -23,7 +23,7 @@ type MCR uint32
 
 type RMCR struct{ mmio.U32 }
 
-func (r *RMCR) Bits(mask MCR) MCR     { return MCR(r.U32.Bits(uint32(mask))) }
+func (r *RMCR) LoadBits(mask MCR) MCR { return MCR(r.U32.LoadBits(uint32(mask))) }
 func (r *RMCR) StoreBits(mask, b MCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RMCR) SetBits(mask MCR)      { r.U32.SetBits(uint32(mask)) }
 func (r *RMCR) ClearBits(mask MCR)    { r.U32.ClearBits(uint32(mask)) }
@@ -39,12 +39,12 @@ type ICTR uint32
 
 type RICTR struct{ mmio.U32 }
 
-func (r *RICTR) Bits(mask ICTR) ICTR    { return ICTR(r.U32.Bits(uint32(mask))) }
-func (r *RICTR) StoreBits(mask, b ICTR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RICTR) SetBits(mask ICTR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RICTR) ClearBits(mask ICTR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RICTR) Load() ICTR             { return ICTR(r.U32.Load()) }
-func (r *RICTR) Store(b ICTR)           { r.U32.Store(uint32(b)) }
+func (r *RICTR) LoadBits(mask ICTR) ICTR { return ICTR(r.U32.LoadBits(uint32(mask))) }
+func (r *RICTR) StoreBits(mask, b ICTR)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RICTR) SetBits(mask ICTR)       { r.U32.SetBits(uint32(mask)) }
+func (r *RICTR) ClearBits(mask ICTR)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RICTR) Load() ICTR              { return ICTR(r.U32.Load()) }
+func (r *RICTR) Store(b ICTR)            { r.U32.Store(uint32(b)) }
 
 type RMICTR struct{ mmio.UM32 }
 
@@ -59,12 +59,12 @@ type ACTLR uint32
 
 type RACTLR struct{ mmio.U32 }
 
-func (r *RACTLR) Bits(mask ACTLR) ACTLR   { return ACTLR(r.U32.Bits(uint32(mask))) }
-func (r *RACTLR) StoreBits(mask, b ACTLR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RACTLR) SetBits(mask ACTLR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RACTLR) ClearBits(mask ACTLR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RACTLR) Load() ACTLR             { return ACTLR(r.U32.Load()) }
-func (r *RACTLR) Store(b ACTLR)           { r.U32.Store(uint32(b)) }
+func (r *RACTLR) LoadBits(mask ACTLR) ACTLR { return ACTLR(r.U32.LoadBits(uint32(mask))) }
+func (r *RACTLR) StoreBits(mask, b ACTLR)   { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RACTLR) SetBits(mask ACTLR)        { r.U32.SetBits(uint32(mask)) }
+func (r *RACTLR) ClearBits(mask ACTLR)      { r.U32.ClearBits(uint32(mask)) }
+func (r *RACTLR) Load() ACTLR               { return ACTLR(r.U32.Load()) }
+func (r *RACTLR) Store(b ACTLR)             { r.U32.Store(uint32(b)) }
 
 type RMACTLR struct{ mmio.UM32 }
 

@@ -24,12 +24,12 @@ type CLIDR uint32
 
 type RCLIDR struct{ mmio.U32 }
 
-func (r *RCLIDR) Bits(mask CLIDR) CLIDR   { return CLIDR(r.U32.Bits(uint32(mask))) }
-func (r *RCLIDR) StoreBits(mask, b CLIDR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RCLIDR) SetBits(mask CLIDR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RCLIDR) ClearBits(mask CLIDR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RCLIDR) Load() CLIDR             { return CLIDR(r.U32.Load()) }
-func (r *RCLIDR) Store(b CLIDR)           { r.U32.Store(uint32(b)) }
+func (r *RCLIDR) LoadBits(mask CLIDR) CLIDR { return CLIDR(r.U32.LoadBits(uint32(mask))) }
+func (r *RCLIDR) StoreBits(mask, b CLIDR)   { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RCLIDR) SetBits(mask CLIDR)        { r.U32.SetBits(uint32(mask)) }
+func (r *RCLIDR) ClearBits(mask CLIDR)      { r.U32.ClearBits(uint32(mask)) }
+func (r *RCLIDR) Load() CLIDR               { return CLIDR(r.U32.Load()) }
+func (r *RCLIDR) Store(b CLIDR)             { r.U32.Store(uint32(b)) }
 
 type RMCLIDR struct{ mmio.UM32 }
 
@@ -136,7 +136,7 @@ type CTR uint32
 
 type RCTR struct{ mmio.U32 }
 
-func (r *RCTR) Bits(mask CTR) CTR     { return CTR(r.U32.Bits(uint32(mask))) }
+func (r *RCTR) LoadBits(mask CTR) CTR { return CTR(r.U32.LoadBits(uint32(mask))) }
 func (r *RCTR) StoreBits(mask, b CTR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RCTR) SetBits(mask CTR)      { r.U32.SetBits(uint32(mask)) }
 func (r *RCTR) ClearBits(mask CTR)    { r.U32.ClearBits(uint32(mask)) }
@@ -172,12 +172,12 @@ type CCSIDR uint32
 
 type RCCSIDR struct{ mmio.U32 }
 
-func (r *RCCSIDR) Bits(mask CCSIDR) CCSIDR  { return CCSIDR(r.U32.Bits(uint32(mask))) }
-func (r *RCCSIDR) StoreBits(mask, b CCSIDR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RCCSIDR) SetBits(mask CCSIDR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RCCSIDR) ClearBits(mask CCSIDR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RCCSIDR) Load() CCSIDR             { return CCSIDR(r.U32.Load()) }
-func (r *RCCSIDR) Store(b CCSIDR)           { r.U32.Store(uint32(b)) }
+func (r *RCCSIDR) LoadBits(mask CCSIDR) CCSIDR { return CCSIDR(r.U32.LoadBits(uint32(mask))) }
+func (r *RCCSIDR) StoreBits(mask, b CCSIDR)    { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RCCSIDR) SetBits(mask CCSIDR)         { r.U32.SetBits(uint32(mask)) }
+func (r *RCCSIDR) ClearBits(mask CCSIDR)       { r.U32.ClearBits(uint32(mask)) }
+func (r *RCCSIDR) Load() CCSIDR                { return CCSIDR(r.U32.Load()) }
+func (r *RCCSIDR) Store(b CCSIDR)              { r.U32.Store(uint32(b)) }
 
 type RMCCSIDR struct{ mmio.UM32 }
 
@@ -216,12 +216,12 @@ type CSSELR uint32
 
 type RCSSELR struct{ mmio.U32 }
 
-func (r *RCSSELR) Bits(mask CSSELR) CSSELR  { return CSSELR(r.U32.Bits(uint32(mask))) }
-func (r *RCSSELR) StoreBits(mask, b CSSELR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RCSSELR) SetBits(mask CSSELR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RCSSELR) ClearBits(mask CSSELR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RCSSELR) Load() CSSELR             { return CSSELR(r.U32.Load()) }
-func (r *RCSSELR) Store(b CSSELR)           { r.U32.Store(uint32(b)) }
+func (r *RCSSELR) LoadBits(mask CSSELR) CSSELR { return CSSELR(r.U32.LoadBits(uint32(mask))) }
+func (r *RCSSELR) StoreBits(mask, b CSSELR)    { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RCSSELR) SetBits(mask CSSELR)         { r.U32.SetBits(uint32(mask)) }
+func (r *RCSSELR) ClearBits(mask CSSELR)       { r.U32.ClearBits(uint32(mask)) }
+func (r *RCSSELR) Load() CSSELR                { return CSSELR(r.U32.Load()) }
+func (r *RCSSELR) Store(b CSSELR)              { r.U32.Store(uint32(b)) }
 
 type RMCSSELR struct{ mmio.UM32 }
 

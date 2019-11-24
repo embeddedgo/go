@@ -24,7 +24,7 @@ type CSR uint32
 
 type RCSR struct{ mmio.U32 }
 
-func (r *RCSR) Bits(mask CSR) CSR     { return CSR(r.U32.Bits(uint32(mask))) }
+func (r *RCSR) LoadBits(mask CSR) CSR { return CSR(r.U32.LoadBits(uint32(mask))) }
 func (r *RCSR) StoreBits(mask, b CSR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RCSR) SetBits(mask CSR)      { r.U32.SetBits(uint32(mask)) }
 func (r *RCSR) ClearBits(mask CSR)    { r.U32.ClearBits(uint32(mask)) }
@@ -56,7 +56,7 @@ type RVR uint32
 
 type RRVR struct{ mmio.U32 }
 
-func (r *RRVR) Bits(mask RVR) RVR     { return RVR(r.U32.Bits(uint32(mask))) }
+func (r *RRVR) LoadBits(mask RVR) RVR { return RVR(r.U32.LoadBits(uint32(mask))) }
 func (r *RRVR) StoreBits(mask, b RVR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RRVR) SetBits(mask RVR)      { r.U32.SetBits(uint32(mask)) }
 func (r *RRVR) ClearBits(mask RVR)    { r.U32.ClearBits(uint32(mask)) }
@@ -76,7 +76,7 @@ type CVR uint32
 
 type RCVR struct{ mmio.U32 }
 
-func (r *RCVR) Bits(mask CVR) CVR     { return CVR(r.U32.Bits(uint32(mask))) }
+func (r *RCVR) LoadBits(mask CVR) CVR { return CVR(r.U32.LoadBits(uint32(mask))) }
 func (r *RCVR) StoreBits(mask, b CVR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RCVR) SetBits(mask CVR)      { r.U32.SetBits(uint32(mask)) }
 func (r *RCVR) ClearBits(mask CVR)    { r.U32.ClearBits(uint32(mask)) }
@@ -96,12 +96,12 @@ type CALIB uint32
 
 type RCALIB struct{ mmio.U32 }
 
-func (r *RCALIB) Bits(mask CALIB) CALIB   { return CALIB(r.U32.Bits(uint32(mask))) }
-func (r *RCALIB) StoreBits(mask, b CALIB) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RCALIB) SetBits(mask CALIB)      { r.U32.SetBits(uint32(mask)) }
-func (r *RCALIB) ClearBits(mask CALIB)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RCALIB) Load() CALIB             { return CALIB(r.U32.Load()) }
-func (r *RCALIB) Store(b CALIB)           { r.U32.Store(uint32(b)) }
+func (r *RCALIB) LoadBits(mask CALIB) CALIB { return CALIB(r.U32.LoadBits(uint32(mask))) }
+func (r *RCALIB) StoreBits(mask, b CALIB)   { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RCALIB) SetBits(mask CALIB)        { r.U32.SetBits(uint32(mask)) }
+func (r *RCALIB) ClearBits(mask CALIB)      { r.U32.ClearBits(uint32(mask)) }
+func (r *RCALIB) Load() CALIB               { return CALIB(r.U32.Load()) }
+func (r *RCALIB) Store(b CALIB)             { r.U32.Store(uint32(b)) }
 
 type RMCALIB struct{ mmio.UM32 }
 

@@ -30,12 +30,12 @@ type STIM uint32
 
 type RSTIM struct{ mmio.U32 }
 
-func (r *RSTIM) Bits(mask STIM) STIM    { return STIM(r.U32.Bits(uint32(mask))) }
-func (r *RSTIM) StoreBits(mask, b STIM) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RSTIM) SetBits(mask STIM)      { r.U32.SetBits(uint32(mask)) }
-func (r *RSTIM) ClearBits(mask STIM)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RSTIM) Load() STIM             { return STIM(r.U32.Load()) }
-func (r *RSTIM) Store(b STIM)           { r.U32.Store(uint32(b)) }
+func (r *RSTIM) LoadBits(mask STIM) STIM { return STIM(r.U32.LoadBits(uint32(mask))) }
+func (r *RSTIM) StoreBits(mask, b STIM)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RSTIM) SetBits(mask STIM)       { r.U32.SetBits(uint32(mask)) }
+func (r *RSTIM) ClearBits(mask STIM)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RSTIM) Load() STIM              { return STIM(r.U32.Load()) }
+func (r *RSTIM) Store(b STIM)            { r.U32.Store(uint32(b)) }
 
 type RMSTIM struct{ mmio.UM32 }
 
@@ -46,7 +46,7 @@ type TER uint32
 
 type RTER struct{ mmio.U32 }
 
-func (r *RTER) Bits(mask TER) TER     { return TER(r.U32.Bits(uint32(mask))) }
+func (r *RTER) LoadBits(mask TER) TER { return TER(r.U32.LoadBits(uint32(mask))) }
 func (r *RTER) StoreBits(mask, b TER) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RTER) SetBits(mask TER)      { r.U32.SetBits(uint32(mask)) }
 func (r *RTER) ClearBits(mask TER)    { r.U32.ClearBits(uint32(mask)) }
@@ -62,7 +62,7 @@ type TPR uint32
 
 type RTPR struct{ mmio.U32 }
 
-func (r *RTPR) Bits(mask TPR) TPR     { return TPR(r.U32.Bits(uint32(mask))) }
+func (r *RTPR) LoadBits(mask TPR) TPR { return TPR(r.U32.LoadBits(uint32(mask))) }
 func (r *RTPR) StoreBits(mask, b TPR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RTPR) SetBits(mask TPR)      { r.U32.SetBits(uint32(mask)) }
 func (r *RTPR) ClearBits(mask TPR)    { r.U32.ClearBits(uint32(mask)) }
@@ -78,7 +78,7 @@ type TCR uint32
 
 type RTCR struct{ mmio.U32 }
 
-func (r *RTCR) Bits(mask TCR) TCR     { return TCR(r.U32.Bits(uint32(mask))) }
+func (r *RTCR) LoadBits(mask TCR) TCR { return TCR(r.U32.LoadBits(uint32(mask))) }
 func (r *RTCR) StoreBits(mask, b TCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RTCR) SetBits(mask TCR)      { r.U32.SetBits(uint32(mask)) }
 func (r *RTCR) ClearBits(mask TCR)    { r.U32.ClearBits(uint32(mask)) }
@@ -130,7 +130,7 @@ type PID uint32
 
 type RPID struct{ mmio.U32 }
 
-func (r *RPID) Bits(mask PID) PID     { return PID(r.U32.Bits(uint32(mask))) }
+func (r *RPID) LoadBits(mask PID) PID { return PID(r.U32.LoadBits(uint32(mask))) }
 func (r *RPID) StoreBits(mask, b PID) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RPID) SetBits(mask PID)      { r.U32.SetBits(uint32(mask)) }
 func (r *RPID) ClearBits(mask PID)    { r.U32.ClearBits(uint32(mask)) }
@@ -146,7 +146,7 @@ type CID uint32
 
 type RCID struct{ mmio.U32 }
 
-func (r *RCID) Bits(mask CID) CID     { return CID(r.U32.Bits(uint32(mask))) }
+func (r *RCID) LoadBits(mask CID) CID { return CID(r.U32.LoadBits(uint32(mask))) }
 func (r *RCID) StoreBits(mask, b CID) { r.U32.StoreBits(uint32(mask), uint32(b)) }
 func (r *RCID) SetBits(mask CID)      { r.U32.SetBits(uint32(mask)) }
 func (r *RCID) ClearBits(mask CID)    { r.U32.ClearBits(uint32(mask)) }

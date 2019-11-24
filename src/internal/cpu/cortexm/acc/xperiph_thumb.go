@@ -27,12 +27,12 @@ type ITCMCR uint32
 
 type RITCMCR struct{ mmio.U32 }
 
-func (r *RITCMCR) Bits(mask ITCMCR) ITCMCR  { return ITCMCR(r.U32.Bits(uint32(mask))) }
-func (r *RITCMCR) StoreBits(mask, b ITCMCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RITCMCR) SetBits(mask ITCMCR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RITCMCR) ClearBits(mask ITCMCR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RITCMCR) Load() ITCMCR             { return ITCMCR(r.U32.Load()) }
-func (r *RITCMCR) Store(b ITCMCR)           { r.U32.Store(uint32(b)) }
+func (r *RITCMCR) LoadBits(mask ITCMCR) ITCMCR { return ITCMCR(r.U32.LoadBits(uint32(mask))) }
+func (r *RITCMCR) StoreBits(mask, b ITCMCR)    { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RITCMCR) SetBits(mask ITCMCR)         { r.U32.SetBits(uint32(mask)) }
+func (r *RITCMCR) ClearBits(mask ITCMCR)       { r.U32.ClearBits(uint32(mask)) }
+func (r *RITCMCR) Load() ITCMCR                { return ITCMCR(r.U32.Load()) }
+func (r *RITCMCR) Store(b ITCMCR)              { r.U32.Store(uint32(b)) }
 
 type RMITCMCR struct{ mmio.UM32 }
 
@@ -59,12 +59,12 @@ type DTCMCR uint32
 
 type RDTCMCR struct{ mmio.U32 }
 
-func (r *RDTCMCR) Bits(mask DTCMCR) DTCMCR  { return DTCMCR(r.U32.Bits(uint32(mask))) }
-func (r *RDTCMCR) StoreBits(mask, b DTCMCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RDTCMCR) SetBits(mask DTCMCR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RDTCMCR) ClearBits(mask DTCMCR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RDTCMCR) Load() DTCMCR             { return DTCMCR(r.U32.Load()) }
-func (r *RDTCMCR) Store(b DTCMCR)           { r.U32.Store(uint32(b)) }
+func (r *RDTCMCR) LoadBits(mask DTCMCR) DTCMCR { return DTCMCR(r.U32.LoadBits(uint32(mask))) }
+func (r *RDTCMCR) StoreBits(mask, b DTCMCR)    { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RDTCMCR) SetBits(mask DTCMCR)         { r.U32.SetBits(uint32(mask)) }
+func (r *RDTCMCR) ClearBits(mask DTCMCR)       { r.U32.ClearBits(uint32(mask)) }
+func (r *RDTCMCR) Load() DTCMCR                { return DTCMCR(r.U32.Load()) }
+func (r *RDTCMCR) Store(b DTCMCR)              { r.U32.Store(uint32(b)) }
 
 type RMDTCMCR struct{ mmio.UM32 }
 
@@ -91,12 +91,12 @@ type AHBPCR uint32
 
 type RAHBPCR struct{ mmio.U32 }
 
-func (r *RAHBPCR) Bits(mask AHBPCR) AHBPCR  { return AHBPCR(r.U32.Bits(uint32(mask))) }
-func (r *RAHBPCR) StoreBits(mask, b AHBPCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RAHBPCR) SetBits(mask AHBPCR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RAHBPCR) ClearBits(mask AHBPCR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RAHBPCR) Load() AHBPCR             { return AHBPCR(r.U32.Load()) }
-func (r *RAHBPCR) Store(b AHBPCR)           { r.U32.Store(uint32(b)) }
+func (r *RAHBPCR) LoadBits(mask AHBPCR) AHBPCR { return AHBPCR(r.U32.LoadBits(uint32(mask))) }
+func (r *RAHBPCR) StoreBits(mask, b AHBPCR)    { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RAHBPCR) SetBits(mask AHBPCR)         { r.U32.SetBits(uint32(mask)) }
+func (r *RAHBPCR) ClearBits(mask AHBPCR)       { r.U32.ClearBits(uint32(mask)) }
+func (r *RAHBPCR) Load() AHBPCR                { return AHBPCR(r.U32.Load()) }
+func (r *RAHBPCR) Store(b AHBPCR)              { r.U32.Store(uint32(b)) }
 
 type RMAHBPCR struct{ mmio.UM32 }
 
@@ -115,12 +115,12 @@ type CACR uint32
 
 type RCACR struct{ mmio.U32 }
 
-func (r *RCACR) Bits(mask CACR) CACR    { return CACR(r.U32.Bits(uint32(mask))) }
-func (r *RCACR) StoreBits(mask, b CACR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RCACR) SetBits(mask CACR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RCACR) ClearBits(mask CACR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RCACR) Load() CACR             { return CACR(r.U32.Load()) }
-func (r *RCACR) Store(b CACR)           { r.U32.Store(uint32(b)) }
+func (r *RCACR) LoadBits(mask CACR) CACR { return CACR(r.U32.LoadBits(uint32(mask))) }
+func (r *RCACR) StoreBits(mask, b CACR)  { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RCACR) SetBits(mask CACR)       { r.U32.SetBits(uint32(mask)) }
+func (r *RCACR) ClearBits(mask CACR)     { r.U32.ClearBits(uint32(mask)) }
+func (r *RCACR) Load() CACR              { return CACR(r.U32.Load()) }
+func (r *RCACR) Store(b CACR)            { r.U32.Store(uint32(b)) }
 
 type RMCACR struct{ mmio.UM32 }
 
@@ -143,12 +143,12 @@ type AHBSCR uint32
 
 type RAHBSCR struct{ mmio.U32 }
 
-func (r *RAHBSCR) Bits(mask AHBSCR) AHBSCR  { return AHBSCR(r.U32.Bits(uint32(mask))) }
-func (r *RAHBSCR) StoreBits(mask, b AHBSCR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RAHBSCR) SetBits(mask AHBSCR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RAHBSCR) ClearBits(mask AHBSCR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RAHBSCR) Load() AHBSCR             { return AHBSCR(r.U32.Load()) }
-func (r *RAHBSCR) Store(b AHBSCR)           { r.U32.Store(uint32(b)) }
+func (r *RAHBSCR) LoadBits(mask AHBSCR) AHBSCR { return AHBSCR(r.U32.LoadBits(uint32(mask))) }
+func (r *RAHBSCR) StoreBits(mask, b AHBSCR)    { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RAHBSCR) SetBits(mask AHBSCR)         { r.U32.SetBits(uint32(mask)) }
+func (r *RAHBSCR) ClearBits(mask AHBSCR)       { r.U32.ClearBits(uint32(mask)) }
+func (r *RAHBSCR) Load() AHBSCR                { return AHBSCR(r.U32.Load()) }
+func (r *RAHBSCR) Store(b AHBSCR)              { r.U32.Store(uint32(b)) }
 
 type RMAHBSCR struct{ mmio.UM32 }
 
@@ -171,12 +171,12 @@ type ABFSR uint32
 
 type RABFSR struct{ mmio.U32 }
 
-func (r *RABFSR) Bits(mask ABFSR) ABFSR   { return ABFSR(r.U32.Bits(uint32(mask))) }
-func (r *RABFSR) StoreBits(mask, b ABFSR) { r.U32.StoreBits(uint32(mask), uint32(b)) }
-func (r *RABFSR) SetBits(mask ABFSR)      { r.U32.SetBits(uint32(mask)) }
-func (r *RABFSR) ClearBits(mask ABFSR)    { r.U32.ClearBits(uint32(mask)) }
-func (r *RABFSR) Load() ABFSR             { return ABFSR(r.U32.Load()) }
-func (r *RABFSR) Store(b ABFSR)           { r.U32.Store(uint32(b)) }
+func (r *RABFSR) LoadBits(mask ABFSR) ABFSR { return ABFSR(r.U32.LoadBits(uint32(mask))) }
+func (r *RABFSR) StoreBits(mask, b ABFSR)   { r.U32.StoreBits(uint32(mask), uint32(b)) }
+func (r *RABFSR) SetBits(mask ABFSR)        { r.U32.SetBits(uint32(mask)) }
+func (r *RABFSR) ClearBits(mask ABFSR)      { r.U32.ClearBits(uint32(mask)) }
+func (r *RABFSR) Load() ABFSR               { return ABFSR(r.U32.Load()) }
+func (r *RABFSR) Store(b ABFSR)             { r.U32.Store(uint32(b)) }
 
 type RMABFSR struct{ mmio.UM32 }
 
