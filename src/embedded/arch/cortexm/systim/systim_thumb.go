@@ -12,7 +12,6 @@
 package systim
 
 import (
-	"embedded/mmio"
 	"internal/cpu/cortexm"
 	"internal/cpu/cortexm/scb"
 	"internal/cpu/cortexm/systick"
@@ -31,9 +30,7 @@ func Nanotime() int64 {
 	var downtick uint32
 	reloadcnt := systim.reloadcnt // non-atomic!
 	for {
-		mmio.MB()
 		downtick = uint32(st.CURRENT().Load())
-		mmio.MB()
 		reloadcnt1 := systim.reloadcnt // non-atomic!
 		if reloadcnt1 == reloadcnt {
 			break
