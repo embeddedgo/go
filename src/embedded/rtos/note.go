@@ -28,13 +28,13 @@ func (n *Note) Sleep(ns int64) bool { return runtime_notetsleepg(n, ns) }
 // Wakeup wakeups the goroutine that sleeps or will try to sleep on the note.
 func (n *Note) Wakeup() { notewakeup(n) }
 
-// Clear clears the note. It also behaves as full memory barrier in a way that
-// the Clear itself and any memory access preceding it in the program order
-// happens before any memory access that follows it.
-func (n *Note) Clear() { atomic_Storeuintptr(&n.key, 0) }
+// Clear clears the note. It also works as publication barrier in a way that
+// the Clear itself and any memory writes preceding it in the program order
+// happens before any memory writes that follows it.
+func (n *Note) Clear() {
+	n.key = 0
+	publicationBarrier()
+}
 
 //go:linkname runtime_notetsleepg runtime.notetsleepg
 func runtime_notetsleepg(n *Note, ns int64) bool
-
-//go:linkname atomic_Storeuintptr runtime/internal/atomic.Storeuintptr
-func atomic_Storeuintptr(p *uintptr, v uintptr)
