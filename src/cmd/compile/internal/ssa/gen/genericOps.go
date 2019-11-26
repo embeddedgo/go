@@ -563,6 +563,9 @@ var genericOps = []opData{
 	{name: "MMIOStore8", argLength: 3, typ: "Mem", hasSideEffects: true},
 	{name: "MMIOMB", argLength: 1, typ: "Mem", hasSideEffects: true},
 
+	// Publication barrier
+	{name: "PublicationBarrier", argLength: 1, typ: "Mem", hasSideEffects: true},
+
 	// Clobber experiment op
 	{name: "Clobber", argLength: 0, typ: "Void", aux: "SymOff", symEffect: "None"}, // write an invalid pointer value to the given pointer slot of a stack variable
 }

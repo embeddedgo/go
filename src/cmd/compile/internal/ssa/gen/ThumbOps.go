@@ -368,6 +368,7 @@ func init() {
 		{name: "StoreOnce16", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVH", typ: "Mem", symEffect: "Write", hasSideEffects: true, faultOnNilArg0: true},
 		{name: "StoreOnce32", argLength: 3, reg: gpstore, aux: "SymOff", asm: "MOVW", typ: "Mem", symEffect: "Write", hasSideEffects: true, faultOnNilArg0: true},
 		{name: "DSB", argLength: 1, typ: "Mem", asm: "DSB", hasSideEffects: true},
+		{name: "DMB_ST", argLength: 1, typ: "Mem", asm: "DMB", hasSideEffects: true},
 		{name: "LoadOnce8idx", argLength: 3, reg: gp2load, asm: "MOVB", typ: "(UInt8,Mem)", hasSideEffects: true, faultOnNilArg0: true},
 		{name: "LoadOnce16idx", argLength: 3, reg: gp2load, asm: "MOVH", typ: "(UInt16,Mem)", hasSideEffects: true, faultOnNilArg0: true},
 		{name: "LoadOnce32idx", argLength: 3, reg: gp2load, asm: "MOVW", typ: "(UInt32,Mem)", hasSideEffects: true, faultOnNilArg0: true},

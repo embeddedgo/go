@@ -3016,6 +3016,7 @@ func init() {
 			},
 			all...)
 	}
+
 	addF("runtime/internal/math", "MulUintptr",
 		func(s *state, n *Node, args []*ssa.Value) *ssa.Value {
 			if s.config.PtrSize == 4 {
@@ -3703,6 +3704,14 @@ func init() {
 	add("embedded/mmio", "MB",
 		func(s *state, n *Node, args []*ssa.Value) *ssa.Value {
 			s.vars[&memVar] = s.newValue1(ssa.OpMMIOMB, types.TypeMem, s.mem())
+			return nil
+		},
+		sys.ArchThumb)
+
+	/******** embedded/rtos ********/
+	add("embedded/rtos", "publicationBarrier",
+		func(s *state, n *Node, args []*ssa.Value) *ssa.Value {
+			s.vars[&memVar] = s.newValue1(ssa.OpPublicationBarrier, types.TypeMem, s.mem())
 			return nil
 		},
 		sys.ArchThumb)

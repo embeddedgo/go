@@ -254,6 +254,9 @@
 (MMIOStore32 ptr val mem) -> (StoreOnce32 ptr val mem)
 (MMIOMB mem) -> (DSB mem) // use DSB instead of DMB because of memory mapped CPU controll registers and to ensure memory update before the sleep (before WFI, WFE)
 
+// publication barrier
+(PublicationBarrier mem) -> (DMB_ST mem)
+
 // zero instructions
 (Zero [0] _ mem) -> mem
 (Zero [1] ptr mem) -> (MOVBstore ptr (MOVWconst [0]) mem)

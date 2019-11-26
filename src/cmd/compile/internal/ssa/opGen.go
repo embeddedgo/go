@@ -2292,6 +2292,7 @@ const (
 	OpThumbStoreOnce16
 	OpThumbStoreOnce32
 	OpThumbDSB
+	OpThumbDMB_ST
 	OpThumbLoadOnce8idx
 	OpThumbLoadOnce16idx
 	OpThumbLoadOnce32idx
@@ -2792,6 +2793,7 @@ const (
 	OpMMIOStore16
 	OpMMIOStore8
 	OpMMIOMB
+	OpPublicationBarrier
 	OpClobber
 )
 
@@ -30921,6 +30923,13 @@ var opcodeTable = [...]opInfo{
 		reg:            regInfo{},
 	},
 	{
+		name:           "DMB_ST",
+		argLen:         1,
+		hasSideEffects: true,
+		asm:            thumb.ADMB,
+		reg:            regInfo{},
+	},
+	{
 		name:           "LoadOnce8idx",
 		argLen:         3,
 		faultOnNilArg0: true,
@@ -34561,6 +34570,12 @@ var opcodeTable = [...]opInfo{
 	},
 	{
 		name:           "MMIOMB",
+		argLen:         1,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "PublicationBarrier",
 		argLen:         1,
 		hasSideEffects: true,
 		generic:        true,

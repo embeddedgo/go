@@ -325,6 +325,8 @@ func rewriteValueThumb(v *Value) bool {
 		return rewriteValueThumb_OpPanicBounds_0(v)
 	case OpPanicExtend:
 		return rewriteValueThumb_OpPanicExtend_0(v)
+	case OpPublicationBarrier:
+		return rewriteValueThumb_OpPublicationBarrier_0(v)
 	case OpRotateLeft16:
 		return rewriteValueThumb_OpRotateLeft16_0(v)
 	case OpRotateLeft32:
@@ -3665,6 +3667,17 @@ func rewriteValueThumb_OpPanicExtend_0(v *Value) bool {
 		return true
 	}
 	return false
+}
+func rewriteValueThumb_OpPublicationBarrier_0(v *Value) bool {
+	// match: (PublicationBarrier mem)
+	// cond:
+	// result: (DMB_ST mem)
+	for {
+		mem := v.Args[0]
+		v.reset(OpThumbDMB_ST)
+		v.AddArg(mem)
+		return true
+	}
 }
 func rewriteValueThumb_OpRotateLeft16_0(v *Value) bool {
 	b := v.Block

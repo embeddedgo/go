@@ -802,6 +802,10 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		// TODO: implement for clobberdead experiment. Nop is ok for now.
 	case ssa.OpThumbDSB:
 		s.Prog(thumb.ADSB)
+	case ssa.OpThumbDMB_ST:
+		p := s.Prog(thumb.ADMB)
+		p.From.Type = obj.TYPE_REG
+		p.From.Reg = thumb.REG_MB_ST
 	default:
 		v.Fatalf("genValue not implemented: %s", v.LongString())
 	}
