@@ -22,17 +22,19 @@ type Note struct {
 }
 
 // Sleep sleeps on cleared note until other goroutine or interrupt handler
-// call Wakeup or until the timeout ns.
+// call Wakeup or until the timeout.
 func (n *Note) Sleep(ns int64) bool { return runtime_notetsleepg(n, ns) }
 
 // Wakeup wakeups the goroutine that sleeps or will try to sleep on the note.
 func (n *Note) Wakeup() { notewakeup(n) }
 
-// Clear clears the note.
-func (n *Note) Clear() { runtime_noteclear(n) }
+// Clear clears the note. It also behaves as full memory barrier in a way that
+// the Clear itself and any memory access preceding it in the program order
+// happens before any memory access that follows it.
+func (n *Note) Clear() { atomic_Storeuintptr(&n.key, 0) }
 
 //go:linkname runtime_notetsleepg runtime.notetsleepg
 func runtime_notetsleepg(n *Note, ns int64) bool
 
-//go:linkname runtime_noteclear runtime.noteclear
-func runtime_noteclear(n *Note)
+//go:linkname atomic_Storeuintptr runtime/internal/atomic.Storeuintptr
+func atomic_Storeuintptr(p *uintptr, v uintptr)
