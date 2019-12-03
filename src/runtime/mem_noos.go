@@ -44,6 +44,7 @@ func (m *pamem) allocPages(size uintptr) unsafe.Pointer {
 //go:nosplit
 func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
 	var p uintptr
+	align-- // align must be power of two
 	astart := (m.start + align) &^ align
 	if m.end-astart >= size {
 		p = astart
