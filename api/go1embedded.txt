@@ -1,7 +1,7 @@
 pkg embedded/mmio, func MB()
 pkg embedded/mmio, method (*U16) Addr() uintptr
-pkg embedded/mmio, method (*U16) Bit(int) int
-pkg embedded/mmio, method (*U16) Bits(uint16) uint16
+pkg embedded/mmio, method (*U16) LoadBit(int) int
+pkg embedded/mmio, method (*U16) LoadBits(uint16) uint16
 pkg embedded/mmio, method (*U16) ClearBit(int)
 pkg embedded/mmio, method (*U16) ClearBits(uint16)
 pkg embedded/mmio, method (*U16) Load() uint16
@@ -11,8 +11,8 @@ pkg embedded/mmio, method (*U16) Store(uint16)
 pkg embedded/mmio, method (*U16) StoreBit(int, int)
 pkg embedded/mmio, method (*U16) StoreBits(uint16, uint16)
 pkg embedded/mmio, method (*U32) Addr() uintptr
-pkg embedded/mmio, method (*U32) Bit(int) int
-pkg embedded/mmio, method (*U32) Bits(uint32) uint32
+pkg embedded/mmio, method (*U32) LoadBit(int) int
+pkg embedded/mmio, method (*U32) LoadBits(uint32) uint32
 pkg embedded/mmio, method (*U32) ClearBit(int)
 pkg embedded/mmio, method (*U32) ClearBits(uint32)
 pkg embedded/mmio, method (*U32) Load() uint32
@@ -22,8 +22,8 @@ pkg embedded/mmio, method (*U32) Store(uint32)
 pkg embedded/mmio, method (*U32) StoreBit(int, int)
 pkg embedded/mmio, method (*U32) StoreBits(uint32, uint32)
 pkg embedded/mmio, method (*U8) Addr() uintptr
-pkg embedded/mmio, method (*U8) Bit(int) int
-pkg embedded/mmio, method (*U8) Bits(uint8) uint8
+pkg embedded/mmio, method (*U8) LoadBit(int) int
+pkg embedded/mmio, method (*U8) LoadBits(uint8) uint8
 pkg embedded/mmio, method (*U8) ClearBit(int)
 pkg embedded/mmio, method (*U8) ClearBits(uint8)
 pkg embedded/mmio, method (*U8) Load() uint8
@@ -69,6 +69,7 @@ pkg embedded/rtos, const IntPrioLowest int
 pkg embedded/rtos, const IntPrioSysTimer = 0
 pkg embedded/rtos, const IntPrioSysTimer int
 pkg embedded/rtos, func Nanotime() int64
+pkg embedded/rtos, func Nanosleep(int64)
 pkg embedded/rtos, func SetPrivLevel(int) (int, error)
 pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64)) error
 pkg embedded/rtos, method (*Error) Error() string
