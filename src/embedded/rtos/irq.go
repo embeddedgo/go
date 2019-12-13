@@ -4,28 +4,32 @@
 
 package rtos
 
-// Package rtos defines a five well known interrupt priority levels ordered by
-// increasing urgency as follows: IntPrioLowest, IRQPrioLow, IRQPrioSysTimer,
-// IRQPrioHigh, IRQPrioHighest. There can be additional priority levels between
-// the defined ones.
+// Package rtos defines a seven well known interrupt priority levels ordered by
+// increasing urgency as follows: IntPrioLowest, IntPrioLow, IntPrioSysCall,
+// IntPrioMid, IntPrioSysTimer, IntPrioHigh, IntPrioHighest. There can be
+// additional priority levels between the defined ones and some can have the
+// same level. You can use ordinary equality operators to compare priority
+// levels.
 //
-// You can use ordinary equality operators to compare priority levels. The
-// numeric values of the defined priority levels satisfy the following
-// inequality:
+// The architecture specific code should provide (if possible) at least four
+// different real priority levels so the defined levels can satisfy the
+// following inequality:
 //
-// IntPrioLowest <= IntPrioLow < IRQPrioSysTimer < IRQPrioHigh <= IRQPrioHighest
+// Lowest <= Low < SysCall < IntPrioMid <= SysTimer < High <= Highest
 //
 // Architecture that supports interrupt nesting must ensure that the incoming
 // interrupt request can not preempt the interrupt handler that runs with the
 // same or higher priority.
 const (
-	IntPrioLowest   int = intPrioLowest
-	IntPrioLow      int = intPrioLow
-	IntPrioSysTimer int = intPrioSysTimer
-	IntPrioHigh     int = intPrioHigh
 	IntPrioHighest  int = intPrioHighest
+	IntPrioHigh     int = intPrioHigh
+	IntPrioSysTimer int = intPrioSysTimer
+	IntPrioMid      int = intPrioMid
+	IntPrioSysCall  int = intPrioSysCall
+	IntPrioLow      int = intPrioLow
+	IntPrioLowest   int = intPrioLowest
 
-	IntPrioCurrent int = intPrioCurrent // do not change the current priority
+	IntPrioCurrent int = intPrioCurrent
 )
 
 // IRQ represents an user accessible interrupt. It provides interface to basic

@@ -5,8 +5,12 @@
 package rtos
 
 const (
-	intPrioLow      = intPrioHighest / 4
-	intPrioSysTimer = intPrioHighest / 2
-	intPrioHigh     = intPrioHighest * 3 / 4
-	intPrioHighest  = 255
+	intPrioHighest  = 255 - 0<<5 // do not use with nRF52 SoftDevice
+	intPrioHigh     = 255 - 1<<5
+	intPrioSysTimer = 255 - 2<<5
+	intPrioMid      = 255 - 3<<5
+	intPrioSysCall  = 255 - 4<<5 // compatible with nRF52 SoftDevice
+	intPrioLow      = 255 - 5<<5
+	intPrioLowest   = 255 - 6<<5
+	intPrioPendSV   = 255 - 255 // unusable because can not wake the scheduler
 )

@@ -6,10 +6,7 @@ package rtos
 
 import _ "unsafe"
 
-const (
-	intPrioCurrent = -1
-	intPrioLowest  = 0
-)
+const intPrioCurrent = -1
 
 func irqEnable(irq IRQ, prio int) error {
 	if uint(prio+1) > intPrioHighest+1 {
