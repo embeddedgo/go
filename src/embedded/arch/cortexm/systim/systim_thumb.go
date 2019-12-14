@@ -12,7 +12,7 @@
 package systim
 
 import (
-	"internal/cpu/cortexm"
+	"embedded/rtos"
 	"internal/cpu/cortexm/scb"
 	"internal/cpu/cortexm/systick"
 	_ "unsafe"
@@ -59,10 +59,8 @@ func Setup(periodns, clkhz int64, external bool) {
 		systim.periodns = 0
 		return
 	}
-	// Set SysTick exception priority in the middle ov available levels.
-	scb.SCB().PRI_SysTick().Store(
-		(cortexm.PrioLo + cortexm.PrioHi) / 2 << scb.PRI_SysTickn,
-	)
+	// Set SysTick exception priority accortding to rtos package.
+	scb.SCB().PRI_SysTick().Store(255 - rtos.IntPrioSysTimer)
 	systim.periodns = periodns
 	systim.reloadcnt = 1 // ensure that nanotime never return zero
 	periodtick := uint32((periodns*clkhz + 5e8) / 1e9)

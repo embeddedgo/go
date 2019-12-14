@@ -65,11 +65,9 @@ func taskerpreinit() {
 
 	sc := scb.SCB()
 
-	// SVCall and PendSV exceptions should have the lowest priority level. They
-	// are both logically part of the thread mode so other exceptions must be
-	// able to preempt them. Additionaly, they must not preempt each other.
-	sc.PRI_SVCall().Store(cortexm.PrioLo << scb.PRI_SVCalln)
-	sc.PRI_PendSV().Store(cortexm.PrioLo << scb.PRI_PendSVn)
+	// set PendSV and SVCall priorities according to description in rtos package
+	sc.PRI_SVCall().Store((4 << 5) << scb.PRI_SVCalln)
+	sc.PRI_PendSV().Store(255 << scb.PRI_PendSVn)
 
 	// All other exceptions/interrupts by default have the highest priority.
 

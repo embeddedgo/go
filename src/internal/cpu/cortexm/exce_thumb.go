@@ -26,12 +26,6 @@ const (
 // Exception number for the first external interrupt.
 const IRQ0 = 16
 
-// Lowest and highest exception priority.
-const (
-	PrioLo = 255
-	PrioHi = 0
-)
-
 // EXC_RETURN fields
 const (
 	ExcReturnBase    = 0xFFFFFFE0 // EXC_RETURN base value

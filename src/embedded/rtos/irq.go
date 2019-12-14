@@ -21,15 +21,15 @@ package rtos
 // interrupt request can not preempt the interrupt handler that runs with the
 // same or higher priority.
 const (
-	IntPrioHighest  int = intPrioHighest
-	IntPrioHigh     int = intPrioHigh
-	IntPrioSysTimer int = intPrioSysTimer
-	IntPrioMid      int = intPrioMid
-	IntPrioSysCall  int = intPrioSysCall
-	IntPrioLow      int = intPrioLow
-	IntPrioLowest   int = intPrioLowest
+	IntPrioHighest  = intPrioHighest
+	IntPrioHigh     = intPrioHigh
+	IntPrioSysTimer = intPrioSysTimer
+	IntPrioMid      = intPrioMid
+	IntPrioSysCall  = intPrioSysCall
+	IntPrioLow      = intPrioLow
+	IntPrioLowest   = intPrioLowest
 
-	IntPrioCurrent int = intPrioCurrent
+	IntPrioCurrent = intPrioCurrent
 )
 
 // IRQ represents an user accessible interrupt. It provides interface to basic
