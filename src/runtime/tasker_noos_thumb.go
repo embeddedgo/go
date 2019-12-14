@@ -30,7 +30,7 @@ func curcpuWakeup() { sev() } // see ARM Errata 563915, STM32F10xx Errata 1.1.2
 // in saved stack pointer that can be used by tasker. It uses it for:
 const (
 	thrPrivLevel = 1 << 0 // thread privilege level
-	thrSmallCtx  = 1 << 1 // manualy saved context contains only g (R10) register
+	thrSmallCtx  = 1 << 1 // context saved in m contains only g (R10) register
 )
 
 // archnewm setups m's stack
@@ -161,28 +161,6 @@ func sysirqctl(irq, ctl int) (enabled, prio, errno int) {
 		enabled = int(NVIC.ISER[irq>>5].Load()) >> bo
 	}
 	return
-}
-
-//go:nowritebarrierrec
-//go:nosplit
-func sysirqprio(irq int) (prio, errno int) {
-	if uint(irq) >= irqNum() {
-		return 0, 4 // rtos.ErrBadIRQNumber
-	}
-	return int(nvic.NVIC().IPR[irq].Load()), 0
-}
-
-//go:nowritebarrierrec
-//go:nosplit
-func syssetirqprio(irq, prio int) (errno int) {
-	if uint(irq) >= irqNum() {
-		return 4 // rtos.ErrBadIRQNumber
-	}
-	if uint(prio) > 255 {
-		return 5 // rtos.ErrBadIRQPrio
-	}
-	nvic.NVIC().IPR[irq].Store(nvic.IPR(prio))
-	return 0
 }
 
 // utils

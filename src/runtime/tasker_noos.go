@@ -504,14 +504,6 @@ func syssetwalltime(sec int64, nsec int32) {
 	t.timestart.mx.unlock()
 }
 
-//go:nowritebarrierrec
-//go:nosplit
-func badSyscall() {
-	for {
-		breakpoint()
-	}
-}
-
 // utils
 
 //go:nosplit
