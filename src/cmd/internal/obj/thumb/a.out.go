@@ -116,7 +116,7 @@ const (
 	// R13 23314
 	// R14 44902
 	// R15 6227
-	// Drawback: incompatible with arm assembly that use R7.
+	// Drawback: incompatible with arm assembly that use R11.
 
 	REGTMP  = REG_R7  // reserved for compiler and linker
 	REGG    = REG_R10 // pointer to goroutine structure (g)

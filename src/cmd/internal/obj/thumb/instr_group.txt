@@ -210,7 +210,7 @@
 	1110 1000 10w0 nnnn  0r0r rrrr rrrr rrrr  .MOVM.IA.w reglist, (Rn)
 	1110 1001 00w0 nnnn  0r0r rrrr rrrr rrrr  .MOVM.DB.w reglist, (Rn)   ; .W,n=13 -> PUSH
 
-	1011 110r rrrr rrrr                       .MOVM.IA.w (R13), reglist  ; POP [R0-R7,R14]
+	1011 110r rrrr rrrr                       .MOVM.IA.W (R13), reglist  ; POP [R0-R7,R14]
 	1100 1nnn rrrr rrrr                       .MOVM.IA.W (Rn), reglist
 	1110 1000 10w1 nnnn  rr0r rrrr rrrr rrrr  .MOVM.IA.w (Rn), reglist   ; .W,n=13 -> POP
 	1110 1001 00w1 nnnn  rr0r rrrr rrrr rrrr  .MOVM.DB.w (Rn), reglist
