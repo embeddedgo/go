@@ -37,7 +37,7 @@ const (
 const (
 	VECTACTIVE  ICSR = 0x1ff << 0  //+ Active exception number (0: thread mode)
 	RETTOBASE   ICSR = 1 << 11     //+ No preempted active exceptions
-	VECTPENDING ICSR = 0x3ff << 12 //+ Highest priority pending exception number
+	VECTPENDING ICSR = 0x1ff << 12 //+ Highest priority pending exception number
 	ISRPENDING  ICSR = 1 << 22     //+ Int. pending flag, excluding NMI, Faults
 	PENDSTCLR   ICSR = 1 << 25     //+ SysTick exception clear-pending bit
 	PENDSTSET   ICSR = 1 << 26     //+ SysTick exception set-pending bit
