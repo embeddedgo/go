@@ -502,23 +502,6 @@ func syssetwalltime(sec int64, nsec int32) {
 	t.timestart.mx.unlock()
 }
 
-// utils
-
-//go:nosplit
-func debugUint(v uint) {
-	var buf [24]byte
-	i := len(buf) - 1
-	buf[i] = '\n'
-	for i--; i > 0; i-- {
-		buf[i] = byte(v%10 + '0')
-		if v < 10 {
-			break
-		}
-		v /= 10
-	}
-	syswrite(2, unsafe.Pointer(&buf[i]), int32(len(buf)-i))
-}
-
 // m fields used
 
 //go:nosplit
