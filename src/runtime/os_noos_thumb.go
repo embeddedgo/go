@@ -10,3 +10,9 @@ func cputicks() int64 {
 	// nanotime() is a poor approximation of CPU ticks that is enough for the profiler.
 	return nanotime()
 }
+
+//go:nosplit
+func cpuid() int {
+	// for now only single CPU is supported (see also identcurcpu, osinit)
+	return 0
+}

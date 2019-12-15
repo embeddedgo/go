@@ -64,6 +64,9 @@ var debuglock mutex
 // For both these reasons, let a thread acquire the printlock 'recursively'.
 
 func printlock() {
+	if isr() {
+		return
+	}
 	mp := getg().m
 	mp.locks++ // do not reschedule between printlock++ and lock(&debuglock).
 	mp.printlock++
@@ -74,6 +77,9 @@ func printlock() {
 }
 
 func printunlock() {
+	if isr() {
+		return
+	}
 	mp := getg().m
 	mp.printlock--
 	if mp.printlock == 0 {

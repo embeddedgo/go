@@ -7,12 +7,14 @@
 package rtos
 
 const (
-	intPrioLowest   = 0
-	intPrioLow      = 0
-	intPrioSysTimer = 0
-	intPrioHigh     = 0
 	intPrioHighest  = 0
-	intPrioCurrent  = 0
+	intPrioHigh     = 0
+	intPrioSysTimer = 0
+	intPrioMid      = 0
+	intPrioSysCall  = 0
+	intPrioLow      = 0
+	intPrioLowest   = 0
+	intPrioCurrent  = -1
 )
 
 func irqEnable(irq IRQ, prio int) error {

@@ -75,8 +75,13 @@ func getRandomData(r []byte) {
 
 //go:nosplit
 func osinit() {
-	ncpu = 1
+	ncpu = 1 // for now only single CPU is supported (see identcurcpu, cpuid)
 	physPageSize = _PageSize
+}
+
+//go:nosplit
+func isr() bool {
+	return getg() == &thetasker.allcpu[cpuid()].gh
 }
 
 func setsystim1()

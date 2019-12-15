@@ -120,7 +120,8 @@ func (t *tasker) fbucketbyaddr(addr uintptr) *mcl {
 }
 
 // gh is the first field of the cpuctx so we can benefit from the getg which is
-// intrinsic function, often compiled to 0 or 1 instruction.
+// intrinsic function, often compiled to 0 or 1 instruction. Don't call in
+// thread mode (valid only in handler mode).
 //go:nosplit
 func getcpuctx() *cpuctx { return (*cpuctx)(unsafe.Pointer(getg())) }
 
