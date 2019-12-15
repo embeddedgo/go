@@ -23,8 +23,4 @@ TEXT SysTick_Handler(SB),NOSPLIT|NOFRAME,$0-0
 	ADD   $1, R1
 	MOVW  R1, 4(R0)
 
-	// ensure that the change in PendSV pending bit and both halves of
-	// streloadcnt are all observable for pendsvHandler and svcallHandler
-	DMB
-
 	RET
