@@ -35,15 +35,15 @@ const (
 )
 
 const (
-	VECTACTIVE  ICSR = 0x1ff << 0  //+
-	RETTOBASE   ICSR = 1 << 11     //+
-	VECTPENDING ICSR = 0x3ff << 12 //+
-	ISRPENDING  ICSR = 1 << 22     //+
-	PENDSTCLR   ICSR = 1 << 25     //+
-	PENDSTSET   ICSR = 1 << 26     //+
-	PENDSVCLR   ICSR = 1 << 27     //+
-	PENDSVSET   ICSR = 1 << 28     //+
-	NMIPENDSET  ICSR = 1 << 31     //+
+	VECTACTIVE  ICSR = 0x1ff << 0  //+ Active exception number (0: thread mode)
+	RETTOBASE   ICSR = 1 << 11     //+ No preempted active exceptions
+	VECTPENDING ICSR = 0x3ff << 12 //+ Highest priority pending exception number
+	ISRPENDING  ICSR = 1 << 22     //+ Int. pending flag, excluding NMI, Faults
+	PENDSTCLR   ICSR = 1 << 25     //+ SysTick exception clear-pending bit
+	PENDSTSET   ICSR = 1 << 26     //+ SysTick exception set-pending bit
+	PENDSVCLR   ICSR = 1 << 27     //+ PendSV clear-pending bit
+	PENDSVSET   ICSR = 1 << 28     //+ PendSV set-pending bit
+	NMIPENDSET  ICSR = 1 << 31     //+ NMI set-pending bit
 )
 
 const (
@@ -85,10 +85,10 @@ const (
 	UNALIGN_TRP    CCR = 1 << 3  //+
 	DIV_0_TRP      CCR = 1 << 4  //+
 	BFHFNMIGN      CCR = 1 << 8  //+
-	STKALIGN       CCR = 1 << 9  //+ Stack 8 B aligned on exception entry.
-	DC             CCR = 1 << 16 //+ Enable data cache.
-	IC             CCR = 1 << 17 //+ Enable instruction cache.
-	BP             CCR = 1 << 18 //+ Branch prediction is enabled.
+	STKALIGN       CCR = 1 << 9  //+ Stack 8 byte aligned on exception entry
+	DC             CCR = 1 << 16 //+ Enable data cache
+	IC             CCR = 1 << 17 //+ Enable instruction cache
+	BP             CCR = 1 << 18 //+ Branch prediction is enabled
 )
 
 const (
