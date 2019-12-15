@@ -29,6 +29,17 @@ func curcpuWakeup() { sev() } // see ARM Errata 563915, STM32F10xx Errata 1.1.2
 
 //go:nosplit
 func curcpuSchedule() {
+	// Can't run the scheduler directly in the system call because the SVCall
+	// has higher priority than some interrupts. If there is no any thread to
+	// run the scheduler sleeps in a loop (there is no idle threads) and if run
+	// in SVCall the CPU can't handle lower priority interrupts.
+	//
+	// Instead, we trigger PendSV (which has priority lower that any other
+	// interrupt) to run the scheduler and rely on the exception tail-chaining
+	// to don't execute any instruction after SWI until the scheduler does its
+	// job.
+	//
+	// Caution! You can't rely on tail-chaining in case of debuging.
 	scb.SCB().ICSR.Store(scb.PENDSVSET)
 }
 
