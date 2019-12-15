@@ -9,16 +9,16 @@
 
 // if you add new syscall you must check SYS_MAX_ARGS in tasker_noos_thumb.s
 
-// non-blocking syscalls
+// syscalls allowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_nanotime*4)(SB)/4, $·sysnanotime(SB)
-DATA runtime·syscalls+(SYS_setsystim1*4)(SB)/4, $·syssetsystim1(SB)
 DATA runtime·syscalls+(SYS_walltime*4)(SB)/4, $·syswalltime(SB)
 DATA runtime·syscalls+(SYS_setwalltime*4)(SB)/4, $·syssetwalltime(SB)
 DATA runtime·syscalls+(SYS_irqctl*4)(SB)/4, $·sysirqctl(SB)
 DATA runtime·syscalls+(SYS_setprivlevel*4)(SB)/4, $·syssetprivlevel(SB)
 DATA runtime·syscalls+(SYS_write*4)(SB)/4, $·syswrite(SB)
 
-// blocking syscalls
+// syscalls disallowed for low priority interrupt handlers
+DATA runtime·syscalls+(SYS_setsystim1*4)(SB)/4, $·syssetsystim1(SB)
 DATA runtime·syscalls+(SYS_newosproc*4)(SB)/4, $·sysnewosproc(SB)
 DATA runtime·syscalls+(SYS_exitThread*4)(SB)/4, $·sysexitThread(SB)
 DATA runtime·syscalls+(SYS_futexsleep*4)(SB)/4, $·sysfutexsleep(SB)
@@ -28,21 +28,11 @@ DATA runtime·syscalls+(SYS_nanosleep*4)(SB)/4, $·sysnanosleep(SB)
 
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*4)
 
-// non-blocking syscalls
-
 // func nanotime() int64
 TEXT ·nanotime(SB),NOSPLIT|NOFRAME,$0-8
 	MOVW  $SYS_nanotime, R4
 	MOVW  $(0+4), R5
 	MOVW  $8, R6
-	SWI
-	RET
-
-// func setsystim1()
-TEXT ·setsystim1(SB),NOSPLIT|NOFRAME,$0-0
-	MOVW  $SYS_setsystim1, R4
-	MOVW  $(0+4), R5
-	MOVW  $0, R6
 	SWI
 	RET
 
@@ -86,7 +76,14 @@ TEXT ·write(SB),NOSPLIT|NOFRAME,$0-16
 	SWI
 	RET
 
-// blocking syscalls
+// func setsystim1()
+TEXT ·setsystim1(SB),NOSPLIT|NOFRAME,$0-0
+	MOVW  $SYS_setsystim1, R4
+	MOVW  $(0+4), R5
+	MOVW  $0, R6
+	SWI
+	RET
+
 
 // func newosproc(mp *m)
 TEXT ·newosproc(SB),NOSPLIT|NOFRAME,$0-4

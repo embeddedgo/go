@@ -175,13 +175,14 @@ TEXT runtime·svcallHandler(SB),NOSPLIT|NOFRAME,$0-0
 	// current CPU context to R0
 	BL  ·identcurcpu(SB)
 
-	// check for blocking call
-	CMP  $SYS_LAST_NONBLOCK, R4
-	BLS  nonBlocking
+	// check for fast syscall (unfortunately it lets through the calls by
+	// higher priority exceptions that are disallowed to use syscalls at all)
+	CMP  $SYS_LAST_LOWISR, R4
+	BLS  fast
 
 	// check for syscall from interrupt handler
 	CMP  R0, g
-	BEQ  badBlockingCall  // blocking call in handler mode
+	BEQ  badHandlerCall  // syscall not allowed in handler mode
 
 	// save thread context (small): SP+CONTROL[nPRIV], EXC_RETURN, g
 	MOVW  (cpuctx_exe)(R0), R3
@@ -193,7 +194,7 @@ TEXT runtime·svcallHandler(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  R5, (m_tls+const_mer*4)(R3)
 	MOVW  g, (m_libcall)(R3)
 
-nonBlocking:
+fast:
 	// call the service routine
 	MOVW  R0, g
 	MOVW  $·syscalls(SB), R0
@@ -217,7 +218,7 @@ badSyscall:
 	BKPT
 	B   -1(PC)
 
-badBlockingCall:
+badHandlerCall:
 	BKPT
 	B   -1(PC)
 
