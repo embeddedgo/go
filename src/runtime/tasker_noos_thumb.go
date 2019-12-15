@@ -18,13 +18,19 @@ import (
 
 func sev()
 func curcpuSleep()
-func curcpuSavectx()
+func curcpuSavectxSched()
+func curcpuSavectxCall() {} // all registars saved on caller's stack
 
 //go:nosplit
 func (cpu *cpuctx) wakeup() { sev() }
 
 //go:nosplit
 func curcpuWakeup() { sev() } // see ARM Errata 563915, STM32F10xx Errata 1.1.2
+
+//go:nosplit
+func curcpuSchedule() {
+	scb.SCB().ICSR.Store(scb.PENDSVSET)
+}
 
 // ARMv7-M requires at least 4 byte stack alignment so there are two bits
 // in saved stack pointer that can be used by tasker. It uses it for:
@@ -64,6 +70,12 @@ func taskerpreinit() {
 	// setup exception priority levels
 
 	sc := scb.SCB()
+
+	// enable fault handlers
+	sc.SHCSR.SetBits(scb.MEMFAULTENA | scb.BUSFAULTENA | scb.USGFAULTENA)
+
+	// division by zero will cause the UsageFault
+	sc.DIV_0_TRP().Set()
 
 	// set PendSV and SVCall priorities according to description in rtos package
 	sc.PRI_SVCall().Store((4 << 5) << scb.PRI_SVCalln)

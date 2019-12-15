@@ -53,7 +53,7 @@ import (
 // will not happen (to avoid race condition). It is allowed that both of these
 // functions do nothing.
 //
-// curcpuSavectx
+// curcpuSavectxCall, curcpuSavectxSched
 //
 // This function is called to save the remaining context, not saved at syscall
 // entry (eg. it can save FPU state).
@@ -61,12 +61,16 @@ import (
 // archnewm
 //
 // This function is called to create the inintial state of the new thread and
-// save it in provided m so the curcpuSchedule can later switch the CPU to it.
+// save it in provided m so the curcpuEnterScheduler can later switch the CPU to
+// it.
+//
+// curcpuSchedule
+//
+// Run scheduler immediately or at syscall exit.
 //
 // The actual context switch is performed by architecture specific code at
-// syscall exit or by system timer handler. It should check the cpuctx.newexe
-// variable and if it is true, switch the context to the new thread specified in
-// cpuctx.exe.
+// curcpuRunScheduler exit. It should check the cpuctx.newexe variable and if
+// it is not nil, switch the context to the new thread specified in cpuctx.exe.
 //
 // Tasker code does not use FPU so the architecture specific context switch
 // code can avoid saving/restoring FPU context if not need.
@@ -82,7 +86,7 @@ type cpuctx struct {
 	gh       g               // for ISRs, must be the first field in this struct
 	t        *tasker         // points to thetasker
 	exe      muintptr        // m currently executed by CPU
-	newexe   bool            // information for architecture-dependent code
+	newexe   bool            // for architecture-dependent code: exe changed
 	runnable mq              // threads in runnable state
 	waitingt msl             // threads waiting until some time elapses
 	wakerq   [fbnum]notelist // futex wakeup request from interrupt handlers
@@ -121,7 +125,7 @@ func (t *tasker) fbucketbyaddr(addr uintptr) *mcl {
 func getcpuctx() *cpuctx { return (*cpuctx)(unsafe.Pointer(getg())) }
 
 //go:nosplit
-func taskerSetrunnable(m *m) *cpuctx {
+func taskerSetrunnable(m *m) {
 	curcpu := getcpuctx()
 	allcpu := curcpu.t.allcpu
 	var (
@@ -159,11 +163,10 @@ end:
 	if bestcpu != curcpu {
 		bestcpu.wakeup()
 	}
-	return bestcpu
 }
 
 //go:nosplit
-func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) (schedule bool) {
+func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) {
 	for ; cnt != 0; cnt-- {
 		fb.lock()
 		m := fb.find(uintptr(unsafe.Pointer(addr)))
@@ -187,9 +190,7 @@ func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) (schedule bool) {
 				wt.remove(m)
 				wt.unlock()
 			}
-			if taskerSetrunnable(m) == getcpuctx() {
-				schedule = true
-			}
+			taskerSetrunnable(m)
 		}
 	}
 	return
@@ -197,7 +198,7 @@ func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) (schedule bool) {
 
 //go:nowritebarrierrec
 //go:nosplit
-func curcpuSchedule() {
+func curcpuRunScheduler() {
 	curcpu := getcpuctx()
 	exe := curcpu.exe.ptr()
 	for {
@@ -253,7 +254,7 @@ func curcpuSchedule() {
 		curcpu.runnable.lock()
 		next := curcpu.runnable.pop()
 		if next != nil && exe != nil {
-			curcpuSavectx()
+			curcpuSavectxSched()
 			curcpu.runnable.push(exe)
 		}
 		curcpu.runnable.unlock()
@@ -382,9 +383,7 @@ func sysnewosproc(m *m) {
 	curcpu := getcpuctx()
 	m.procid = uint64(atomic.Xadduintptr(&curcpu.t.tidgen, 1))
 	archnewm(m)
-	if taskerSetrunnable(m) == curcpu {
-		curcpuSchedule()
-	}
+	taskerSetrunnable(m)
 }
 
 //go:nowritebarrierrec
@@ -421,7 +420,7 @@ func sysfutexsleep(addr *uint32, val uint32, ns int64) {
 	fb.lock()
 	sleep := (*addr == val)
 	if sleep {
-		curcpuSavectx()
+		curcpuSavectxCall()
 		curcpu.exe = 0
 		msetkey(m, uintptr(unsafe.Pointer(addr)))
 		fb.push(m)
@@ -441,9 +440,7 @@ func sysfutexsleep(addr *uint32, val uint32, ns int64) {
 //go:nosplit
 func sysfutexwakeup(addr *uint32, cnt uint32) {
 	fb := getcpuctx().t.fbucketbyaddr(uintptr(unsafe.Pointer(addr)))
-	if taskerFutexwakeup(fb, addr, cnt) {
-		curcpuSchedule()
-	}
+	taskerFutexwakeup(fb, addr, cnt)
 }
 
 //go:nowritebarrierrec
@@ -452,7 +449,7 @@ func sysnanosleep(ns int64) {
 	if uint64(ns) < 64 {
 		return // to short to sleep (64 ns selected arbitrary)
 	}
-	curcpuSavectx()
+	curcpuSavectxCall()
 	curcpu := getcpuctx()
 	m := curcpu.exe.ptr()
 	curcpu.exe = 0

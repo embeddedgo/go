@@ -128,11 +128,6 @@ TEXT ·osyield(SB),NOSPLIT|NOFRAME,$0-0
 	SWI
 	RET
 
-// func publicationBarrier()
-TEXT ·publicationBarrier(SB),NOSPLIT|NOFRAME,$0-0
-	DMB  MB_ST
-	RET
-
 // func nanosleep(ns int64)
 TEXT ·nanosleep(SB),NOSPLIT|NOFRAME,$0-8
 	MOVW  $SYS_nanosleep, R4
@@ -147,3 +142,10 @@ TEXT ·nanosleep(SB),NOSPLIT|NOFRAME,$0-8
 TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-4
 	BKPT
 	B   -1(PC)
+
+// utils
+
+// func publicationBarrier()
+TEXT ·publicationBarrier(SB),NOSPLIT|NOFRAME,$0-0
+	DMB  MB_ST
+	RET
