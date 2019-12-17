@@ -30,6 +30,6 @@ package rtos
 // implementation at a later stage (which is discouraged) you must ensure a
 // continuity of time and that all gorutines that sleeeps using old setalarm
 // function will be wakeup.
-func SetSystemTimer(nanotime func() int64, setalarm func(ns int64)) error {
+func SetSystemTimer(nanotime func() int64, setalarm func(ns int64) bool) error {
 	return setSystemTimer(nanotime, setalarm)
 }

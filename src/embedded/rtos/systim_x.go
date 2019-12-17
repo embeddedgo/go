@@ -6,6 +6,6 @@
 
 package rtos
 
-func setSystemTimer(nanotime func() int64, setalarm func(ns int64)) error {
+func setSystemTimer(nanotime func() int64, setalarm func(ns int64) bool) error {
 	return ErrNotSuppoted
 }

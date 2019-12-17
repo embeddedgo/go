@@ -11,7 +11,7 @@ import (
 
 var setsystimmx sync.Mutex
 
-func setSystemTimer(nanotime func() int64, setalarm func(ns int64)) error {
+func setSystemTimer(nanotime func() int64, setalarm func(ns int64) bool) error {
 	setsystimmx.Lock()
 	runtime_setsystim(nanotime, setalarm)
 	setsystimmx.Unlock()
@@ -19,5 +19,5 @@ func setSystemTimer(nanotime func() int64, setalarm func(ns int64)) error {
 }
 
 //go:linkname runtime_setsystim runtime.setsystim
-func runtime_setsystim(nanotime func() int64, setalarm func(ns int64))
+func runtime_setsystim(nanotime func() int64, setalarm func(ns int64) bool)
 

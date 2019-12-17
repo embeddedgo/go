@@ -47,7 +47,7 @@ func crash() {
 }
 
 //go:nosplit
-func setsystim(nanotime func() int64, setalarm func(ns int64)) {
+func setsystim(nanotime func() int64, setalarm func(ns int64) bool) {
 	if nanotime != nil {
 		thetasker.newnanotime = nanotime
 	} else {

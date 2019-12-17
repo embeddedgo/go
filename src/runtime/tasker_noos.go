@@ -75,8 +75,8 @@ import (
 // Tasker code does not use FPU so the architecture specific context switch
 // code can avoid saving/restoring FPU context if not need.
 
-func dummyNanotime() int64   { return 1 }
-func dummySetalarm(ns int64) {}
+func dummyNanotime() int64        { return 1 }
+func dummySetalarm(ns int64) bool { return false }
 
 var thetasker = tasker{nanotime: dummyNanotime, setalarm: dummySetalarm}
 
@@ -105,10 +105,10 @@ type tasker struct {
 	}
 
 	nanotime func() int64
-	setalarm func(ns int64)
+	setalarm func(ns int64) bool
 
-	newnanotime func() int64   // see embedded/rtos.SetSystemTimer
-	newsetalarm func(ns int64) // see embedded/rtos.SetSystemTimer
+	newnanotime func() int64        // see embedded/rtos.SetSystemTimer
+	newsetalarm func(ns int64) bool // see embedded/rtos.SetSystemTimer
 }
 
 //go:nosplit
@@ -270,8 +270,9 @@ func curcpuRunScheduler() {
 
 		// Nothing to execute. If this will be a work-stealing scheduler it will
 		// try to steal some work from the other CPU here.
-		curcpu.t.setalarm(sleepuntil)
-		curcpuSleep()
+		if curcpu.t.setalarm(sleepuntil) {
+			curcpuSleep()
+		}
 	}
 }
 
