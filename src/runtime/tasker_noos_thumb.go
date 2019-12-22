@@ -95,14 +95,19 @@ func taskerpreinit() {
 
 	// All other exceptions/interrupts by default have the highest priority.
 
-	// if MPU is available use it to catch nil pointer dereferences
-	if _, d, _ := mpu.Type(); d > 3 {
+	// use MPU if available to catch nil pointer dereferences (need 4 regions)
+	if _, d, _ := mpu.Type(); d >= 4 {
 		// Bellow there is the MPU configuration that more or less corresponds
 		// to the default CPU behavior, without MPU enabled.
 		//
-		// The Code region starts at offset 64 (corresponds to the first 16
-		// exception vectors) that makes the beggining o memory inaccessible to
-		// catch nil pointer dereferences.
+		// All regions starts at address 0x00000000. The SIZE and SRD
+		// (sub-region disabled) fields are used to set the region address
+		// ranges.
+		//
+		// The first 64 bytes of the code region that corresponds to the first
+		// 16 exception vectors are set inaccessible to catch nil pointer
+		// dereferences. The code region is declared read/write because some
+		// MCUs use normal memory access to program Flash.
 		//
 		// Tha RAM region is configured as shareable (usually shared with DMA).
 		// Shareable regions are by default not cacheable. If you enable L1
