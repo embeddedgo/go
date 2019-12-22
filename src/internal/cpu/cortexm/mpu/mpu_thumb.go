@@ -57,20 +57,20 @@ type Attr uint32
 const (
 	ENA Attr = 1 << 0 // Enables region
 
-	B Attr = 1 << 16 // Bufferable.
-	C Attr = 1 << 17 // Cacheable.
-	S Attr = 1 << 18 // Shareable.
+	B Attr = 1 << 16 // Bufferable
+	C Attr = 1 << 17 // Cacheable
+	S Attr = 1 << 18 // Shareable
 
 	// Access permissons.
-	Amask Attr = 7 << 24 // Use to extract access permission bits.
-	A____ Attr = 0 << 24 // No access.
-	Ar___ Attr = 5 << 24 // Priv-RO.
-	Arw__ Attr = 1 << 24 // Priv-RW.
-	Ar_r_ Attr = 6 << 24 // Priv-RO, Unpriv-RO.
-	Arwr_ Attr = 2 << 24 // Priv-RW, Unpriv-RO.
-	Arwrw Attr = 3 << 24 // Priv-RW, Unpriv-RW.
+	Amask Attr = 7 << 24 // Use to extract access permission bits
+	A____ Attr = 0 << 24 // No access
+	Ar___ Attr = 5 << 24 // Priv-RO
+	Arw__ Attr = 1 << 24 // Priv-RW
+	Ar_r_ Attr = 6 << 24 // Priv-RO, Unpriv-RO
+	Arwr_ Attr = 2 << 24 // Priv-RW, Unpriv-RO
+	Arwrw Attr = 3 << 24 // Priv-RW, Unpriv-RW
 
-	XN Attr = 1 << 28 // Instruction access disable.
+	XN Attr = 1 << 28 // Instruction access disable
 )
 
 func SIZE(exp int) Attr {
@@ -81,12 +81,12 @@ func (a Attr) SIZE() (exp int) {
 	return int(a>>1)&0x1f + 1
 }
 
-func SRD(srd int) Attr {
-	return Attr(srd&0xff) << 8
+func SRD(srd uint8) Attr {
+	return Attr(srd) << 8
 }
 
-func (a Attr) SRD() int {
-	return int(a>>8) & 0xff
+func (a Attr) SRD() uint8 {
+	return uint8(a >> 8)
 }
 
 func TEX(tex int) Attr {

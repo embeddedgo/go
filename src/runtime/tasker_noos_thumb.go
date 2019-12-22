@@ -8,6 +8,7 @@ import (
 	"embedded/mmio"
 	"internal/cpu/cortexm"
 	"internal/cpu/cortexm/debug/itm"
+	"internal/cpu/cortexm/mpu"
 	"internal/cpu/cortexm/nvic"
 	"internal/cpu/cortexm/scb"
 	"internal/cpu/cortexm/scid"
@@ -94,7 +95,43 @@ func taskerpreinit() {
 
 	// All other exceptions/interrupts by default have the highest priority.
 
-	mmio.MB() // ensure the exception priorities are set
+	// if MPU is available use it to catch nil pointer dereferences
+	if _, d, _ := mpu.Type(); d > 3 {
+		// Bellow there is the MPU configuration that more or less corresponds
+		// to the default CPU behavior, without MPU enabled.
+		//
+		// The Code region starts at offset 64 (corresponds to the first 16
+		// exception vectors) that makes the beggining o memory inaccessible to
+		// catch nil pointer dereferences.
+		//
+		// Tha RAM region is configured as shareable (usually shared with DMA).
+		// Shareable regions are by default not cacheable. If you enable L1
+		// cache in Cortex-M7 set the acc.SIWT bit so the RAM will be cacheable
+		// in write-through mode. WT mode degrades performance (not as much as
+		// you may think) but allows to avoid cache maintenance operations which
+		// are problematic in case of Cortex-M7.
+		var (
+			noacc  = mpu.A____
+			code   = mpu.Arwrw | mpu.C
+			ram    = mpu.Arwrw | mpu.TEX(1) | mpu.C | mpu.B | mpu.S
+			periph = mpu.Arwrw | mpu.B | mpu.S | mpu.XN
+		)
+		mpu.SetRegion(0x00000000|mpu.VALID|0, mpu.ENA|mpu.SIZE(29)|code)
+		mpu.SetRegion(0x00000000|mpu.VALID|1, mpu.ENA|mpu.SIZE(6)|noacc)
+		mpu.SetRegion(
+			0x00000000|mpu.VALID|2,
+			mpu.ENA|mpu.SIZE(32)|mpu.SRD(0b10011011)|periph,
+		)
+		mpu.SetRegion(
+			0x00000000|mpu.VALID|3,
+			mpu.ENA|mpu.SIZE(32)|mpu.SRD(0b11100101)|ram,
+		)
+		mmio.MB() // ensure any previous memory access is done before enable MPU
+		mpu.Set(mpu.ENABLE | mpu.PRIVDEFENA)
+	}
+
+	// ensure everything is set before any subsequent memory access
+	mmio.MB()
 }
 
 func taskerinit() {}
