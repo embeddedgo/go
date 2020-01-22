@@ -6,12 +6,13 @@ package rtos
 
 import _ "unsafe"
 
-// Note allows sleep and wakeup on one-time events.
+// Note allows to communicate the occurrence of an event.
 //
 // Before any calls to Sleep or Wakeup, must call Clear to initialize the Note.
 //
-// Exactly one gorutine can call Sleep and exactly one gorutine or interrupt
-// handler can call Wakeup (once). Future Sleep will return immediately.
+// Exactly one gorutine can call Sleep but there is allowed to multiple
+// gorutines or interrupt handlers to call Wakeup. Future Sleep will return
+// immediately.
 //
 // Subsequent Clear must be called only after previous Sleep has returned, e.g.
 // it is disallowed to call Clear straight after Wakeup.
@@ -21,16 +22,18 @@ type Note struct {
 	link uintptr
 }
 
-// Sleep sleeps on cleared note until other goroutine or interrupt handler
+// Sleep sleeps on the cleared note until other goroutine or interrupt handler
 // call Wakeup or until the timeout.
 func (n *Note) Sleep(ns int64) bool { return runtime_notetsleepg(n, ns) }
 
-// Wakeup wakeups the goroutine that sleeps or will try to sleep on the note.
+// Wakeup wakeups the goroutine that sleeps on the note. The Wakeup remains in
+// effect until subequent Clear so future Sleep will return immediately.
 func (n *Note) Wakeup() { notewakeup(n) }
 
-// Clear clears the note. It also works as publication barrier in a way that
-// the Clear itself and any memory writes preceding it in the program order
-// happens before any memory writes that follows it.
+// Clear clears the note. Any Wakeup that happened before Clear is forgotten.
+// Clear works as a publication barrier, that is, the Clear itself and any
+// memory writes preceding it in the program order happens before any memory
+// writes that follows it.
 func (n *Note) Clear() {
 	n.key = 0
 	publicationBarrier()

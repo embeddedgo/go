@@ -276,14 +276,15 @@ func curcpuRunScheduler() {
 	}
 }
 
-// notewakeupirq is called by an interrupt handler that wants the sheduler to
-// wake up one thread that sleeps on n
 //go:nowritebarrierrec
 //go:nosplit
-func notewakeupirq(n *notel) {
-	old := atomic.Xchg(key32(&n.key), 1)
-	for old != 0 {
-		breakpoint() // double wakeup
+func rtos_notewakeup(n *notel) {
+	if !atomic.Cas(key32(&n.key), 0, 1) {
+		return
+	}
+	if !isr() {
+		futexwakeup(key32(&n.key), 1)
+		return
 	}
 	if n.acquire() {
 		getcpuctx().wakerq[fhash(uintptr(unsafe.Pointer(&n.key)))].insert(n)

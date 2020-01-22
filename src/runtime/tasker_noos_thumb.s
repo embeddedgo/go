@@ -320,10 +320,3 @@ TEXT runtime·curcpuSavectxSched(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW   R1, CONTROL  // to avoid stacking again by higher priority handler
 	CPSIE
 	RET
-
-// func notelwakeup(n *notel)
-TEXT ·notelwakeup(SB),NOSPLIT|NOFRAME,$0-4
-	MOVW  IPSR, R0
-	TST   $0x1FF, R0
-	BNE   ·notewakeupirq(SB)
-	B     ·notewakeup(SB)
