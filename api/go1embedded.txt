@@ -56,22 +56,26 @@ pkg embedded/mmio, type UM32 struct, R *U32
 pkg embedded/mmio, type UM8 struct
 pkg embedded/mmio, type UM8 struct, Mask uint8
 pkg embedded/mmio, type UM8 struct, R *U8
-pkg embedded/rtos, const IntPrioCurrent = 0
-pkg embedded/rtos, const IntPrioCurrent int
+pkg embedded/rtos, const IntPrioCurrent = -1
+pkg embedded/rtos, const IntPrioCurrent ideal-int
 pkg embedded/rtos, const IntPrioHigh = 0
-pkg embedded/rtos, const IntPrioHigh int
+pkg embedded/rtos, const IntPrioHigh ideal-int
 pkg embedded/rtos, const IntPrioHighest = 0
-pkg embedded/rtos, const IntPrioHighest int
+pkg embedded/rtos, const IntPrioHighest ideal-int
 pkg embedded/rtos, const IntPrioLow = 0
-pkg embedded/rtos, const IntPrioLow int
+pkg embedded/rtos, const IntPrioLow ideal-int
 pkg embedded/rtos, const IntPrioLowest = 0
-pkg embedded/rtos, const IntPrioLowest int
+pkg embedded/rtos, const IntPrioLowest ideal-int
+pkg embedded/rtos, const IntPrioMid = 0
+pkg embedded/rtos, const IntPrioMid ideal-int
+pkg embedded/rtos, const IntPrioSysCall = 0
+pkg embedded/rtos, const IntPrioSysCall ideal-int
 pkg embedded/rtos, const IntPrioSysTimer = 0
-pkg embedded/rtos, const IntPrioSysTimer int
+pkg embedded/rtos, const IntPrioSysTimer ideal-int
 pkg embedded/rtos, func Nanotime() int64
 pkg embedded/rtos, func Nanosleep(int64)
 pkg embedded/rtos, func SetPrivLevel(int) (int, error)
-pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64)) error
+pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64) bool) error
 pkg embedded/rtos, method (*Error) Error() string
 pkg embedded/rtos, method (*Note) Clear()
 pkg embedded/rtos, method (*Note) Sleep(int64) bool

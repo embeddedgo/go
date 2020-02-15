@@ -36,7 +36,7 @@ var pkgDeps = map[string][]string{
 	// L0 is the lowest level, core, nearly unavoidable packages.
 	"errors":                  {"runtime", "internal/reflectlite"},
 	"io":                      {"errors", "sync", "sync/atomic"},
-	"runtime":                 {"unsafe", "runtime/internal/atomic", "runtime/internal/sys", "runtime/internal/math", "internal/cpu", "internal/cpu/cortexm", "internal/cpu/cortexm/nvic", "internal/cpu/cortexm/scb", "internal/cpu/cortexm/scid", "internal/cpu/cortexm/debug/itm", "internal/bytealg", "embedded/mmio"},
+	"runtime":                 {"unsafe", "runtime/internal/atomic", "runtime/internal/sys", "runtime/internal/math", "internal/cpu", "internal/cpu/cortexm", "internal/cpu/cortexm/nvic", "internal/cpu/cortexm/scb", "internal/cpu/cortexm/scid", "internal/cpu/cortexm/debug/itm", "internal/cpu/cortexm/mpu", "internal/bytealg", "embedded/mmio"},
 	"runtime/internal/sys":    {},
 	"runtime/internal/atomic": {"unsafe", "internal/cpu", "runtime/internal/sys"},
 	"runtime/internal/math":   {"runtime/internal/sys"},
@@ -465,7 +465,7 @@ var pkgDeps = map[string][]string{
 	"internal/cpu/cortexm/systick":   {"unsafe", "embedded/mmio"},
 	"internal/cpu/cortexm/debug/itm": {"unsafe", "embedded/mmio"},
 	"embedded/mmio":                  {"unsafe"},
-	"embedded/arch/cortexm/systim":   {"unsafe", "embedded/mmio", "internal/cpu/cortexm", "internal/cpu/cortexm/scb", "internal/cpu/cortexm/systick"},
+	"embedded/arch/cortexm/systim":   {"unsafe", "embedded/mmio", "embedded/rtos", "internal/cpu/cortexm", "internal/cpu/cortexm/scb", "internal/cpu/cortexm/systick"},
 	"embedded/rtos":                  {"unsafe", "errors", "sync"},
 }
 
