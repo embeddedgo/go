@@ -1211,6 +1211,24 @@ func (ctxt *Link) dodata() {
 		}
 	}
 
+	if ctxt.HeadType == objabi.Hnoos {
+		// leave some read-only variables in Flash (hack to save some RAM)
+		for _, s := range ctxt.Syms.Allsym {
+			switch s.Name {
+			case "runtime.zeroVal", "runtime.staticbytes",
+				"runtime.fastlog2Table", "runtime.class_to_size",
+				"runtime.class_to_divmagic", "runtime.size_to_class128",
+				"runtime/internal/sys.ntz8tab",
+				"strconv.smallPowersOfTen", "strconv.powersOfTen",
+				"strconv.uint64pow10",
+				"math/rand.rngCooked",
+				"unicode/utf8.first":
+				s.Type = sym.SRODATA
+				//fmt.Printf("%s %d\n", s.Name, s.Size)
+			}
+		}
+	}
+
 	// Collect data symbols by type into data.
 	var data [sym.SXREF][]*sym.Symbol
 	for _, s := range ctxt.Syms.Allsym {
