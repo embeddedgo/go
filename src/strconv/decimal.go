@@ -175,7 +175,7 @@ type leftCheat struct {
 	cutoff string // minus one digit if original < a.
 }
 
-var leftcheats = []leftCheat{
+var leftcheats = [...]leftCheat{
 	// Leading digits of 1/2^i = 5^i.
 	// 5^23 is not an exact 64-bit floating point number,
 	// so have to use bc for the math.
