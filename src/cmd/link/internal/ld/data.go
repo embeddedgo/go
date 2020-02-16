@@ -1215,16 +1215,38 @@ func (ctxt *Link) dodata() {
 		// leave some read-only variables in Flash (hack to save some RAM)
 		for _, s := range ctxt.Syms.Allsym {
 			switch s.Name {
-			case "runtime.zeroVal", "runtime.staticbytes",
+			case "embedded/rtos.errorsByNumber",
+				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
+				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
+				"math._lgamV", "math._lgamW", "math._sin", "math._cos",
+				"math.pow10tab", "math.pow10postab32", "math.pow10negtab32",
+				"math.tanhP", "math.tanhQ", "math._gamP", "math._gamQ",
+				"math._gamS",
+				"math/big.pow5tab", "math/big._Accuracy_index",
+				"math/big._RoundingMode_index",
+				"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
+				"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
+				"runtime.zeroVal", "runtime.staticbytes",
 				"runtime.fastlog2Table", "runtime.class_to_size",
-				"runtime.class_to_divmagic", "runtime.size_to_class128",
+				"runtime.class_to_allocnpages", "runtime.class_to_divmagic",
+				"runtime.size_to_class8", "runtime.size_to_class128",
+				"runtime.waitReasonStrings", "runtime.boundsErrorFmts",
+				"runtime.boundsNegErrorFmts", "runtime.finalizer1",
+				"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
+				"runtime.emptymspan",
 				"runtime/internal/sys.ntz8tab",
 				"strconv.smallPowersOfTen", "strconv.powersOfTen",
-				"strconv.uint64pow10",
-				"math/rand.rngCooked",
-				"unicode/utf8.first":
+				"strconv.uint64pow10", "strconv.leftcheats",
+				"strconv.isPrint32", "strconv.isPrint16",
+				"strconv.isNotPrint32", "strconv.isNotPrint16",
+				"strconv.isGraphic", "strconv.float64info",
+				"strconv.float32info",
+				"syscall.errors",
+				"time.std0x", "time.months", "time.days", "time.daysBefore",
+				"time.utcLoc",
+				"unicode/utf8.first", "unicode/utf8.acceptRanges":
+
 				s.Type = sym.SRODATA
-				//fmt.Printf("%s %d\n", s.Name, s.Size)
 			}
 		}
 	}
@@ -2451,7 +2473,7 @@ func (ctxt *Link) layout(order []*sym.Segment) uint64 {
 				// Assuming the previous segment was
 				// aligned, the following rounding
 				// should ensure that this segment's
-				// VA ≡ Fileoff mod FlagRound.
+				// VA ��� Fileoff mod FlagRound.
 				seg.Fileoff = uint64(Rnd(int64(prev.Fileoff+prev.Filelen), int64(*FlagRound)))
 				if seg.Vaddr%uint64(*FlagRound) != seg.Fileoff%uint64(*FlagRound) {
 					Exitf("bad segment rounding (Vaddr=%#x Fileoff=%#x FlagRound=%#x)", seg.Vaddr, seg.Fileoff, *FlagRound)
