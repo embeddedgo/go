@@ -59,8 +59,8 @@ type mstats struct {
 	next_gc         uint64 // goal heap_live for when next GC ends; ^0 if disabled
 	last_gc_unix    uint64 // last gc (in unix time)
 	pause_total_ns  uint64
-	pause_ns        [256*(1-_MCU) + 32*_MCU]uint64 // circular buffer of recent gc pause lengths
-	pause_end       [256*(1-_MCU) + 32*_MCU]uint64 // circular buffer of recent gc end times (nanoseconds since 1970)
+	pause_ns        [256*(1-_MCU) + 16*_MCU]uint64 // circular buffer of recent gc pause lengths
+	pause_end       [256*(1-_MCU) + 16*_MCU]uint64 // circular buffer of recent gc end times (nanoseconds since 1970)
 	numgc           uint32
 	numforcedgc     uint32  // number of user-forced GCs
 	gc_cpu_fraction float64 // fraction of CPU time used by GC
@@ -354,7 +354,7 @@ type MemStats struct {
 	// general, PauseNs[N%256] records the time paused in the most
 	// recent N%256th GC cycle. There may be multiple pauses per
 	// GC cycle; this is the sum of all pauses during a cycle.
-	PauseNs [256*(1-_MCU) + 32*_MCU]uint64
+	PauseNs [256*(1-_MCU) + 16*_MCU]uint64
 
 	// PauseEnd is a circular buffer of recent GC pause end times,
 	// as nanoseconds since 1970 (the UNIX epoch).
@@ -362,7 +362,7 @@ type MemStats struct {
 	// This buffer is filled the same way as PauseNs. There may be
 	// multiple pauses per GC cycle; this records the end of the
 	// last pause in a cycle.
-	PauseEnd [256*(1-_MCU) + 32*_MCU]uint64
+	PauseEnd [256*(1-_MCU) + 16*_MCU]uint64
 
 	// NumGC is the number of completed GC cycles.
 	NumGC uint32
