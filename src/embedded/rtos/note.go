@@ -4,7 +4,10 @@
 
 package rtos
 
-import _ "unsafe"
+import (
+	"time"
+	_ "unsafe"
+)
 
 // Note allows to communicate the occurrence of an event.
 //
@@ -24,7 +27,9 @@ type Note struct {
 
 // Sleep sleeps on the cleared note until other goroutine or interrupt handler
 // call Wakeup or until the timeout.
-func (n *Note) Sleep(ns int64) bool { return runtime_notetsleepg(n, ns) }
+func (n *Note) Sleep(timeout time.Duration) bool {
+	return runtime_notetsleepg(n, int64(timeout))
+}
 
 // Wakeup wakeups the goroutine that sleeps on the note. The Wakeup remains in
 // effect until subequent Clear so future Sleep will return immediately.

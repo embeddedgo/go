@@ -466,7 +466,7 @@ var pkgDeps = map[string][]string{
 	"internal/cpu/cortexm/debug/itm": {"unsafe", "embedded/mmio"},
 	"embedded/mmio":                  {"unsafe"},
 	"embedded/arch/cortexm/systim":   {"unsafe", "embedded/mmio", "embedded/rtos", "internal/cpu/cortexm", "internal/cpu/cortexm/scb", "internal/cpu/cortexm/systick"},
-	"embedded/rtos":                  {"unsafe", "errors", "sync"},
+	"embedded/rtos":                  {"unsafe", "errors", "sync", "time"},
 }
 
 // isMacro reports whether p is a package dependency macro

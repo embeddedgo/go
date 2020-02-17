@@ -72,13 +72,12 @@ pkg embedded/rtos, const IntPrioSysCall = 0
 pkg embedded/rtos, const IntPrioSysCall ideal-int
 pkg embedded/rtos, const IntPrioSysTimer = 0
 pkg embedded/rtos, const IntPrioSysTimer ideal-int
-pkg embedded/rtos, func Nanotime() int64
-pkg embedded/rtos, func Nanosleep(int64)
+pkg embedded/rtos, func Nanotime() time.Duration
 pkg embedded/rtos, func SetPrivLevel(int) (int, error)
 pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64) bool) error
 pkg embedded/rtos, method (*Error) Error() string
 pkg embedded/rtos, method (*Note) Clear()
-pkg embedded/rtos, method (*Note) Sleep(int64) bool
+pkg embedded/rtos, method (*Note) Sleep(time.Duration) bool
 pkg embedded/rtos, method (*Note) Wakeup()
 pkg embedded/rtos, method (IRQ) Disable() error
 pkg embedded/rtos, method (IRQ) Enable(int) error

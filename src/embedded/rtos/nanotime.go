@@ -4,16 +4,16 @@
 
 package rtos
 
-import _ "unsafe"
+import (
+	"time"
+	_ "unsafe"
+)
 
-// Nanotime returns monotonic time in nanosecond.
-func Nanotime() int64 { return runtime_nanotime() }
-
-// Nanosleep pauses the current goroutine for at least ns nanosecond.
-func Nanosleep(ns int64) { time_sleep(ns) }
+// Nanotime returns a time duration from some event in the past. Typically it's
+// roughly corresponds to the system runtime.
+func Nanotime() time.Duration {
+	return time.Duration(runtime_nanotime())
+}
 
 //go:linkname runtime_nanotime runtime.nanotime
 func runtime_nanotime() int64
-
-//go:linkname time_sleep time.Sleep
-func time_sleep(ns int64)
