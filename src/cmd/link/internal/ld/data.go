@@ -1214,6 +1214,10 @@ func (ctxt *Link) dodata() {
 	if ctxt.HeadType == objabi.Hnoos {
 		// leave some read-only variables in Flash (hack to save some RAM)
 		for _, s := range ctxt.Syms.Allsym {
+			if strings.HasPrefix(s.Name, "unicode..stmp_") {
+				s.Type = sym.SRODATA
+				continue
+			}
 			switch s.Name {
 			case "embedded/rtos.errorsByNumber",
 				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
