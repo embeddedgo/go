@@ -211,9 +211,6 @@ const (
 	// A reference to name@GOT(SB) is a reference to the entry in the global offset
 	// table for 'name'.
 	NAME_GOTREF
-	// Indicates auto that was optimized away, but whose type
-	// we want to preserve in the DWARF debug info.
-	NAME_DELETED_AUTO
 	// Indicates that this is a reference to a TOC anchor.
 	NAME_TOCREF
 )
@@ -369,6 +366,7 @@ const (
 	ABasePPC64
 	ABaseARM64
 	ABaseMIPS
+	ABaseRISCV
 	ABaseS390X
 	ABaseThumb
 	ABaseWasm
@@ -391,6 +389,10 @@ type LSym struct {
 	R      []Reloc
 
 	Func *FuncInfo
+
+	Pkg    string
+	PkgIdx int32
+	SymIdx int32 // TODO: replace RefIdx
 }
 
 // A FuncInfo contains extra fields for STEXT symbols.
@@ -398,20 +400,23 @@ type FuncInfo struct {
 	Args     int32
 	Locals   int32
 	Text     *Prog
-	Autom    []*Auto
+	Autot    map[*LSym]struct{}
 	Pcln     Pcln
 	InlMarks []InlMark
 
-	dwarfInfoSym   *LSym
-	dwarfLocSym    *LSym
-	dwarfRangesSym *LSym
-	dwarfAbsFnSym  *LSym
-	dwarfIsStmtSym *LSym
+	dwarfInfoSym       *LSym
+	dwarfLocSym        *LSym
+	dwarfRangesSym     *LSym
+	dwarfAbsFnSym      *LSym
+	dwarfDebugLinesSym *LSym
 
-	GCArgs       *LSym
-	GCLocals     *LSym
-	GCRegs       *LSym
-	StackObjects *LSym
+	GCArgs             *LSym
+	GCLocals           *LSym
+	GCRegs             *LSym
+	StackObjects       *LSym
+	OpenCodedDeferInfo *LSym
+
+	FuncInfoSym *LSym
 }
 
 type InlMark struct {
@@ -429,6 +434,15 @@ type InlMark struct {
 // just before the body of the inlined function.
 func (fi *FuncInfo) AddInlMark(p *Prog, id int32) {
 	fi.InlMarks = append(fi.InlMarks, InlMark{p: p, id: id})
+}
+
+// Record the type symbol for an auto variable so that the linker
+// an emit DWARF type information for the type.
+func (fi *FuncInfo) RecordAutoType(gotype *LSym) {
+	if fi.Autot == nil {
+		fi.Autot = make(map[*LSym]struct{})
+	}
+	fi.Autot[gotype] = struct{}{}
 }
 
 //go:generate stringer -type ABI
@@ -495,6 +509,10 @@ const (
 	// keep unwinding beyond this frame.
 	AttrTopFrame
 
+	// Indexed indicates this symbol has been assigned with an index (when using the
+	// new object file format).
+	AttrIndexed
+
 	// Generate an interrupt entry/exit prologue/epilogue.
 	AttrISR
 
@@ -521,6 +539,7 @@ func (a Attribute) NoFrame() bool       { return a&AttrNoFrame != 0 }
 func (a Attribute) Static() bool        { return a&AttrStatic != 0 }
 func (a Attribute) WasInlined() bool    { return a&AttrWasInlined != 0 }
 func (a Attribute) TopFrame() bool      { return a&AttrTopFrame != 0 }
+func (a Attribute) Indexed() bool       { return a&AttrIndexed != 0 }
 func (a Attribute) ISR() bool           { return a&AttrISR != 0 }
 
 func (a *Attribute) Set(flag Attribute, value bool) {
@@ -556,6 +575,7 @@ var textAttrStrings = [...]struct {
 	{bit: AttrStatic, s: "STATIC"},
 	{bit: AttrWasInlined, s: ""},
 	{bit: AttrTopFrame, s: "TOPFRAME"},
+	{bit: AttrIndexed, s: ""},
 }
 
 // TextAttrString formats a for printing in as part of a TEXT prog.
@@ -634,8 +654,10 @@ type Link struct {
 	Debugpcln          string
 	Flag_shared        bool
 	Flag_dynlink       bool
+	Flag_linkshared    bool
 	Flag_optimize      bool
 	Flag_locationlists bool
+	Flag_newobj        bool // use new object file format
 	Bso                *bufio.Writer
 	Pathname           string
 	hashmu             sync.Mutex       // protects hash, funchash
@@ -648,7 +670,7 @@ type Link struct {
 	Imports            []string
 	DiagFunc           func(string, ...interface{})
 	DiagFlush          func()
-	DebugInfo          func(fn *LSym, curfn interface{}) ([]dwarf.Scope, dwarf.InlCalls) // if non-nil, curfn is a *gc.Node
+	DebugInfo          func(fn *LSym, info *LSym, curfn interface{}) ([]dwarf.Scope, dwarf.InlCalls) // if non-nil, curfn is a *gc.Node
 	GenAbstractFunc    func(fn *LSym)
 	Errors             int
 
@@ -669,6 +691,14 @@ type Link struct {
 	// TODO(austin): Replace this with ABI wrappers once the ABIs
 	// actually diverge.
 	ABIAliases []*LSym
+
+	// pkgIdx maps package path to index. The index is used for
+	// symbol reference in the object file.
+	pkgIdx map[string]int32
+
+	defs       []*LSym // list of defined symbols in the current package
+	nonpkgdefs []*LSym // list of defined non-package symbols
+	nonpkgrefs []*LSym // list of referenced non-package symbols
 }
 
 func (ctxt *Link) Diag(format string, args ...interface{}) {

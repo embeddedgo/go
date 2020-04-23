@@ -23,6 +23,7 @@
 #define SYS_close (SYS_BASE + 6)
 #define SYS_getpid (SYS_BASE + 20)
 #define SYS_kill (SYS_BASE + 37)
+#define SYS_pipe (SYS_BASE + 42)
 #define SYS_clone (SYS_BASE + 120)
 #define SYS_rt_sigreturn (SYS_BASE + 173)
 #define SYS_rt_sigaction (SYS_BASE + 174)
@@ -45,6 +46,7 @@
 #define SYS_epoll_ctl (SYS_BASE + 251)
 #define SYS_epoll_wait (SYS_BASE + 252)
 #define SYS_epoll_create1 (SYS_BASE + 357)
+#define SYS_pipe2 (SYS_BASE + 359)
 #define SYS_fcntl (SYS_BASE + 55)
 #define SYS_access (SYS_BASE + 33)
 #define SYS_connect (SYS_BASE + 283)
@@ -63,7 +65,7 @@ TEXT runtime·open(SB),NOSPLIT,$0
 	CMP      R1, R0
 	MOVW.HI  $-1, R0
 	MOVW     R0, ret+12(FP)
-	RET      
+	RET
 
 TEXT runtime·closefd(SB),NOSPLIT,$0
 	MOVW     fd+0(FP), R0
@@ -73,31 +75,42 @@ TEXT runtime·closefd(SB),NOSPLIT,$0
 	CMP      R1, R0
 	MOVW.HI  $-1, R0
 	MOVW     R0, ret+4(FP)
-	RET      
+	RET
 
-TEXT runtime·write(SB),NOSPLIT,$0
-	MOVW     fd+0(FP), R0
-	MOVW     p+4(FP), R1
-	MOVW     n+8(FP), R2
-	MOVW     $SYS_write, R7
-	SWI      $0
-	MOVW     $0xfffff001, R1
-	CMP      R1, R0
-	MOVW.HI  $-1, R0
-	MOVW     R0, ret+12(FP)
-	RET      
+TEXT runtime·write1(SB),NOSPLIT,$0
+	MOVW  fd+0(FP), R0
+	MOVW  p+4(FP), R1
+	MOVW  n+8(FP), R2
+	MOVW  $SYS_write, R7
+	SWI   $0
+	MOVW  R0, ret+12(FP)
+	RET
 
 TEXT runtime·read(SB),NOSPLIT,$0
-	MOVW     fd+0(FP), R0
-	MOVW     p+4(FP), R1
-	MOVW     n+8(FP), R2
-	MOVW     $SYS_read, R7
-	SWI      $0
-	MOVW     $0xfffff001, R1
-	CMP      R1, R0
-	MOVW.HI  $-1, R0
-	MOVW     R0, ret+12(FP)
-	RET      
+	MOVW  fd+0(FP), R0
+	MOVW  p+4(FP), R1
+	MOVW  n+8(FP), R2
+	MOVW  $SYS_read, R7
+	SWI   $0
+	MOVW  R0, ret+12(FP)
+	RET
+
+// func pipe() (r, w int32, errno int32)
+TEXT runtime·pipe(SB),NOSPLIT,$0-12
+	MOVW  $r+0(FP), R0
+	MOVW  $SYS_pipe, R7
+	SWI   $0
+	MOVW  R0, errno+8(FP)
+	RET
+
+// func pipe2(flags int32) (r, w int32, errno int32)
+TEXT runtime·pipe2(SB),NOSPLIT,$0-16
+	MOVW  $r+4(FP), R0
+	MOVW  flags+0(FP), R1
+	MOVW  $SYS_pipe2, R7
+	SWI   $0
+	MOVW  R0, errno+12(FP)
+	RET
 
 TEXT runtime·exit(SB),NOSPLIT|NOFRAME,$0
 	MOVW  code+0(FP), R0
@@ -135,7 +148,7 @@ TEXT runtime·gettid(SB),NOSPLIT,$0-4
 	MOVW  $SYS_gettid, R7
 	SWI   $0
 	MOVW  R0, ret+0(FP)
-	RET   
+	RET
 
 TEXT runtime·raise(SB),NOSPLIT|NOFRAME,$0
 	MOVW  $SYS_getpid, R7
@@ -148,7 +161,7 @@ TEXT runtime·raise(SB),NOSPLIT|NOFRAME,$0
 	MOVW  sig+0(FP), R2  // arg 3
 	MOVW  $SYS_tgkill, R7
 	SWI   $0
-	RET   
+	RET
 
 TEXT runtime·raiseproc(SB),NOSPLIT|NOFRAME,$0
 	MOVW  $SYS_getpid, R7
@@ -157,7 +170,21 @@ TEXT runtime·raiseproc(SB),NOSPLIT|NOFRAME,$0
 	MOVW  sig+0(FP), R1  // arg 2 - signal
 	MOVW  $SYS_kill, R7
 	SWI   $0
-	RET   
+	RET
+
+TEXT ·getpid(SB),NOSPLIT,$0-4
+	MOVW  $SYS_getpid, R7
+	SWI   $0
+	MOVW  R0, ret+0(FP)
+	RET
+
+TEXT ·tgkill(SB),NOSPLIT,$0-12
+	MOVW  tgid+0(FP), R0
+	MOVW  tid+4(FP), R1
+	MOVW  sig+8(FP), R2
+	MOVW  $SYS_tgkill, R7
+	SWI   $0
+	RET
 
 TEXT runtime·mmap(SB),NOSPLIT,$0
 	MOVW       addr+0(FP), R0
@@ -176,7 +203,7 @@ TEXT runtime·mmap(SB),NOSPLIT,$0
 	MOVW.HI    $0, R0
 	MOVW       R0, p+24(FP)
 	MOVW       R1, err+28(FP)
-	RET        
+	RET
 
 TEXT runtime·munmap(SB),NOSPLIT,$0
 	MOVW       addr+0(FP), R0
@@ -187,7 +214,7 @@ TEXT runtime·munmap(SB),NOSPLIT,$0
 	CMP        R6, R0
 	MOVW.P.HI  $0, R8  // crash on syscall failure
 	MOVW.HI    R8, (R8)
-	RET        
+	RET
 
 TEXT runtime·madvise(SB),NOSPLIT,$0
 	MOVW  addr+0(FP), R0
@@ -196,7 +223,7 @@ TEXT runtime·madvise(SB),NOSPLIT,$0
 	MOVW  $SYS_madvise, R7
 	SWI   $0
 	MOVW  R0, ret+12(FP)
-	RET   
+	RET
 
 TEXT runtime·setitimer(SB),NOSPLIT,$0
 	MOVW  mode+0(FP), R0
@@ -204,7 +231,7 @@ TEXT runtime·setitimer(SB),NOSPLIT,$0
 	MOVW  old+8(FP), R2
 	MOVW  $SYS_setitimer, R7
 	SWI   $0
-	RET   
+	RET
 
 TEXT runtime·mincore(SB),NOSPLIT,$0
 	MOVW  addr+0(FP), R0
@@ -213,9 +240,9 @@ TEXT runtime·mincore(SB),NOSPLIT,$0
 	MOVW  $SYS_mincore, R7
 	SWI   $0
 	MOVW  R0, ret+12(FP)
-	RET   
+	RET
 
-TEXT runtime·walltime(SB),NOSPLIT,$0-12
+TEXT runtime·walltime1(SB),NOSPLIT,$0-12
 	// We don't know how much stack space the VDSO code will need,
 	// so switch to g0.
 
@@ -242,11 +269,38 @@ noswitch:
 
 	MOVW  $CLOCK_REALTIME, R0
 	MOVW  $8(R13), R1  // timespec
-	MOVW  runtime·vdsoClockgettimeSym(SB), REGTMP
-	CMP   $0, REGTMP
+	MOVW  runtime·vdsoClockgettimeSym(SB), R2
+	CMP   $0, R2
 	B.EQ  fallback
 
-	BL   (REGTMP)
+	// Store g on gsignal's stack, so if we receive a signal
+	// during VDSO code we can find the g.
+	// If we don't have a signal stack, we won't receive signal,
+	// so don't bother saving g.
+	// When using cgo, we already saved g on TLS, also don't save
+	// g here.
+	// Also don't save g if we are already on the signal stack.
+	// We won't get a nested signal.
+	MOVB  runtime·iscgo(SB), R6
+	CMP   $0, R6
+	BNE   nosaveg
+	MOVW  m_gsignal(R5), R6  // g.m.gsignal
+	CMP   $0, R6
+	BEQ   nosaveg
+	CMP   g, R6
+	BEQ   nosaveg
+	MOVW  (g_stack+stack_lo)(R6), R6  // g.m.gsignal.stack.lo
+	MOVW  g, (R6)
+
+	BL  (R2)
+
+	MOVW  $0, R1
+	MOVW  R1, (R6)  // clear g slot, R6 is unchanged by C code
+
+	JMP  finish
+
+nosaveg:
+	BL   (R2)
 	JMP  finish
 
 fallback:
@@ -264,10 +318,10 @@ finish:
 	MOVW  R0, sec_lo+0(FP)
 	MOVW  R1, sec_hi+4(FP)
 	MOVW  R2, nsec+8(FP)
-	RET   
+	RET
 
-// int64 nanotime(void)
-TEXT runtime·nanotime(SB),NOSPLIT,$0-8
+// int64 nanotime1(void)
+TEXT runtime·nanotime1(SB),NOSPLIT,$0-8
 	// Switch to g0 stack. See comment above in runtime·walltime.
 
 	// Save old SP. Use R13 instead of SP to avoid linker rewriting the offsets.
@@ -293,11 +347,38 @@ noswitch:
 
 	MOVW  $CLOCK_MONOTONIC, R0
 	MOVW  $8(R13), R1  // timespec
-	MOVW  runtime·vdsoClockgettimeSym(SB), REGTMP
-	CMP   $0, REGTMP
+	MOVW  runtime·vdsoClockgettimeSym(SB), R2
+	CMP   $0, R2
 	B.EQ  fallback
 
-	BL   (REGTMP)
+	// Store g on gsignal's stack, so if we receive a signal
+	// during VDSO code we can find the g.
+	// If we don't have a signal stack, we won't receive signal,
+	// so don't bother saving g.
+	// When using cgo, we already saved g on TLS, also don't save
+	// g here.
+	// Also don't save g if we are already on the signal stack.
+	// We won't get a nested signal.
+	MOVB  runtime·iscgo(SB), R6
+	CMP   $0, R6
+	BNE   nosaveg
+	MOVW  m_gsignal(R5), R6  // g.m.gsignal
+	CMP   $0, R6
+	BEQ   nosaveg
+	CMP   g, R6
+	BEQ   nosaveg
+	MOVW  (g_stack+stack_lo)(R6), R6  // g.m.gsignal.stack.lo
+	MOVW  g, (R6)
+
+	BL  (R2)
+
+	MOVW  $0, R1
+	MOVW  R1, (R6)  // clear g slot, R6 is unchanged by C code
+
+	JMP  finish
+
+nosaveg:
+	BL   (R2)
 	JMP  finish
 
 fallback:
@@ -319,7 +400,7 @@ finish:
 
 	MOVW  R0, ret_lo+0(FP)
 	MOVW  R1, ret_hi+4(FP)
-	RET   
+	RET
 
 // int32 futex(int32 *uaddr, int32 op, int32 val,
 //	struct timespec *timeout, int32 *uaddr2, int32 val2);
@@ -333,7 +414,7 @@ TEXT runtime·futex(SB),NOSPLIT,$0
 	MOVW  $SYS_futex, R7
 	SWI   $0
 	MOVW  R0, ret+24(FP)
-	RET   
+	RET
 
 // int32 clone(int32 flags, void *stack, M *mp, G *gp, void (*fn)(void));
 TEXT runtime·clone(SB),NOSPLIT,$0
@@ -362,7 +443,7 @@ TEXT runtime·clone(SB),NOSPLIT,$0
 	CMP   $0, R0
 	BEQ   3(PC)
 	MOVW  R0, ret+20(FP)
-	RET   
+	RET
 
 	// Paranoia: check that SP is as we expect. Use R13 to avoid linker 'fixup'
 	NOP   R13  // tell vet SP/R13 changed - stop checking offsets
@@ -420,7 +501,7 @@ TEXT runtime·sigaltstack(SB),NOSPLIT,$0
 	CMP        R6, R0
 	MOVW.P.HI  $0, R8  // crash on syscall failure
 	MOVW.HI    R8, (R8)
-	RET        
+	RET
 
 TEXT runtime·sigfwd(SB),NOSPLIT,$0-16
 	MOVW  sig+4(FP), R0
@@ -432,17 +513,24 @@ TEXT runtime·sigfwd(SB),NOSPLIT,$0-16
 	BIC   $0x7, R13  // alignment for ELF ABI
 	BL    (REGTMP)
 	MOVW  R4, R13
-	RET   
+	RET
 
-TEXT runtime·sigtramp(SB),NOSPLIT,$12
-	// this might be called in external code context,
-	// where g is not set.
+TEXT runtime·sigtramp(SB),NOSPLIT,$0
+	// Reserve space for callee-save registers and arguments.
+	MOVM.DB.W  [R4-R11], (R13)
+	SUB        $16, R13
+
 	MOVW  R0, 4(R13)
 	MOVW  R1, 8(R13)
 	MOVW  R2, 12(R13)
 	MOVW  $runtime·sigtrampgo(SB), REGTMP
 	BL    (REGTMP)
-	RET   
+
+	// Restore callee-save registers.
+	ADD        $16, R13
+	MOVM.IA.W  (R13), [R4-R11]
+
+	RET
 
 TEXT runtime·cgoSigtramp(SB),NOSPLIT,$0
 	MOVW  $runtime·sigtramp(SB), REGTMP
@@ -455,7 +543,7 @@ TEXT runtime·rtsigprocmask(SB),NOSPLIT,$0
 	MOVW  size+12(FP), R3
 	MOVW  $SYS_rt_sigprocmask, R7
 	SWI   $0
-	RET   
+	RET
 
 TEXT runtime·rt_sigaction(SB),NOSPLIT,$0
 	MOVW  sig+0(FP), R0
@@ -465,7 +553,7 @@ TEXT runtime·rt_sigaction(SB),NOSPLIT,$0
 	MOVW  $SYS_rt_sigaction, R7
 	SWI   $0
 	MOVW  R0, ret+16(FP)
-	RET   
+	RET
 
 TEXT runtime·usleep(SB),NOSPLIT,$12
 	MOVW  usec+0(FP), R0
@@ -478,7 +566,7 @@ TEXT runtime·usleep(SB),NOSPLIT,$12
 	MOVW  $0, R1
 	MOVW  $SYS_nanosleep, R7
 	SWI   $0
-	RET   
+	RET
 
 TEXT ·publicationBarrier(SB),NOSPLIT,$0
 	DMB  MB_ST
@@ -487,7 +575,7 @@ TEXT ·publicationBarrier(SB),NOSPLIT,$0
 TEXT runtime·osyield(SB),NOSPLIT,$0
 	MOVW  $SYS_sched_yield, R7
 	SWI   $0
-	RET   
+	RET
 
 TEXT runtime·sched_getaffinity(SB),NOSPLIT,$0
 	MOVW  pid+0(FP), R0
@@ -496,7 +584,7 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT,$0
 	MOVW  $SYS_sched_getaffinity, R7
 	SWI   $0
 	MOVW  R0, ret+12(FP)
-	RET   
+	RET
 
 // int32 runtime·epollcreate(int32 size)
 TEXT runtime·epollcreate(SB),NOSPLIT,$0
@@ -504,7 +592,7 @@ TEXT runtime·epollcreate(SB),NOSPLIT,$0
 	MOVW  $SYS_epoll_create, R7
 	SWI   $0
 	MOVW  R0, ret+4(FP)
-	RET   
+	RET
 
 // int32 runtime·epollcreate1(int32 flags)
 TEXT runtime·epollcreate1(SB),NOSPLIT,$0
@@ -512,7 +600,7 @@ TEXT runtime·epollcreate1(SB),NOSPLIT,$0
 	MOVW  $SYS_epoll_create1, R7
 	SWI   $0
 	MOVW  R0, ret+4(FP)
-	RET   
+	RET
 
 // func epollctl(epfd, op, fd int32, ev *epollEvent) int
 TEXT runtime·epollctl(SB),NOSPLIT,$0
@@ -523,7 +611,7 @@ TEXT runtime·epollctl(SB),NOSPLIT,$0
 	MOVW  $SYS_epoll_ctl, R7
 	SWI   $0
 	MOVW  R0, ret+16(FP)
-	RET   
+	RET
 
 // int32 runtime·epollwait(int32 epfd, EpollEvent *ev, int32 nev, int32 timeout)
 TEXT runtime·epollwait(SB),NOSPLIT,$0
@@ -534,7 +622,7 @@ TEXT runtime·epollwait(SB),NOSPLIT,$0
 	MOVW  $SYS_epoll_wait, R7
 	SWI   $0
 	MOVW  R0, ret+16(FP)
-	RET   
+	RET
 
 // void runtime·closeonexec(int32 fd)
 TEXT runtime·closeonexec(SB),NOSPLIT,$0
@@ -543,7 +631,21 @@ TEXT runtime·closeonexec(SB),NOSPLIT,$0
 	MOVW  $1, R2        // FD_CLOEXEC
 	MOVW  $SYS_fcntl, R7
 	SWI   $0
-	RET   
+	RET
+
+// func runtime·setNonblock(fd int32)
+TEXT runtime·setNonblock(SB),NOSPLIT,$0-4
+	MOVW  fd+0(FP), R0  // fd
+	MOVW  $3, R1        // F_GETFL
+	MOVW  $0, R2
+	MOVW  $SYS_fcntl, R7
+	SWI   $0
+	ORR   $0x800, R0, R2  // O_NONBLOCK
+	MOVW  fd+0(FP), R0    // fd
+	MOVW  $4, R1          // F_SETFL
+	MOVW  $SYS_fcntl, R7
+	SWI   $0
+	RET
 
 // b __kuser_get_tls @ 0xffff0fe0
 TEXT runtime·read_tls_fallback(SB),NOSPLIT|NOFRAME,$0
@@ -556,7 +658,7 @@ TEXT runtime·access(SB),NOSPLIT,$0
 	MOVW  $SYS_access, R7
 	SWI   $0
 	MOVW  R0, ret+8(FP)
-	RET   
+	RET
 
 TEXT runtime·connect(SB),NOSPLIT,$0
 	MOVW  fd+0(FP), R0
@@ -565,7 +667,7 @@ TEXT runtime·connect(SB),NOSPLIT,$0
 	MOVW  $SYS_connect, R7
 	SWI   $0
 	MOVW  R0, ret+12(FP)
-	RET   
+	RET
 
 TEXT runtime·socket(SB),NOSPLIT,$0
 	MOVW  domain+0(FP), R0
@@ -574,7 +676,7 @@ TEXT runtime·socket(SB),NOSPLIT,$0
 	MOVW  $SYS_socket, R7
 	SWI   $0
 	MOVW  R0, ret+12(FP)
-	RET   
+	RET
 
 // func sbrk0() uintptr
 TEXT runtime·sbrk0(SB),NOSPLIT,$0-4
@@ -583,7 +685,7 @@ TEXT runtime·sbrk0(SB),NOSPLIT,$0-4
 	MOVW  $SYS_brk, R7
 	SWI   $0
 	MOVW  R0, ret+0(FP)
-	RET   
+	RET
 
 TEXT runtime·sigreturn(SB),NOSPLIT,$0-0
-	RET  
+	RET

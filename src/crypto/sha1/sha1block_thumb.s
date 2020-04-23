@@ -4,7 +4,7 @@
 //
 // Thumb version of md5block.go
 
-#include "/home/michal/P/go/goroot/src/runtime/textflag.h"
+#include "textflag.h"
 
 // SHA-1 block routine. See sha1block.go for Go equivalent.
 //

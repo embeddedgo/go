@@ -328,6 +328,15 @@ func _MOVM_IAw(enc uint32) Args {
 	return Args{Mem{Base: Rn, Mode: mode}, RegList(enc)}
 }
 
+// 1110 1110 111x 0001  tttt 1010 0001 0000
+func _MOVW__FPSCR__Rt(enc uint32) Args {
+	Rt := Reg(enc >> 12 & 15)
+	if enc>>20&1 != 0 {
+		return Args{Rt, FPSCR}
+	}
+	return Args{FPSCR, Rt}
+}
+
 // 1111 100x 0xxx nnnn  tttt 0000 00uu mmmm
 func _MOVW__Rn_Rm_1_u2__Rt(enc uint32) Args {
 	return Args{

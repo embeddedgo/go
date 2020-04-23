@@ -37,6 +37,10 @@ func checkGdbEnvironment(t *testing.T) {
 		}
 	case "freebsd":
 		t.Skip("skipping gdb tests on FreeBSD; see https://golang.org/issue/29508")
+	case "aix":
+		if testing.Short() {
+			t.Skip("skipping gdb tests on AIX; see https://golang.org/issue/35710")
+		}
 	}
 	if final := os.Getenv("GOROOT_FINAL"); final != "" && runtime.GOROOT() != final {
 		t.Skip("gdb test can fail with GOROOT_FINAL pending")
@@ -66,8 +70,8 @@ func checkGdbVersion(t *testing.T) {
 }
 
 func checkGdbPython(t *testing.T) {
-	if runtime.GOOS == "solaris" && testenv.Builder() != "solaris-amd64-smartosbuildlet" {
-		t.Skip("skipping gdb python tests on solaris; see golang.org/issue/20821")
+	if runtime.GOOS == "solaris" || runtime.GOOS == "illumos" {
+		t.Skip("skipping gdb python tests on illumos and solaris; see golang.org/issue/20821")
 	}
 
 	cmd := exec.Command("gdb", "-nx", "-q", "--batch", "-iex", "python import sys; print('go gdb python support')")

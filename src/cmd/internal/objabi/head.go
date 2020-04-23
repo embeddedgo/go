@@ -42,7 +42,6 @@ const (
 	Hfreebsd
 	Hjs
 	Hlinux
-	Hnacl
 	Hnetbsd
 	Hopenbsd
 	Hplan9
@@ -66,8 +65,6 @@ func (h *HeadType) Set(s string) error {
 		*h = Hjs
 	case "linux", "android":
 		*h = Hlinux
-	case "nacl":
-		*h = Hnacl
 	case "netbsd":
 		*h = Hnetbsd
 	case "noos":
@@ -100,8 +97,6 @@ func (h *HeadType) String() string {
 		return "js"
 	case Hlinux:
 		return "linux"
-	case Hnacl:
-		return "nacl"
 	case Hnetbsd:
 		return "netbsd"
 	case Hnoos:

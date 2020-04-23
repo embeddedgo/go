@@ -10,6 +10,7 @@ import (
 	"cmd/internal/bio"
 	"cmd/internal/objabi"
 	"cmd/internal/sys"
+	"cmd/link/internal/loader"
 	"cmd/link/internal/sym"
 	"debug/elf"
 	"encoding/binary"
@@ -451,7 +452,23 @@ func parseArmAttributes(e binary.ByteOrder, data []byte) (found bool, ehdrFlags 
 	return found, ehdrFlags, nil
 }
 
-// Load loads the ELF file pn from f.
+func Load(l *loader.Loader, arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length int64, pn string, flags uint32) ([]*sym.Symbol, uint32, error) {
+	newSym := func(name string, version int) *sym.Symbol {
+		return l.Create(name, syms)
+	}
+	lookup := func(name string, version int) *sym.Symbol {
+		return l.LookupOrCreate(name, version, syms)
+	}
+	return load(arch, syms.IncVersion(), newSym, lookup, f, pkg, length, pn, flags)
+}
+
+func LoadOld(arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length int64, pn string, flags uint32) ([]*sym.Symbol, uint32, error) {
+	return load(arch, syms.IncVersion(), syms.Newsym, syms.Lookup, f, pkg, length, pn, flags)
+}
+
+type lookupFunc func(string, int) *sym.Symbol
+
+// load loads the ELF file pn from f.
 // Symbols are written into syms, and a slice of the text symbols is returned.
 //
 // On ARM systems, Load will attempt to determine what ELF header flags to
@@ -459,12 +476,11 @@ func parseArmAttributes(e binary.ByteOrder, data []byte) (found bool, ehdrFlags 
 // parameter initEhdrFlags contains the current header flags for the output
 // object, and the returned ehdrFlags contains what this Load function computes.
 // TODO: find a better place for this logic.
-func Load(arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length int64, pn string, initEhdrFlags uint32) (textp []*sym.Symbol, ehdrFlags uint32, err error) {
+func load(arch *sys.Arch, localSymVersion int, newSym, lookup lookupFunc, f *bio.Reader, pkg string, length int64, pn string, initEhdrFlags uint32) (textp []*sym.Symbol, ehdrFlags uint32, err error) {
 	errorf := func(str string, args ...interface{}) ([]*sym.Symbol, uint32, error) {
 		return nil, 0, fmt.Errorf("loadelf: %s: %v", pn, fmt.Sprintf(str, args...))
 	}
 
-	localSymVersion := syms.IncVersion()
 	base := f.Offset()
 
 	var hdrbuf [64]uint8
@@ -715,7 +731,7 @@ func Load(arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length i
 		}
 		sectsymNames[name] = true
 
-		s := syms.Lookup(name, localSymVersion)
+		s := lookup(name, localSymVersion)
 
 		switch int(sect.flags) & (ElfSectFlagAlloc | ElfSectFlagWrite | ElfSectFlagExec) {
 		default:
@@ -754,7 +770,7 @@ func Load(arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length i
 
 	for i := 1; i < elfobj.nsymtab; i++ {
 		var elfsym ElfSym
-		if err := readelfsym(arch, syms, elfobj, i, &elfsym, 1, localSymVersion); err != nil {
+		if err := readelfsym(newSym, lookup, arch, elfobj, i, &elfsym, 1, localSymVersion); err != nil {
 			return errorf("%s: malformed elf file: %v", pn, err)
 		}
 		symbols[i] = elfsym.sym
@@ -888,14 +904,26 @@ func Load(arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length i
 		p := rsect.base
 		for j := 0; j < n; j++ {
 			var add uint64
+			var symIdx int
+			var relocType uint64
+
 			rp := &r[j]
-			var info uint64
 			if is64 != 0 {
 				// 64-bit rel/rela
 				rp.Off = int32(e.Uint64(p))
 
 				p = p[8:]
-				info = e.Uint64(p)
+				switch arch.Family {
+				case sys.MIPS64:
+					// https://www.linux-mips.org/pub/linux/mips/doc/ABI/elf64-2.4.pdf
+					// The doc shows it's different with general Linux ELF
+					symIdx = int(e.Uint32(p))
+					relocType = uint64(p[7])
+				default:
+					info := e.Uint64(p)
+					relocType = info & 0xffffffff
+					symIdx = int(info >> 32)
+				}
 				p = p[8:]
 				if rela != 0 {
 					add = e.Uint64(p)
@@ -906,8 +934,9 @@ func Load(arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length i
 				rp.Off = int32(e.Uint32(p))
 
 				p = p[4:]
-				info = uint64(e.Uint32(p))
-				info = info>>8<<32 | info&0xff // convert to 64-bit info
+				info := e.Uint32(p)
+				relocType = uint64(info & 0xff)
+				symIdx = int(info >> 8)
 				p = p[4:]
 				if rela != 0 {
 					add = uint64(e.Uint32(p))
@@ -915,29 +944,29 @@ func Load(arch *sys.Arch, syms *sym.Symbols, f *bio.Reader, pkg string, length i
 				}
 			}
 
-			if info&0xffffffff == 0 { // skip R_*_NONE relocation
+			if relocType == 0 { // skip R_*_NONE relocation
 				j--
 				n--
 				continue
 			}
 
-			if info>>32 == 0 { // absolute relocation, don't bother reading the null symbol
+			if symIdx == 0 { // absolute relocation, don't bother reading the null symbol
 				rp.Sym = nil
 			} else {
 				var elfsym ElfSym
-				if err := readelfsym(arch, syms, elfobj, int(info>>32), &elfsym, 0, 0); err != nil {
+				if err := readelfsym(newSym, lookup, arch, elfobj, symIdx, &elfsym, 0, 0); err != nil {
 					return errorf("malformed elf file: %v", err)
 				}
-				elfsym.sym = symbols[info>>32]
+				elfsym.sym = symbols[symIdx]
 				if elfsym.sym == nil {
-					return errorf("malformed elf file: %s#%d: reloc of invalid sym #%d %s shndx=%d type=%d", sect.sym.Name, j, int(info>>32), elfsym.name, elfsym.shndx, elfsym.type_)
+					return errorf("malformed elf file: %s#%d: reloc of invalid sym #%d %s shndx=%d type=%d", sect.sym.Name, j, symIdx, elfsym.name, elfsym.shndx, elfsym.type_)
 				}
 
 				rp.Sym = elfsym.sym
 			}
 
-			rp.Type = objabi.ElfRelocOffset + objabi.RelocType(info)
-			rp.Siz, err = relSize(arch, pn, uint32(info))
+			rp.Type = objabi.ElfRelocOffset + objabi.RelocType(relocType)
+			rp.Siz, err = relSize(arch, pn, uint32(relocType))
 			if err != nil {
 				return nil, 0, err
 			}
@@ -1002,7 +1031,7 @@ func elfmap(elfobj *ElfObj, sect *ElfSect) (err error) {
 	return nil
 }
 
-func readelfsym(arch *sys.Arch, syms *sym.Symbols, elfobj *ElfObj, i int, elfsym *ElfSym, needSym int, localSymVersion int) (err error) {
+func readelfsym(newSym, lookup lookupFunc, arch *sys.Arch, elfobj *ElfObj, i int, elfsym *ElfSym, needSym int, localSymVersion int) (err error) {
 	if i >= elfobj.nsymtab || i < 0 {
 		err = fmt.Errorf("invalid elf symbol index")
 		return err
@@ -1052,7 +1081,7 @@ func readelfsym(arch *sys.Arch, syms *sym.Symbols, elfobj *ElfObj, i int, elfsym
 		switch elfsym.bind {
 		case ElfSymBindGlobal:
 			if needSym != 0 {
-				s = syms.Lookup(elfsym.name, 0)
+				s = lookup(elfsym.name, 0)
 
 				// for global scoped hidden symbols we should insert it into
 				// symbol hash table, but mark them as hidden.
@@ -1077,7 +1106,7 @@ func readelfsym(arch *sys.Arch, syms *sym.Symbols, elfobj *ElfObj, i int, elfsym
 				// We need to be able to look this up,
 				// so put it in the hash table.
 				if needSym != 0 {
-					s = syms.Lookup(elfsym.name, localSymVersion)
+					s = lookup(elfsym.name, localSymVersion)
 					s.Attr |= sym.AttrVisibilityHidden
 				}
 
@@ -1088,14 +1117,17 @@ func readelfsym(arch *sys.Arch, syms *sym.Symbols, elfobj *ElfObj, i int, elfsym
 				// local names and hidden global names are unique
 				// and should only be referenced by their index, not name, so we
 				// don't bother to add them into the hash table
-				s = syms.Newsym(elfsym.name, localSymVersion)
+				// FIXME: pass empty string here for name? This would
+				// reduce mem use, but also (possibly) make it harder
+				// to debug problems.
+				s = newSym(elfsym.name, localSymVersion)
 
 				s.Attr |= sym.AttrVisibilityHidden
 			}
 
 		case ElfSymBindWeak:
 			if needSym != 0 {
-				s = syms.Lookup(elfsym.name, 0)
+				s = lookup(elfsym.name, 0)
 				if elfsym.other == 2 {
 					s.Attr |= sym.AttrVisibilityHidden
 				}
@@ -1128,17 +1160,35 @@ func relSize(arch *sys.Arch, pn string, elftype uint32) (uint8, error) {
 	// performance.
 
 	const (
-		AMD64 = uint32(sys.AMD64)
-		ARM   = uint32(sys.ARM)
-		ARM64 = uint32(sys.ARM64)
-		I386  = uint32(sys.I386)
-		PPC64 = uint32(sys.PPC64)
-		S390X = uint32(sys.S390X)
+		AMD64  = uint32(sys.AMD64)
+		ARM    = uint32(sys.ARM)
+		ARM64  = uint32(sys.ARM64)
+		I386   = uint32(sys.I386)
+		PPC64  = uint32(sys.PPC64)
+		S390X  = uint32(sys.S390X)
+		MIPS   = uint32(sys.MIPS)
+		MIPS64 = uint32(sys.MIPS64)
 	)
 
 	switch uint32(arch.Family) | elftype<<16 {
 	default:
 		return 0, fmt.Errorf("%s: unknown relocation type %d; compiled without -fpic?", pn, elftype)
+
+	case MIPS | uint32(elf.R_MIPS_HI16)<<16,
+		MIPS | uint32(elf.R_MIPS_LO16)<<16,
+		MIPS | uint32(elf.R_MIPS_GOT16)<<16,
+		MIPS | uint32(elf.R_MIPS_GPREL16)<<16,
+		MIPS | uint32(elf.R_MIPS_GOT_PAGE)<<16,
+		MIPS | uint32(elf.R_MIPS_JALR)<<16,
+		MIPS | uint32(elf.R_MIPS_GOT_OFST)<<16,
+		MIPS64 | uint32(elf.R_MIPS_HI16)<<16,
+		MIPS64 | uint32(elf.R_MIPS_LO16)<<16,
+		MIPS64 | uint32(elf.R_MIPS_GOT16)<<16,
+		MIPS64 | uint32(elf.R_MIPS_GPREL16)<<16,
+		MIPS64 | uint32(elf.R_MIPS_GOT_PAGE)<<16,
+		MIPS64 | uint32(elf.R_MIPS_JALR)<<16,
+		MIPS64 | uint32(elf.R_MIPS_GOT_OFST)<<16:
+		return 4, nil
 
 	case S390X | uint32(elf.R_390_8)<<16:
 		return 1, nil

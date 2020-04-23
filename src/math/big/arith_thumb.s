@@ -4,7 +4,7 @@
 
 // +build !math_big_pure_go
 
-#include "/home/michal/P/go/goroot/src/runtime/textflag.h"
+#include "textflag.h"
 
 // This file provides fast assembly versions for the elementary
 // arithmetic operations on vectors implemented in arith.go.

@@ -61,8 +61,7 @@ import (
 // archnewm
 //
 // This function is called to create the inintial state of the new thread and
-// save it in provided m so the curcpuEnterScheduler can later switch the CPU to
-// it.
+// save it in provided m.
 //
 // curcpuSchedule
 //
@@ -70,7 +69,7 @@ import (
 //
 // The actual context switch is performed by architecture specific code at
 // curcpuRunScheduler exit. It should check the cpuctx.newexe variable and if
-// it is not nil, switch the context to the new thread specified in cpuctx.exe.
+// true switch the context to the new thread specified in cpuctx.exe.
 //
 // Tasker code does not use FPU so the architecture specific context switch
 // code can avoid saving/restoring FPU context if not need.

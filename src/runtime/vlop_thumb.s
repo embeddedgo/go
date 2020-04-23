@@ -27,9 +27,9 @@
 
 // _mul64by32 and _div64by32 not implemented on thumb
 TEXT runtime·_mul64by32(SB), NOSPLIT, $0
-	MOVW	$-1, R0
+	MOVW	$0, R0
 	MOVW	(R0), R1 // crash
 
 TEXT runtime·_div64by32(SB), NOSPLIT, $0
-	MOVW	$-1, R0
+	MOVW	$0, R0
 	MOVW	(R0), R1 // crash

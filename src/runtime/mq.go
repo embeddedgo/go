@@ -224,7 +224,7 @@ func mnext2(m *m) *m { return muintptr(m.tls[3]).ptr() }
 func mval(m *m) int64 { return int64(m.ncgocall) }
 
 //go:nosplit
-func mkey(m *m) uintptr { return m.thread }
+func mkey(m *m) uintptr { return m.mqkey }
 
 //go:nosplit
 func msetprev1(m, prev *m) { (*muintptr)(&m.tls[0]).set(prev) }
@@ -242,4 +242,4 @@ func msetnext2(m, next *m) { (*muintptr)(&m.tls[3]).set(next) }
 func msetval(m *m, val int64) { m.ncgocall = uint64(val) }
 
 //go:nosplit
-func msetkey(m *m, key uintptr) { m.thread = key }
+func msetkey(m *m, key uintptr) { m.mqkey = key }

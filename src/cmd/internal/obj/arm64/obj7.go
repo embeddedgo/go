@@ -62,6 +62,12 @@ func (c *ctxt7) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = REG_R1
 
+	// Mark the stack bound check and morestack call async nonpreemptible.
+	// If we get preempted here, when resumed the preemption request is
+	// cleared, but we'll still call morestack, which will double the stack
+	// unnecessarily. See issue #35470.
+	p = c.ctxt.StartUnsafePoint(p, c.newprog)
+
 	q := (*obj.Prog)(nil)
 	if framesize <= objabi.StackSmall {
 		// small stack: SP < stackguard
@@ -156,6 +162,8 @@ func (c *ctxt7) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	bls.As = ABLS
 	bls.To.Type = obj.TYPE_BRANCH
 
+	end := c.ctxt.EndUnsafePoint(bls, c.newprog, -1)
+
 	var last *obj.Prog
 	for last = c.cursym.Func.Text; last.Link != nil; last = last.Link {
 	}
@@ -167,7 +175,8 @@ func (c *ctxt7) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	spfix.As = obj.ANOP
 	spfix.Spadj = -framesize
 
-	pcdata := c.ctxt.EmitEntryLiveness(c.cursym, spfix, c.newprog)
+	pcdata := c.ctxt.EmitEntryStackMap(c.cursym, spfix, c.newprog)
+	pcdata = c.ctxt.StartUnsafePoint(pcdata, c.newprog)
 
 	// MOV	LR, R3
 	movlr := obj.Appendp(pcdata, c.newprog)
@@ -204,18 +213,16 @@ func (c *ctxt7) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	}
 	call.To.Sym = c.ctxt.Lookup(morestack)
 
+	pcdata = c.ctxt.EndUnsafePoint(call, c.newprog, -1)
+
 	// B	start
-	jmp := obj.Appendp(call, c.newprog)
+	jmp := obj.Appendp(pcdata, c.newprog)
 	jmp.As = AB
 	jmp.To.Type = obj.TYPE_BRANCH
 	jmp.Pcond = c.cursym.Func.Text.Link
 	jmp.Spadj = +framesize
 
-	// placeholder for bls's jump target
-	// p = obj.Appendp(ctxt, p)
-	// p.As = obj.ANOP
-
-	return bls
+	return end
 }
 
 func progedit(ctxt *obj.Link, p *obj.Prog, newprog obj.ProgAlloc) {
@@ -599,6 +606,10 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				// Store link register before decrementing SP, so if a signal comes
 				// during the execution of the function prologue, the traceback
 				// code will not see a half-updated stack frame.
+				// This sequence is not async preemptible, as if we open a frame
+				// at the current SP, it will clobber the saved LR.
+				q = c.ctxt.StartUnsafePoint(q, c.newprog)
+
 				q = obj.Appendp(q, c.newprog)
 				q.Pos = p.Pos
 				q.As = ASUB
@@ -624,6 +635,21 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				q1.To.Type = obj.TYPE_REG
 				q1.To.Reg = REGSP
 				q1.Spadj = c.autosize
+
+				if c.ctxt.Headtype == objabi.Hdarwin {
+					// iOS does not support SA_ONSTACK. We will run the signal handler
+					// on the G stack. If we write below SP, it may be clobbered by
+					// the signal handler. So we save LR after decrementing SP.
+					q1 = obj.Appendp(q1, c.newprog)
+					q1.Pos = p.Pos
+					q1.As = AMOVD
+					q1.From.Type = obj.TYPE_REG
+					q1.From.Reg = REGLINK
+					q1.To.Type = obj.TYPE_MEM
+					q1.To.Reg = REGSP
+				}
+
+				q1 = c.ctxt.EndUnsafePoint(q1, c.newprog, -1)
 			} else {
 				// small frame, update SP and save LR in a single MOVD.W instruction
 				q1 = obj.Appendp(q, c.newprog)
@@ -806,22 +832,27 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 
 				aoffset := c.autosize
 
-				if aoffset > 0xF0 {
-					aoffset = 0xF0
-				}
-				p.As = AMOVD
-				p.From.Type = obj.TYPE_MEM
-				p.Scond = C_XPOST
-				p.From.Offset = int64(aoffset)
-				p.From.Reg = REGSP
-				p.To.Type = obj.TYPE_REG
-				p.To.Reg = REGLINK
-				p.Spadj = -aoffset
-				if c.autosize > aoffset {
+				if aoffset <= 0xF0 {
+					p.As = AMOVD
+					p.From.Type = obj.TYPE_MEM
+					p.Scond = C_XPOST
+					p.From.Offset = int64(aoffset)
+					p.From.Reg = REGSP
+					p.To.Type = obj.TYPE_REG
+					p.To.Reg = REGLINK
+					p.Spadj = -aoffset
+				} else {
+					p.As = AMOVD
+					p.From.Type = obj.TYPE_MEM
+					p.From.Offset = 0
+					p.From.Reg = REGSP
+					p.To.Type = obj.TYPE_REG
+					p.To.Reg = REGLINK
+
 					q = newprog()
 					q.As = AADD
 					q.From.Type = obj.TYPE_CONST
-					q.From.Offset = int64(c.autosize) - int64(aoffset)
+					q.From.Offset = int64(aoffset)
 					q.To.Type = obj.TYPE_REG
 					q.To.Reg = REGSP
 					q.Link = p.Link

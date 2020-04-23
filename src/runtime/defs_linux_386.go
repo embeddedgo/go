@@ -7,6 +7,7 @@ const (
 	_EINTR  = 0x4
 	_EAGAIN = 0xb
 	_ENOMEM = 0xc
+	_ENOSYS = 0x26
 
 	_PROT_NONE  = 0x0
 	_PROT_READ  = 0x1
@@ -78,8 +79,9 @@ const (
 	_ITIMER_VIRTUAL = 0x1
 	_ITIMER_PROF    = 0x2
 
-	_O_RDONLY  = 0x0
-	_O_CLOEXEC = 0x80000
+	_O_RDONLY   = 0x0
+	_O_NONBLOCK = 0x800
+	_O_CLOEXEC  = 0x80000
 
 	_EPOLLIN       = 0x1
 	_EPOLLOUT      = 0x4
@@ -224,4 +226,15 @@ type epollevent struct {
 type sockaddr_un struct {
 	family uint16
 	path   [108]byte
+}
+
+const __NEW_UTS_LEN = 64
+
+type new_utsname struct {
+	sysname    [__NEW_UTS_LEN + 1]byte
+	nodename   [__NEW_UTS_LEN + 1]byte
+	release    [__NEW_UTS_LEN + 1]byte
+	version    [__NEW_UTS_LEN + 1]byte
+	machine    [__NEW_UTS_LEN + 1]byte
+	domainname [__NEW_UTS_LEN + 1]byte
 }

@@ -1,6 +1,6 @@
 <!--{
 	"Title": "The Go Programming Language Specification",
-	"Subtitle": "Version of July 31, 2019",
+	"Subtitle": "Version of Jan 14, 2020",
 	"Path": "/ref/spec"
 }-->
 
@@ -20,8 +20,8 @@ dependencies.
 </p>
 
 <p>
-The grammar is compact and regular, allowing for easy analysis by
-automatic tools such as integrated development environments.
+The grammar is compact and simple to parse, allowing for easy analysis
+by automatic tools such as integrated development environments.
 </p>
 
 <h2 id="Notation">Notation</h2>
@@ -1244,16 +1244,15 @@ The value of an uninitialized variable of interface type is <code>nil</code>.
 </p>
 
 <pre class="ebnf">
-InterfaceType      = "interface" "{" { MethodSpec ";" } "}" .
-MethodSpec         = MethodName Signature | InterfaceTypeName .
+InterfaceType      = "interface" "{" { ( MethodSpec | InterfaceTypeName ) ";" } "}" .
+MethodSpec         = MethodName Signature .
 MethodName         = identifier .
 InterfaceTypeName  = TypeName .
 </pre>
 
 <p>
-As with all method sets, in an interface type, each method must have a
-<a href="#Uniqueness_of_identifiers">unique</a>
-non-<a href="#Blank_identifier">blank</a> name.
+An interface type may specify methods <i>explicitly</i> through method specifications,
+or it may <i>embed</i> methods of other interfaces through interface type names.
 </p>
 
 <pre>
@@ -1264,6 +1263,11 @@ interface {
 	Close() error
 }
 </pre>
+
+<p>
+The name of each explicitly specified method must be <a href="#Uniqueness_of_identifiers">unique</a>
+and not <a href="#Blank_identifier">blank</a>.
+</p>
 
 <pre>
 interface {
@@ -1280,9 +1284,9 @@ have the method set
 </p>
 
 <pre>
-func (p T) Read(p []byte) (n int, err error)   { return … }
-func (p T) Write(p []byte) (n int, err error)  { return … }
-func (p T) Close() error                       { return … }
+func (p T) Read(p []byte) (n int, err error)
+func (p T) Write(p []byte) (n int, err error)
+func (p T) Close() error
 </pre>
 
 <p>
@@ -1332,27 +1336,41 @@ as the <code>File</code> interface.
 <p>
 An interface <code>T</code> may use a (possibly qualified) interface type
 name <code>E</code> in place of a method specification. This is called
-<i>embedding</i> interface <code>E</code> in <code>T</code>; it adds
-all (exported and non-exported) methods of <code>E</code> to the interface
-<code>T</code>.
+<i>embedding</i> interface <code>E</code> in <code>T</code>.
+The <a href="#Method_sets">method set</a> of <code>T</code> is the <i>union</i>
+of the method sets of <code>T</code>’s explicitly declared methods and of
+<code>T</code>’s embedded interfaces.
 </p>
 
 <pre>
+type Reader interface {
+	Read(p []byte) (n int, err error)
+	Close() error
+}
+
+type Writer interface {
+	Write(p []byte) (n int, err error)
+	Close() error
+}
+
+// ReadWriter's methods are Read, Write, and Close.
 type ReadWriter interface {
-	Read(b Buffer) bool
-	Write(b Buffer) bool
+	Reader  // includes methods of Reader in ReadWriter's method set
+	Writer  // includes methods of Writer in ReadWriter's method set
 }
+</pre>
 
-type File interface {
-	ReadWriter  // same as adding the methods of ReadWriter
-	Locker      // same as adding the methods of Locker
-	Close()
-}
+<p>
+A <i>union</i> of method sets contains the (exported and non-exported)
+methods of each method set exactly once, and methods with the
+<a href="#Uniqueness_of_identifiers">same</a> names must
+have <a href="#Type_identity">identical</a> signatures.
+</p>
 
-type LockedFile interface {
-	Locker
-	File        // illegal: Lock, Unlock not unique
-	Lock()      // illegal: Lock not unique
+<pre>
+type ReadCloser interface {
+	Reader   // includes methods of Reader in ReadCloser's method set
+	Close()  // illegal: signatures of Reader.Close and Close are different
 }
 </pre>
 
@@ -2024,7 +2042,7 @@ of the last non-empty expression list.
 <p>
 A type declaration binds an identifier, the <i>type name</i>, to a <a href="#Types">type</a>.
 Type declarations come in two forms: alias declarations and type definitions.
-<p>
+</p>
 
 <pre class="ebnf">
 TypeDecl = "type" ( TypeSpec | "(" { TypeSpec ";" } ")" ) .
@@ -2395,7 +2413,7 @@ operand only on the left-hand side of an <a href="#Assignments">assignment</a>.
 Operand     = Literal | OperandName | "(" Expression ")" .
 Literal     = BasicLit | CompositeLit | FunctionLit .
 BasicLit    = int_lit | float_lit | imaginary_lit | rune_lit | string_lit .
-OperandName = identifier | QualifiedIdent.
+OperandName = identifier | QualifiedIdent .
 </pre>
 
 <h3 id="Qualified_identifiers">Qualified identifiers</h3>
@@ -2535,7 +2553,7 @@ does not have the same effect as allocating a new slice or map value with
 </p>
 
 <pre>
-p1 := &[]int{}    // p1 points to an initialized, empty slice with value []int{} and length 0
+p1 := &amp;[]int{}    // p1 points to an initialized, empty slice with value []int{} and length 0
 p2 := new([]int)  // p2 points to an uninitialized slice with value nil and length 0
 </pre>
 
@@ -3272,8 +3290,8 @@ array with the operand.
 
 <pre>
 var a [10]int
-s1 := a[3:7]   // underlying array of s1 is array a; &s1[2] == &a[5]
-s2 := s1[1:4]  // underlying array of s2 is underlying array of s1 which is array a; &s2[1] == &a[5]
+s1 := a[3:7]   // underlying array of s1 is array a; &amp;s1[2] == &amp;a[5]
+s2 := s1[1:4]  // underlying array of s2 is underlying array of s1 which is array a; &amp;s2[1] == &amp;a[5]
 s2[1] = 42     // s2[1] == s1[2] == a[5] == 42; they all refer to the same underlying array element
 </pre>
 
@@ -3714,7 +3732,7 @@ be replaced by a bitwise AND operation:
 
 <p>
 The shift operators shift the left operand by the shift count specified by the
-right operand, which must be positive. If the shift count is negative at run time,
+right operand, which must be non-negative. If the shift count is negative at run time,
 a <a href="#Run_time_panics">run-time panic</a> occurs.
 The shift operators implement arithmetic shifts if the left operand is a signed
 integer and logical shifts if it is an unsigned integer.
@@ -5261,7 +5279,7 @@ for i, s := range a {
 }
 
 var key string
-var val interface {}  // element type of m is assignable to val
+var val interface{}  // element type of m is assignable to val
 m := map[string]int{"mon":0, "tue":1, "wed":2, "thu":3, "fri":4, "sat":5, "sun":6}
 for key, val = range m {
 	h(key, val)

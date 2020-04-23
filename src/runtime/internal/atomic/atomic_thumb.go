@@ -10,8 +10,6 @@ import (
 	"unsafe"
 )
 
-const _MCU = sys.GoosNoos
-
 type spinlock struct {
 	v uint32
 }
@@ -29,6 +27,8 @@ func (l *spinlock) lock() {
 func (l *spinlock) unlock() {
 	Store(&l.v, 0)
 }
+
+const _MCU = sys.GoosNoos
 
 var locktab [57*(1-_MCU) + 29*_MCU]struct {
 	l   spinlock
@@ -144,6 +144,9 @@ func Load(addr *uint32) uint32
 func Loadp(addr unsafe.Pointer) unsafe.Pointer
 
 //go:noescape
+func Load64(addr *uint64) uint64
+
+//go:noescape
 func Loadint64(ptr *int64) int64
 
 //go:noescape
@@ -171,6 +174,9 @@ func StoreRel(addr *uint32, v uint32)
 func Store64(addr *uint64, v uint64)
 
 //go:noescape
+func Store8(addr *uint8, v uint8)
+
+//go:noescape
 func Xaddint64(ptr *int64, delta int64) int64
 
 //go:noescape
@@ -190,9 +196,6 @@ func Xadd64(addr *uint64, delta int64) uint64
 
 //go:noescape
 func Xchg64(addr *uint64, v uint64) uint64
-
-//go:noescape
-func Load64(addr *uint64) uint64
 
 // Export the following wrapper function via linkname to assembly in sync/atomic.
 //go:linkname Loaduint

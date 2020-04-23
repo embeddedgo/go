@@ -530,18 +530,14 @@ TEXT runtime·abort(SB),NOSPLIT|NOFRAME,$0-0
 	B   -1(PC)
 
 // AES hashing not implemented for ARM
-TEXT runtime·aeshash(SB),NOSPLIT|NOFRAME,$0-0
-	MOVW  $0, R0
-	MOVW  (R0), R1
-TEXT runtime·aeshash32(SB),NOSPLIT|NOFRAME,$0-0
-	MOVW  $0, R0
-	MOVW  (R0), R1
-TEXT runtime·aeshash64(SB),NOSPLIT|NOFRAME,$0-0
-	MOVW  $0, R0
-	MOVW  (R0), R1
-TEXT runtime·aeshashstr(SB),NOSPLIT|NOFRAME,$0-0
-	MOVW  $0, R0
-	MOVW  (R0), R1
+TEXT runtime·memhash(SB),NOSPLIT|NOFRAME,$0-16
+	JMP	runtime·memhashFallback(SB)
+TEXT runtime·strhash(SB),NOSPLIT|NOFRAME,$0-12
+	JMP	runtime·strhashFallback(SB)
+TEXT runtime·memhash32(SB),NOSPLIT|NOFRAME,$0-12
+	JMP	runtime·memhash32Fallback(SB)
+TEXT runtime·memhash64(SB),NOSPLIT|NOFRAME,$0-12
+	JMP	runtime·memhash64Fallback(SB)
 
 TEXT runtime·return0(SB),NOSPLIT,$0
 	MOVW  $0, R0
@@ -558,20 +554,20 @@ yieldloop:
 
 // Called from cgo wrappers, this function returns g->m->curg.stack.hi.
 // Must obey the gcc calling convention.
-TEXT _cgo_topofstack(SB),NOSPLIT,$8
-	// R11 (REGCTXT) and g register are clobbered by load_g. They are
-	// callee-save in the gcc calling convention, so save them here.
-	MOVW  REGCTXT, saveR11-4(SP)
-	MOVW  g, saveG-8(SP)
-
-	BL    runtime·load_g(SB)
-	MOVW  g_m(g), R0
-	MOVW  m_curg(R0), R0
-	MOVW  (g_stack+stack_hi)(R0), R0
-
-	MOVW  saveG-8(SP), g
-	MOVW  saveR11-4(SP), REGCTXT
-	RET
+//TEXT _cgo_topofstack(SB),NOSPLIT,$8
+//	// R11 (REGCTXT) and g register are clobbered by load_g. They are
+//	// callee-save in the gcc calling convention, so save them here.
+//	MOVW  REGCTXT, saveR11-4(SP)
+//	MOVW  g, saveG-8(SP)
+//
+//	BL    runtime·load_g(SB)
+//	MOVW  g_m(g), R0
+//	MOVW  m_curg(R0), R0
+//	MOVW  (g_stack+stack_hi)(R0), R0
+//
+//	MOVW  saveG-8(SP), g
+//	MOVW  saveR11-4(SP), REGCTXT
+//	RET
 
 // The top-most function running on a goroutine
 // returns to goexit+PCQuantum.
@@ -651,8 +647,6 @@ ret:
 	MOVM.IA.W  (R13), [R0,R1]
 	// Do the write.
 	MOVW  R3, (R2)
-	// Normally RET on nacl clobbers R12, but because this
-	// function has no frame it doesn't have to usual epilogue.
 	RET
 
 flush:

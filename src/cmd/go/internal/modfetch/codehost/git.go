@@ -6,9 +6,11 @@ package codehost
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,7 +22,9 @@ import (
 
 	"cmd/go/internal/lockedfile"
 	"cmd/go/internal/par"
-	"cmd/go/internal/semver"
+	"cmd/go/internal/web"
+
+	"golang.org/x/mod/semver"
 )
 
 // GitRepo returns the code repository at the given Git remote reference.
@@ -33,6 +37,15 @@ func GitRepo(remote string) (Repo, error) {
 func LocalGitRepo(remote string) (Repo, error) {
 	return newGitRepoCached(remote, true)
 }
+
+// A notExistError wraps another error to retain its original text
+// but makes it opaquely equivalent to os.ErrNotExist.
+type notExistError struct {
+	err error
+}
+
+func (e notExistError) Error() string   { return e.err.Error() }
+func (notExistError) Is(err error) bool { return err == os.ErrNotExist }
 
 const gitWorkDirType = "git3"
 
@@ -85,8 +98,9 @@ func newGitRepo(remote string, localOK bool) (Repo, error) {
 				os.RemoveAll(r.dir)
 				return nil, err
 			}
-			r.remote = "origin"
 		}
+		r.remoteURL = r.remote
+		r.remote = "origin"
 	} else {
 		// Local path.
 		// Disallow colon (not in ://) because sometimes
@@ -113,9 +127,9 @@ func newGitRepo(remote string, localOK bool) (Repo, error) {
 }
 
 type gitRepo struct {
-	remote string
-	local  bool
-	dir    string
+	remote, remoteURL string
+	local             bool
+	dir               string
 
 	mu lockedfile.Mutex // protects fetchLevel and git repo state
 
@@ -166,14 +180,25 @@ func (r *gitRepo) loadRefs() {
 	// The git protocol sends all known refs and ls-remote filters them on the client side,
 	// so we might as well record both heads and tags in one shot.
 	// Most of the time we only care about tags but sometimes we care about heads too.
-	out, err := Run(r.dir, "git", "ls-remote", "-q", r.remote)
-	if err != nil {
-		if rerr, ok := err.(*RunError); ok {
+	out, gitErr := Run(r.dir, "git", "ls-remote", "-q", r.remote)
+	if gitErr != nil {
+		if rerr, ok := gitErr.(*RunError); ok {
 			if bytes.Contains(rerr.Stderr, []byte("fatal: could not read Username")) {
 				rerr.HelpText = "Confirm the import path was entered correctly.\nIf this is a private repository, see https://golang.org/doc/faq#git_https for additional information."
 			}
 		}
-		r.refsErr = err
+
+		// If the remote URL doesn't exist at all, ideally we should treat the whole
+		// repository as nonexistent by wrapping the error in a notExistError.
+		// For HTTP and HTTPS, that's easy to detect: we'll try to fetch the URL
+		// ourselves and see what code it serves.
+		if u, err := url.Parse(r.remoteURL); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+			if _, err := web.GetBytes(u); errors.Is(err, os.ErrNotExist) {
+				gitErr = notExistError{gitErr}
+			}
+		}
+
+		r.refsErr = gitErr
 		return
 	}
 
@@ -657,8 +682,11 @@ func (r *gitRepo) RecentTag(rev, prefix, major string) (tag string, err error) {
 
 			semtag := line[len(prefix):]
 			// Consider only tags that are valid and complete (not just major.minor prefixes).
-			if c := semver.Canonical(semtag); c != "" && strings.HasPrefix(semtag, c) && (major == "" || semver.Major(c) == major) {
-				highest = semver.Max(highest, semtag)
+			// NOTE: Do not replace the call to semver.Compare with semver.Max.
+			// We want to return the actual tag, not a canonicalized version of it,
+			// and semver.Max currently canonicalizes (see golang.org/issue/32700).
+			if c := semver.Canonical(semtag); c != "" && strings.HasPrefix(semtag, c) && (major == "" || semver.Major(c) == major) && semver.Compare(semtag, highest) > 0 {
+				highest = semtag
 			}
 		}
 
@@ -771,7 +799,7 @@ func (r *gitRepo) DescendsFrom(rev, tag string) (bool, error) {
 	return false, err
 }
 
-func (r *gitRepo) ReadZip(rev, subdir string, maxSize int64) (zip io.ReadCloser, actualSubdir string, err error) {
+func (r *gitRepo) ReadZip(rev, subdir string, maxSize int64) (zip io.ReadCloser, err error) {
 	// TODO: Use maxSize or drop it.
 	args := []string{}
 	if subdir != "" {
@@ -779,17 +807,17 @@ func (r *gitRepo) ReadZip(rev, subdir string, maxSize int64) (zip io.ReadCloser,
 	}
 	info, err := r.Stat(rev) // download rev into local git repo
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	unlock, err := r.mu.Lock()
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer unlock()
 
 	if err := ensureGitAttributes(r.dir); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	// Incredibly, git produces different archives depending on whether
@@ -800,12 +828,12 @@ func (r *gitRepo) ReadZip(rev, subdir string, maxSize int64) (zip io.ReadCloser,
 	archive, err := Run(r.dir, "git", "-c", "core.autocrlf=input", "-c", "core.eol=lf", "archive", "--format=zip", "--prefix=prefix/", info.Name, args)
 	if err != nil {
 		if bytes.Contains(err.(*RunError).Stderr, []byte("did not match any files")) {
-			return nil, "", os.ErrNotExist
+			return nil, os.ErrNotExist
 		}
-		return nil, "", err
+		return nil, err
 	}
 
-	return ioutil.NopCloser(bytes.NewReader(archive)), "", nil
+	return ioutil.NopCloser(bytes.NewReader(archive)), nil
 }
 
 // ensureGitAttributes makes sure export-subst and export-ignore features are

@@ -41,26 +41,30 @@ var bootstrapDirs = []string{
 	"cmd/compile/internal/arm",
 	"cmd/compile/internal/arm64",
 	"cmd/compile/internal/gc",
+	"cmd/compile/internal/logopt",
 	"cmd/compile/internal/mips",
 	"cmd/compile/internal/mips64",
 	"cmd/compile/internal/ppc64",
-	"cmd/compile/internal/types",
+	"cmd/compile/internal/riscv64",
 	"cmd/compile/internal/s390x",
 	"cmd/compile/internal/ssa",
 	"cmd/compile/internal/syntax",
 	"cmd/compile/internal/thumb",
+	"cmd/compile/internal/types",
 	"cmd/compile/internal/x86",
 	"cmd/compile/internal/wasm",
 	"cmd/internal/bio",
 	"cmd/internal/gcprog",
 	"cmd/internal/dwarf",
 	"cmd/internal/edit",
+	"cmd/internal/goobj2",
 	"cmd/internal/objabi",
 	"cmd/internal/obj",
 	"cmd/internal/obj/arm",
 	"cmd/internal/obj/arm64",
 	"cmd/internal/obj/mips",
 	"cmd/internal/obj/ppc64",
+	"cmd/internal/obj/riscv",
 	"cmd/internal/obj/s390x",
 	"cmd/internal/obj/thumb",
 	"cmd/internal/obj/x86",
@@ -73,6 +77,7 @@ var bootstrapDirs = []string{
 	"cmd/link/internal/arm64",
 	"cmd/link/internal/ld",
 	"cmd/link/internal/loadelf",
+	"cmd/link/internal/loader",
 	"cmd/link/internal/loadmacho",
 	"cmd/link/internal/loadpe",
 	"cmd/link/internal/loadxcoff",
@@ -80,6 +85,7 @@ var bootstrapDirs = []string{
 	"cmd/link/internal/mips64",
 	"cmd/link/internal/objfile",
 	"cmd/link/internal/ppc64",
+	"cmd/link/internal/riscv64",
 	"cmd/link/internal/s390x",
 	"cmd/link/internal/sym",
 	"cmd/link/internal/thumb",
@@ -254,6 +260,9 @@ func isUnneededSSARewriteFile(srcFile string) (archCaps string, unneeded bool) {
 	archCaps = fileArch
 	fileArch = strings.ToLower(fileArch)
 	fileArch = strings.TrimSuffix(fileArch, "splitload")
+	if fileArch == os.Getenv("GOHOSTARCH") {
+		return "", false
+	}
 	if fileArch == strings.TrimSuffix(runtime.GOARCH, "le") {
 		return "", false
 	}

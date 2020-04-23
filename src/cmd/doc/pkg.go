@@ -53,14 +53,18 @@ type pkgBuffer struct {
 }
 
 func (pb *pkgBuffer) Write(p []byte) (int, error) {
-	if !pb.printed && len(p) > 0 {
+	pb.packageClause()
+	return pb.Buffer.Write(p)
+}
+
+func (pb *pkgBuffer) packageClause() {
+	if !pb.printed {
 		pb.printed = true
 		// Only show package clause for commands if requested explicitly.
 		if pb.pkg.pkg.Name != "main" || showCmd {
 			pb.pkg.packageClause()
 		}
 	}
-	return pb.Buffer.Write(p)
 }
 
 type PackageError string // type returned by pkg.Fatalf.
@@ -172,18 +176,18 @@ func parsePackage(writer io.Writer, pkg *build.Package, userPath string) *Packag
 	constructor := make(map[*doc.Func]bool)
 	for _, typ := range docPkg.Types {
 		docPkg.Consts = append(docPkg.Consts, typ.Consts...)
-		for _, value := range typ.Consts {
-			typedValue[value] = true
-		}
 		docPkg.Vars = append(docPkg.Vars, typ.Vars...)
-		for _, value := range typ.Vars {
-			typedValue[value] = true
-		}
 		docPkg.Funcs = append(docPkg.Funcs, typ.Funcs...)
-		for _, fun := range typ.Funcs {
-			// We don't count it as a constructor bound to the type
-			// if the type itself is not exported.
-			if isExported(typ.Name) {
+		if isExported(typ.Name) {
+			for _, value := range typ.Consts {
+				typedValue[value] = true
+			}
+			for _, value := range typ.Vars {
+				typedValue[value] = true
+			}
+			for _, fun := range typ.Funcs {
+				// We don't count it as a constructor bound to the type
+				// if the type itself is not exported.
 				constructor[fun] = true
 			}
 		}
@@ -210,6 +214,8 @@ func (pkg *Package) Printf(format string, args ...interface{}) {
 }
 
 func (pkg *Package) flush() {
+	// Print the package clause in case it wasn't written already.
+	pkg.buf.packageClause()
 	_, err := pkg.writer.Write(pkg.buf.Bytes())
 	if err != nil {
 		log.Fatal(err)
@@ -507,24 +513,34 @@ func (pkg *Package) allDoc() {
 func (pkg *Package) packageDoc() {
 	defer pkg.flush()
 
-	doc.ToText(&pkg.buf, pkg.doc.Doc, "", indent, indentedWidth)
-	pkg.newlines(1)
+	if !short {
+		doc.ToText(&pkg.buf, pkg.doc.Doc, "", indent, indentedWidth)
+		pkg.newlines(1)
+	}
 
 	if pkg.pkg.Name == "main" && !showCmd {
 		// Show only package docs for commands.
 		return
 	}
 
-	pkg.newlines(2) // Guarantee blank line before the components.
+	if !short {
+		pkg.newlines(2) // Guarantee blank line before the components.
+	}
+
 	pkg.valueSummary(pkg.doc.Consts, false)
 	pkg.valueSummary(pkg.doc.Vars, false)
 	pkg.funcSummary(pkg.doc.Funcs, false)
 	pkg.typeSummary()
-	pkg.bugs()
+	if !short {
+		pkg.bugs()
+	}
 }
 
 // packageClause prints the package clause.
 func (pkg *Package) packageClause() {
+	if short {
+		return
+	}
 	importPath := pkg.build.ImportComment
 	if importPath == "" {
 		importPath = pkg.build.ImportPath

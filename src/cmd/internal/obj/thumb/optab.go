@@ -171,6 +171,9 @@ var optab = [...]Optab{
 	{AMOVW, C_SPEC, C_NONE, C_REG, 0x14, 0, 0, 0, _MOVW__SYSm__Rd}, // MOVW SYSm, Rd
 	{AMOVW, C_REG, C_NONE, C_SPEC, 0x14, 0, 0, 0, _MOVW__SYSm__Rd}, // MOVW Rn, SYSm
 
+	{AMOVW, C_FCR, C_NONE, C_REG, 0x14, 0, 0, 0, _MOVW__FPSCR__Rt}, // MOVW FPSCR, Rt
+	{AMOVW, C_REG, C_NONE, C_FCR, 0x14, 0, 0, 0, _MOVW__FPSCR__Rt}, // MOVW Rt, FPSCR
+
 	{AMUL, C_REG, C_REG, C_REG, 0x14, 0, 0, C_PBIT, _MUL__Rm__Rn__Rd},  // MUL Rm, Rn, Rd
 	{AMUL, C_REG, C_NONE, C_REG, 0x14, 0, 0, C_PBIT, _MUL__Rm__Rn__Rd}, // MUL Rm, Rdn
 	{as: ADIV},
@@ -360,7 +363,7 @@ var optab = [...]Optab{
 
 	{ACPSID, C_NONE, C_NONE, C_NONE, 0x12, 0, 0, 0, _CPSID},
 	{as: ACPSIE},
-	
+
 	{ANOP4, C_NONE, C_NONE, C_NONE, 0x14, 0, 0, 0, _NOP4},
 	{as: ACLREX},
 
@@ -1127,6 +1130,21 @@ func _MOVW__SYSm__Rd(c *Ctx, p *obj.Prog, out []uint16) int {
 		out[0] = uint16(0xF380 | Rn&15)
 		out[1] = uint16(0x8800 | SYSm&31)
 	}
+	return 4
+}
+
+// 1110 1110 111x 0001  tttt 1010 0001 0000
+func _MOVW__FPSCR__Rt(c *Ctx, p *obj.Prog, out []uint16) int {
+	o1, o2 := 0xEEE1, 0x0A10
+	var Rt int
+	if p.From.Reg == REG_FPSCR {
+		o1 |= 1 << 4
+		Rt = int(p.To.Reg)
+	} else {
+		Rt = int(p.From.Reg)
+	}
+	out[0] = uint16(o1)
+	out[1] = uint16(o2 | Rt&15<<12)
 	return 4
 }
 

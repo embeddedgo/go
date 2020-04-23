@@ -4,7 +4,6 @@
 
 // +build !386
 // +build !amd64
-// +build !amd64p32
 // +build !arm
 // +build !thumb
 // +build !arm64

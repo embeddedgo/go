@@ -10,6 +10,7 @@ import (
 	"math/bits"
 
 	"cmd/compile/internal/gc"
+	"cmd/compile/internal/logopt"
 	"cmd/compile/internal/ssa"
 	"cmd/compile/internal/types"
 	"cmd/internal/obj"
@@ -100,11 +101,6 @@ func genshift(s *gc.SSAGenState, as obj.As, r0, r1, r int16, typ int64, n int64)
 		p.To.Reg = r
 	}
 	return p
-}
-
-// makeregshift encodes a register shifted by a register
-func makeregshift(r1 int16, typ int64, r2 int16) shift {
-	return shift(int64(r1&0xf) | typ | int64(r2&0xf)<<8 | 1<<4)
 }
 
 // find a (lsb, width) pair for BFC
@@ -198,6 +194,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbSLL,
 		ssa.OpThumbSRL,
 		ssa.OpThumbSRA,
+		ssa.OpThumbSRR,
 		ssa.OpThumbMULF,
 		ssa.OpThumbMULD,
 		ssa.OpThumbNMULF,
@@ -213,7 +210,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.Reg = r1
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = r
-	case ssa.OpThumbMULAF, ssa.OpThumbMULAD, ssa.OpThumbMULSF, ssa.OpThumbMULSD:
+	case ssa.OpThumbMULAF, ssa.OpThumbMULAD, ssa.OpThumbMULSF, ssa.OpThumbMULSD, ssa.OpThumbFMULAD:
 		r := v.Reg()
 		r0 := v.Args[0].Reg()
 		r1 := v.Args[1].Reg()
@@ -594,6 +591,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbSQRTD,
 		ssa.OpThumbNEGF,
 		ssa.OpThumbNEGD,
+		ssa.OpThumbABSD,
 		ssa.OpThumbMOVWF,
 		ssa.OpThumbMOVWD,
 		ssa.OpThumbMOVFW,
@@ -662,7 +660,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Offset = v.AuxInt
 	case ssa.OpThumbLoweredNilCheck:
 		if objabi.GOOS == "noos" {
-			// BUG: see https://github.com/embeddedgo/go/issues/1
+			// BUG: avoid nil check because of MMIO
 		} else {
 			// Issue a load which will fault if arg is nil.
 			p := s.Prog(thumb.AMOVBU)
@@ -671,9 +669,12 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 			gc.AddAux(&p.From, v)
 			p.To.Type = obj.TYPE_REG
 			p.To.Reg = thumb.REGTMP
-		}
-		if gc.Debug_checknil != 0 && v.Pos.Line() > 1 { // v.Pos.Line()==1 in generated wrappers
-			gc.Warnl(v.Pos, "generated nil check")
+			if logopt.Enabled() {
+				logopt.LogOpt(v.Pos, "nilcheck", "genssa", v.Block.Func.Name)
+			}
+			if gc.Debug_checknil != 0 && v.Pos.Line() > 1 { // v.Pos.Line()==1 in generated wrappers
+				gc.Warnl(v.Pos, "generated nil check")
+			}
 		}
 	case ssa.OpThumbLoweredZero:
 		// MOVW.P	Rarg2, 4(R1)
@@ -898,6 +899,6 @@ func ssaGenBlock(s *gc.SSAGenState, b, next *ssa.Block) {
 		}
 
 	default:
-		b.Fatalf("branch not implemented: %s. Control: %s", b.LongString(), b.Control.LongString())
+		b.Fatalf("branch not implemented: %s", b.LongString())
 	}
 }

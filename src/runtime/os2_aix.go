@@ -6,7 +6,7 @@
 // Pollset syscalls are in netpoll_aix.go.
 // The implementation is based on Solaris and Windows.
 // Each syscall is made by calling its libc symbol using asmcgocall and asmsyscall6
-// asssembly functions.
+// assembly functions.
 
 package runtime
 
@@ -38,6 +38,7 @@ var (
 //go:cgo_import_dynamic libc_madvise madvise "libc.a/shr_64.o"
 //go:cgo_import_dynamic libc_malloc malloc "libc.a/shr_64.o"
 //go:cgo_import_dynamic libc_mmap mmap "libc.a/shr_64.o"
+//go:cgo_import_dynamic libc_mprotect mprotect "libc.a/shr_64.o"
 //go:cgo_import_dynamic libc_munmap munmap "libc.a/shr_64.o"
 //go:cgo_import_dynamic libc_open open "libc.a/shr_64.o"
 //go:cgo_import_dynamic libc_pipe pipe "libc.a/shr_64.o"
@@ -64,6 +65,8 @@ var (
 //go:cgo_import_dynamic libpthread_attr_setstackaddr pthread_attr_setstackaddr "libpthread.a/shr_xpg5_64.o"
 //go:cgo_import_dynamic libpthread_create pthread_create "libpthread.a/shr_xpg5_64.o"
 //go:cgo_import_dynamic libpthread_sigthreadmask sigthreadmask "libpthread.a/shr_xpg5_64.o"
+//go:cgo_import_dynamic libpthread_self pthread_self "libpthread.a/shr_xpg5_64.o"
+//go:cgo_import_dynamic libpthread_kill pthread_kill "libpthread.a/shr_xpg5_64.o"
 
 //go:linkname libc__Errno libc__Errno
 //go:linkname libc_clock_gettime libc_clock_gettime
@@ -75,6 +78,7 @@ var (
 //go:linkname libc_madvise libc_madvise
 //go:linkname libc_malloc libc_malloc
 //go:linkname libc_mmap libc_mmap
+//go:linkname libc_mprotect libc_mprotect
 //go:linkname libc_munmap libc_munmap
 //go:linkname libc_open libc_open
 //go:linkname libc_pipe libc_pipe
@@ -101,6 +105,8 @@ var (
 //go:linkname libpthread_attr_setstackaddr libpthread_attr_setstackaddr
 //go:linkname libpthread_create libpthread_create
 //go:linkname libpthread_sigthreadmask libpthread_sigthreadmask
+//go:linkname libpthread_self libpthread_self
+//go:linkname libpthread_kill libpthread_kill
 
 var (
 	//libc
@@ -114,6 +120,7 @@ var (
 	libc_madvise,
 	libc_malloc,
 	libc_mmap,
+	libc_mprotect,
 	libc_munmap,
 	libc_open,
 	libc_pipe,
@@ -139,7 +146,9 @@ var (
 	libpthread_attr_setdetachstate,
 	libpthread_attr_setstackaddr,
 	libpthread_create,
-	libpthread_sigthreadmask libFunc
+	libpthread_sigthreadmask,
+	libpthread_self,
+	libpthread_kill libFunc
 )
 
 type libFunc uintptr
@@ -390,25 +399,32 @@ func exit(code int32) {
 	exit1(code)
 }
 
-func write1(fd, p uintptr, n int32) int32
+func write2(fd, p uintptr, n int32) int32
 
 //go:nosplit
-func write(fd uintptr, p unsafe.Pointer, n int32) int32 {
+func write1(fd uintptr, p unsafe.Pointer, n int32) int32 {
 	_g_ := getg()
 
 	// Check the validity of g because without a g during
 	// newosproc0.
 	if _g_ != nil {
-		r, _ := syscall3(&libc_write, uintptr(fd), uintptr(p), uintptr(n))
+		r, errno := syscall3(&libc_write, uintptr(fd), uintptr(p), uintptr(n))
+		if int32(r) < 0 {
+			return -int32(errno)
+		}
 		return int32(r)
 	}
-	return write1(fd, uintptr(p), n)
+	// Note that in this case we can't return a valid errno value.
+	return write2(fd, uintptr(p), n)
 
 }
 
 //go:nosplit
 func read(fd int32, p unsafe.Pointer, n int32) int32 {
-	r, _ := syscall3(&libc_read, uintptr(fd), uintptr(p), uintptr(n))
+	r, errno := syscall3(&libc_read, uintptr(fd), uintptr(p), uintptr(n))
+	if int32(r) < 0 {
+		return -int32(errno)
+	}
 	return int32(r)
 }
 
@@ -425,9 +441,10 @@ func closefd(fd int32) int32 {
 }
 
 //go:nosplit
-func pipe(fd *int32) int32 {
-	r, _ := syscall1(&libc_pipe, uintptr(unsafe.Pointer(fd)))
-	return int32(r)
+func pipe() (r, w int32, errno int32) {
+	var p [2]int32
+	_, err := syscall1(&libc_pipe, uintptr(noescape(unsafe.Pointer(&p[0]))))
+	return p[0], p[1], int32(err)
 }
 
 // mmap calls the mmap system call.
@@ -438,6 +455,15 @@ func pipe(fd *int32) int32 {
 //go:nosplit
 func mmap(addr unsafe.Pointer, n uintptr, prot, flags, fd int32, off uint32) (unsafe.Pointer, int) {
 	r, err0 := syscall6(&libc_mmap, uintptr(addr), uintptr(n), uintptr(prot), uintptr(flags), uintptr(fd), uintptr(off))
+	if r == ^uintptr(0) {
+		return nil, int(err0)
+	}
+	return unsafe.Pointer(r), int(err0)
+}
+
+//go:nosplit
+func mprotect(addr unsafe.Pointer, n uintptr, prot int32) (unsafe.Pointer, int) {
+	r, err0 := syscall3(&libc_mprotect, uintptr(addr), uintptr(n), uintptr(prot))
 	if r == ^uintptr(0) {
 		return nil, int(err0)
 	}
@@ -715,4 +741,15 @@ func sigprocmask(how int32, new, old *sigset) {
 	}
 	sigprocmask1(uintptr(how), uintptr(unsafe.Pointer(new)), uintptr(unsafe.Pointer(old)))
 
+}
+
+//go:nosplit
+func pthread_self() pthread {
+	r, _ := syscall0(&libpthread_self)
+	return pthread(r)
+}
+
+//go:nosplit
+func signalM(mp *m, sig int) {
+	syscall2(&libpthread_kill, uintptr(pthread(mp.procid)), uintptr(sig))
 }

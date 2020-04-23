@@ -519,7 +519,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 
 			// If there are instructions following this ARET, they come from a
 			// branch with the same stackframe, so no spadj.
-			if p.To.Sym != nil { // retjmp
+			if sym != nil { // retjmp
 				if p.As == AMOVW {
 					// MOVW.P autosize(SP),PC -> MOVW.P autosize(SP),LR
 					p.To.Reg = REGLINK
@@ -625,6 +625,12 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	p.To.Type = obj.TYPE_REG
 	p.To.Reg = REG_R1
 
+	// Mark the stack bound check and morestack call async nonpreemptible.
+	// If we get preempted here, when resumed the preemption request is
+	// cleared, but we'll still call morestack, which will double the stack
+	// unnecessarily. See issue #35470.
+	p = c.ctxt.StartUnsafePoint(p, c.newprog)
+
 	if framesize <= objabi.StackSmall {
 		// small stack: SP < stackguard
 		//	CMP	stackguard, SP
@@ -708,6 +714,8 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	bls.As = ABLS
 	bls.To.Type = obj.TYPE_BRANCH
 
+	end := c.ctxt.EndUnsafePoint(bls, c.newprog, -1)
+
 	var last *obj.Prog
 	for last = c.cursym.Func.Text; last.Link != nil; last = last.Link {
 	}
@@ -719,7 +727,8 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	spfix.As = obj.ANOP
 	spfix.Spadj = -framesize
 
-	pcdata := c.ctxt.EmitEntryLiveness(c.cursym, spfix, c.newprog)
+	pcdata := c.ctxt.EmitEntryStackMap(c.cursym, spfix, c.newprog)
+	pcdata = c.ctxt.StartUnsafePoint(pcdata, c.newprog)
 
 	// MOVW	LR, R3
 	movw := obj.Appendp(pcdata, c.newprog)
@@ -744,14 +753,16 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	}
 	call.To.Sym = c.ctxt.Lookup(morestack)
 
+	pcdata = c.ctxt.EndUnsafePoint(call, c.newprog, -1)
+
 	// B start
-	b := obj.Appendp(call, c.newprog)
+	b := obj.Appendp(pcdata, c.newprog)
 	b.As = obj.AJMP
 	b.To.Type = obj.TYPE_BRANCH
 	b.Pcond = c.cursym.Func.Text.Link
 	b.Spadj = +framesize
 
-	return bls
+	return end
 }
 
 func progedit(ctxt *obj.Link, p *obj.Prog, newprog obj.ProgAlloc) {
@@ -793,8 +804,8 @@ func progedit(ctxt *obj.Link, p *obj.Prog, newprog obj.ProgAlloc) {
 		}
 		return
 	}
-	// Rewrite SRA/SRL/SLL to MOVW
-	if ASLL <= p.As && p.As <= ASRA {
+	// Rewrite SLL/SRL/SRA/SRR/ to MOVW
+	if ASLL <= p.As && p.As <= ASRR {
 		Rn := int(p.To.Reg)
 		if p.Reg != 0 {
 			Rn = int(p.Reg)

@@ -57,6 +57,25 @@ func UTF16ToString(s []uint16) string {
 	return string(utf16.Decode(s))
 }
 
+// utf16PtrToString is like UTF16ToString, but takes *uint16
+// as a parameter instead of []uint16.
+// max is how many times p can be advanced looking for the null terminator.
+// If max is hit, the string is truncated at that point.
+func utf16PtrToString(p *uint16, max int) string {
+	if p == nil {
+		return ""
+	}
+	// Find NUL terminator.
+	end := unsafe.Pointer(p)
+	n := 0
+	for *(*uint16)(end) != 0 && n < max {
+		end = unsafe.Pointer(uintptr(end) + unsafe.Sizeof(*p))
+		n++
+	}
+	s := (*[(1 << 30) - 1]uint16)(unsafe.Pointer(p))[:n:n]
+	return string(utf16.Decode(s))
+}
+
 // StringToUTF16Ptr returns pointer to the UTF-16 encoding of
 // the UTF-8 string s, with a terminating NUL added. If s
 // contains a NUL byte this function panics instead of
@@ -77,6 +96,12 @@ func UTF16PtrFromString(s string) (*uint16, error) {
 }
 
 // Errno is the Windows error number.
+//
+// Errno values can be tested against error values from the os package
+// using errors.Is. For example:
+//
+//	_, _, err := syscall.Syscall(...)
+//	if errors.Is(err, os.ErrNotExist) ...
 type Errno uintptr
 
 func langid(pri, sub uint16) uint32 { return uint32(sub)<<10 | uint32(pri) }
@@ -306,7 +331,11 @@ func Open(path string, mode int, perm uint32) (fd Handle, err error) {
 	default:
 		createmode = OPEN_EXISTING
 	}
-	h, e := CreateFile(pathp, access, sharemode, sa, createmode, FILE_ATTRIBUTE_NORMAL, 0)
+	var attrs uint32 = FILE_ATTRIBUTE_NORMAL
+	if perm&S_IWRITE == 0 {
+		attrs = FILE_ATTRIBUTE_READONLY
+	}
+	h, e := CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
 	return h, e
 }
 
@@ -759,7 +788,7 @@ func (rsa *RawSockaddrAny) Sockaddr() (Sockaddr, error) {
 		for n < len(pp.Path) && pp.Path[n] != 0 {
 			n++
 		}
-		bytes := (*[10000]byte)(unsafe.Pointer(&pp.Path[0]))[0:n]
+		bytes := (*[len(pp.Path)]byte)(unsafe.Pointer(&pp.Path[0]))[0:n:n]
 		sa.Name = string(bytes)
 		return sa, nil
 

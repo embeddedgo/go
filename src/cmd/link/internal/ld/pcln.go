@@ -5,82 +5,18 @@
 package ld
 
 import (
+	"cmd/internal/obj"
 	"cmd/internal/objabi"
 	"cmd/internal/src"
 	"cmd/internal/sys"
 	"cmd/link/internal/sym"
 	"encoding/binary"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 )
-
-// PCIter iterates over encoded pcdata tables.
-type PCIter struct {
-	p       []byte
-	pc      uint32
-	nextpc  uint32
-	pcscale uint32
-	value   int32
-	start   bool
-	done    bool
-}
-
-// newPCIter creates a PCIter and configures it for ctxt's architecture.
-func newPCIter(ctxt *Link) *PCIter {
-	it := new(PCIter)
-	it.pcscale = uint32(ctxt.Arch.MinLC)
-	return it
-}
-
-// next advances it to the next pc.
-func (it *PCIter) next() {
-	it.pc = it.nextpc
-	if it.done {
-		return
-	}
-	if len(it.p) == 0 {
-		it.done = true
-		return
-	}
-
-	// value delta
-	val, n := binary.Varint(it.p)
-	if n <= 0 {
-		log.Fatalf("bad value varint in pciternext: read %v", n)
-	}
-	it.p = it.p[n:]
-
-	if val == 0 && !it.start {
-		it.done = true
-		return
-	}
-
-	it.start = false
-	it.value += int32(val)
-
-	// pc delta
-	pc, n := binary.Uvarint(it.p)
-	if n <= 0 {
-		log.Fatalf("bad pc varint in pciternext: read %v", n)
-	}
-	it.p = it.p[n:]
-
-	it.nextpc = it.pc + uint32(pc)*it.pcscale
-}
-
-// init prepares it to iterate over p,
-// and advances it to the first pc.
-func (it *PCIter) init(p []byte) {
-	it.p = p
-	it.pc = 0
-	it.nextpc = 0
-	it.value = -1
-	it.start = true
-	it.done = false
-	it.next()
-}
 
 func ftabaddstring(ftab *sym.Symbol, s string) int32 {
 	start := len(ftab.P)
@@ -109,10 +45,10 @@ func renumberfiles(ctxt *Link, files []*sym.Symbol, d *sym.Pcdata) {
 	buf := make([]byte, binary.MaxVarintLen32)
 	newval := int32(-1)
 	var out sym.Pcdata
-	it := newPCIter(ctxt)
-	for it.init(d.P); !it.done; it.next() {
+	it := obj.NewPCIter(uint32(ctxt.Arch.MinLC))
+	for it.Init(d.P); !it.Done; it.Next() {
 		// value delta
-		oldval := it.value
+		oldval := it.Value
 
 		var val int32
 		if oldval == -1 {
@@ -132,7 +68,7 @@ func renumberfiles(ctxt *Link, files []*sym.Symbol, d *sym.Pcdata) {
 		out.P = append(out.P, buf[:n]...)
 
 		// pc delta
-		pc := (it.nextpc - it.pc) / it.pcscale
+		pc := (it.NextPC - it.PC) / it.PCScale
 		n = binary.PutUvarint(buf, uint64(pc))
 		out.P = append(out.P, buf[:n]...)
 	}
@@ -202,6 +138,7 @@ func (ctxt *Link) pclntab() {
 
 	// Gather some basic stats and info.
 	var nfunc int32
+	prevSect := ctxt.Textp[0].Sect
 	for _, s := range ctxt.Textp {
 		if !emitPcln(ctxt, s) {
 			continue
@@ -209,6 +146,14 @@ func (ctxt *Link) pclntab() {
 		nfunc++
 		if pclntabFirstFunc == nil {
 			pclntabFirstFunc = s
+		}
+		if s.Sect != prevSect {
+			// With multiple text sections, the external linker may insert functions
+			// between the sections, which are not known by Go. This leaves holes in
+			// the PC range covered by the func table. We need to generate an entry
+			// to mark the hole.
+			nfunc++
+			prevSect = s.Sect
 		}
 	}
 
@@ -245,10 +190,23 @@ func (ctxt *Link) pclntab() {
 	}
 
 	nfunc = 0 // repurpose nfunc as a running index
+	prevFunc := ctxt.Textp[0]
 	for _, s := range ctxt.Textp {
 		if !emitPcln(ctxt, s) {
 			continue
 		}
+
+		if s.Sect != prevFunc.Sect {
+			// With multiple text sections, there may be a hole here in the address
+			// space (see the comment above). We use an invalid funcoff value to
+			// mark the hole.
+			// See also runtime/symtab.go:findfunc
+			ftab.SetAddrPlus(ctxt.Arch, 8+int64(ctxt.Arch.PtrSize)+int64(nfunc)*2*int64(ctxt.Arch.PtrSize), prevFunc, prevFunc.Size)
+			ftab.SetUint(ctxt.Arch, 8+int64(ctxt.Arch.PtrSize)+int64(nfunc)*2*int64(ctxt.Arch.PtrSize)+int64(ctxt.Arch.PtrSize), ^uint64(0))
+			nfunc++
+		}
+		prevFunc = s
+
 		pcln := s.FuncInfo
 		if pcln == nil {
 			pcln = &pclntabZpcln
@@ -318,15 +276,30 @@ func (ctxt *Link) pclntab() {
 				// set the resumption point to PC_B.
 				lastWasmAddr = uint32(r.Add)
 			}
-			if r.Type.IsDirectJump() && r.Sym != nil && r.Sym.Name == "runtime.deferreturn" {
+			if r.Type.IsDirectCall() && r.Sym != nil && r.Sym.Name == "runtime.deferreturn" {
 				if ctxt.Arch.Family == sys.Wasm {
-					deferreturn = lastWasmAddr
+					deferreturn = lastWasmAddr - 1
 				} else {
 					// Note: the relocation target is in the call instruction, but
 					// is not necessarily the whole instruction (for instance, on
 					// x86 the relocation applies to bytes [1:5] of the 5 byte call
 					// instruction).
 					deferreturn = uint32(r.Off)
+					switch ctxt.Arch.Family {
+					case sys.AMD64, sys.I386:
+						deferreturn--
+					case sys.PPC64, sys.ARM, sys.ARM64, sys.MIPS, sys.MIPS64, sys.Thumb:
+						// no change
+					case sys.RISCV64:
+						// TODO(jsing): The JALR instruction is marked with
+						// R_CALLRISCV, whereas the actual reloc is currently
+						// one instruction earlier starting with the AUIPC.
+						deferreturn -= 4
+					case sys.S390X:
+						deferreturn -= 2
+					default:
+						panic(fmt.Sprint("Unhandled architecture:", ctxt.Arch.Family))
+					}
 				}
 				break // only need one
 			}
@@ -337,10 +310,10 @@ func (ctxt *Link) pclntab() {
 			renumberfiles(ctxt, pcln.File, &pcln.Pcfile)
 			if false {
 				// Sanity check the new numbering
-				it := newPCIter(ctxt)
-				for it.init(pcln.Pcfile.P); !it.done; it.next() {
-					if it.value < 1 || it.value > int32(len(ctxt.Filesyms)) {
-						Errorf(s, "bad file number in pcfile: %d not in range [1, %d]\n", it.value, len(ctxt.Filesyms))
+				it := obj.NewPCIter(uint32(ctxt.Arch.MinLC))
+				for it.Init(pcln.Pcfile.P); !it.Done; it.Next() {
+					if it.Value < 1 || it.Value > int32(len(ctxt.Filesyms)) {
+						Errorf(s, "bad file number in pcfile: %d not in range [1, %d]\n", it.Value, len(ctxt.Filesyms))
 						errorexit()
 					}
 				}
@@ -359,10 +332,10 @@ func (ctxt *Link) pclntab() {
 				// appears in the Pcfile table. In that case, this assigns
 				// the outer file a number.
 				numberfile(ctxt, call.File)
-				nameoff := nameToOffset(call.Func.Name)
+				nameoff := nameToOffset(call.Func)
 
 				inlTreeSym.SetUint16(ctxt.Arch, int64(i*20+0), uint16(call.Parent))
-				inlTreeSym.SetUint8(ctxt.Arch, int64(i*20+2), uint8(objabi.GetFuncID(call.Func.Name, call.Func.File)))
+				inlTreeSym.SetUint8(ctxt.Arch, int64(i*20+2), uint8(objabi.GetFuncID(call.Func, "")))
 				// byte 3 is unused
 				inlTreeSym.SetUint32(ctxt.Arch, int64(i*20+4), uint32(call.File.Value))
 				inlTreeSym.SetUint32(ctxt.Arch, int64(i*20+8), uint32(call.Line))
@@ -447,7 +420,7 @@ func (ctxt *Link) pclntab() {
 	ftab.Size = int64(len(ftab.P))
 
 	if ctxt.Debugvlog != 0 {
-		ctxt.Logf("%5.2f pclntab=%d bytes, funcdata total %d bytes\n", Cputime(), ftab.Size, funcdataBytes)
+		ctxt.Logf("pclntab=%d bytes, funcdata total %d bytes\n", ftab.Size, funcdataBytes)
 	}
 }
 

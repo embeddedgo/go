@@ -6,7 +6,10 @@ package runtime
 
 import "unsafe"
 
-const _NSIG = 0
+const (
+	_NSIG             = 0
+	preemptMSupported = false
+)
 
 type gsignalStack struct{}
 type sigset struct{}
@@ -38,6 +41,7 @@ func mpreinit(mp *m)                 {}
 func msigsave(mp *m)                 {}
 func goenvs()                        {}
 func minit()                         {}
+func preemptM(mp *m)                 {}
 
 //go:nosplit
 func crash() {
@@ -90,7 +94,7 @@ func exit(code int32)
 func osyield()
 
 //go:noescape
-func write(fd uintptr, p unsafe.Pointer, n int32) int32
+func write1(fd uintptr, p unsafe.Pointer, n int32) int32
 
 //go:noescape
 func futexsleep(addr *uint32, val uint32, ns int64)

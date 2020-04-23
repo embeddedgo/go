@@ -11,6 +11,13 @@ TEXT ·Load(SB),NOSPLIT,$0-8
 	MOVW  R1, ret+4(FP)
 	RET
 
+TEXT ·Load8(SB),NOSPLIT,$0-5
+	MOVW   addr+0(FP), R0
+	MOVBU  (R0), R1
+	DMB    MB_ISH
+	MOVB   R1, ret+4(FP)
+	RET
+
 TEXT ·Store(SB),NOSPLIT,$0-8
 	MOVW  addr+0(FP), R1
 	MOVW  v+4(FP), R2
@@ -19,6 +26,14 @@ TEXT ·Store(SB),NOSPLIT,$0-8
 	DMB   MB_ISH
 	RET
 
+TEXT ·Store8(SB),NOSPLIT,$0-5
+	MOVW   addr+0(FP), R1
+	MOVBU  v+4(FP), R2
+	DMB    MB_ISH
+	MOVB   R2, (R1)
+	DMB    MB_ISH
+	RET
+	
 TEXT ·Cas(SB),NOSPLIT|NOFRAME,$0
 	MOVW  ptr+0(FP), R1
 	MOVW  old+4(FP), R2

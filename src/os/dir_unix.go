@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build aix dragonfly freebsd js,wasm linux nacl netbsd openbsd solaris
+// +build aix dragonfly freebsd js,wasm linux netbsd openbsd solaris
 
 package os
 
@@ -25,6 +25,8 @@ const (
 )
 
 func (d *dirInfo) close() {}
+
+func (f *File) seekInvalidate() {}
 
 func (f *File) readdirnames(n int) (names []string, err error) {
 	// If this file has no dirinfo, create one.

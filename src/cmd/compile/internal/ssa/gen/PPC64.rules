@@ -68,6 +68,7 @@
 (Round x) -> (FROUND x)
 (Copysign x y) -> (FCPSGN y x)
 (Abs x) -> (FABS x)
+(FMA x y z) -> (FMADD x y z)
 
 // Lowering constants
 (Const(64|32|16|8)  [val]) -> (MOVDconst [val])
@@ -447,29 +448,29 @@
 (NE (CMPWconst [0] (ANDconst [c] x)) yes no) -> (NE (ANDCCconst [c] x) yes no)
 
 // absorb flag constants into branches
-(EQ (FlagEQ) yes no) -> (First nil yes no)
-(EQ (FlagLT) yes no) -> (First nil no yes)
-(EQ (FlagGT) yes no) -> (First nil no yes)
+(EQ (FlagEQ) yes no) -> (First yes no)
+(EQ (FlagLT) yes no) -> (First no yes)
+(EQ (FlagGT) yes no) -> (First no yes)
 
-(NE (FlagEQ) yes no) -> (First nil no yes)
-(NE (FlagLT) yes no) -> (First nil yes no)
-(NE (FlagGT) yes no) -> (First nil yes no)
+(NE (FlagEQ) yes no) -> (First no yes)
+(NE (FlagLT) yes no) -> (First yes no)
+(NE (FlagGT) yes no) -> (First yes no)
 
-(LT (FlagEQ) yes no) -> (First nil no yes)
-(LT (FlagLT) yes no) -> (First nil yes no)
-(LT (FlagGT) yes no) -> (First nil no yes)
+(LT (FlagEQ) yes no) -> (First no yes)
+(LT (FlagLT) yes no) -> (First yes no)
+(LT (FlagGT) yes no) -> (First no yes)
 
-(LE (FlagEQ) yes no) -> (First nil yes no)
-(LE (FlagLT) yes no) -> (First nil yes no)
-(LE (FlagGT) yes no) -> (First nil no yes)
+(LE (FlagEQ) yes no) -> (First yes no)
+(LE (FlagLT) yes no) -> (First yes no)
+(LE (FlagGT) yes no) -> (First no yes)
 
-(GT (FlagEQ) yes no) -> (First nil no yes)
-(GT (FlagLT) yes no) -> (First nil no yes)
-(GT (FlagGT) yes no) -> (First nil yes no)
+(GT (FlagEQ) yes no) -> (First no yes)
+(GT (FlagLT) yes no) -> (First no yes)
+(GT (FlagGT) yes no) -> (First yes no)
 
-(GE (FlagEQ) yes no) -> (First nil yes no)
-(GE (FlagLT) yes no) -> (First nil no yes)
-(GE (FlagGT) yes no) -> (First nil yes no)
+(GE (FlagEQ) yes no) -> (First yes no)
+(GE (FlagLT) yes no) -> (First no yes)
+(GE (FlagGT) yes no) -> (First yes no)
 
 // absorb InvertFlags into branches
 (LT (InvertFlags cmp) yes no) -> (GT cmp yes no)
@@ -541,6 +542,9 @@
 ((EQ|NE|LT|LE|GT|GE) (CMPconst [0] z:(AND x y)) yes no) && z.Uses == 1 -> ((EQ|NE|LT|LE|GT|GE) (ANDCC x y) yes no)
 ((EQ|NE|LT|LE|GT|GE) (CMPconst [0] z:(OR x y)) yes no) && z.Uses == 1 -> ((EQ|NE|LT|LE|GT|GE) (ORCC x y) yes no)
 ((EQ|NE|LT|LE|GT|GE) (CMPconst [0] z:(XOR x y)) yes no) && z.Uses == 1 -> ((EQ|NE|LT|LE|GT|GE) (XORCC x y) yes no)
+
+(CondSelect x y bool) && flagArg(bool) != nil -> (ISEL [2] x y bool)
+(CondSelect x y bool) && flagArg(bool) == nil -> (ISEL [2] x y (CMPWconst [0] bool))
 
 // Lowering loads
 (Load <t> ptr mem) && (is64BitInt(t) || isPtr(t)) -> (MOVDload ptr mem)
@@ -809,7 +813,7 @@
 (MFVSRD x:(FMOVDload [off] {sym} ptr mem)) && x.Uses == 1 && clobber(x) -> @x.Block (MOVDload [off] {sym} ptr mem)
 
 // Fold offsets for stores.
-(MOVDstore [off1] {sym} (ADDconst [off2] x) val mem) && is16Bit(off1+off2) -> (MOVDstore [off1+off2] {sym} x val mem)
+(MOVDstore [off1] {sym} (ADDconst [off2] x) val mem) && is16Bit(off1+off2) && (off1+off2)%4 == 0 -> (MOVDstore [off1+off2] {sym} x val mem)
 (MOVWstore [off1] {sym} (ADDconst [off2] x) val mem) && is16Bit(off1+off2) -> (MOVWstore [off1+off2] {sym} x val mem)
 (MOVHstore [off1] {sym} (ADDconst [off2] x) val mem) && is16Bit(off1+off2) -> (MOVHstore [off1+off2] {sym} x val mem)
 (MOVBstore [off1] {sym} (ADDconst [off2] x) val mem) && is16Bit(off1+off2) -> (MOVBstore [off1+off2] {sym} x val mem)
@@ -832,7 +836,7 @@
 	&& (ptr.Op != OpSB || p.Uses == 1) ->
         (MOVWstore [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
 (MOVDstore [off1] {sym1} p:(MOVDaddr [off2] {sym2} ptr) val mem) && canMergeSym(sym1,sym2)
-	&& (ptr.Op != OpSB || p.Uses == 1) ->
+	&& (ptr.Op != OpSB || p.Uses == 1) && (off1+off2)%4 == 0 ->
         (MOVDstore [off1+off2] {mergeSym(sym1,sym2)} ptr val mem)
 
 (FMOVSstore [off1] {sym1} p:(MOVDaddr [off2] {sym2} ptr) val mem) && canMergeSym(sym1,sym2)
@@ -852,13 +856,13 @@
 	&& (ptr.Op != OpSB || p.Uses == 1) ->
         (MOVHZload [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
 (MOVWload [off1] {sym1} p:(MOVDaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2)
-	&& (ptr.Op != OpSB || p.Uses == 1) ->
+	&& (ptr.Op != OpSB || p.Uses == 1) && (off1+off2)%4 == 0 ->
         (MOVWload [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
 (MOVWZload [off1] {sym1} p:(MOVDaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2)
 	&& (ptr.Op != OpSB || p.Uses == 1) ->
         (MOVWZload [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
 (MOVDload [off1] {sym1} p:(MOVDaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2)
-	&& (ptr.Op != OpSB || p.Uses == 1) ->
+	&& (ptr.Op != OpSB || p.Uses == 1) && (off1+off2)%4 == 0 ->
         (MOVDload [off1+off2] {mergeSym(sym1,sym2)} ptr mem)
 (FMOVSload [off1] {sym1} p:(MOVDaddr [off2] {sym2} ptr) mem) && canMergeSym(sym1,sym2)
 	&& (ptr.Op != OpSB || p.Uses == 1) ->
@@ -871,8 +875,8 @@
 (FMOVSload [off1] {sym} (ADDconst [off2] ptr) mem) && is16Bit(off1+off2) -> (FMOVSload [off1+off2] {sym} ptr mem)
 (FMOVDload [off1] {sym} (ADDconst [off2] ptr) mem) && is16Bit(off1+off2) -> (FMOVDload [off1+off2] {sym} ptr mem)
 
-(MOVDload [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) -> (MOVDload [off1+off2] {sym} x mem)
-(MOVWload [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) -> (MOVWload [off1+off2] {sym} x mem)
+(MOVDload [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) && (off1+off2)%4 == 0 -> (MOVDload [off1+off2] {sym} x mem)
+(MOVWload [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) && (off1+off2)%4 == 0 -> (MOVWload [off1+off2] {sym} x mem)
 (MOVWZload [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) -> (MOVWZload [off1+off2] {sym} x mem)
 (MOVHload [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) -> (MOVHload [off1+off2] {sym} x mem)
 (MOVHZload [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) -> (MOVHZload [off1+off2] {sym} x mem)
@@ -882,9 +886,10 @@
 (MOV(D|W|WZ|H|HZ|BZ)load [0] {sym} p:(ADD ptr idx) mem) && sym == nil && p.Uses == 1 -> (MOV(D|W|WZ|H|HZ|BZ)loadidx ptr idx mem)
 
 // Determine indexed loads with constant values that can be done without index
-(MOV(D|W|WZ|H|HZ|BZ)loadidx ptr (MOVDconst [c]) mem) && is16Bit(c) -> (MOV(D|W|WZ|H|HZ|BZ)load [c] ptr mem)
-(MOV(D|W|WZ|H|HZ|BZ)loadidx (MOVDconst [c]) ptr mem) && is16Bit(c) -> (MOV(D|W|WZ|H|HZ|BZ)load [c] ptr mem)
-
+(MOV(D|W)loadidx ptr (MOVDconst [c]) mem) && is16Bit(c) && c%4 == 0 -> (MOV(D|W)load [c] ptr mem)
+(MOV(WZ|H|HZ|BZ)loadidx ptr (MOVDconst [c]) mem) && is16Bit(c) -> (MOV(WZ|H|HZ|BZ)load [c] ptr mem)
+(MOV(D|W)loadidx (MOVDconst [c]) ptr mem) && is16Bit(c) && c%4 == 0 -> (MOV(D|W)load [c] ptr mem)
+(MOV(WZ|H|HZ|BZ)loadidx (MOVDconst [c]) ptr mem) && is16Bit(c) -> (MOV(WZ|H|HZ|BZ)load [c] ptr mem)
 
 // Store of zero -> storezero
 (MOVDstore [off] {sym} ptr (MOVDconst [0]) mem) -> (MOVDstorezero [off] {sym} ptr mem)
@@ -893,7 +898,7 @@
 (MOVBstore [off] {sym} ptr (MOVDconst [0]) mem) -> (MOVBstorezero [off] {sym} ptr mem)
 
 // Fold offsets for storezero
-(MOVDstorezero [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) ->
+(MOVDstorezero [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) && (off1+off2)%4 == 0 ->
     (MOVDstorezero [off1+off2] {sym} x mem)
 (MOVWstorezero [off1] {sym} (ADDconst [off2] x) mem) && is16Bit(off1+off2) ->
     (MOVWstorezero [off1+off2] {sym} x mem)
@@ -906,12 +911,14 @@
 (MOV(D|W|H|B)store [off] {sym} p:(ADD ptr idx) val mem) && off == 0 && sym == nil && p.Uses == 1 -> (MOV(D|W|H|B)storeidx ptr idx val mem)
 
 // Stores with constant index values can be done without indexed instructions
-(MOV(D|W|H|B)storeidx ptr (MOVDconst [c]) val mem) && is16Bit(c) -> (MOV(D|W|H|B)store [c] ptr val mem)
-(MOV(D|W|H|B)storeidx (MOVDconst [c]) ptr val mem) && is16Bit(c) -> (MOV(D|W|H|B)store [c] ptr val mem)
+(MOVDstoreidx ptr (MOVDconst [c]) val mem) && is16Bit(c) && c%4 == 0 -> (MOVDstore [c] ptr val mem)
+(MOV(W|H|B)storeidx ptr (MOVDconst [c]) val mem) && is16Bit(c) -> (MOV(W|H|B)store [c] ptr val mem)
+(MOVDstoreidx (MOVDconst [c]) ptr val mem) && is16Bit(c) && c%4 == 0 -> (MOVDstore [c] ptr val mem)
+(MOV(W|H|B)storeidx (MOVDconst [c]) ptr val mem) && is16Bit(c) -> (MOV(W|H|B)store [c] ptr val mem)
 
 // Fold symbols into storezero
 (MOVDstorezero [off1] {sym1} p:(MOVDaddr [off2] {sym2} x) mem) && canMergeSym(sym1,sym2)
-	&& (x.Op != OpSB || p.Uses == 1) ->
+	&& (x.Op != OpSB || p.Uses == 1) && (off1+off2)%4 == 0 ->
     (MOVDstorezero [off1+off2] {mergeSym(sym1,sym2)} x mem)
 (MOVWstorezero [off1] {sym1} p:(MOVDaddr [off2] {sym2} x) mem) && canMergeSym(sym1,sym2)
 	&& (x.Op != OpSB || p.Uses == 1) ->
@@ -927,7 +934,7 @@
 (AtomicLoad(8|32|64|Ptr)  ptr mem) -> (LoweredAtomicLoad(8|32|64|Ptr) [1] ptr mem)
 (AtomicLoadAcq32        ptr mem) -> (LoweredAtomicLoad32 [0] ptr mem)
 
-(AtomicStore(32|64)      ptr val mem) -> (LoweredAtomicStore(32|64) [1] ptr val mem)
+(AtomicStore(8|32|64)    ptr val mem) -> (LoweredAtomicStore(8|32|64) [1] ptr val mem)
 (AtomicStoreRel32        ptr val mem) -> (LoweredAtomicStore32 [0] ptr val mem)
 //(AtomicStorePtrNoWB ptr val mem) -> (STLR  ptr val mem)
 
@@ -1018,6 +1025,59 @@
 (CMPU (MOVDconst [c]) y) && isU16Bit(c) -> (InvertFlags (CMPUconst y [c]))
 (CMPWU x (MOVDconst [c])) && isU16Bit(c) -> (CMPWUconst x [c])
 (CMPWU (MOVDconst [c]) y) && isU16Bit(c) -> (InvertFlags (CMPWUconst y [c]))
+
+// ISEL auxInt values 0=LT 1=GT 2=EQ   arg2 ? arg0 : arg1
+// ISEL auxInt values 4=GE 5=LE 6=NE   arg2 ? arg1 : arg0
+// ISELB special case where arg0, arg1 values are 0, 1
+
+(Equal cmp) -> (ISELB [2] (MOVDconst [1]) cmp)
+(NotEqual cmp) -> (ISELB [6] (MOVDconst [1]) cmp)
+(LessThan cmp) -> (ISELB [0] (MOVDconst [1]) cmp)
+(FLessThan cmp) -> (ISELB [0] (MOVDconst [1]) cmp)
+(FLessEqual cmp) -> (ISEL [2] (MOVDconst [1]) (ISELB [0] (MOVDconst [1]) cmp) cmp)
+(GreaterEqual cmp) -> (ISELB [4] (MOVDconst [1]) cmp)
+(GreaterThan cmp) -> (ISELB [1] (MOVDconst [1]) cmp)
+(FGreaterThan cmp) -> (ISELB [1] (MOVDconst [1]) cmp)
+(FGreaterEqual cmp) -> (ISEL [2] (MOVDconst [1]) (ISELB [1] (MOVDconst [1]) cmp) cmp)
+(LessEqual cmp) -> (ISELB [5] (MOVDconst [1]) cmp)
+
+(ISELB [0] _ (FlagLT)) -> (MOVDconst [1])
+(ISELB [0] _ (Flag(GT|EQ))) -> (MOVDconst [0])
+(ISELB [1] _ (FlagGT)) -> (MOVDconst [1])
+(ISELB [1] _ (Flag(LT|EQ))) -> (MOVDconst [0])
+(ISELB [2] _ (FlagEQ)) -> (MOVDconst [1])
+(ISELB [2] _ (Flag(LT|GT))) -> (MOVDconst [0])
+(ISELB [4] _ (FlagLT)) -> (MOVDconst [0])
+(ISELB [4] _ (Flag(GT|EQ))) -> (MOVDconst [1])
+(ISELB [5] _ (FlagGT)) -> (MOVDconst [0])
+(ISELB [5] _ (Flag(LT|EQ))) -> (MOVDconst [1])
+(ISELB [6] _ (FlagEQ)) -> (MOVDconst [0])
+(ISELB [6] _ (Flag(LT|GT))) -> (MOVDconst [1])
+
+(ISEL [2] x _ (FlagEQ)) -> x
+(ISEL [2] _ y (Flag(LT|GT))) -> y
+
+(ISEL [6] _ y (FlagEQ)) -> y
+(ISEL [6] x _ (Flag(LT|GT))) -> x
+
+(ISEL [0] _ y (Flag(EQ|GT))) -> y
+(ISEL [0] x _ (FlagLT)) -> x
+
+(ISEL [5] _ x (Flag(EQ|LT))) -> x
+(ISEL [5] y _ (FlagGT)) -> y
+
+(ISEL [1] _ y (Flag(EQ|LT))) -> y
+(ISEL [1] x _ (FlagGT)) -> x
+
+(ISEL [4] x _ (Flag(EQ|GT))) -> x
+(ISEL [4] _ y (FlagLT)) -> y
+
+(ISELB [n] (MOVDconst [1]) (InvertFlags bool)) && n%4 == 0 -> (ISELB [n+1] (MOVDconst [1]) bool)
+(ISELB [n] (MOVDconst [1]) (InvertFlags bool)) && n%4 == 1 -> (ISELB [n-1] (MOVDconst [1]) bool)
+(ISELB [n] (MOVDconst [1]) (InvertFlags bool)) && n%4 == 2 -> (ISELB [n] (MOVDconst [1]) bool)
+(ISEL [n] x y (InvertFlags bool)) && n%4 == 0 -> (ISEL [n+1] x y bool)
+(ISEL [n] x y (InvertFlags bool)) && n%4 == 1 -> (ISEL [n-1] x y bool)
+(ISEL [n] x y (InvertFlags bool)) && n%4 == 2 -> (ISEL [n] x y bool)
 
 // A particular pattern seen in cgo code:
 (AND (MOVDconst [c]) x:(MOVBZload _ _)) -> (ANDconst [c&0xFF] x)
@@ -1292,7 +1352,7 @@
 
 // The 2 byte store appears after the 4 byte store so that the
 // match for the 2 byte store is not done first.
-// If the 4 byte store is based on the 2 byte store then there are 
+// If the 4 byte store is based on the 2 byte store then there are
 // variations on the MOVDaddr subrule that would require additional
 // rules to be written.
 

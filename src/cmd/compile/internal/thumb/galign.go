@@ -17,7 +17,6 @@ func Init(arch *gc.Arch) {
 	arch.MAXWIDTH = (1 << 32) - 1
 	arch.SoftFloat = objabi.GOARM&0xF != 0xD // TODO: handle GOARM==0x7F (32-bit FPU)
 	arch.ZeroRange = zerorange
-	arch.ZeroAuto = zeroAuto
 	arch.Ginsnop = ginsnop      // used as inline mark
 	arch.Ginsnopdefer = ginsnop // for stack trace to show right line number for deffered calls
 

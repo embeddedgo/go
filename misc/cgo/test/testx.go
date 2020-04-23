@@ -83,33 +83,18 @@ extern void f7665(void);
 
 void issue7978cb(void);
 
-#if defined(__APPLE__) && defined(__arm__)
-// on Darwin/ARM, libSystem doesn't provide implementation of the __sync_fetch_and_add
-// primitive, and although gcc supports it, it doesn't inline its definition.
-// Clang could inline its definition, so we require clang on Darwin/ARM.
-#if defined(__clang__)
-#define HAS_SYNC_FETCH_AND_ADD 1
-#else
-#define HAS_SYNC_FETCH_AND_ADD 0
-#endif
-#else
-#define HAS_SYNC_FETCH_AND_ADD 1
-#endif
-
 // use ugly atomic variable sync since that doesn't require calling back into
 // Go code or OS dependencies
 static void issue7978c(uint32_t *sync) {
-#if HAS_SYNC_FETCH_AND_ADD
-	while(__sync_fetch_and_add(sync, 0) != 0)
+	while(__atomic_load_n(sync, __ATOMIC_SEQ_CST) != 0)
 		;
-	__sync_fetch_and_add(sync, 1);
-	while(__sync_fetch_and_add(sync, 0) != 2)
+	__atomic_add_fetch(sync, 1, __ATOMIC_SEQ_CST);
+	while(__atomic_load_n(sync, __ATOMIC_SEQ_CST) != 2)
 		;
 	issue7978cb();
-	__sync_fetch_and_add(sync, 1);
-	while(__sync_fetch_and_add(sync, 0) != 6)
+	__atomic_add_fetch(sync, 1, __ATOMIC_SEQ_CST);
+	while(__atomic_load_n(sync, __ATOMIC_SEQ_CST) != 6)
 		;
-#endif
 }
 
 // issue 8331 part 2 - part 1 in test.go
@@ -117,12 +102,28 @@ static void issue7978c(uint32_t *sync) {
 // #include'd twice.  No runtime test; just make sure it compiles.
 #include "issue8331.h"
 
+// issue 8945
+
+typedef void (*PFunc8945)();
+extern PFunc8945 func8945; // definition is in test.go
+
 // issue 20910
 void callMulti(void);
 
 // issue 28772 part 2 - part 1 in issuex.go
 #define issue28772Constant2 2
 
+
+// issue 31891
+typedef struct {
+	long obj;
+} Issue31891A;
+
+typedef struct {
+	long obj;
+} Issue31891B;
+
+void callIssue31891(void);
 */
 import "C"
 
@@ -496,9 +497,6 @@ func test7978(t *testing.T) {
 	if runtime.Compiler == "gccgo" {
 		t.Skip("gccgo can not do stack traces of C code")
 	}
-	if C.HAS_SYNC_FETCH_AND_ADD == 0 {
-		t.Skip("clang required for __sync_fetch_and_add support on darwin/arm")
-	}
 	debug.SetTraceback("2")
 	issue7978sync = 0
 	go issue7978go()
@@ -521,6 +519,13 @@ func test7978(t *testing.T) {
 
 var issue8331Var C.issue8331
 
+// issue 8945
+
+//export Test8945
+func Test8945() {
+	_ = C.func8945
+}
+
 // issue 20910
 
 //export multi
@@ -535,3 +540,15 @@ func test20910(t *testing.T) {
 // issue 28772 part 2
 
 const issue28772Constant2 = C.issue28772Constant2
+
+// issue 31891
+
+//export useIssue31891A
+func useIssue31891A(c *C.Issue31891A) {}
+
+//export useIssue31891B
+func useIssue31891B(c *C.Issue31891B) {}
+
+func test31891(t *testing.T) {
+	C.callIssue31891()
+}

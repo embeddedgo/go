@@ -162,6 +162,18 @@ func pthread_self() (t pthread) {
 }
 func pthread_self_trampoline()
 
+//go:nosplit
+//go:cgo_unsafe_args
+func pthread_kill(t pthread, sig uint32) {
+	libcCall(unsafe.Pointer(funcPC(pthread_kill_trampoline)), unsafe.Pointer(&t))
+	return
+}
+func pthread_kill_trampoline()
+
+// mmap is used to do low-level memory allocation via mmap. Don't allow stack
+// splits, since this function (used by sysAlloc) is called in a lot of low-level
+// parts of the runtime and callers often assume it won't acquire any locks.
+// go:nosplit
 func mmap(addr unsafe.Pointer, n uintptr, prot, flags, fd int32, off uint32) (unsafe.Pointer, int) {
 	args := struct {
 		addr            unsafe.Pointer
@@ -230,7 +242,7 @@ func usleep_trampoline()
 
 //go:nosplit
 //go:cgo_unsafe_args
-func write(fd uintptr, p unsafe.Pointer, n int32) int32 {
+func write1(fd uintptr, p unsafe.Pointer, n int32) int32 {
 	return libcCall(unsafe.Pointer(funcPC(write_trampoline)), unsafe.Pointer(&fd))
 }
 func write_trampoline()
@@ -244,7 +256,7 @@ func open_trampoline()
 
 //go:nosplit
 //go:cgo_unsafe_args
-func nanotime() int64 {
+func nanotime1() int64 {
 	var r struct {
 		t            int64  // raw timer
 		numer, denom uint32 // conversion factors. nanoseconds = t * numer / denom.
@@ -266,7 +278,7 @@ func nanotime_trampoline()
 
 //go:nosplit
 //go:cgo_unsafe_args
-func walltime() (int64, int32) {
+func walltime1() (int64, int32) {
 	var t timeval
 	libcCall(unsafe.Pointer(funcPC(walltime_trampoline)), unsafe.Pointer(&t))
 	return int64(t.tv_sec), 1000 * t.tv_usec
@@ -415,6 +427,8 @@ func setNonblock(fd int32) {
 //go:cgo_import_dynamic libc_pthread_attr_getstacksize pthread_attr_getstacksize "/usr/lib/libSystem.B.dylib"
 //go:cgo_import_dynamic libc_pthread_attr_setdetachstate pthread_attr_setdetachstate "/usr/lib/libSystem.B.dylib"
 //go:cgo_import_dynamic libc_pthread_create pthread_create "/usr/lib/libSystem.B.dylib"
+//go:cgo_import_dynamic libc_pthread_self pthread_self "/usr/lib/libSystem.B.dylib"
+//go:cgo_import_dynamic libc_pthread_kill pthread_kill "/usr/lib/libSystem.B.dylib"
 //go:cgo_import_dynamic libc_exit exit "/usr/lib/libSystem.B.dylib"
 //go:cgo_import_dynamic libc_raise raise "/usr/lib/libSystem.B.dylib"
 
