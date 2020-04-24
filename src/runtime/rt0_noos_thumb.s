@@ -10,9 +10,7 @@
 
 #define PALLOC_MIN 20*1024
 
-
 TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
-	// TODO: check does we have to disable interrupts for initialization.
 
 	// initialize data and BSS
 
@@ -34,6 +32,11 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	MOVW       R1, 8(R13)
 	BL         runtime·memclrNoHeapPointers(SB)  // clear non-DMA memory
 	ADD        $12, R13
+
+	B   runtime·rt0_go(SB) // rt0_go is known as top of a goroutine stack
+
+
+TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// setup main stack in cpu0.gh
 
@@ -531,13 +534,13 @@ TEXT runtime·abort(SB),NOSPLIT|NOFRAME,$0-0
 
 // AES hashing not implemented for ARM
 TEXT runtime·memhash(SB),NOSPLIT|NOFRAME,$0-16
-	JMP	runtime·memhashFallback(SB)
+	JMP  runtime·memhashFallback(SB)
 TEXT runtime·strhash(SB),NOSPLIT|NOFRAME,$0-12
-	JMP	runtime·strhashFallback(SB)
+	JMP  runtime·strhashFallback(SB)
 TEXT runtime·memhash32(SB),NOSPLIT|NOFRAME,$0-12
-	JMP	runtime·memhash32Fallback(SB)
+	JMP  runtime·memhash32Fallback(SB)
 TEXT runtime·memhash64(SB),NOSPLIT|NOFRAME,$0-12
-	JMP	runtime·memhash64Fallback(SB)
+	JMP  runtime·memhash64Fallback(SB)
 
 TEXT runtime·return0(SB),NOSPLIT,$0
 	MOVW  $0, R0
