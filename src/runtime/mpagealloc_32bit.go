@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build 386 arm mips mipsle wasm darwin,arm64 linux,thumb
+// +build 386 arm mips mipsle wasm darwin,arm64 !noos,thumb
 
 // wasm is a treated as a 32-bit architecture for the purposes of the page
 // allocator, even though it has 64-bit pointers. This is because any wasm

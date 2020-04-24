@@ -130,7 +130,8 @@ const (
 	_64bit = 1 << (^uintptr(0) >> 63) / 2
 
 	_ARMv7M = sys.GoosNoos * sys.GoarchThumb
-	_MCU    = _ARMv7M
+	_RISCVM = sys.GoosNoos * sys.GoarchRiscv64
+	_MCU    = _ARMv7M + _RISCVM
 
 	// Tiny allocator parameters, see "Tiny allocator" comment in malloc.go.
 	_TinySize      = 16
@@ -217,14 +218,18 @@ const (
 	// to 0x9FFFFFFF. arenaBaseOffset is used to offset addresses by
 	// -0x20000000 so all possible RAM fits into 2GB (offsetted). For now
 	// the supported address space is further limited to only 1 MB.
-	heapAddrBits = (_64bit*(1-sys.GoarchWasm)*(1-sys.GoosDarwin*sys.GoarchArm64))*48 + (1-_64bit+sys.GoarchWasm)*(32-(sys.GoarchMips+sys.GoarchMipsle)-12*_ARMv7M) + 33*sys.GoosDarwin*sys.GoarchArm64
+	//
+	// In case of RISC-V QEMU and many RISC-V SOCs the RAM starts at
+	// 0x80000000. For now the supported address space is 8 MB starting at
+	// this address.
+	heapAddrBits = (_64bit*(1-sys.GoarchWasm)*(1-sys.GoosDarwin*sys.GoarchArm64)*(1-_MCU))*48 + (1-_64bit+sys.GoarchWasm)*(1-_MCU)*(32-(sys.GoarchMips+sys.GoarchMipsle)) + 33*sys.GoosDarwin*sys.GoarchArm64 + 20*_ARMv7M + 23*_RISCVM
 
 	// maxAlloc is the maximum size of an allocation. On 64-bit,
 	// it's theoretically possible to allocate 1<<heapAddrBits bytes. On
 	// 32-bit, however, this is one less than 1<<32 because the
 	// number of bytes in the address space doesn't actually fit
 	// in a uintptr.
-	maxAlloc = (1 << heapAddrBits) - (1-_64bit)*1
+	maxAlloc = (1 << heapAddrBits) - (1-_64bit)*(1-_MCU)
 
 	// The number of bits in a heap address, the size of heap
 	// arenas, and the L1 and L2 arena map sizes are related by
@@ -257,7 +262,7 @@ const (
 	// logHeapArenaBytes is log_2 of heapArenaBytes. For clarity,
 	// prefer using heapArenaBytes where possible (we need the
 	// constant to compute some other constants).
-	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoarchWasm)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit)*(1-_MCU) + 14*_MCU + (2+20)*sys.GoarchWasm
+	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoarchWasm)*(1-_MCU)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit)*(1-_MCU) + 14*_MCU + (2+20)*sys.GoarchWasm
 
 	// heapArenaBitmapBytes is the size of each heap arena's bitmap.
 	heapArenaBitmapBytes = heapArenaBytes / (sys.PtrSize * 8 / 2)
@@ -314,7 +319,7 @@ const (
 	// and starts at 0, so no offset is necessary.
 	//
 	// In case of ARMv7-M the SRAM region starts at 0x20000000.
-	arenaBaseOffset = sys.GoarchAmd64*(1<<47) + (^0x0a00000000000000+1)&uintptrMask*sys.GoosAix + _ARMv7M*(1<<32-0x20000000)
+	arenaBaseOffset = sys.GoarchAmd64*(1<<47) + (^0x0a00000000000000+1)&uintptrMask*sys.GoosAix + _ARMv7M*(1<<32-0x20000000) + _RISCVM*(^uintptr(0)-0x80000000+1)
 
 	// Max number of threads to run garbage collection.
 	// 2, 3, and 4 are all plausible maximums depending
