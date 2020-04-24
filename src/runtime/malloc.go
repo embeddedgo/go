@@ -130,8 +130,8 @@ const (
 	_64bit = 1 << (^uintptr(0) >> 63) / 2
 
 	_ARMv7M = sys.GoosNoos * sys.GoarchThumb
-	_RISCVM = sys.GoosNoos * sys.GoarchRiscv64
-	_MCU    = _ARMv7M + _RISCVM
+	_RV64M  = sys.GoosNoos * sys.GoarchRiscv64
+	_MCU    = _ARMv7M + _RV64M
 
 	// Tiny allocator parameters, see "Tiny allocator" comment in malloc.go.
 	_TinySize      = 16
@@ -222,7 +222,7 @@ const (
 	// In case of RISC-V QEMU and many RISC-V SOCs the RAM starts at
 	// 0x80000000. For now the supported address space is 8 MB starting at
 	// this address.
-	heapAddrBits = (_64bit*(1-sys.GoarchWasm)*(1-sys.GoosDarwin*sys.GoarchArm64)*(1-_MCU))*48 + (1-_64bit+sys.GoarchWasm)*(1-_MCU)*(32-(sys.GoarchMips+sys.GoarchMipsle)) + 33*sys.GoosDarwin*sys.GoarchArm64 + 20*_ARMv7M + 23*_RISCVM
+	heapAddrBits = (_64bit*(1-sys.GoarchWasm)*(1-sys.GoosDarwin*sys.GoarchArm64)*(1-_MCU))*48 + (1-_64bit+sys.GoarchWasm)*(1-_MCU)*(32-(sys.GoarchMips+sys.GoarchMipsle)) + 33*sys.GoosDarwin*sys.GoarchArm64 + 20*_ARMv7M + 23*_RV64M
 
 	// maxAlloc is the maximum size of an allocation. On 64-bit,
 	// it's theoretically possible to allocate 1<<heapAddrBits bytes. On
@@ -319,7 +319,7 @@ const (
 	// and starts at 0, so no offset is necessary.
 	//
 	// In case of ARMv7-M the SRAM region starts at 0x20000000.
-	arenaBaseOffset = sys.GoarchAmd64*(1<<47) + (^0x0a00000000000000+1)&uintptrMask*sys.GoosAix + _ARMv7M*(1<<32-0x20000000) + _RISCVM*(^uintptr(0)-0x80000000+1)
+	arenaBaseOffset = sys.GoarchAmd64*(1<<47) + (^0x0a00000000000000+1)&uintptrMask*sys.GoosAix + _ARMv7M*(1<<32-0x20000000) + _RV64M*(1<<64-0x80000000)
 
 	// Max number of threads to run garbage collection.
 	// 2, 3, and 4 are all plausible maximums depending

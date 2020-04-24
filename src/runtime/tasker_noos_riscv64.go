@@ -4,16 +4,12 @@
 
 package runtime
 
-import (
-	"embedded/mmio"
-	"internal/cpu/cortexm"
-	"internal/cpu/cortexm/debug/itm"
-	"internal/cpu/cortexm/mpu"
-	"internal/cpu/cortexm/nvic"
-	"internal/cpu/cortexm/scb"
-	"internal/cpu/cortexm/scid"
-	"unsafe"
-)
-
-
 type mOS [1]uint64
+
+func curcpuSleep()          { breakpoint() }
+func curcpuSavectxSched()   { breakpoint() }
+func curcpuWakeup()         { breakpoint() }
+func archnewm(m *m)         { breakpoint() }
+func curcpuSchedule()       { breakpoint() }
+func curcpuSavectxCall()    { breakpoint() }
+func (cpu *cpuctx) wakeup() { breakpoint() }

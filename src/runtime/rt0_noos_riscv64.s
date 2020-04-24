@@ -19,10 +19,10 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
 	// initialize data and BSS
 
-	MOVW  $runtime·ramstart(SB), A0
-	MOVW  $runtime·romdata(SB), A1
-	MOVW  $runtime·bss(SB), A3
-	MOVW  $runtime·ramend(SB), A4
+	MOV  $runtime·ramstart(SB), A0
+	MOV  $runtime·romdata(SB), A1
+	MOV  $runtime·bss(SB), A3
+	MOV  $runtime·ramend(SB), A4
 
 	JMP  runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
 
