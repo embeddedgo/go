@@ -150,7 +150,7 @@ func asmb2(ctxt *ld.Link) {
 
 	ctxt.Out.SeekSet(0)
 	switch ctxt.HeadType {
-	case objabi.Hlinux:
+	case objabi.Hlinux, objabi.Hnoos:
 		ld.Asmbelf(ctxt, int64(symo))
 	default:
 		ld.Errorf(nil, "unsupported operating system")

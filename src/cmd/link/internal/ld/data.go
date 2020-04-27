@@ -2233,6 +2233,9 @@ func (ctxt *Link) address() []*sym.Segment {
 	var order []*sym.Segment // Layout order
 
 	va := uint64(*FlagTextAddr)
+	if ctxt.HeadType == objabi.Hnoos {
+		fmt.Printf("Segtext: %#x\n", va)
+	}
 	order = append(order, &Segtext)
 	Segtext.Rwx = 05
 	Segtext.Vaddr = va
@@ -2261,6 +2264,9 @@ func (ctxt *Link) address() []*sym.Segment {
 		// Ideally the last page of the text segment would not be
 		// writable even for this short period.
 		va = uint64(Rnd(int64(va), int64(*FlagRound)))
+	if ctxt.HeadType == objabi.Hnoos {
+		fmt.Printf("Segrodata: %#x\n", va)
+	}
 
 		order = append(order, &Segrodata)
 		Segrodata.Rwx = 04
@@ -2283,6 +2289,10 @@ func (ctxt *Link) address() []*sym.Segment {
 			// Relro data are inside data segment on AIX.
 			va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
 		}
+	if ctxt.HeadType == objabi.Hnoos {
+			fmt.Printf("Segrelrodata: %#x\n", va)
+
+	}
 
 		order = append(order, &Segrelrodata)
 		Segrelrodata.Rwx = 06
@@ -2310,14 +2320,16 @@ func (ctxt *Link) address() []*sym.Segment {
 			la = va
 		}
 	case objabi.Hnoos:
-		va = RAM.Base
 		switch ctxt.Arch {
 		case sys.ArchThumb:
 			// Main stack on the lowest addresses so overflows can be detected
 			// even without MPU. Segdata.Laddr is set to main stack size (see
 			// ../thumb/asm.go:/Laddr = /)
-			va += Segdata.Laddr //
+			va = RAM.Base + Segdata.Laddr
 		}
+	}
+	if ctxt.HeadType == objabi.Hnoos {
+		fmt.Printf("Segdata: %#x\n", va)
 	}
 	order = append(order, &Segdata)
 	Segdata.Rwx = 06
