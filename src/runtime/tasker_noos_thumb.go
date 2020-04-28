@@ -71,7 +71,7 @@ var (
 
 //go:nowritebarrierrec
 //go:nosplit
-func taskerpreinit() {
+func taskerinit() {
 	*(*uintptr)(unsafe.Pointer(&cpu0.t)) = uintptr(unsafe.Pointer(&thetasker))
 	cpu0.exe.set(getg().m)
 	allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
@@ -138,8 +138,6 @@ func taskerpreinit() {
 	// ensure everything is set before any subsequent memory access
 	mmio.MB()
 }
-
-func taskerinit() {}
 
 // syscall handlers (architecture specific code)
 

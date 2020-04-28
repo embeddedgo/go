@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !noos
-
 #include "go_asm.h"
 #include "go_tls.h"
 #include "funcdata.h"
 #include "textflag.h"
+
+
+#ifndef GOOS_noos
 
 // using NOFRAME means do not save LR on stack.
 // argc is in R0, argv is in R1.
@@ -55,14 +56,12 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	BL    runtime·schedinit(SB)
 
 	// create a new goroutine to start program
-	MOVW    $runtime·mainPC(SB), R0
-	MOVW.W  R0, -4(R13)
-	MOVW    $8, R0
-	MOVW.W  R0, -4(R13)
-	MOVW    $0, R0
-	MOVW.W  R0, -4(R13)  // push $0 as guard
-	BL      runtime·newproc(SB)
-	MOVW    $12(R13), R13  // pop args and LR
+	MOVW       $0, R0
+	MOVW       $8, R1
+	MOVW       $runtime·mainPC(SB), R2
+	MOVM.DB.W  [R0-R2], (R13)
+	BL         runtime·newproc(SB)
+	MOVW       $12(R13), R13
 
 	// start this M
 	BL  runtime·mstart(SB)
@@ -70,6 +69,9 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOVW  $1234, R0
 	MOVW  $1000, R1
 	MOVW  R0, (R1)  // fail hard
+	
+#endif
+
 
 DATA runtime·mainPC+0(SB)/4,$runtime·main(SB)
 GLOBL runtime·mainPC(SB),RODATA,$4
@@ -77,8 +79,12 @@ GLOBL runtime·mainPC(SB),RODATA,$4
 TEXT runtime·breakpoint(SB),NOSPLIT,$0-0
 	// gdb won't skip this breakpoint instruction automatically,
 	// so you must manually "set $pc+=4" to skip it and continue.
+#ifdef GOOS_noos
+	BKPT
+#else
 	UNDEF  $1  // undefined instruction that gdb understands is a software breakpoint
 	//WORD 0xA000F7F0 // T32 UNDEF $0
+#endif
 	RET
 
 TEXT runtime·asminit(SB),NOSPLIT,$0-0
@@ -91,9 +97,9 @@ TEXT runtime·asminit(SB),NOSPLIT,$0-0
 	// WORD	$0xeee1ba10	// vmsr fpscr, REGTMP
 	RET
 
-/*
-	*   go-routine
-	*/
+//
+//  go-routine
+//
 
 // void gosave(Gobuf*)
 // save state in Gobuf; setjmp
@@ -108,7 +114,7 @@ TEXT runtime·gosave(SB),NOSPLIT|NOFRAME,$0-4
 	// Assert ctxt is zero. See func save.
 	MOVW  gobuf_ctxt(R0), R0
 	CMP   R0, REGTMP
-	BEQ   2(PC)
+	B.EQ   2(PC)
 	CALL  runtime·badctxt(SB)
 	RET
 
@@ -191,9 +197,11 @@ TEXT runtime·systemstack(SB),NOSPLIT,$0-4
 	MOVW  fn+0(FP), R0  // R0 = fn
 	MOVW  g_m(g), R1    // R1 = m
 
+#ifndef GOOS_noos
 	MOVW  m_gsignal(R1), R2  // R2 = gsignal
 	CMP   g, R2
 	B.EQ  noswitch
+#endif
 
 	MOVW  m_g0(R1), R2  // R2 = g0
 	CMP   g, R2
@@ -253,9 +261,9 @@ noswitch:
 	MOVW.P  4(R13), R14  // restore LR
 	B       (R0)
 
-/*
-	*   support for morestack
-	*/
+//
+//  support for morestack
+//
 
 // Called during function prolog when more stack is needed.
 // R3 prolog's LR
@@ -274,12 +282,14 @@ TEXT runtime·morestack(SB),NOSPLIT|NOFRAME,$0-0
 	BL    runtime·badmorestackg0(SB)
 	B     runtime·abort(SB)
 
+#ifndef GOOS_noos
 	// Cannot grow signal stack (m->gsignal).
 	MOVW  m_gsignal(R8), R4
 	CMP   g, R4
 	BNE   3(PC)
 	BL    runtime·badmorestackgsignal(SB)
 	B     runtime·abort(SB)
+#endif
 
 	// Called from f.
 	// Set g->sched to context in f.

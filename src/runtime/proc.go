@@ -120,10 +120,10 @@ func main() {
 	// Max stack size is 1 GB on 64-bit, 250 MB on 32-bit.
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
-	if sys.PtrSize == 8 {
+	if _MCU != 0 {
+		maxstacksize = 16384
+	} else if sys.PtrSize == 8 {
 		maxstacksize = 1000000000
-	} else if _MCU != 0 {
-		maxstacksize = 16000
 	} else {
 		maxstacksize = 250000000
 	}
