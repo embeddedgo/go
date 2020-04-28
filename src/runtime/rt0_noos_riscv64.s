@@ -1,4 +1,4 @@
-// Copyright 2009 The Go Authors. All rights reserved.
+// Copyright 2020 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -6,732 +6,196 @@
 #include "go_tls.h"
 #include "funcdata.h"
 #include "textflag.h"
+#include "asm_riscv64.h"
 
 
-// Prefer X8-X15 registers (S0, S1, A0-A5) to allow 16-bit instructions
-// if C extension will be supported.
+// Prefer S0-X15 registers (S0, S1, A0-A5) to allow 16-bit instructions if C
+// extension (compressed instruction-set) will be supported. By the convention
+// we use An for addresses and addressing related things, Sn for numbers.
+//
+// The gdb and objdump use C ABI names (Tn, An, Sn, ...) by default. In most
+// cases there is imposible to make them print Xn names so we use C ABI names
+// in RISC-V assembly except X2 (stack pointer) and g (X4).
 
 
-#define PALLOC_MIN 20*1024
-
-// CSRs
-
-#define FFLAGS 0x001
-#define FRM 0x002
-#define FCSR 0x003 // FFLAGS + FRM
-
-#define MSTATUS 0x300
-#define MEDELEG 0x302
-#define MIDELEG 0x303
-#define MIE 0x304
-#define MTVEC 0x305
-
-#define MSCRATCH 0x340
-#define MEPC 0x341
-#define MCAUSE 0x342
-#define MTVAL 0x343
-#define MIP 0x344
-
-#define MHARTID 0xF14
-
-// instructinos not implemented by assembly
-
-#define CSRW(REG,CSR) WORD $(0x1073 + REG<<15 + CSR<<20)
-#define CSRS(REG,CSR) WORD $(0x2073 + REG<<15 + CSR<<20)
-#define CSRR(CSR,REG) WORD $(0x2073 + REG<<7 + CSR<<20)
-#define WFI WORD $0x10500073
+#define HSTACK_SIZE 4*1024 // size of stack usesd by trap handlers
+#define PALLOC_MIN 64*1024
 
 
 TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
 	// initialize all running cores
 
-	CSRW  (0, MIDELEG)
-	CSRW  (0, MEDELEG)
-	CSRW  (0, MIE)
-	CSRW  (0, MIP)
-	MOV   $runtime·interruptHandler(SB), X8
-	CSRW  (8, MTVEC)
+	CSRWI  (0, MIDELEG)
+	CSRWI  (0, MEDELEG)
+	CSRWI  (0, MIE)
+	CSRWI  (0, MIP)
+	CSRWI  (0, FCSR)
+	CSRWI  (0, MSCRATCH)
 
-	MOV   $(3<<13), X8  // MTVEC: FS=dirty,
-	CSRS  (8, MSTATUS)
+	MOV   $·trapHandler(SB), S0
+	CSRW  (s0, MTVEC)
 
-	CSRW  (0, FCSR)
+	MOV   $(1<<13+1<<7+1<<3), S0  // FS=1(initial), MPIE=1, MIE=1
+	CSRW  (s0, MSTATUS)
 
-	// hartid != 0 to wfiLoop
+	// park excess harts
+	CSRR  (MHARTID, s0)
+	MOV   $const_maxHarts, S1
+	BGE   S0, S1, parkHart
 
-	CSRR  (MHARTID, 8)
-	BNE   ZERO, X8, wfiLoop
+	// allocate handler stack for this hart
 
-	// initialize data and BSS
+	// ensure stacks are 16 byte aligned (may be required in the future)
+	MOV  $runtime·end(SB), A0
+	ADD  $(HSTACK_SIZE+15), A0
+	AND  $~15, A0
 
-	MOV  $runtime·ramstart(SB), A0
-	MOV  $runtime·romdata(SB), A1
-	MOV  $runtime·bss(SB), A3
-	MOV  $runtime·ramend(SB), A4
+	// set handler SP for this hart
+	MOV  $HSTACK_SIZE, A1
+	MUL  S0, A1, A2
+	ADD  A2, A0, X2
 
-loop:
-	WFI
-	JMP  loop
+	// only hart0 does further initialisation
+	BNE  ZERO, S0, parkHart
+
+	// clear the BSS and the whole unallocated memory
+
+	MOV   $runtime·bss(SB), A0
+	MOV   $runtime·ramend(SB), A1
+	SUB   A0, A1
+	ADD   $-24, X2
+	MOV   ZERO, 0(X2)
+	MOV   A0, 8(X2)
+	MOV   A1, 16(X2)
+	CALL  runtime·memclrNoHeapPointers(SB)
+
+	MOV   $runtime·nodmastart(SB), A0
+	MOV   $runtime·nodmaend(SB), A1
+	SUB   A0, A1
+	MOV   A0, 8(X2)
+	MOV   A1, 16(X2)
+	CALL  runtime·memclrNoHeapPointers(SB)
+
+	ADD  $24, X2
 
 	JMP  runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
 
-wfiLoop:
+parkHart:
 	WFI
-	JMP  wfiLoop
+	JMP  parkHart
 
 
+TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
+	// setup handler stack in harts[mhartid].gh
+	MOV   $runtime·harts(SB), g
+	MOV   $cpuctx__size, A1
+	CSRR  (MHARTID, s0)
+	MUL   S0, A1
+	ADD   A1, g                  // gh is the first field of the cpuctx struct
+	ADD   $-HSTACK_SIZE, X2, A1  // stack_lo
+	MOVW  A1, (g_stack+stack_lo)(g)
+	MOVW  X2, (g_stack+stack_hi)(g)
 
+	// **** TODO: other harts should go the scheduler now (rearange this) ****
 
-
-// func rt0_go()
-TEXT runtime·rt0_go(SB),NOSPLIT,$0
-	// X2 = stack; A0 = argc; A1 = argv
-
-	ADD  $-24, X2
-	MOV  A0, 8(X2)   // argc
-	MOV  A1, 16(X2)  // argv
-
-	// create istack out of the given (operating system) stack.
-	// _cgo_init may update stackguard.
-	MOV  $runtime·g0(SB), g
-	MOV  $(-64*1024), T0
-	ADD  T0, X2, T1
-	MOV  T1, g_stackguard0(g)
-	MOV  T1, g_stackguard1(g)
-	MOV  T1, (g_stack+stack_lo)(g)
-	MOV  X2, (g_stack+stack_hi)(g)
-
-	// update stackguard after _cgo_init
-	MOV  (g_stack+stack_lo)(g), T0
-	ADD  $const__StackGuard, T0
-	MOV  T0, g_stackguard0(g)
-	MOV  T0, g_stackguard1(g)
-
-	// set the per-goroutine and per-mach "registers"
-	MOV  $runtime·m0(SB), T0
-
-	// save m->g0 = g0
-	MOV  g, m_g0(T0)
-	// save m0 to g0->m
-	MOV  T0, g_m(g)
+	// set up m0 (bootstrap thread), temporarily use harts[0].gh as g
+	MOV  $runtime·m0(SB), A1
+	MOV  g, m_g0(A1)  // m0.g0 = harts[mhartid].gh
+	MOV  A1, g_m(g)   // harts[mhartid].gh.m = m0
 
 	CALL  runtime·check(SB)
-
-	// args are already prepared
-	CALL  runtime·args(SB)
 	CALL  runtime·osinit(SB)
+
+	// initialize sysMem
+
+	// calculate the beginning of free memory (just after handler stacks)
+	MOV  $runtime·end(SB), A0
+	ADD  $(const_maxHarts*HSTACK_SIZE+15), A0
+	AND  $~15, A0
+	MOV  $runtime·ramend(SB), A1
+	SUB  A0, A1, A5  // size of available memory (DMA capable)
+
+	// estimate the space need for non-heap allocations
+	SRL  $(const__PageShift+2), A5, A4
+	MOV  $mspan__size, A2
+	MUL  A2, A4
+	ADD  $PALLOC_MIN, A4
+
+	MOV  $runtime·nodmastart(SB), A2
+	MOV  $runtime·nodmaend(SB), A3
+	SUB  A2, A3, S0  // size of non-DMA memory
+
+	// we prefer the non-DMA memory for non-heap objects to preserve as much as
+	// possible of the DMA capable memory for heap allocations
+	SUB  S0, A4
+
+	// reduce the arena by the remain of the non-heap space that did not fit in
+	// the non-DMA memory, properly align the arena
+	BLT  A4, ZERO, 2(PC)
+	SUB  A4, A5
+	AND  $~(const_heapArenaBytes-1), A5
+	SUB  A5, A1
+
+	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize}
+	MOV  $runtime·sysMem(SB), S0
+	MOV  A0, 0(S0)
+	MOV  A1, 8(S0)
+	MOV  A2, 16(S0)
+	MOV  A3, 24(S0)
+	MOV  A1, 32(S0)
+	MOV  A5, 40(S0)
+
+	// initialize noos tasker and Go scheduler
+
+	CALL  runtime·taskerinit(SB)
 	CALL  runtime·schedinit(SB)
 
-	// create a new goroutine to start program
-	MOV   $runtime·mainPC(SB), T0  // entry
+	// allocate g0 for m0 and leave gh
+
+	MOV   $(2*const__FixedStack), A0
 	ADD   $-24, X2
-	MOV   T0, 16(X2)
-	MOV   ZERO, 8(X2)
 	MOV   ZERO, 0(X2)
-	CALL  runtime·newproc(SB)
+	MOV   A0, 8(X2)
+	CALL  runtime·malg(SB)
+	MOV   16(X2), A0  // newg in A0
 	ADD   $24, X2
 
+	// stackguard check during newproc requires valid stackguard1 but malg
+	// sets it to 0xFFFFFFFFFFFFFFFF (mstart fixes this but is called later)
+	MOV  g_stackguard0(A0), A1
+	MOV  A1, g_stackguard1(A0)
+
+	MOV  $runtime·m0(SB), A1
+	MOV  A0, m_g0(A1)  // m0.g0 = newg
+	MOV  A1, g_m(A0)   // newg.m = m0
+
+	// newg stack pointer to X2
+	MOV  (g_stack+stack_hi)(A0), A1
+	MOV  A1, X2
+
+	MOV  g, A2
+	MOV  A0, g
+
+	// fix harts[0].gh, harts[0].mh
+
+	ADD  $cpuctx_mh, A2, A1  // A2 points to harts[0](.gh)
+	MOV  A2, m_g0(A1)        // harts[0].mh.g0 = harts[0].gh
+	MOV  A1, g_m(A2)         // harts[0].gh.m = harts[0].mh
+
+	// TODO: switch to user mode
+
+	// create a new goroutine to start program
+	MOV	$runtime·mainPC(SB), A0		// entry
+	ADD	$-24, X2
+	MOV	A0, 16(X2)
+	MOV	ZERO, 8(X2)
+	MOV	ZERO, 0(X2)
+	CALL	runtime·newproc(SB)
+	ADD	$24, X2
+
 	// start this M
-	CALL  runtime·mstart(SB)
+	CALL	runtime·mstart(SB)
 
-	WORD  $0  // crash if reached
-	RET
-
-// void setg_gcc(G*); set g called from gcc with g in A0
-TEXT setg_gcc<>(SB),NOSPLIT,$0-0
-	MOV   A0, g
-	CALL  runtime·save_g(SB)
-	RET
-
-// func cputicks() int64
-TEXT runtime·cputicks(SB),NOSPLIT,$0-8
-	WORD  $0xc0102573  // rdtime a0
-	MOV   A0, ret+0(FP)
-	RET
-
-// systemstack_switch is a dummy routine that systemstack leaves at the bottom
-// of the G stack. We need to distinguish the routine that
-// lives at the bottom of the G stack from the one that lives
-// at the top of the system stack because the one at the top of
-// the system stack terminates the stack walk (see topofstack()).
-TEXT runtime·systemstack_switch(SB), NOSPLIT, $0-0
-	UNDEF
-	JALR  RA, ZERO  // make sure this function is not leaf
-	RET
-
-// func systemstack(fn func())
-TEXT runtime·systemstack(SB), NOSPLIT, $0-8
-	MOV  fn+0(FP), CTXT  // CTXT = fn
-	MOV  g_m(g), T0      // T0 = m
-
-	MOV  m_gsignal(T0), T1  // T1 = gsignal
-	BEQ  g, T1, noswitch
-
-	MOV  m_g0(T0), T1  // T1 = g0
-	BEQ  g, T1, noswitch
-
-	MOV  m_curg(T0), T2
-	BEQ  g, T2, switch
-
-	// Bad: g is not gsignal, not g0, not curg. What is it?
-	// Hide call from linker nosplit analysis.
-	MOV   $runtime·badsystemstack(SB), T1
-	JALR  RA, T1
-
-switch:
-	// save our state in g->sched. Pretend to
-	// be systemstack_switch if the G stack is scanned.
-	MOV  $runtime·systemstack_switch(SB), T2
-	ADD  $8, T2  // get past prologue
-	MOV  T2, (g_sched+gobuf_pc)(g)
-	MOV  X2, (g_sched+gobuf_sp)(g)
-	MOV  ZERO, (g_sched+gobuf_lr)(g)
-	MOV  g, (g_sched+gobuf_g)(g)
-
-	// switch to g0
-	MOV   T1, g
-	CALL  runtime·save_g(SB)
-	MOV   (g_sched+gobuf_sp)(g), T0
-	// make it look like mstart called systemstack on g0, to stop traceback
-	ADD  $-8, T0
-	MOV  $runtime·mstart(SB), T1
-	MOV  T1, 0(T0)
-	MOV  T0, X2
-
-	// call target function
-	MOV   0(CTXT), T1  // code pointer
-	JALR  RA, T1
-
-	// switch back to g
-	MOV   g_m(g), T0
-	MOV   m_curg(T0), g
-	CALL  runtime·save_g(SB)
-	MOV   (g_sched+gobuf_sp)(g), X2
-	MOV   ZERO, (g_sched+gobuf_sp)(g)
-	RET
-
-noswitch:
-	// already on m stack, just call directly
-	// Using a tail call here cleans up tracebacks since we won't stop
-	// at an intermediate systemstack.
-	MOV  0(CTXT), T1  // code pointer
-	ADD  $8, X2
-	JMP  (T1)
-
-TEXT runtime·getcallerpc(SB),NOSPLIT|NOFRAME,$0-8
-	MOV  0(X2), T0  // LR saved by caller
-	MOV  T0, ret+0(FP)
-	RET
-
-/*
-	*   support for morestack
-	*/
-
-// Called during function prolog when more stack is needed.
-// Caller has already loaded:
-// R1: framesize, R2: argsize, R3: LR
-//
-// The traceback routines see morestack on a g0 as being
-// the top of a stack (for example, morestack calling newstack
-// calling the scheduler calling newm calling gc), so we must
-// record an argument size. For that purpose, it has no arguments.
-
-// func morestack()
-TEXT runtime·morestack(SB),NOSPLIT|NOFRAME,$0-0
-	// Cannot grow scheduler stack (m->g0).
-	MOV   g_m(g), A0
-	MOV   m_g0(A0), A1
-	BNE   g, A1, 3(PC)
-	CALL  runtime·badmorestackg0(SB)
-	CALL  runtime·abort(SB)
-
-	// Cannot grow signal stack (m->gsignal).
-	MOV   m_gsignal(A0), A1
-	BNE   g, A1, 3(PC)
-	CALL  runtime·badmorestackgsignal(SB)
-	CALL  runtime·abort(SB)
-
-	// Called from f.
-	// Set g->sched to context in f.
-	MOV  X2, (g_sched+gobuf_sp)(g)
-	MOV  T0, (g_sched+gobuf_pc)(g)
-	MOV  RA, (g_sched+gobuf_lr)(g)
-	MOV  CTXT, (g_sched+gobuf_ctxt)(g)
-
-	// Called from f.
-	// Set m->morebuf to f's caller.
-	MOV  RA, (m_morebuf+gobuf_pc)(A0)  // f's caller's PC
-	MOV  X2, (m_morebuf+gobuf_sp)(A0)  // f's caller's SP
-	MOV  g, (m_morebuf+gobuf_g)(A0)
-
-	// Call newstack on m->g0's stack.
-	MOV   m_g0(A0), g
-	CALL  runtime·save_g(SB)
-	MOV   (g_sched+gobuf_sp)(g), X2
-	// Create a stack frame on g0 to call newstack.
-	MOV   ZERO, -8(X2)  // Zero saved LR in frame
-	ADD   $-8, X2
-	CALL  runtime·newstack(SB)
-
-	// Not reached, but make sure the return PC from the call to newstack
-	// is still in this function, and not the beginning of the next.
-	UNDEF
-
-// func morestack_noctxt()
-TEXT runtime·morestack_noctxt(SB),NOSPLIT|NOFRAME,$0-0
-	MOV  ZERO, CTXT
-	JMP  runtime·morestack(SB)
-
-// AES hashing not implemented for riscv64
-TEXT runtime·memhash(SB),NOSPLIT|NOFRAME,$0-32
-	JMP  runtime·memhashFallback(SB)
-TEXT runtime·strhash(SB),NOSPLIT|NOFRAME,$0-24
-	JMP  runtime·strhashFallback(SB)
-TEXT runtime·memhash32(SB),NOSPLIT|NOFRAME,$0-24
-	JMP  runtime·memhash32Fallback(SB)
-TEXT runtime·memhash64(SB),NOSPLIT|NOFRAME,$0-24
-	JMP  runtime·memhash64Fallback(SB)
-
-// func return0()
-TEXT runtime·return0(SB), NOSPLIT, $0
-	MOV  $0, A0
-	RET
-
-// restore state from Gobuf; longjmp
-
-// func gogo(buf *gobuf)
-TEXT runtime·gogo(SB), NOSPLIT, $16-8
-	MOV   buf+0(FP), T0
-	MOV   gobuf_g(T0), g  // make sure g is not nil
-	CALL  runtime·save_g(SB)
-
-	MOV   (g), ZERO  // make sure g is not nil
-	MOV   gobuf_sp(T0), X2
-	MOV   gobuf_lr(T0), RA
-	MOV   gobuf_ret(T0), A0
-	MOV   gobuf_ctxt(T0), CTXT
-	MOV   ZERO, gobuf_sp(T0)
-	MOV   ZERO, gobuf_ret(T0)
-	MOV   ZERO, gobuf_lr(T0)
-	MOV   ZERO, gobuf_ctxt(T0)
-	MOV   gobuf_pc(T0), T0
-	JALR  ZERO, T0
-
-// func jmpdefer(fv *funcval, argp uintptr)
-// called from deferreturn
-// 1. grab stored return address from the caller's frame
-// 2. sub 8 bytes to get back to JAL deferreturn
-// 3. JMP to fn
-TEXT runtime·jmpdefer(SB), NOSPLIT|NOFRAME, $0-16
-	MOV  0(X2), RA
-	ADD  $-8, RA
-
-	MOV   fv+0(FP), CTXT
-	MOV   argp+8(FP), X2
-	ADD   $-8, X2
-	MOV   0(CTXT), T0
-	JALR  ZERO, T0
-
-// func procyield(cycles uint32)
-TEXT runtime·procyield(SB),NOSPLIT,$0-0
-	RET
-
-// Switch to m->g0's stack, call fn(g).
-// Fn must never return. It should gogo(&g->sched)
-// to keep running g.
-
-// func mcall(fn func(*g))
-TEXT runtime·mcall(SB), NOSPLIT|NOFRAME, $0-8
-	// Save caller state in g->sched
-	MOV  X2, (g_sched+gobuf_sp)(g)
-	MOV  RA, (g_sched+gobuf_pc)(g)
-	MOV  ZERO, (g_sched+gobuf_lr)(g)
-	MOV  g, (g_sched+gobuf_g)(g)
-
-	// Switch to m->g0 & its stack, call fn.
-	MOV   g, T0
-	MOV   g_m(g), T1
-	MOV   m_g0(T1), g
-	CALL  runtime·save_g(SB)
-	BNE   g, T0, 2(PC)
-	JMP   runtime·badmcall(SB)
-	MOV   fn+0(FP), CTXT             // context
-	MOV   0(CTXT), T1                // code pointer
-	MOV   (g_sched+gobuf_sp)(g), X2  // sp = m->g0->sched.sp
-	ADD   $-16, X2
-	MOV   T0, 8(X2)
-	MOV   ZERO, 0(X2)
-	JALR  RA, T1
-	JMP   runtime·badmcall2(SB)
-
-// func gosave(buf *gobuf)
-// save state in Gobuf; setjmp
-TEXT runtime·gosave(SB), NOSPLIT|NOFRAME, $0-8
-	MOV  buf+0(FP), T1
-	MOV  X2, gobuf_sp(T1)
-	MOV  RA, gobuf_pc(T1)
-	MOV  g, gobuf_g(T1)
-	MOV  ZERO, gobuf_lr(T1)
-	MOV  ZERO, gobuf_ret(T1)
-	// Assert ctxt is zero. See func save.
-	MOV   gobuf_ctxt(T1), T1
-	BEQ   T1, ZERO, 2(PC)
-	CALL  runtime·badctxt(SB)
-	RET
-
-// func asmcgocall(fn, arg unsafe.Pointer) int32
-TEXT ·asmcgocall(SB),NOSPLIT,$0-20
-	// TODO(jsing): Add support for cgo - issue #36641.
-	WORD  $0  // crash
-
-// func asminit()
-TEXT runtime·asminit(SB),NOSPLIT|NOFRAME,$0-0
-	RET
-
-// reflectcall: call a function with the given argument list
-// func call(argtype *_type, f *FuncVal, arg *byte, argsize, retoffset uint32).
-// we don't have variable-sized frames, so we use a small number
-// of constant-sized-frame functions to encode a few bits of size in the pc.
-// Caution: ugly multiline assembly macros in your future!
-
-#define DISPATCH(NAME,MAXSIZE) \
-	MOV   $MAXSIZE, T1 \
-	BLTU  T1, T0, 3(PC) \
-	MOV   $NAME(SB), T2; \
-	JALR  ZERO, T2
-// Note: can't just "BR NAME(SB)" - bad inlining results.
-
-// func call(argtype *rtype, fn, arg unsafe.Pointer, n uint32, retoffset uint32)
-TEXT reflect·call(SB), NOSPLIT, $0-0
-	JMP  ·reflectcall(SB)
-
-// func reflectcall(argtype *_type, fn, arg unsafe.Pointer, argsize uint32, retoffset uint32)
-TEXT ·reflectcall(SB), NOSPLIT|NOFRAME, $0-32
-	MOVWU                             argsize+24(FP), T0
-	DISPATCH(runtime·call32,          32)
-	DISPATCH(runtime·call64,          64)
-	DISPATCH(runtime·call128,         128)
-	DISPATCH(runtime·call256,         256)
-	DISPATCH(runtime·call512,         512)
-	DISPATCH(runtime·call1024,        1024)
-	DISPATCH(runtime·call2048,        2048)
-	DISPATCH(runtime·call4096,        4096)
-	DISPATCH(runtime·call8192,        8192)
-	DISPATCH(runtime·call16384,       16384)
-	DISPATCH(runtime·call32768,       32768)
-	DISPATCH(runtime·call65536,       65536)
-	DISPATCH(runtime·call131072,      131072)
-	DISPATCH(runtime·call262144,      262144)
-	DISPATCH(runtime·call524288,      524288)
-	DISPATCH(runtime·call1048576,     1048576)
-	DISPATCH(runtime·call2097152,     2097152)
-	DISPATCH(runtime·call4194304,     4194304)
-	DISPATCH(runtime·call8388608,     8388608)
-	DISPATCH(runtime·call16777216,    16777216)
-	DISPATCH(runtime·call33554432,    33554432)
-	DISPATCH(runtime·call67108864,    67108864)
-	DISPATCH(runtime·call134217728,   134217728)
-	DISPATCH(runtime·call268435456,   268435456)
-	DISPATCH(runtime·call536870912,   536870912)
-	DISPATCH(runtime·call1073741824,  1073741824)
-	MOV                               $runtime·badreflectcall(SB), T2
-	JALR                              ZERO, T2
-
-#define CALLFN(NAME,MAXSIZE) \
-TEXT NAME(SB), WRAPPER, $MAXSIZE-24; \
-	NO_LOCAL_POINTERS;  \
-/* copy arguments to stack */		\
-	MOV    arg+16(FP), A1; \
-	MOVWU  argsize+24(FP), A2; \
-	MOV    X2, A3; \
-	ADD    $8, A3; \
-	ADD    A3, A2; \
-	BEQ    A3, A2, 6(PC); \
-	MOVBU  (A1), A4; \
-	ADD    $1, A1; \
-	MOVB   A4, (A3); \
-	ADD    $1, A3; \
-	JMP    -5(PC); \
-/* call function */			\
-	MOV     f+8(FP), CTXT; \
-	MOV     (CTXT), A4; \
-	PCDATA  $PCDATA_StackMapIndex, $0; \
-	JALR    RA, A4; \
-/* copy return values back */		\
-	MOV    argtype+0(FP), A5; \
-	MOV    arg+16(FP), A1; \
-	MOVWU  n+24(FP), A2; \
-	MOVWU  retoffset+28(FP), A4; \
-	ADD    $8, X2, A3; \
-	ADD    A4, A3; \
-	ADD    A4, A1; \
-	SUB    A4, A2; \
-	CALL   callRet<>(SB); \
-	RET
-
-// callRet copies return values back at the end of call*. This is a
-// separate function so it can allocate stack space for the arguments
-// to reflectcallmove. It does not follow the Go ABI; it expects its
-// arguments in registers.
-TEXT callRet<>(SB), NOSPLIT, $32-0
-	MOV   A5, 8(X2)
-	MOV   A1, 16(X2)
-	MOV   A3, 24(X2)
-	MOV   A2, 32(X2)
-	CALL  runtime·reflectcallmove(SB)
-	RET
-
-	CALLFN(·call16,          16)
-	CALLFN(·call32,          32)
-	CALLFN(·call64,          64)
-	CALLFN(·call128,         128)
-	CALLFN(·call256,         256)
-	CALLFN(·call512,         512)
-	CALLFN(·call1024,        1024)
-	CALLFN(·call2048,        2048)
-	CALLFN(·call4096,        4096)
-	CALLFN(·call8192,        8192)
-	CALLFN(·call16384,       16384)
-	CALLFN(·call32768,       32768)
-	CALLFN(·call65536,       65536)
-	CALLFN(·call131072,      131072)
-	CALLFN(·call262144,      262144)
-	CALLFN(·call524288,      524288)
-	CALLFN(·call1048576,     1048576)
-	CALLFN(·call2097152,     2097152)
-	CALLFN(·call4194304,     4194304)
-	CALLFN(·call8388608,     8388608)
-	CALLFN(·call16777216,    16777216)
-	CALLFN(·call33554432,    33554432)
-	CALLFN(·call67108864,    67108864)
-	CALLFN(·call134217728,   134217728)
-	CALLFN(·call268435456,   268435456)
-	CALLFN(·call536870912,   536870912)
-	CALLFN(·call1073741824,  1073741824)
-
-// func goexit(neverCallThisFunction)
-// The top-most function running on a goroutine
-// returns to goexit+PCQuantum.
-TEXT runtime·goexit(SB),NOSPLIT|NOFRAME,$0-0
-	MOV  ZERO, ZERO           // NOP
-	JMP  runtime·goexit1(SB)  // does not return
-	// traceback from goexit1 must hit code range of goexit
-	MOV  ZERO, ZERO  // NOP
-
-// func cgocallback_gofunc(fv uintptr, frame uintptr, framesize, ctxt uintptr)
-TEXT ·cgocallback_gofunc(SB),NOSPLIT,$24-32
-	// TODO(jsing): Add support for cgo - issue #36641.
-	WORD  $0  // crash
-
-TEXT runtime·breakpoint(SB),NOSPLIT|NOFRAME,$0-0
-	EBREAK
-	RET
-
-TEXT runtime·abort(SB),NOSPLIT|NOFRAME,$0-0
-	EBREAK
-	RET
-
-// void setg(G*); set g. for use by needm.
-TEXT runtime·setg(SB), NOSPLIT, $0-8
-	MOV  gg+0(FP), g
-	// This only happens if iscgo, so jump straight to save_g
-	CALL  runtime·save_g(SB)
-	RET
-
-TEXT ·checkASM(SB),NOSPLIT,$0-1
-	MOV  $1, T0
-	MOV  T0, ret+0(FP)
-	RET
-
-// gcWriteBarrier performs a heap pointer write and informs the GC.
-//
-// gcWriteBarrier does NOT follow the Go ABI. It takes two arguments:
-// - T0 is the destination of the write
-// - T1 is the value being written at T0.
-// It clobbers R30 (the linker temp register - REG_TMP).
-// The act of CALLing gcWriteBarrier will clobber RA (LR).
-// It does not clobber any other general-purpose registers,
-// but may clobber others (e.g., floating point registers).
-TEXT runtime·gcWriteBarrier(SB),NOSPLIT,$296
-	// Save the registers clobbered by the fast path.
-	MOV  A0, 280(X2)
-	MOV  A1, 288(X2)
-	MOV  g_m(g), A0
-	MOV  m_p(A0), A0
-	MOV  (p_wbBuf+wbBuf_next)(A0), A1
-	// Increment wbBuf.next position.
-	ADD  $16, A1
-	MOV  A1, (p_wbBuf+wbBuf_next)(A0)
-	MOV  (p_wbBuf+wbBuf_end)(A0), A0
-	MOV  A0, T6  // T6 is linker temp register (REG_TMP)
-	// Record the write.
-	MOV  T1, -16(A1)  // Record value
-	MOV  (T0), A0     // TODO: This turns bad writes into bad reads.
-	MOV  A0, -8(A1)   // Record *slot
-	// Is the buffer full?
-	BEQ  A1, T6, flush
-ret:
-	MOV  280(X2), A0
-	MOV  288(X2), A1
-	// Do the write.
-	MOV  T1, (T0)
-	RET
-
-flush:
-	// Save all general purpose registers since these could be
-	// clobbered by wbBufFlush and were not saved by the caller.
-	MOV  T0, 8(X2)   // Also first argument to wbBufFlush
-	MOV  T1, 16(X2)  // Also second argument to wbBufFlush
-
-	// TODO: Optimise
-	// R3 is g.
-	// R4 already saved (T0)
-	// R5 already saved (T1)
-	// R9 already saved (A0)
-	// R10 already saved (A1)
-	// R30 is tmp register.
-	MOV  X0, 24(X2)
-	MOV  X1, 32(X2)
-	MOV  X2, 40(X2)
-	MOV  X3, 48(X2)
-	MOV  X4, 56(X2)
-	MOV  X5, 64(X2)
-	MOV  X6, 72(X2)
-	MOV  X7, 80(X2)
-	MOV  X8, 88(X2)
-	MOV  X9, 96(X2)
-	MOV  X10, 104(X2)
-	MOV  X11, 112(X2)
-	MOV  X12, 120(X2)
-	MOV  X13, 128(X2)
-	MOV  X14, 136(X2)
-	MOV  X15, 144(X2)
-	MOV  X16, 152(X2)
-	MOV  X17, 160(X2)
-	MOV  X18, 168(X2)
-	MOV  X19, 176(X2)
-	MOV  X20, 184(X2)
-	MOV  X21, 192(X2)
-	MOV  X22, 200(X2)
-	MOV  X23, 208(X2)
-	MOV  X24, 216(X2)
-	MOV  X25, 224(X2)
-	MOV  X26, 232(X2)
-	MOV  X27, 240(X2)
-	MOV  X28, 248(X2)
-	MOV  X29, 256(X2)
-	MOV  X30, 264(X2)
-	MOV  X31, 272(X2)
-
-	// This takes arguments T0 and T1.
-	CALL  runtime·wbBufFlush(SB)
-
-	MOV  24(X2), X0
-	MOV  32(X2), X1
-	MOV  40(X2), X2
-	MOV  48(X2), X3
-	MOV  56(X2), X4
-	MOV  64(X2), X5
-	MOV  72(X2), X6
-	MOV  80(X2), X7
-	MOV  88(X2), X8
-	MOV  96(X2), X9
-	MOV  104(X2), X10
-	MOV  112(X2), X11
-	MOV  120(X2), X12
-	MOV  128(X2), X13
-	MOV  136(X2), X14
-	MOV  144(X2), X15
-	MOV  152(X2), X16
-	MOV  160(X2), X17
-	MOV  168(X2), X18
-	MOV  176(X2), X19
-	MOV  184(X2), X20
-	MOV  192(X2), X21
-	MOV  200(X2), X22
-	MOV  208(X2), X23
-	MOV  216(X2), X24
-	MOV  224(X2), X25
-	MOV  232(X2), X26
-	MOV  240(X2), X27
-	MOV  248(X2), X28
-	MOV  256(X2), X29
-	MOV  264(X2), X30
-	MOV  272(X2), X31
-
-	JMP  ret
-
-// Note: these functions use a special calling convention to save generated code space.
-// Arguments are passed in registers, but the space for those arguments are allocated
-// in the caller's stack frame. These stubs write the args into that stack space and
-// then tail call to the corresponding runtime handler.
-// The tail call makes these stubs disappear in backtraces.
-TEXT runtime·panicIndex(SB),NOSPLIT,$0-16
-	MOV  T0, x+0(FP)
-	MOV  T1, y+8(FP)
-	JMP  runtime·goPanicIndex(SB)
-TEXT runtime·panicIndexU(SB),NOSPLIT,$0-16
-	MOV  T0, x+0(FP)
-	MOV  T1, y+8(FP)
-	JMP  runtime·goPanicIndexU(SB)
-TEXT runtime·panicSliceAlen(SB),NOSPLIT,$0-16
-	MOV  T1, x+0(FP)
-	MOV  T2, y+8(FP)
-	JMP  runtime·goPanicSliceAlen(SB)
-TEXT runtime·panicSliceAlenU(SB),NOSPLIT,$0-16
-	MOV  T1, x+0(FP)
-	MOV  T2, y+8(FP)
-	JMP  runtime·goPanicSliceAlenU(SB)
-TEXT runtime·panicSliceAcap(SB),NOSPLIT,$0-16
-	MOV  T1, x+0(FP)
-	MOV  T2, y+8(FP)
-	JMP  runtime·goPanicSliceAcap(SB)
-TEXT runtime·panicSliceAcapU(SB),NOSPLIT,$0-16
-	MOV  T1, x+0(FP)
-	MOV  T2, y+8(FP)
-	JMP  runtime·goPanicSliceAcapU(SB)
-TEXT runtime·panicSliceB(SB),NOSPLIT,$0-16
-	MOV  T0, x+0(FP)
-	MOV  T1, y+8(FP)
-	JMP  runtime·goPanicSliceB(SB)
-TEXT runtime·panicSliceBU(SB),NOSPLIT,$0-16
-	MOV  T0, x+0(FP)
-	MOV  T1, y+8(FP)
-	JMP  runtime·goPanicSliceBU(SB)
-TEXT runtime·panicSlice3Alen(SB),NOSPLIT,$0-16
-	MOV  T2, x+0(FP)
-	MOV  T3, y+8(FP)
-	JMP  runtime·goPanicSlice3Alen(SB)
-TEXT runtime·panicSlice3AlenU(SB),NOSPLIT,$0-16
-	MOV  T2, x+0(FP)
-	MOV  T3, y+8(FP)
-	JMP  runtime·goPanicSlice3AlenU(SB)
-TEXT runtime·panicSlice3Acap(SB),NOSPLIT,$0-16
-	MOV  T2, x+0(FP)
-	MOV  T3, y+8(FP)
-	JMP  runtime·goPanicSlice3Acap(SB)
-TEXT runtime·panicSlice3AcapU(SB),NOSPLIT,$0-16
-	MOV  T2, x+0(FP)
-	MOV  T3, y+8(FP)
-	JMP  runtime·goPanicSlice3AcapU(SB)
-TEXT runtime·panicSlice3B(SB),NOSPLIT,$0-16
-	MOV  T1, x+0(FP)
-	MOV  T2, y+8(FP)
-	JMP  runtime·goPanicSlice3B(SB)
-TEXT runtime·panicSlice3BU(SB),NOSPLIT,$0-16
-	MOV  T1, x+0(FP)
-	MOV  T2, y+8(FP)
-	JMP  runtime·goPanicSlice3BU(SB)
-TEXT runtime·panicSlice3C(SB),NOSPLIT,$0-16
-	MOV  T0, x+0(FP)
-	MOV  T1, y+8(FP)
-	JMP  runtime·goPanicSlice3C(SB)
-TEXT runtime·panicSlice3CU(SB),NOSPLIT,$0-16
-	MOV  T0, x+0(FP)
-	MOV  T1, y+8(FP)
-	JMP  runtime·goPanicSlice3CU(SB)
-
-DATA runtime·mainPC+0(SB)/8,$runtime·main(SB)
-GLOBL runtime·mainPC(SB),RODATA,$8
+	UNDEF  // fail

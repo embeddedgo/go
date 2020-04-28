@@ -29,13 +29,19 @@ DATA runtime·syscalls+(SYS_nanosleep*8)(SB)/8, $·sysnanosleep(SB)
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*8)
 
 // func nanotime1() int64
-TEXT ·nanotime1(SB),NOSPLIT|NOFRAME,$0-8
-	EBREAK
+TEXT ·nanotime1(SB),NOSPLIT|NOFRAME,$0
+	MOV  $SYS_nanotime, A0
+	MOV  $(0+8), A1
+	MOV  $8, A2
+	ECALL
 	RET
 
 // func walltime1() (sec int64, nsec int32)
-TEXT ·walltime1(SB),NOSPLIT|NOFRAME,$0-12
-	EBREAK
+TEXT ·walltime1(SB),NOSPLIT|NOFRAME,$0
+	MOV  $SYS_walltime, A0
+	MOV  $(0+8), A1
+	MOV  $16, A2
+	ECALL
 	RET
 
 // func setwalltime(sec int64, nsec int32)

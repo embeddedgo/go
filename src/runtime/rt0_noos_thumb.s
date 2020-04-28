@@ -31,7 +31,7 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	BL         runtime·memclrNoHeapPointers(SB)  // clear non-DMA memory
 	ADD        $12, R13
 
-	B   runtime·rt0_go(SB) // rt0_go is known as top of a goroutine stack
+	B   runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
 
 
 #define PALLOC_MIN 20*1024
@@ -39,7 +39,6 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// setup main stack in cpu0.gh
-
 	MOVW  $runtime·cpu0(SB), R0      // gh is the first field of the cpuctx struct
 	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of memory
 	MOVW  R1, (g_stack+stack_lo)(R0)
@@ -55,7 +54,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	MOVW  R0, g  // we use R0 above instead of g for shorter encoding
 
-	BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
+	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
 	BL  runtime·check(SB)
 	BL  runtime·osinit(SB)
 
@@ -67,7 +66,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// estimate the space need for non-heap allocations
 	MOVW  R5>>(const__PageShift+2), R4
-	MOVW  $const_mspanSize, R2
+	MOVW  $mspan__size, R2
 	MUL   R2, R4
 	ADD   $PALLOC_MIN, R4
 
@@ -138,11 +137,11 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// create a new goroutine to start program
 	MOVW       $0, R0
-	MOVW       $8, R1
+	MOVW       $0, R1
 	MOVW       $runtime·mainPC(SB), R2
 	MOVM.DB.W  [R0-R2], (R13)
 	BL         runtime·newproc(SB)
-	MOVW       $12(R13), R13
+	ADD        $12, R13
 
 	// start this M
 	BL  runtime·mstart(SB)

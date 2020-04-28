@@ -2264,9 +2264,9 @@ func (ctxt *Link) address() []*sym.Segment {
 		// Ideally the last page of the text segment would not be
 		// writable even for this short period.
 		va = uint64(Rnd(int64(va), int64(*FlagRound)))
-	if ctxt.HeadType == objabi.Hnoos {
-		fmt.Printf("Segrodata: %#x\n", va)
-	}
+		if ctxt.HeadType == objabi.Hnoos {
+			fmt.Printf("Segrodata: %#x\n", va)
+		}
 
 		order = append(order, &Segrodata)
 		Segrodata.Rwx = 04
@@ -2289,10 +2289,10 @@ func (ctxt *Link) address() []*sym.Segment {
 			// Relro data are inside data segment on AIX.
 			va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
 		}
-	if ctxt.HeadType == objabi.Hnoos {
+		if ctxt.HeadType == objabi.Hnoos {
 			fmt.Printf("Segrelrodata: %#x\n", va)
 
-	}
+		}
 
 		order = append(order, &Segrelrodata)
 		Segrelrodata.Rwx = 06
@@ -2485,11 +2485,20 @@ func (ctxt *Link) address() []*sym.Segment {
 	ctxt.xdefine("runtime.end", sym.SBSS, int64(Segdata.Vaddr+Segdata.Length))
 
 	if ctxt.HeadType == objabi.Hnoos {
-		ctxt.xdefine("runtime.ramstart", sym.SRODATA, int64(RAM.Base))
-		ctxt.xdefine("runtime.ramend", sym.SRODATA, int64(RAM.Base+RAM.Size))
+		ramstart := int64(RAM.Base)
+		ramend := int64(RAM.Base + RAM.Size)
+		ctxt.xdefine("runtime.ramstart", sym.SRODATA, ramstart)
+		ctxt.xdefine("runtime.ramend", sym.SRODATA, ramend)
 		ctxt.xdefine("runtime.romdata", sym.SRODATA, int64(Segdata.Laddr))
-		ctxt.xdefine("runtime.nodmastart", sym.SRODATA, int64(NoDMA.Base))
-		ctxt.xdefine("runtime.nodmaend", sym.SRODATA, int64(NoDMA.Base+NoDMA.Size))
+		nodmastart := int64(NoDMA.Base)
+		nodmaend := int64(NoDMA.Base + NoDMA.Size)
+		if nodmastart == 0 && nodmaend == 0 {
+			// avoid "relocation does not fit in 32-bits" kind of errors
+			nodmastart = ramstart
+			nodmaend = ramstart
+		}
+		ctxt.xdefine("runtime.nodmastart", sym.SRODATA, nodmastart)
+		ctxt.xdefine("runtime.nodmaend", sym.SRODATA, nodmaend)
 	}
 
 	return order

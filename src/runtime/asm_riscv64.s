@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !noos
-
 #include "go_asm.h"
 #include "funcdata.h"
 #include "textflag.h"
+
+#ifndef GOOS_noos
 
 // func rt0_go()
 TEXT runtime·rt0_go(SB),NOSPLIT,$0
@@ -73,6 +73,9 @@ nocgo:
 	WORD $0 // crash if reached
 	RET
 
+#endif
+
+
 // void setg_gcc(G*); set g called from gcc with g in A0
 TEXT setg_gcc<>(SB),NOSPLIT,$0-0
 	MOV	A0, g
@@ -100,8 +103,10 @@ TEXT runtime·systemstack(SB), NOSPLIT, $0-8
 	MOV	fn+0(FP), CTXT	// CTXT = fn
 	MOV	g_m(g), T0	// T0 = m
 
+#ifndef GOOS_noos
 	MOV	m_gsignal(T0), T1	// T1 = gsignal
 	BEQ	g, T1, noswitch
+#endif
 
 	MOV	m_g0(T0), T1	// T1 = g0
 	BEQ	g, T1, noswitch
@@ -181,11 +186,13 @@ TEXT runtime·morestack(SB),NOSPLIT|NOFRAME,$0-0
 	CALL	runtime·badmorestackg0(SB)
 	CALL	runtime·abort(SB)
 
+#ifndef GOOS_noos
 	// Cannot grow signal stack (m->gsignal).
 	MOV	m_gsignal(A0), A1
 	BNE	g, A1, 3(PC)
 	CALL	runtime·badmorestackgsignal(SB)
 	CALL	runtime·abort(SB)
+#endif
 
 	// Called from f.
 	// Set g->sched to context in f.

@@ -105,7 +105,7 @@ type MemBlock struct {
 	Base, Size uint64
 }
 
-func (mb *MemBlock) init(descr string) {
+func (mb *MemBlock) set(descr string) {
 	i := strings.IndexByte(descr, ':')
 	if i < 0 {
 		Exitf("memory layout (-M): no BASE:SIZE separator: %s", descr)
@@ -182,10 +182,10 @@ func Main(arch *sys.Arch, theArch Arch) {
 			Exitf("memory layout (-M) not specified")
 		}
 		if len(descr) > 0 {
-			RAM.init(descr[0])
+			RAM.set(descr[0])
 		}
 		if len(descr) > 1 {
-			NoDMA.init(descr[1])
+			NoDMA.set(descr[1])
 		}
 		if len(descr) > 2 {
 			Exitf("-M describes more than two memory blocks")

@@ -126,5 +126,3 @@ func sysUnused(v unsafe.Pointer, n uintptr)   {}
 func sysUsed(v unsafe.Pointer, n uintptr)     {}
 func sysFault(v unsafe.Pointer, n uintptr)    {}
 func sysHugePage(v unsafe.Pointer, n uintptr) {}
-
-const mspanSize = unsafe.Sizeof(mspan{}) // used by assembly

@@ -23,6 +23,12 @@ func curcpuSavectxSched()
 func curcpuSavectxCall() {} // all registars saved on caller's stack
 
 //go:nosplit
+func cpuid() int {
+	// for now only single CPU is supported (see also identcurcpu, osinit)
+	return 0
+}
+
+//go:nosplit
 func (cpu *cpuctx) wakeup() { sev() }
 
 //go:nosplit

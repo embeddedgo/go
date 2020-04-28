@@ -4,7 +4,42 @@
 
 package runtime
 
-type mOS [1]uint64
+import "unsafe"
+
+func cpuid() int // consider remove this function, don't use it in isr(), taskerinit()
+
+const maxHarts = 2
+
+var (
+	harts  [maxHarts]cpuctx
+	pharts [maxHarts]*cpuctx
+)
+
+//go:nowritebarrierrec
+//go:nosplit
+func taskerinit() {
+	if cpuid() == 0 {
+		uharts := (*[maxHarts]uintptr)(unsafe.Pointer(&pharts))
+		for i := range harts {
+			uharts[i] = uintptr(unsafe.Pointer(&harts[i]))
+		}
+		allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
+		*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(uharts))
+		allcpu.len = 1
+		allcpu.cap = maxHarts
+		getcpuctx().exe.set(getg().m)
+	}
+}
+
+// m.tls fields
+
+const mer = 5
+
+type mOS struct {
+	x    [31]uint64 // x1-x31
+	fcsr uint64
+	f    [32]float64
+}
 
 func curcpuSleep()          { breakpoint() }
 func curcpuSavectxSched()   { breakpoint() }
