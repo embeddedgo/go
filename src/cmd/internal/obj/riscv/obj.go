@@ -645,6 +645,16 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 		prologue.To = obj.Addr{Type: obj.TYPE_REG, Reg: REG_SP}
 		prologue.Spadj = int32(stacksize)
 
+		if ctxt.Headtype == objabi.Hnoos {
+			// If we are on handler stack the nested trap can clober LR saved
+			// before (required by async preemption). Save LR one more time
+			// after decrementing SP.
+			prologue = obj.Appendp(prologue, newprog)
+			prologue.As = AMOV
+			prologue.From = obj.Addr{Type: obj.TYPE_REG, Reg: REG_LR}
+			prologue.To = obj.Addr{Type: obj.TYPE_MEM, Reg: REG_SP}
+		}
+
 		prologue = ctxt.EndUnsafePoint(prologue, newprog, -1)
 	}
 
