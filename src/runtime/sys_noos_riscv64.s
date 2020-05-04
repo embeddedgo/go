@@ -7,7 +7,7 @@
 #include "textflag.h"
 #include "syscall_noos.h"
 
-// if you add new syscall you must check SYS_MAX_ARGS in tasker_noos_thumb.s
+// if you add new syscall you must check sysMaxArgs in tasker_noos_riscv64.s
 
 // syscalls allowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_nanotime*8)(SB)/8, $·sysnanotime(SB)
@@ -29,18 +29,26 @@ DATA runtime·syscalls+(SYS_nanosleep*8)(SB)/8, $·sysnanosleep(SB)
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*8)
 
 // func nanotime1() int64
-TEXT ·nanotime1(SB),NOSPLIT|NOFRAME,$0
-	MOV  $SYS_nanotime, A0
-	MOV  $(0+8), A1
-	MOV  $8, A2
+TEXT ·nanotime1(SB),NOSPLIT|NOFRAME,$0-8
+	MOV  $SYS_nanotime, A3
+	MOV  $(0+8), A4
+	MOV  $8, A5
+	ECALL
+	RET
+
+// func cputicks() int64
+TEXT ·cputicks(SB),NOSPLIT|NOFRAME,$0-8
+	MOV  $SYS_nanotime, A3
+	MOV  $(0+8), A4
+	MOV  $8, A5
 	ECALL
 	RET
 
 // func walltime1() (sec int64, nsec int32)
-TEXT ·walltime1(SB),NOSPLIT|NOFRAME,$0
-	MOV  $SYS_walltime, A0
-	MOV  $(0+8), A1
-	MOV  $16, A2
+TEXT ·walltime1(SB),NOSPLIT|NOFRAME,$0-16
+	MOV  $SYS_walltime, A3
+	MOV  $(0+8), A4
+	MOV  $16, A5
 	ECALL
 	RET
 

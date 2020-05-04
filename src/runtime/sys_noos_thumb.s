@@ -7,7 +7,7 @@
 #include "textflag.h"
 #include "syscall_noos.h"
 
-// if you add new syscall you must check SYS_MAX_ARGS in tasker_noos_thumb.s
+// if you add new syscall you must check sysMaxArgs in tasker_noos_thumb.s
 
 // syscalls allowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_nanotime*4)(SB)/4, $·sysnanotime(SB)

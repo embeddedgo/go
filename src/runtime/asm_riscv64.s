@@ -73,9 +73,6 @@ nocgo:
 	WORD $0 // crash if reached
 	RET
 
-#endif
-
-
 // void setg_gcc(G*); set g called from gcc with g in A0
 TEXT setg_gcc<>(SB),NOSPLIT,$0-0
 	MOV	A0, g
@@ -87,6 +84,8 @@ TEXT runtime·cputicks(SB),NOSPLIT,$0-8
 	WORD	$0xc0102573	// rdtime a0
 	MOV	A0, ret+0(FP)
 	RET
+
+#endif
 
 // systemstack_switch is a dummy routine that systemstack leaves at the bottom
 // of the G stack. We need to distinguish the routine that

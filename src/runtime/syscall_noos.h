@@ -14,7 +14,7 @@
 #define SYS_setprivlevel  4
 #define SYS_write         5
 
-#define SYS_LAST_LOWISR   5 
+#define SYS_LAST_FAST     5
 
 #define SYS_setsystim1    6
 #define SYS_newosproc     7

@@ -26,17 +26,16 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
 	// initialize all running cores
 
+	CSRWI  (0, MIE)
 	CSRWI  (0, MIDELEG)
 	CSRWI  (0, MEDELEG)
-	CSRWI  (0, MIE)
-	CSRWI  (0, MIP)
 	CSRWI  (0, FCSR)
 	CSRWI  (0, MSCRATCH)
 
 	MOV   $·trapHandler(SB), S0
 	CSRW  (s0, MTVEC)
 
-	MOV   $(1<<13+1<<7+1<<3), S0  // FS=1(initial), MPIE=1, MIE=1
+	MOV   $(1<<13+1<<7), S0  // FS=1(initial), MPIE=1
 	CSRW  (s0, MSTATUS)
 
 	// park excess harts
@@ -180,22 +179,23 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// fix harts[0].gh, harts[0].mh
 
-	ADD  $cpuctx_mh, A2, A1  // A2 points to harts[0](.gh)
-	MOV  A2, m_g0(A1)        // harts[0].mh.g0 = harts[0].gh
-	MOV  A1, g_m(A2)         // harts[0].gh.m = harts[0].mh
+	ADD   $cpuctx_mh, A2, A1  // A2 points to harts[0](.gh)
+	MOV   A2, m_g0(A1)        // harts[0].mh.g0 = harts[0].gh
+	MOV   A1, g_m(A2)         // harts[0].gh.m = harts[0].mh
+	CSRW  (a2, MSCRATCH)
 
 	// TODO: switch to user mode
 
 	// create a new goroutine to start program
-	MOV	$runtime·mainPC(SB), A0		// entry
-	ADD	$-24, X2
-	MOV	A0, 16(X2)
-	MOV	ZERO, 8(X2)
-	MOV	ZERO, 0(X2)
-	CALL	runtime·newproc(SB)
-	ADD	$24, X2
+	MOV   $runtime·mainPC(SB), A0  // entry
+	ADD   $-24, X2
+	MOV   A0, 16(X2)
+	MOV   ZERO, 8(X2)
+	MOV   ZERO, 0(X2)
+	CALL  runtime·newproc(SB)
+	ADD   $24, X2
 
 	// start this M
-	CALL	runtime·mstart(SB)
+	CALL  runtime·mstart(SB)
 
 	UNDEF  // fail
