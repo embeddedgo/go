@@ -140,7 +140,7 @@ const (
 	_FixAllocChunk = 16 << 10 // Chunk size for FixAlloc
 
 	// Per-P, per order stack segment cache size.
-	_StackCacheSize = 32*1024*(1-_MCU) + 4*1024*_MCU
+	_StackCacheSize = 32*1024*(1-_MCU) + 4*1024*_MCU*(1+_64bit)
 
 	// Number of orders that get caching. Order 0 is FixedStack
 	// and each successive order is twice as large.
@@ -154,8 +154,9 @@ const (
 	//   windows/32       | 4KB        | 3
 	//   windows/64       | 8KB        | 2
 	//   plan9            | 4KB        | 3
-	//   MCU              | 1KB        | 2
-	_NumStackOrders = 4 - sys.PtrSize/4*sys.GoosWindows - 1*sys.GoosPlan9 - 2*_MCU
+	//   MCU/32           | 1KB        | 2
+	//   MCU/64           | 1KB        | 3
+	_NumStackOrders = 4 - sys.PtrSize/4*sys.GoosWindows - 1*sys.GoosPlan9 - (2-_64bit)*_MCU
 
 	// heapAddrBits is the number of bits in a heap address. On
 	// amd64, addresses are sign-extended beyond heapAddrBits. On
@@ -262,7 +263,7 @@ const (
 	// logHeapArenaBytes is log_2 of heapArenaBytes. For clarity,
 	// prefer using heapArenaBytes where possible (we need the
 	// constant to compute some other constants).
-	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoarchWasm)*(1-_MCU)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit)*(1-_MCU) + 14*_MCU + (2+20)*sys.GoarchWasm
+	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoarchWasm)*(1-_MCU)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit)*(1-_MCU) + (14+3*_64bit)*_MCU + (2+20)*sys.GoarchWasm
 
 	// heapArenaBitmapBytes is the size of each heap arena's bitmap.
 	heapArenaBitmapBytes = heapArenaBytes / (sys.PtrSize * 8 / 2)
@@ -489,7 +490,9 @@ func mallocinit() {
 	_g_.m.mcache = allocmcache()
 
 	// Create initial arena growth hints.
-	if sys.PtrSize == 8 {
+	if _MCU != 0 {
+		mheap_.arena.init(sysReserveMaxArena())
+	} else if sys.PtrSize == 8 {
 		// On a 64-bit machine, we pick the following hints
 		// because:
 		//
@@ -552,8 +555,6 @@ func mallocinit() {
 			hint.addr = p
 			hint.next, mheap_.arenaHints = mheap_.arenaHints, hint
 		}
-	} else if _MCU == 1 {
-		mheap_.arena.init(sysReserveMaxArena())
 	} else {
 		// On a 32-bit machine, we're much more concerned
 		// about keeping the usable heap contiguous.

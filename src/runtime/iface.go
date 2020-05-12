@@ -245,7 +245,7 @@ imethods:
 func itabsinit() {
 	lock(&itabLock)
 	if _MCU != 0 {
-		// allocate starter table, it will fit into two 256-byte pages
+		// allocate starter table
 		itabTable = (*itabTableType)(mallocgc((2+126)*sys.PtrSize, nil, true))
 		itabTable.size = 126
 	}
