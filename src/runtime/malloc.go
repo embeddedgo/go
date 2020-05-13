@@ -129,9 +129,11 @@ const (
 	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
 	_64bit = 1 << (^uintptr(0) >> 63) / 2
 
-	_ARMv7M = sys.GoosNoos * sys.GoarchThumb
-	_RV64G  = sys.GoosNoos * sys.GoarchRiscv64
-	_MCU    = _ARMv7M + _RV64G
+	_ARMv7M     = sys.GoosNoos * sys.GoarchThumb
+	_RV64G      = sys.GoosNoos * sys.GoarchRiscv64
+	_MCU        = _ARMv7M + _RV64G
+	logMemScale = 0*_ARMv7M + 3*_RV64G
+	memScale    = 1 << logMemScale
 
 	// Tiny allocator parameters, see "Tiny allocator" comment in malloc.go.
 	_TinySize      = 16
@@ -140,7 +142,7 @@ const (
 	_FixAllocChunk = 16 << 10 // Chunk size for FixAlloc
 
 	// Per-P, per order stack segment cache size.
-	_StackCacheSize = 32*1024*(1-_MCU) + 4*1024*_MCU*(1+_64bit)
+	_StackCacheSize = 32*1024*(1-_MCU) + 4*1024*(1+memScale/2)*_MCU
 
 	// Number of orders that get caching. Order 0 is FixedStack
 	// and each successive order is twice as large.
@@ -155,8 +157,8 @@ const (
 	//   windows/64       | 8KB        | 2
 	//   plan9            | 4KB        | 3
 	//   MCU/32           | 1KB        | 2
-	//   MCU/64           | 1KB        | 3
-	_NumStackOrders = 4 - sys.PtrSize/4*sys.GoosWindows - 1*sys.GoosPlan9 - (2-_64bit)*_MCU
+	//   MCU/64           | 2KB        | 3
+	_NumStackOrders = 4 - sys.PtrSize/4*sys.GoosWindows - 1*sys.GoosPlan9 - (2-logMemScale/8)*_MCU
 
 	// heapAddrBits is the number of bits in a heap address. On
 	// amd64, addresses are sign-extended beyond heapAddrBits. On
@@ -263,7 +265,7 @@ const (
 	// logHeapArenaBytes is log_2 of heapArenaBytes. For clarity,
 	// prefer using heapArenaBytes where possible (we need the
 	// constant to compute some other constants).
-	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoarchWasm)*(1-_MCU)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit)*(1-_MCU) + (14+3*_64bit)*_MCU + (2+20)*sys.GoarchWasm
+	logHeapArenaBytes = (6+20)*(_64bit*(1-sys.GoosWindows)*(1-sys.GoarchWasm)*(1-_MCU)) + (2+20)*(_64bit*sys.GoosWindows) + (2+20)*(1-_64bit)*(1-_MCU) + (14+logMemScale)*_MCU + (2+20)*sys.GoarchWasm
 
 	// heapArenaBitmapBytes is the size of each heap arena's bitmap.
 	heapArenaBitmapBytes = heapArenaBytes / (sys.PtrSize * 8 / 2)

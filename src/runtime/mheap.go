@@ -1786,7 +1786,7 @@ func (b *gcBits) bitp(n uintptr) (bytep *uint8, mask uint8) {
 	return b.bytep(n / 8), 1 << (n % 8)
 }
 
-const gcBitsChunkBytes = uintptr((64*(1-_MCU) + 2*_MCU*(1+_64bit)) << 10)
+const gcBitsChunkBytes = uintptr((64*(1-_MCU) + 2*memScale*_MCU) << 10)
 const gcBitsHeaderBytes = unsafe.Sizeof(gcBitsHeader{})
 
 type gcBitsHeader struct {

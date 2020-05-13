@@ -43,8 +43,8 @@ type gcSweepBuf struct {
 }
 
 const (
-	gcSweepBlockEntries    = 512*(1-_MCU) + 64*_MCU*(1+_64bit) // 4KB on 64-bit
-	gcSweepBufInitSpineCap = 256*(1-_MCU) + 64*_MCU            // Enough for 1GB heap on 64-bit
+	gcSweepBlockEntries    = 512*(1-_MCU) + 64*memScale*_MCU // 4KB on 64-bit
+	gcSweepBufInitSpineCap = 256*(1-_MCU) + 64*_MCU          // Enough for 1GB heap on 64-bit
 )
 
 type gcSweepBlock struct {

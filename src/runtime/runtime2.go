@@ -572,7 +572,7 @@ type p struct {
 	// Queue of runnable goroutines. Accessed without lock.
 	runqhead uint32
 	runqtail uint32
-	runq     [256*(1-_MCU) + 64*_MCU]guintptr
+	runq     [256*(1-_MCU) + 64*(1+logMemScale/2)*_MCU]guintptr
 	// runnext, if non-nil, is a runnable G that was ready'd by
 	// the current G and should be run next instead of what's in
 	// runq if there's time remaining in the running G's time

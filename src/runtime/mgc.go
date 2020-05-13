@@ -137,7 +137,7 @@ import (
 const (
 	_DebugGC         = 0
 	_ConcurrentSweep = true
-	_FinBlockSize    = 4*1024*(1-_MCU) + 512*_MCU*(1+_64bit)
+	_FinBlockSize    = 4*1024*(1-_MCU) + 256*memScale*_MCU
 
 	// debugScanConservative enables debug logging for stack
 	// frames that are scanned conservatively.
@@ -146,7 +146,7 @@ const (
 	// sweepMinHeapDistance is a lower bound on the heap distance
 	// (in bytes) reserved for concurrent sweeping between GC
 	// cycles.
-	sweepMinHeapDistance = 1024*1024*(1-_MCU) + 1024*_MCU*(1+_64bit)
+	sweepMinHeapDistance = 1024*1024*(1-_MCU) + 1024*memScale*_MCU
 )
 
 // heapminimum is the minimum heap size at which to trigger GC.
@@ -164,7 +164,7 @@ const (
 var heapminimum uint64 = defaultHeapMinimum
 
 // defaultHeapMinimum is the value of heapminimum for GOGC==100.
-const defaultHeapMinimum = 4<<20*(1-_MCU) + 8<<10*_MCU*(1+_64bit)
+const defaultHeapMinimum = 4<<20*(1-_MCU) + 8<<10*memScale*_MCU
 
 // Initialized from $GOGC.  GOGC=off means no GC.
 var gcpercent int32
@@ -428,8 +428,8 @@ func (c *gcControllerState) startCycle() {
 	// GOGC. Assist is proportional to this distance, so enforce a
 	// minimum distance, even if it means going over the GOGC goal
 	// by a tiny bit.
-	if memstats.next_gc < memstats.heap_live+1024*1024*(1-_MCU)+1024*_MCU*(1+_64bit) {
-		memstats.next_gc = memstats.heap_live + 1024*1024*(1-_MCU) + 1024*_MCU*(1+_64bit)
+	if memstats.next_gc < memstats.heap_live+1024*1024*(1-_MCU)+1024*memScale*_MCU {
+		memstats.next_gc = memstats.heap_live + 1024*1024*(1-_MCU) + 1024*memScale*_MCU
 	}
 
 	// Compute the background mark utilization goal. In general,
