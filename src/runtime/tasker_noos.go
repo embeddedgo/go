@@ -34,8 +34,8 @@ import (
 // Tasker does not define new fields in m but reuses unused ones:
 //
 // - tls[0:4], ncgocall, thread: used by mq, msl, mcl types (see mq.go),
-// - tls[4:6] and the space from libcall to the end of m struct: used by
-//   architecture-specific code (see: tasker_GOARCH.go),
+// - tls[4:6] and some other unused fields are used by architecture-specific code
+//   (see: tasker_GOARCH.go),
 // - cgoCallersUse, caughtsig : used by tasker.
 //
 // Tasker relies on the following architecture-specific functions:

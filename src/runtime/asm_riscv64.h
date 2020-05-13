@@ -21,6 +21,12 @@
 
 #define MHARTID  0xF14
 
+// mstatus field offsets
+
+#define MIEn  3
+#define MPIEn 7
+#define FSn  13
+
 // instructinos not implemented by assembly
 
 #define WFI  WORD $0x10500073

@@ -21,22 +21,34 @@
 #define HSTACK_SIZE 4*1024 // size of stack usesd by trap handlers
 #define PALLOC_MIN 64*1024
 
-
 TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
 	// initialize all running cores
 
 	CSRWI  (0, MIE)
-	CSRWI  (0, MIDELEG)
-	CSRWI  (0, MEDELEG)
-	CSRWI  (0, FCSR)
-	CSRWI  (0, MSCRATCH)
-
 	MOV   $·trapHandler(SB), S0
 	CSRW  (s0, MTVEC)
+	
+	// Disable interrupts and enable FPU (Kendryte K210 supports only
+	// FS=0(off)/3(dirty), this is a weakness of the Rocket Chip Generator used
+	// to generate K210 cores).
+	MOV   $0x7FFF, S0
+	CSRC  (s0, MSTATUS)
+	MOV   $(1<<FSn + 1<<MIEn), S0
+	CSRS  (s0, MSTATUS)
 
-	MOV   $(1<<13+1<<7), S0  // FS=1(initial), MPIE=1
-	CSRW  (s0, MSTATUS)
+	CSRWI  (0, MIDELEG)
+	CSRWI  (0, MEDELEG)
+	CSRWI  (0, MSCRATCH)
+	CSRWI  (0, FCSR)
+
+	//MOV  ZERO, X1
+	//...
+	//MOV  ZERO, X32
+	//
+	//FCVTDL  ZERO, F0
+	//...
+	//FCVTDL  ZERO, F31
 
 	// park excess harts
 	CSRR  (MHARTID, s0)
@@ -97,7 +109,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOVW  A1, (g_stack+stack_lo)(g)
 	MOVW  X2, (g_stack+stack_hi)(g)
 
-	// **** TODO: other harts should go the scheduler now (rearange this) ****
+	// **** TODO: other harts should go the scheduler here (rearange this) ****
 
 	// set up m0 (bootstrap thread), temporarily use harts[0].gh as g
 	MOV  $runtime·m0(SB), A1
@@ -171,20 +183,25 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV  A1, g_m(A0)   // newg.m = m0
 
 	// newg stack pointer to X2
-	MOV  (g_stack+stack_hi)(A0), A1
-	MOV  A1, X2
+	MOV  (g_stack+stack_hi)(A0), X2
 
-	MOV  g, A2
+	MOV  g, A1
 	MOV  A0, g
 
 	// fix harts[0].gh, harts[0].mh
 
-	ADD   $cpuctx_mh, A2, A1  // A2 points to harts[0](.gh)
-	MOV   A2, m_g0(A1)        // harts[0].mh.g0 = harts[0].gh
-	MOV   A1, g_m(A2)         // harts[0].gh.m = harts[0].mh
-	CSRW  (a2, MSCRATCH)
+	ADD   $cpuctx_mh, A1, A0
+	MOV   A1, m_g0(A0)  // harts[0].mh.g0 = harts[0].gh
+	MOV   A0, g_m(A1)   // harts[0].gh.m = harts[0].mh
+	CSRW  (a1, MSCRATCH)
 
-	// TODO: switch to user mode
+	// enable interrupts and switch to user mode
+	MOV    $0x888, A0
+	CSRW   (a0, MIE)
+	AUIPC  $0, A0
+	ADD    $16, A0  // A0 must point just after MRET
+	CSRW   (a0, MEPC)
+	MRET
 
 	// create a new goroutine to start program
 	MOV   $runtime·mainPC(SB), A0  // entry

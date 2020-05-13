@@ -79,8 +79,11 @@ TEXT ·setsystim1(SB),NOSPLIT|NOFRAME,$0-0
 
 
 // func newosproc(mp *m)
-TEXT ·newosproc(SB),NOSPLIT|NOFRAME,$0-4
-	EBREAK
+TEXT ·newosproc(SB),NOSPLIT|NOFRAME,$0-8
+	MOV  $SYS_newosproc, A3
+	MOV  $(8+8), A4
+	MOV  $0, A5
+	ECALL
 	RET
 
 // func exitThread(wait *uint32)

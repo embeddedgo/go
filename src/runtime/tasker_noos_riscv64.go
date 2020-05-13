@@ -35,19 +35,32 @@ func taskerinit() {
 
 // m.tls fields
 
-const mstatus = 4
-const mepc = 5
+const (
+	mstatus = 4 // privilege level, small context flag
+	mepc    = 5
+
+	thrSmallCtx = 1 << 4 // context saved in mOS contains only LR, SP, g registers
+
+	numGPRS = 27 // must be in sync with saveRegs function
+
+)
 
 type mOS struct {
-	x    [31]uint64 // x1-x31
-	fcsr uint64
+	x    [numGPRS]uintptr
 	f    [32]float64
+	fcsr uint64
+}
+
+func archnewm(m *m) {
+	m.tls[mstatus] = thrSmallCtx
+	m.tls[mepc] = funcPC(mstart)
+	m.x[1] = m.g0.stack.hi                 // SP
+	m.x[2] = uintptr(unsafe.Pointer(m.g0)) // g
 }
 
 func curcpuSleep()                                         { breakpoint() }
 func curcpuSavectxSched()                                  { breakpoint() }
 func curcpuWakeup()                                        { breakpoint() }
-func archnewm(m *m)                                        { breakpoint() }
 func curcpuSchedule()                                      { breakpoint() }
 func curcpuSavectxCall()                                   { breakpoint() }
 func (cpu *cpuctx) wakeup()                                { breakpoint() }
