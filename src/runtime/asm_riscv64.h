@@ -3,34 +3,40 @@
 
 // CSRs
 
-#define FFLAGS   0x001
-#define FRM      0x002
-#define FCSR     0x003 // FFLAGS + FRM
+#define fflags   0x001
+#define frm      0x002
+#define fcsr     0x003 // fflags + frm
 
-#define MSTATUS  0x300
-#define MEDELEG  0x302
-#define MIDELEG  0x303
-#define MIE      0x304
-#define MTVEC    0x305
+#define mstatus  0x300
+#define medeleg  0x302
+#define mideleg  0x303
+#define mie      0x304
+#define mtvec    0x305
 
-#define MSCRATCH 0x340
-#define MEPC     0x341
-#define MCAUSE   0x342
-#define MTVAL    0x343
-#define MIP      0x344
+#define mscratch 0x340
+#define mepc     0x341
+#define mcause   0x342
+#define mtval    0x343
+#define mip      0x344
 
-#define MHARTID  0xF14
+#define mhartid  0xF14
 
 // mstatus field offsets
 
 #define MIEn  3
 #define MPIEn 7
+#define MPPn 11
 #define FSn  13
+
+// core peripherals
+
+#define CLINT_BASE 0x2000000 // true for QEMU, K210 but not standardized
 
 // instructinos not implemented by assembly
 
-#define WFI  WORD $0x10500073
-#define MRET WORD $0x30200073
+#define WFI   WORD $0x10500073
+#define MRET  WORD $0x30200073
+#define FENCE WORD $0x0ff0000f
 
 #define CSRW(RS,CSR)     WORD $(0x1073 + RS<<15 + CSR<<20)
 #define CSRR(CSR,RD)     WORD $(0x2073 + RD<<7 + CSR<<20)
@@ -44,7 +50,7 @@
 #define CSRRWI(U5,CSR,RD) WORD $(0x5073 + RD<<7 + U5<<15 + CSR<<20)
 #define CSRRCI(U5,CSR,RD) WORD $(0x7073 + RD<<7 + U5<<15 + CSR<<20)
 
-// register numbers for CSR* macros
+// register numbers for above CSR* macros
 
 #define zero 0
 #define lr   1

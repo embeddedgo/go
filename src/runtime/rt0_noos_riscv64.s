@@ -9,38 +9,40 @@
 #include "asm_riscv64.h"
 
 
-// Prefer S0-X15 registers (S0, S1, A0-A5) to allow 16-bit instructions if C
-// extension (compressed instruction-set) will be supported. By the convention
-// we use An for addresses and addressing related things, Sn for numbers.
+// Prefer X8-X15 registers (S0, S1, A0-A5) to allow compressed instructions if
+// compiler will support C extension. By the convention An registers are
+// preffered for addresses and addressing related things, Sn for numbers and
+// other things..
 //
-// The gdb and objdump use C ABI names (Tn, An, Sn, ...) by default. In most
+// The gdb and objdump use C ABI names for registers (Tn, An, Sn, ...). In most
 // cases there is imposible to make them print Xn names so we use C ABI names
-// in RISC-V assembly except X2 (stack pointer) and g (X4).
+// in RISC-V assembly except  LR (RA), X2 (stack pointer), g (X4) and TMP (T6).
 
 
-#define HSTACK_SIZE 4*1024 // size of stack usesd by trap handlers
-#define PALLOC_MIN 64*1024
+#define handlerStackSize 4*1024 // size of stack usesd by trap handlers
+#define persistAllocMin 64*1024
 
+// _rt0_riscv64_noos initializs all running cores
 TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
-	// initialize all running cores
+	// disable interrupts, set temporary trap handler
+	CSRWI  (0, mie)
+	MOV    $·defaultHandler(SB), S0
+	CSRW   (s0, mtvec)
 
-	CSRWI  (0, MIE)
-	MOV   $·trapHandler(SB), S0
-	CSRW  (s0, MTVEC)
-	
-	// Disable interrupts and enable FPU (Kendryte K210 supports only
+	// Set MIE (global machine interrupt enable bit, interrupts are still
+	// disabled in mie register), enable FPU (Kendryte K210 supports only
 	// FS=0(off)/3(dirty), this is a weakness of the Rocket Chip Generator used
 	// to generate K210 cores).
 	MOV   $0x7FFF, S0
-	CSRC  (s0, MSTATUS)
+	CSRC  (s0, mstatus)
 	MOV   $(1<<FSn + 1<<MIEn), S0
-	CSRS  (s0, MSTATUS)
+	CSRS  (s0, mstatus)
 
-	CSRWI  (0, MIDELEG)
-	CSRWI  (0, MEDELEG)
-	CSRWI  (0, MSCRATCH)
-	CSRWI  (0, FCSR)
+	CSRWI  (0, mideleg)
+	CSRWI  (0, medeleg)
+	CSRWI  (0, mscratch)
+	CSRWI  (0, fcsr)
 
 	//MOV  ZERO, X1
 	//...
@@ -51,7 +53,7 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	//FCVTDL  ZERO, F31
 
 	// park excess harts
-	CSRR  (MHARTID, s0)
+	CSRR  (mhartid, s0)
 	MOV   $const_maxHarts, S1
 	BGE   S0, S1, parkHart
 
@@ -59,11 +61,11 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
 	// ensure stacks are 16 byte aligned (may be required in the future)
 	MOV  $runtime·end(SB), A0
-	ADD  $(HSTACK_SIZE+15), A0
+	ADD  $(handlerStackSize+15), A0
 	AND  $~15, A0
 
 	// set handler SP for this hart
-	MOV  $HSTACK_SIZE, A1
+	MOV  $handlerStackSize, A1
 	MUL  S0, A1, A2
 	ADD  A2, A0, X2
 
@@ -71,45 +73,45 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	BNE  ZERO, S0, parkHart
 
 	// clear the BSS and the whole unallocated memory
-
+	ADD   $-24, X2
 	MOV   $runtime·bss(SB), A0
 	MOV   $runtime·ramend(SB), A1
 	SUB   A0, A1
-	ADD   $-24, X2
 	MOV   ZERO, 0(X2)
 	MOV   A0, 8(X2)
 	MOV   A1, 16(X2)
 	CALL  runtime·memclrNoHeapPointers(SB)
-
 	MOV   $runtime·nodmastart(SB), A0
 	MOV   $runtime·nodmaend(SB), A1
 	SUB   A0, A1
 	MOV   A0, 8(X2)
 	MOV   A1, 16(X2)
 	CALL  runtime·memclrNoHeapPointers(SB)
+	ADD   $24, X2
 
-	ADD  $24, X2
+	// setup handler stack in harts[mhartid].gh
+	MOV   $runtime·harts(SB), g
+	MOV   $cpuctx__size, A1
+	CSRR  (mhartid, s0)
+	MUL   S0, A1
+	ADD   A1, g  // gh is the first field of the cpuctx struct
+	ADD   $-handlerStackSize, X2, A1
+	MOVW  A1, (g_stack+stack_lo)(g)
+	MOVW  X2, (g_stack+stack_hi)(g)
 
-	JMP  runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
+	// as we have SP and g set we can set real trap handler in mtvec
+	MOV   $·trapHandler(SB), S0
+	CSRW  (s0, mtvec)
+
+	JMP  runtime·rt0_go(SB)
 
 parkHart:
 	WFI
 	JMP  parkHart
 
 
+// rt0_go is known as top of a goroutine stack
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
-
-	// setup handler stack in harts[mhartid].gh
-	MOV   $runtime·harts(SB), g
-	MOV   $cpuctx__size, A1
-	CSRR  (MHARTID, s0)
-	MUL   S0, A1
-	ADD   A1, g                  // gh is the first field of the cpuctx struct
-	ADD   $-HSTACK_SIZE, X2, A1  // stack_lo
-	MOVW  A1, (g_stack+stack_lo)(g)
-	MOVW  X2, (g_stack+stack_hi)(g)
-
-	// **** TODO: other harts should go the scheduler here (rearange this) ****
 
 	// set up m0 (bootstrap thread), temporarily use harts[0].gh as g
 	MOV  $runtime·m0(SB), A1
@@ -123,7 +125,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// calculate the beginning of free memory (just after handler stacks)
 	MOV  $runtime·end(SB), A0
-	ADD  $(const_maxHarts*HSTACK_SIZE+15), A0
+	ADD  $(const_maxHarts*handlerStackSize+15), A0
 	AND  $~15, A0
 	MOV  $runtime·ramend(SB), A1
 	SUB  A0, A1, A5  // size of available memory (DMA capable)
@@ -132,7 +134,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	SRL  $(const__PageShift+2), A5, A4
 	MOV  $mspan__size, A2
 	MUL  A2, A4
-	ADD  $PALLOC_MIN, A4
+	ADD  $persistAllocMin, A4
 
 	MOV  $runtime·nodmastart(SB), A2
 	MOV  $runtime·nodmaend(SB), A3
@@ -193,17 +195,29 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	ADD   $cpuctx_mh, A1, A0
 	MOV   A1, m_g0(A0)  // harts[0].mh.g0 = harts[0].gh
 	MOV   A0, g_m(A1)   // harts[0].gh.m = harts[0].mh
-	CSRW  (a1, MSCRATCH)
+	CSRW  (a1, mscratch)
 
-	// enable interrupts and switch to user mode
-	MOV    $0x888, A0
-	CSRW   (a0, MIE)
+	// disable interrupts globally to safely set mie, mstatus, mepc
+	CSRCI  ((1<<MIEn), mstatus)
+
+	// enable software and external interrupts
+	MOV    $0x808, A0
+	CSRW   (a0, mie)
+
+	// switch to user mode
+	MOV    $(1<<MPIEn), A0
+	CSRS   (a0, mstatus)
 	AUIPC  $0, A0
 	ADD    $16, A0  // A0 must point just after MRET
-	CSRW   (a0, MEPC)
+	CSRW   (a0, mepc)
 	MRET
 
-	// create a new goroutine to start program
+	// K210: Don't be surprised the MIE is cleared though we set the MPIE before
+	// MRET. It's described in RISC-V 1.9.1 spec (changed in 1.10 and fixed in
+	// Rocket Chip by 29414f3a239174201938a345ac8565726892fdbb commit). Despite
+	// this, machine mode interrupts are globally enabled because we are now in
+	// user mode.
+
 	MOV   $runtime·mainPC(SB), A0  // entry
 	ADD   $-24, X2
 	MOV   A0, 16(X2)
