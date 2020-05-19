@@ -15,6 +15,24 @@ import (
 )
 
 func gentext(ctxt *ld.Link) {
+	if ctxt.HeadType == objabi.Hnoos {
+		// move entry symbol on the beggining of text segment
+		entry := ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABI0)
+		if entry == nil || entry.FuncInfo == nil {
+			entry = ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABIInternal)
+			if entry == nil || entry.FuncInfo == nil {
+				ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
+			}
+		}
+		for i, s := range ctxt.Textp {
+			if s == entry {
+				copy(ctxt.Textp[1:], ctxt.Textp[:i])
+				ctxt.Textp[0] = s
+				return
+			}
+		}
+		ld.Errorf(entry, "cannot find symbol in ctxt.Textp")
+	}
 }
 
 func adddynrela(ctxt *ld.Link, rel *sym.Symbol, s *sym.Symbol, r *sym.Reloc) {
