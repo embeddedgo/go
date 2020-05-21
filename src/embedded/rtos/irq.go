@@ -4,30 +4,33 @@
 
 package rtos
 
-// Package rtos defines a seven well known interrupt priority levels ordered by
-// increasing urgency as follows: IntPrioLowest, IntPrioLow, IntPrioSysCall,
-// IntPrioMid, IntPrioSysTimer, IntPrioHigh, IntPrioHighest. There can be
-// additional priority levels between the defined ones and some can have the
-// same level. You can use ordinary equality operators to compare priority
-// levels.
+// Package rtos defines seven well known interrupt priority levels among which
+// five are ordered by increasing urgency as follows: IntPrioLowest, IntPrioLow,
+// IntPrioMid, IntPrioHigh, IntPrioHighest. There can be additional priority
+// levels between the defined ones and some or all of them can have the same
+// effecive level.
 //
-// The architecture specific code should provide (if possible) at least four
-// different real priority levels so the defined levels can satisfy the
-// following inequality:
+// You can use ordinary equality operators to compare interrupt priority levels.
+// The defined priority levels satisfy the following inequality:
 //
-// Lowest <= Low < SysCall < IntPrioMid <= SysTimer < High <= Highest
+// Lowest <= Low <= IntPrioMid <= High <= Highest
 //
-// Architecture that supports interrupt nesting must ensure that the incoming
+// Architecture that supports interrupt nesting must ensure the incoming
 // interrupt request can not preempt the interrupt handler that runs with the
 // same or higher priority.
+//
+// The IntPrioSysCall and IntPrioSysTimer are special priority levels. Do not
+// use them to set or calclulate an interrupt priority if they are outside the
+// [IntPrioLowest, IntPrioHighest] range.
 const (
-	IntPrioHighest  = intPrioHighest
-	IntPrioHigh     = intPrioHigh
-	IntPrioSysTimer = intPrioSysTimer
-	IntPrioMid      = intPrioMid
+	IntPrioHighest = intPrioHighest
+	IntPrioHigh    = intPrioHigh
+	IntPrioMid     = intPrioMid
+	IntPrioLow     = intPrioLow
+	IntPrioLowest  = intPrioLowest
+
 	IntPrioSysCall  = intPrioSysCall
-	IntPrioLow      = intPrioLow
-	IntPrioLowest   = intPrioLowest
+	IntPrioSysTimer = intPrioSysTimer
 
 	IntPrioCurrent = intPrioCurrent
 )

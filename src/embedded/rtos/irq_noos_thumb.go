@@ -13,4 +13,6 @@ const (
 	intPrioLow      = 255 - 5<<5
 	intPrioLowest   = 255 - 6<<5
 	intPrioPendSV   = 255 - 255 // unusable because can not wake the scheduler
+
+	intPrioCurrent = -1
 )

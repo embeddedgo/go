@@ -71,7 +71,6 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 // MEI, MTI, MSI
 //
 // We don't support supervisor or user mode interrupts.
-
 TEXT runtime·trapHandler(SB),NOSPLIT|NOFRAME,$0
 	// At this point the interrupts are globaly disabled (mstatus.MIE=0).
 	// We want to enable higher priority interrupts as soon as possible.
@@ -91,15 +90,15 @@ nestedTrap:
 	// save trap context, free another register (LR)
 	ADD     $-trapCtxSize, X2
 	MOV     LR, _LR(X2)
-	SLTU    A0, ZERO, A0  // calculate fromThread flag
-	CSRR    (mepc, lr)
-	OR      LR, A0
-	MOV     A0, _mepc(X2)
+	SLTU    A0, ZERO, LR       // calculate fromThread flag
 	CSRRWI  (0, mscratch, a0)  // set mscratch=0
 	MOV     A0, _A0(X2)        // save original A0 content
 	CSRR    (mstatus, a0)
 	OR      $(1<<MPIEn), A0  // fix RISC-V <1.10 behavior if trap from user mode
 	MOV     A0, _mstatus(X2)
+	CSRR    (mepc, a0)
+	OR      LR, A0
+	MOV     A0, _mepc(X2)
 	// mie will be saved below
 
 	// mask same or lower priority interrupts (always mask software interrupts)
@@ -141,6 +140,33 @@ unsupported:
 	EBREAK
 	JMP  -1(PC)
 
+
+TEXT runtime·interruptReturn(SB),NOSPLIT|NOFRAME,$0
+	MOV  _LR(X2), LR  // restore LR
+
+	// restore CSRs
+	MOV   _mstatus(X2), A0
+	CSRW  (a0, mstatus)  // disables interrupts
+	MOV   _mie(X2), A0
+	CSRW  (a0, mie)
+	MOV   _mepc(X2), A0
+	CSRW  (a0, mepc)
+	AND   $1, A0
+	BEQ   ZERO, A0, returnToHandler
+
+	// return to thread
+	MOV   _A0(X2), A0                // restore A0
+	CSRW  (G, mscratch)              // cpuctx to mscratch
+	MOV   (g_sched+gobuf_sp)(g), X2  // restore thread SP
+	MOV   (g_sched+gobuf_g)(g), g    // restore thread g
+	MRET
+
+returnToHandler:
+	MOV  _A0(X2), A0  // restore A0
+	ADD  $trapCtxSize, X2
+	MRET
+
+
 TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
 	// if cpuctx.exe == nil then context saved by environmentCallHandler
@@ -170,9 +196,9 @@ contextSaved:
 	// clear software interrupt
 	MOV    $CLINT_BASE, A0
 	CSRR   (mhartid, a1)
-	SLL    $3, A1
+	SLL    $2, A1  // MSIP registers are 32-bit
 	ADD    A1, A0
-	MOV    ZERO, (A0)
+	MOVW   ZERO, (A0)
 	FENCE  // ensure clearing happens before checking nanotime and futexes
 
 	// enter scheduler
@@ -227,13 +253,22 @@ smallCtx:
 
 
 TEXT runtime·timerInterruptHandler(SB),NOSPLIT|NOFRAME,$0
-	EBREAK
-	JMP  -1(PC)
+
+	// rise software interrupt
+	MOV   $CLINT_BASE, A0
+	CSRR  (mhartid, lr)
+	SLL   $2, LR  // MSIP registers are 32-bit
+	ADD   LR, A0
+	MOV   $1, LR
+	MOVW  LR, (A0)
+
+	JMP  ·interruptReturn(SB)
 
 
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	EBREAK
 	JMP  -1(PC)
+	JMP  ·interruptReturn(SB)
 
 
 // System call is like oridnary function call so all registers except LR are
@@ -243,7 +278,6 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 // A3: syscall number
 // A4: argument data size on the stack (+8 for frame-pointer)
 // A5: return data size on the stack
-//
 TEXT runtime·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 
 	// check the syscall number

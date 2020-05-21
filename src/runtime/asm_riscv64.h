@@ -28,6 +28,12 @@
 #define MPPn 11
 #define FSn  13
 
+// mip/mie bits
+
+#define MSI 1<<3
+#define MTI 1<<7
+#define MEI 1<<11
+
 // core peripherals
 
 #define CLINT_BASE 0x2000000 // true for QEMU, K210 but not standardized

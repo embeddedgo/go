@@ -201,8 +201,8 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	CSRCI  ((1<<MIEn), mstatus)
 
 	// enable software and external interrupts
-	MOV    $0x808, A0
-	CSRW   (a0, mie)
+	MOV   $(MSI+MEI), A0
+	CSRW  (a0, mie)
 
 	// switch to user mode
 	MOV    $(1<<MPIEn), A0
