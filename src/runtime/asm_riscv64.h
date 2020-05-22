@@ -37,6 +37,9 @@
 // core peripherals
 
 #define CLINT_BASE 0x2000000 // true for QEMU, K210 but not standardized
+#define msip     (CLINT_BASE + 0x0000)
+#define mtimecmp (CLINT_BASE + 0x4000)
+#define mtime    (CLINT_BASE + 0xBFF8)
 
 // instructinos not implemented by assembly
 

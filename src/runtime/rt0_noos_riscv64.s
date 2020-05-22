@@ -22,18 +22,21 @@
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
 #define persistAllocMin 64*1024
 
+DATA runtime·waitInit+(0*8)(SB)/4, $1
+GLOBL runtime·waitInit(SB), NOPTR, $4
+
 // _rt0_riscv64_noos initializs all running cores
 TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
-	// disable interrupts, set temporary trap handler
+	// Disable interrupts locally and set a temporary trap handler.
 	CSRWI  (0, mie)
 	MOV    $·defaultHandler(SB), S0
 	CSRW   (s0, mtvec)
 
-	// Set MIE (global machine interrupt enable bit, interrupts are still
-	// disabled in mie register), enable FPU (Kendryte K210 supports only
-	// FS=0(off)/3(dirty), this is a weakness of the Rocket Chip Generator used
-	// to generate K210 cores).
+	// Enable interrupts globally (interrupts are still disabled in mie
+	// register) and enable FPU (Kendryte K210 supports only FS=0(off)/3(dirty),
+	// this is a weakness of the Rocket Chip Generator used to generate K210
+	// cores).
 	MOV   $0x7FFF, S0
 	CSRC  (s0, mstatus)
 	MOV   $(1<<FSn + 1<<MIEn), S0
@@ -69,8 +72,27 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	MUL  S0, A1, A2
 	ADD  A2, A0, X2
 
-	// only hart0 does further initialisation
-	BNE  ZERO, S0, parkHart
+	// clear msip register
+	MOV   $msip, A0
+	SLL   $2, S0, A1
+	ADD   A1, A0
+	MOVW  ZERO, (A0)
+
+	// set mtimecmp to maximum value
+	MOV  $mtimecmp, A0
+	SLL  $3, S0, A1
+	ADD  A1, A0
+	MOV  $-1, A1
+	MOV  A1, (A0)
+
+	// other harts have to wait for hart0 to initaialize all shared components
+	BNE  ZERO, S0, waitInit
+
+	// clear mtime register
+	MOV  $mtime, A0
+	SLL  $3, S0, A1
+	ADD  A1, A0
+	MOV  ZERO, (A0)
 
 	// clear the BSS and the whole unallocated memory
 	ADD   $-24, X2
@@ -89,6 +111,12 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	CALL  runtime·memclrNoHeapPointers(SB)
 	ADD   $24, X2
 
+continue:
+
+	// can enable software and timer interrupts
+	MOV   $(MSI+MTI), S1
+	CSRW  (s1, mie)
+
 	// setup handler stack in harts[mhartid].gh
 	MOV   $runtime·harts(SB), g
 	MOV   $cpuctx__size, A1
@@ -103,14 +131,22 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	MOV   $·trapHandler(SB), S0
 	CSRW  (s0, mtvec)
 
+	BNE  ZERO, S0, parkHart
+
 	JMP  runtime·rt0_go(SB)
+
+waitInit:
+	MOV   $·waitInit(SB), A0
+	MOVW  (A0), S1
+	BEQ   ZERO, S1, continue
+	JMP   -2(PC)
 
 parkHart:
 	WFI
 	JMP  parkHart
 
 
-// rt0_go is known as top of a goroutine stack
+// rt0_go is known as top level function
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// set up m0 (bootstrap thread), temporarily use harts[0].gh as g
@@ -199,10 +235,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// disable interrupts globally to safely set mie, mstatus, mepc
 	CSRCI  ((1<<MIEn), mstatus)
-
-	// enable software and external interrupts
-	MOV   $(MSI+MEI), A0
-	CSRW  (a0, mie)
 
 	// switch to user mode
 	MOV    $(1<<MPIEn), A0

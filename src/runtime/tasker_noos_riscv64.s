@@ -194,9 +194,9 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
 contextSaved:
 	// clear software interrupt
-	MOV    $CLINT_BASE, A0
+	MOV    $msip, A0
 	CSRR   (mhartid, a1)
-	SLL    $2, A1  // MSIP registers are 32-bit
+	SLL    $2, A1  // msip registers are 32-bit
 	ADD    A1, A0
 	MOVW   ZERO, (A0)
 	FENCE  // ensure clearing happens before checking nanotime and futexes
@@ -255,9 +255,9 @@ smallCtx:
 TEXT runtime·timerInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
 	// rise software interrupt
-	MOV   $CLINT_BASE, A0
+	MOV   $msip, A0
 	CSRR  (mhartid, lr)
-	SLL   $2, LR  // MSIP registers are 32-bit
+	SLL   $2, LR  // msip registers are 32-bit
 	ADD   LR, A0
 	MOV   $1, LR
 	MOVW  LR, (A0)
