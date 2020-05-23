@@ -11,7 +11,14 @@ import (
 
 func cpuid() int
 func curcpuSavectxSched()
+func curcpuSleep()
+func curcpuWakeup()      {}
 func curcpuSavectxCall() {} // all registars saved on caller's stack
+
+//go:nosplit
+func (cpu *cpuctx) wakeup() {
+	clint.CLINT().MSIP[cpu.id()].Store(1)
+}
 
 //go:nosplit
 func curcpuSchedule() {
@@ -30,7 +37,7 @@ func curcpuSchedule() {
 	// more space on the handler stack) or leave this function unchanged but
 	// check the mstatus.MSIP flag before return from the environmentCallHandler
 	// and run the scheduler if the software interrupt is pending.
-	clint.CLINT().MSIP[cpuid()].Store(1)
+	curcpu().wakeup()
 }
 
 const thrSmallCtx = 1 // context saved in mOS contains only LR, SP, g
@@ -64,7 +71,7 @@ func taskerinit() {
 		*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(uharts))
 		allcpu.len = 1
 		allcpu.cap = maxHarts
-		getcpuctx().exe.set(getg().m)
+		curcpu().exe.set(getg().m)
 	}
 }
 
@@ -82,9 +89,7 @@ type mOS struct {
 	f    [32]float64
 }
 
-func curcpuSleep()                                         { breakpoint() }
-func curcpuWakeup()                                        { breakpoint() }
-func (cpu *cpuctx) wakeup()                                { breakpoint() }
+func syssetprivlevel(newlevel int) (oldlevel, errno int)
+
 func sysirqctl(irq, ctl int) (enabled, prio, errno int)    { breakpoint(); return }
-func syssetprivlevel(newlevel int) (oldlevel, errno int)   { breakpoint(); return }
 func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 { breakpoint(); return -1 }

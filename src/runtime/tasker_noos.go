@@ -92,6 +92,8 @@ type cpuctx struct {
 	mh       m               // for ISRs, mostly not written so works as cache line pad
 }
 
+func (cpu *cpuctx) id() int { return int(cpu.gh.goid) }
+
 type tasker struct {
 	allcpu   []*cpuctx
 	waitingf [fbnum]mcl // threads waiting on futex
@@ -122,11 +124,11 @@ func (t *tasker) fbucketbyaddr(addr uintptr) *mcl {
 // intrinsic function, often compiled to 0 or 1 instruction. Don't call in
 // thread mode (valid only in handler mode).
 //go:nosplit
-func getcpuctx() *cpuctx { return (*cpuctx)(unsafe.Pointer(getg())) }
+func curcpu() *cpuctx { return (*cpuctx)(unsafe.Pointer(getg())) }
 
 //go:nosplit
 func taskerSetrunnable(m *m) {
-	curcpu := getcpuctx()
+	curcpu := curcpu()
 	allcpu := curcpu.t.allcpu
 	var (
 		bestcpu *cpuctx
@@ -158,9 +160,10 @@ byid:
 	bestcpu = allcpu[int(p.ptr().id)%len(allcpu)]
 end:
 	bestcpu.runnable.lock()
+	n := bestcpu.runnable.n
 	bestcpu.runnable.push(m)
 	bestcpu.runnable.unlock()
-	if bestcpu != curcpu {
+	if bestcpu != curcpu && n == 0 {
 		bestcpu.wakeup()
 	}
 }
@@ -199,7 +202,7 @@ func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) {
 //go:nowritebarrierrec
 //go:nosplit
 func curcpuRunScheduler() {
-	curcpu := getcpuctx()
+	curcpu := curcpu()
 	exe := curcpu.exe.ptr()
 	for {
 		// handle the wakeup requests from interrupt handlers
@@ -257,10 +260,14 @@ func curcpuRunScheduler() {
 			curcpuSavectxSched()
 			curcpu.runnable.push(exe)
 		}
+		n := curcpu.runnable.n
 		curcpu.runnable.unlock()
 		if next != nil {
 			curcpu.exe.set(next)
 			curcpu.newexe = true
+			if n != 0 {
+				curcpu.t.setalarm(now + 2e6)
+			}
 			return
 		}
 		if exe != nil {
@@ -268,7 +275,7 @@ func curcpuRunScheduler() {
 		}
 
 		// Nothing to execute. If this will be a work-stealing scheduler it will
-		// try to steal some work from the other CPU here.
+		// try to steal some work from some other CPU here.
 		if curcpu.t.setalarm(sleepuntil) {
 			curcpuSleep()
 		}
@@ -286,7 +293,7 @@ func rtos_notewakeup(n *notel) {
 		return
 	}
 	if n.acquire() {
-		getcpuctx().wakerq[fhash(uintptr(unsafe.Pointer(&n.key)))].insert(n)
+		curcpu().wakerq[fhash(uintptr(unsafe.Pointer(&n.key)))].insert(n)
 		curcpuWakeup()
 	}
 }
@@ -366,23 +373,23 @@ func (l *notelist) removeall() *notel {
 //go:nowritebarrierrec
 //go:nosplit
 func syssetsystim1() {
-	t := getcpuctx().t
+	t := curcpu().t
 	const n = unsafe.Sizeof(t.nanotime) / unsafe.Sizeof(uintptr(0))
 	*(*[n]uintptr)(unsafe.Pointer(&t.nanotime)) = *(*[n]uintptr)(unsafe.Pointer(&t.newnanotime))
 	*(*[n]uintptr)(unsafe.Pointer(&t.setalarm)) = *(*[n]uintptr)(unsafe.Pointer(&t.newsetalarm))
-
+	curcpuSchedule() // ensure scheduler uses new timer
 }
 
 //go:nowritebarrierrec
 //go:nosplit
 func sysnanotime() int64 {
-	return getcpuctx().t.nanotime()
+	return curcpu().t.nanotime()
 }
 
 //go:nowritebarrierrec
 //go:nosplit
 func sysnewosproc(m *m) {
-	curcpu := getcpuctx()
+	curcpu := curcpu()
 	m.procid = uint64(atomic.Xadduintptr(&curcpu.t.tidgen, 1))
 	archnewm(m)
 	taskerSetrunnable(m)
@@ -391,8 +398,7 @@ func sysnewosproc(m *m) {
 //go:nowritebarrierrec
 //go:nosplit
 func sysexitThread(wait *uint32) {
-	curcpu := getcpuctx()
-	curcpu.exe = 0
+	curcpu().exe = 0
 	*wait = 0
 	curcpuSchedule()
 }
@@ -403,7 +409,7 @@ func sysfutexsleep(addr *uint32, val uint32, ns int64) {
 	if uint64(ns) < 64 {
 		return // to short to sleep (64 ns selected arbitrary)
 	}
-	curcpu := getcpuctx()
+	curcpu := curcpu()
 	m := curcpu.exe.ptr()
 	if ns >= 0 {
 		// pre-insert m into curcpu.waitingt, m is not visible for other CPUs
@@ -441,7 +447,7 @@ func sysfutexsleep(addr *uint32, val uint32, ns int64) {
 //go:nowritebarrierrec
 //go:nosplit
 func sysfutexwakeup(addr *uint32, cnt uint32) {
-	fb := getcpuctx().t.fbucketbyaddr(uintptr(unsafe.Pointer(addr)))
+	fb := curcpu().t.fbucketbyaddr(uintptr(unsafe.Pointer(addr)))
 	taskerFutexwakeup(fb, addr, cnt)
 }
 
@@ -452,7 +458,7 @@ func sysnanosleep(ns int64) {
 		return // to short to sleep (64 ns selected arbitrary)
 	}
 	curcpuSavectxCall()
-	curcpu := getcpuctx()
+	curcpu := curcpu()
 	m := curcpu.exe.ptr()
 	curcpu.exe = 0
 	msetkey(m, 0)
@@ -467,7 +473,7 @@ func sysnanosleep(ns int64) {
 //go:nowritebarrierrec
 //go:nosplit
 func syswalltime() (sec int64, nsec int32) {
-	t := getcpuctx().t
+	t := curcpu().t
 	t.timestart.mx.lock()
 	sec = t.timestart.sec
 	nsec = t.timestart.nsec
@@ -487,7 +493,7 @@ func syswalltime() (sec int64, nsec int32) {
 //go:nowritebarrierrec
 //go:nosplit
 func syssetwalltime(sec int64, nsec int32) {
-	t := getcpuctx().t
+	t := curcpu().t
 	now := t.nanotime()
 	s := now / 1e9
 	ns := int32(now - s*1e9)

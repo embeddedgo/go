@@ -63,9 +63,12 @@ TEXT ·irqctl(SB),NOSPLIT|NOFRAME,$0-20
 	JMP  -1(PC)
 
 // func setprivlevel(newlevel int) (oldlevel, errno int)
-TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-12
-	EBREAK
-	JMP  -1(PC)
+TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
+	MOV  $SYS_setprivlevel, A3
+	MOV  $(8+8), A4
+	MOV  $16, A5
+	ECALL
+	RET
 
 // func write1(fd uintptr, p unsafe.Pointer, n int32) int32
 TEXT ·write1(SB),NOSPLIT|NOFRAME,$0-28
@@ -77,8 +80,11 @@ TEXT ·write1(SB),NOSPLIT|NOFRAME,$0-28
 
 // func setsystim1()
 TEXT ·setsystim1(SB),NOSPLIT|NOFRAME,$0-0
-	EBREAK
-	JMP  -1(PC)
+	MOV  $SYS_setsystim1, A3
+	MOV  $(0+8), A4
+	MOV  $0, A5
+	ECALL
+	RET
 
 // func newosproc(mp *m)
 TEXT ·newosproc(SB),NOSPLIT|NOFRAME,$0-8

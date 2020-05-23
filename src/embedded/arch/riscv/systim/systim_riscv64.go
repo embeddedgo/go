@@ -8,7 +8,6 @@ package systim
 import (
 	"embedded/rtos"
 	"internal/cpu/riscv/clint"
-	"runtime"
 	_ "unsafe" // for linkname
 )
 
@@ -19,13 +18,6 @@ var timerHz uint64
 func Setup(clkhz int64) {
 	timerHz = uint64(clkhz)
 	rtos.SetSystemTimer(nanotime, setAlarm)
-	runtime.LockOSThread()
-	pl, _ := rtos.SetPrivLevel(0)
-	clint := clint.CLINT()
-	clint.MTIMECMP[0].Store(0) // ensure timer interrupt
-	enableTimerInterrupt()
-	rtos.SetPrivLevel(pl)
-	runtime.UnlockOSThread()
 }
 
 //go:nosplit
@@ -57,8 +49,6 @@ func mulDivUp(x, m, d uint64) uint64 {
 	modm := m - divm*d
 	return divx*m + modx*divm + (modx*modm+o)/d
 }
-
-func enableTimerInterrupt()
 
 //go:linkname cpuid runtime.cpuid
 func cpuid() int

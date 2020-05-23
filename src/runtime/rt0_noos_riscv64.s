@@ -34,7 +34,7 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	CSRW   (s0, mtvec)
 
 	// Enable interrupts globally (interrupts are still disabled in mie
-	// register) and enable FPU (Kendryte K210 supports only FS=0(off)/3(dirty),
+	// register), enable FPU (Kendryte K210 supports only FS=0(off)/3(dirty),
 	// this is a weakness of the Rocket Chip Generator used to generate K210
 	// cores).
 	MOV   $0x7FFF, S0
@@ -56,13 +56,11 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	//FCVTDL  ZERO, F31
 
 	// park excess harts
-	CSRR  (mhartid, s0)
+	CSRR  (mhartid, s0)  // from now S0 used only to provide hart id
 	MOV   $const_maxHarts, S1
 	BGE   S0, S1, parkHart
 
-	// allocate handler stack for this hart
-
-	// ensure stacks are 16 byte aligned (may be required in the future)
+	// ensure handler stacks are 16 byte aligned (may be required in the future)
 	MOV  $runtime·end(SB), A0
 	ADD  $(handlerStackSize+15), A0
 	AND  $~15, A0
@@ -120,7 +118,6 @@ continue:
 	// setup handler stack in harts[mhartid].gh
 	MOV   $runtime·harts(SB), g
 	MOV   $cpuctx__size, A1
-	CSRR  (mhartid, s0)
 	MUL   S0, A1
 	ADD   A1, g  // gh is the first field of the cpuctx struct
 	ADD   $-handlerStackSize, X2, A1
@@ -128,8 +125,10 @@ continue:
 	MOVW  X2, (g_stack+stack_hi)(g)
 
 	// as we have SP and g set we can set real trap handler in mtvec
-	MOV   $·trapHandler(SB), S0
-	CSRW  (s0, mtvec)
+	MOV   $·trapHandler(SB), S1
+	CSRW  (s1, mtvec)
+
+	// enable
 
 	BNE  ZERO, S0, parkHart
 
@@ -138,7 +137,7 @@ continue:
 waitInit:
 	MOV   $·waitInit(SB), A0
 	MOVW  (A0), S1
-	BEQ   ZERO, S1, continue
+	BNE   ZERO, S1, continue
 	JMP   -2(PC)
 
 parkHart:
@@ -233,7 +232,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV   A0, g_m(A1)   // harts[0].gh.m = harts[0].mh
 	CSRW  (a1, mscratch)
 
-	// disable interrupts globally to safely set mie, mstatus, mepc
+	// disable interrupts globally to ensure exclusive access to mstatus, mepc
 	CSRCI  ((1<<MIEn), mstatus)
 
 	// switch to user mode

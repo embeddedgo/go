@@ -48,6 +48,7 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 
 
 #define sysMaxArgs (24+8)
+#define envCallFrameSize (sysMaxArgs+3*8)
 
 #define _LR (0*8)
 #define _A0 (1*8)
@@ -156,8 +157,8 @@ TEXT runtime·interruptReturn(SB),NOSPLIT|NOFRAME,$0
 
 	// return to thread
 	MOV   _A0(X2), A0                // restore A0
-	CSRW  (G, mscratch)              // cpuctx to mscratch
 	MOV   (g_sched+gobuf_sp)(g), X2  // restore thread SP
+	CSRW  (G, mscratch)              // cpuctx to mscratch
 	MOV   (g_sched+gobuf_g)(g), g    // restore thread g
 	MRET
 
@@ -254,6 +255,14 @@ smallCtx:
 
 TEXT runtime·timerInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
+	// clear timer interrupt
+	MOV   $mtimecmp, A0
+	CSRR  (mhartid, lr)
+	SLL   $3, LR
+	ADD   LR, A0
+	MOV   $-1, LR
+	MOV   LR, (A0)
+
 	// rise software interrupt
 	MOV   $msip, A0
 	CSRR  (mhartid, lr)
@@ -314,7 +323,7 @@ currentStack: // called from handler
 
 continue:
 	// make a space on the stack for arguments + 3 registers
-	ADD  $-(sysMaxArgs+3*8), X2
+	ADD  $-envCallFrameSize, X2
 
 	// copy arguments from the caller's stack
 	MOV   $·duffcopy+2048(SB), A2
@@ -347,7 +356,7 @@ continue:
 nothingToCopy:
 
 	// pop everything from the stack
-	ADD  $(sysMaxArgs+3*8), X2
+	ADD  $envCallFrameSize, X2
 	MOV  _LR(X2), LR
 	MOV  _mstatus(X2), A0
 	MOV  _mepc(X2), A1
@@ -533,4 +542,38 @@ TEXT runtime·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
 	MOVD  ((30+const_numGPRS)*8)(A0), F29
 	MOVD  ((31+const_numGPRS)*8)(A0), F30
 	MOVD  ((32+const_numGPRS)*8)(A0), F31
+	RET
+
+
+// func curcpuSleep()
+TEXT ·curcpuSleep(SB),NOSPLIT|NOFRAME,$0-0
+	WFI
+	RET
+
+
+// func syssetprivlevel(newlevel int) (oldlevel, errno int)
+TEXT ·syssetprivlevel(SB),NOSPLIT|NOFRAME,$0-24
+	MOV  newlevel+0(FP), A0
+	MOV  (envCallFrameSize+_mstatus)(X2), S0
+	SRL  $MPPn, S0, S1
+	AND  $3, S1
+	MOV  $3, A1
+	SUB  S1, A1, S1
+	MOV  S1, oldlevel+8(FP)
+
+	BLTU  A1, A0, badPrivLevel
+	SUB   A0, A1, S1
+	SLL   $MPPn, S1
+	SLL   $MPPn, A1
+	XOR   $-1, A1
+	AND   A1, S0
+	OR    S1, S0
+	MOV   S0, (envCallFrameSize+_mstatus)(X2)
+	MOV   ZERO, errno+16(FP)
+	RET
+badPrivLevel:
+	MOV  $0, S0
+	BLT  A0, ZERO, 2(PC)
+	MOV  $2, S0  // rtos.ErrBadPrivLevel
+	MOV  S0, errno+16(FP)
 	RET

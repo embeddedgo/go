@@ -191,7 +191,7 @@ func syssetprivlevel(newlevel int) (oldlevel, errno int) {
 	oldlevel = int(ctrl | 1)
 	if uint(newlevel) <= 1 {
 		setcpucontrol(ctrl&^1 | uint32(newlevel))
-	} else {
+	} else if newlevel > 0 {
 		errno = 2 // rtos.ErrBadPrivLevel
 	}
 	return
