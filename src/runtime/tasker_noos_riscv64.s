@@ -115,8 +115,8 @@ nestedTrap:
 	CSRW  (a0, mie)
 
 	// enable interrupts
-	CSRR   (mcause, a0)  // read mcause before enable
-	CSRSI  (8, mstatus)  // set mstatus.MIE=1
+	CSRR   (mcause, a0)  // read mcause before enable interrupts
+	CSRSI  ((1<<MIEn), mstatus)
 
 	// jump to the exception/interrupt handler passing mcause*8 in A0
 	BGE  A0, ZERO, handleException
@@ -213,7 +213,7 @@ contextSaved:
 	MOV  (m_tls+const_mstatus*8-m_mOS)(A0), S0
 	AND  $const_thrSmallCtx, S0
 	BNE  ZERO, S0, smallCtx
-	// no need to restore FPRs if exe didn't changed (cpuctx.newexe == false)
+	// no need to restore FPRs if exe didn't changed
 	MOVB  (cpuctx_newexe)(g), A1
 	BEQ   ZERO, A1, oldexe
 	CALL  ·restoreFPRs(SB)
@@ -222,23 +222,22 @@ oldexe:
 smallCtx:
 	MOVB  ZERO, (cpuctx_newexe)(g)  // clear cpuctx.newexe
 
-	// thread scheduler works at lowest interrupt priority level so it always
-	// returns to the thread mode
+	// tasker works at lowest interrupt priority level so it always
+	// returns to thread mode
 
-	// load thread status
-	MOV  (m_tls+const_mstatus*8-m_mOS)(A0), LR
-	AND  $(3<<(MPPn-7)), LR  // select priority field
+	// restore mstatus
+	MOV   _mstatus(X2), LR
+	SRL   $7, LR
+	AND   $~(3<<(MPPn-7)), LR  // clear MPP field
+	SLL   $7, LR
+	CSRW  (lr, mstatus)  // disables interrupts
 
-	// disable interrupts
-	CSRCI  ((1<<MIEn), mstatus)
-
-	// restore CSRs
+	// restore remaining CSRs
 	CSRW  (G, mscratch)
-	MOV   _mstatus(X2), g
-	SRL   $7, g
-	OR    LR, g
+	MOV   (m_tls+const_mstatus*8-m_mOS)(A0), g  // load thread status
+	AND   $(3<<(MPPn-7)), g
 	SLL   $7, g
-	CSRW  (G, mstatus)
+	CSRS  (G, mstatus)  // set priority field
 	MOV   (m_tls+const_mepc*8-m_mOS)(A0), g
 	CSRW  (G, mepc)
 	MOV   _mie(X2), g

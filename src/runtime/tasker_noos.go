@@ -266,7 +266,7 @@ func curcpuRunScheduler() {
 			curcpu.exe.set(next)
 			curcpu.newexe = true
 			if n != 0 {
-				curcpu.t.setalarm(now + 2e6)
+				//curcpu.t.setalarm(now + 15e9)
 			}
 			return
 		}
