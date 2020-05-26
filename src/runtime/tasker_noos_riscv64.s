@@ -313,6 +313,7 @@ TEXT runtime·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 	AND  $(3<<(MPPn-7)), A1
 	OR   $const_thrSmallCtx, A1
 	MOV  A1, (m_tls+const_mstatus*8)(S0)
+	ADD  $4, S1  // mepc points back to ECALL, adjust it
 	MOV  S1, (m_tls+const_mepc*8)(S0)
 	JMP  continue
 
@@ -359,7 +360,7 @@ nothingToCopy:
 	MOV  _LR(X2), LR
 	MOV  _mstatus(X2), A0
 	MOV  _mepc(X2), A1
-	ADD  $4, A1  // points back to ECALL, adjust it
+	ADD  $4, A1  // mepc points back to ECALL, adjust it
 	MOV  _mie(X2), A2
 	ADD  $trapCtxSize, X2
 
