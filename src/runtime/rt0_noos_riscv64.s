@@ -22,16 +22,18 @@
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
 #define persistAllocMin 64*1024
 
-DATA runtime·waitInit+(0*8)(SB)/4, $1
+DATA runtime·waitInit+0(SB)/4, $1
 GLOBL runtime·waitInit(SB), NOPTR, $4
 
 // _rt0_riscv64_noos initializs all running cores
 TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
-
 	// Disable interrupts locally and set a temporary trap handler.
 	CSRWI  (0, mie)
 	MOV    $·defaultHandler(SB), S0
 	CSRW   (s0, mtvec)
+
+	//MOV $1, S0
+	//BNE ZERO, S0, -1(PC)
 
 	// Enable interrupts globally (interrupts are still disabled in mie
 	// register), enable FPU (Kendryte K210 supports only FS=0(off)/3(dirty),
@@ -135,14 +137,15 @@ continue:
 	JMP  runtime·rt0_go(SB)
 
 waitInit:
+	JMP   parkHart
 	MOV   $·waitInit(SB), A0
 	MOVW  (A0), S1
-	BNE   ZERO, S1, continue
+	BEQ   ZERO, S1, continue
 	JMP   -2(PC)
 
 parkHart:
 	WFI
-	JMP  parkHart
+	JMP  -1(PC)
 
 
 // rt0_go is known as top level function

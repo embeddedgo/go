@@ -75,7 +75,7 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 TEXT runtime·trapHandler(SB),NOSPLIT|NOFRAME,$0
 	// At this point the interrupts are globaly disabled (mstatus.MIE=0).
 	// We want to enable higher priority interrupts as soon as possible.
-	// Be carefult to don't clobber T6 (A0) and A3-A5 (syscall args).
+	// Be carefult to don't clobber T6 (TMP) and A3-A5 (syscall args).
 
 	// mscratch contains &cpuctx if trap from thread mode, 0 for nested trap
 	CSRRW  (a0, mscratch, a0)  // swap A0 with cpuctx in mscratch
@@ -142,42 +142,39 @@ unsupported:
 	JMP  -1(PC)
 
 
-TEXT runtime·interruptReturn(SB),NOSPLIT|NOFRAME,$0
-	MOV  _LR(X2), LR  // restore LR
-
-	// restore CSRs
-	MOV   _mstatus(X2), A0
-	CSRW  (a0, mstatus)  // disables interrupts
-	MOV   _mie(X2), A0
-	CSRW  (a0, mie)
-	MOV   _mepc(X2), A0
-	CSRW  (a0, mepc)
-	AND   $1, A0
-	BEQ   ZERO, A0, returnToHandler
-
-	// return to thread
-	MOV   _A0(X2), A0                // restore A0
-	MOV   (g_sched+gobuf_sp)(g), X2  // restore thread SP
-	CSRW  (G, mscratch)              // cpuctx to mscratch
-	MOV   (g_sched+gobuf_g)(g), g    // restore thread g
-	MRET
-
-returnToHandler:
-	MOV  _A0(X2), A0  // restore A0
-	ADD  $trapCtxSize, X2
+#define INTERRUPT_RETURN \
+	MOV  _LR(X2), LR \  // restore LR
+	\
+	\     // restore CSRs
+	MOV   _mstatus(X2), A0 \
+	CSRW  (a0, mstatus) \  // disables interrupts
+	MOV   _mie(X2), A0 \
+	CSRW  (a0, mie) \
+	MOV   _mepc(X2), A0 \
+	CSRW  (a0, mepc) \
+	AND   $1, A0 \
+	BEQ   ZERO, A0, 6(PC) \
+	\     // return to thread
+	MOV   _A0(X2), A0 \                // restore A0
+	MOV   (g_sched+gobuf_sp)(g), X2 \  // restore thread SP
+	CSRW  (G, mscratch) \              // cpuctx to mscratch
+	MOV   (g_sched+gobuf_g)(g), g \    // restore thread g
+	MRET  \
+	\     // return to handler
+	MOV   _A0(X2), A0 \  // restore A0
+	ADD   $trapCtxSize, X2 \
 	MRET
 
 
 TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
 	// if cpuctx.exe == nil then context saved by environmentCallHandler
-	MOVW  (cpuctx_exe)(g), A0
-	BEQ   ZERO, A0, contextSaved
+	MOV  (cpuctx_exe)(g), A0
+	BEQ  ZERO, A0, contextSaved
 
-	// save most of the GPRs
-	ADD   $m_mOS, A0
-	CALL  ·saveGPRs(SB)
-	// save the remaining ones: LR, SP, g, status, mepc
+	SAVE_GPRS  (A0)  // save most of GPRs
+
+	// save the remaining registers: LR, SP, g, status, mepc
 	MOV  _LR(X2), A1
 	MOV  _A0(X2), A2
 	MOV  _mstatus(X2), S0
@@ -186,12 +183,12 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOV  _mepc(X2), S1
 	MOV  (g_sched+gobuf_sp)(g), A3
 	MOV  (g_sched+gobuf_g)(g), A4
-	MOV  A1, (const_numGPRS*8-32)(A0)  // LR
-	MOV  A3, (const_numGPRS*8-24)(A0)  // SP
-	MOV  A4, (const_numGPRS*8-16)(A0)  // g
-	MOV  A2, (const_numGPRS*8-8)(A0)   // A0
-	MOV  S0, (m_tls+const_mstatus*8-m_mOS)(A0)
-	MOV  S1, (m_tls+const_mepc*8-m_mOS)(A0)
+	MOV  A1, (m_mOS+const_numGPRS*8-32)(A0)  // LR
+	MOV  A3, (m_mOS+const_numGPRS*8-24)(A0)  // SP
+	MOV  A4, (m_mOS+const_numGPRS*8-16)(A0)  // g
+	MOV  A2, (m_mOS+const_numGPRS*8-8)(A0)   // A0
+	MOV  S0, (m_tls+const_mstatus*8)(A0)
+	MOV  S1, (m_tls+const_mepc*8)(A0)
 
 contextSaved:
 	// clear software interrupt
@@ -205,25 +202,22 @@ contextSaved:
 	// enter scheduler
 	CALL  ·curcpuRunScheduler(SB)
 
-	// load cpuctx.exe
-	MOV  (cpuctx_exe)(g), A0
-	ADD  $m_mOS, A0
+	MOV  (cpuctx_exe)(g), A0  // load cpuctx.exe
 
 	// check context size
-	MOV  (m_tls+const_mstatus*8-m_mOS)(A0), S0
+	MOV  (m_tls+const_mstatus*8)(A0), S0
 	AND  $const_thrSmallCtx, S0
 	BNE  ZERO, S0, smallCtx
 	// no need to restore FPRs if exe didn't changed
-	MOVB  (cpuctx_newexe)(g), A1
-	BEQ   ZERO, A1, oldexe
-	CALL  ·restoreFPRs(SB)
-oldexe:
-	CALL  ·restoreGPRs(SB)  // restore most of the GPRs
+	MOVB          (cpuctx_newexe)(g), A1
+	BEQ           ZERO, A1, 2(PC)
+	CALL          ·restoreFPRs(SB)  // clobbers LR, TMP
+	RESTORE_GPRS  (A0)              // restore most of GPRs
 smallCtx:
 	MOVB  ZERO, (cpuctx_newexe)(g)  // clear cpuctx.newexe
 
 	// tasker works at lowest interrupt priority level so it always
-	// returns to thread mode
+	// returns to the thread mode
 
 	// restore mstatus
 	MOV   _mstatus(X2), LR
@@ -234,20 +228,20 @@ smallCtx:
 
 	// restore remaining CSRs
 	CSRW  (G, mscratch)
-	MOV   (m_tls+const_mstatus*8-m_mOS)(A0), g  // load thread status
+	MOV   (m_tls+const_mstatus*8)(A0), g  // load thread status
 	AND   $(3<<(MPPn-7)), g
 	SLL   $7, g
 	CSRS  (G, mstatus)  // set priority field
-	MOV   (m_tls+const_mepc*8-m_mOS)(A0), g
+	MOV   (m_tls+const_mepc*8)(A0), g
 	CSRW  (G, mepc)
 	MOV   _mie(X2), g
 	CSRW  (G, mie)
 
 	// restore remaining GPRs
-	MOV  (const_numGPRS*8-32)(A0), LR
-	MOV  (const_numGPRS*8-24)(A0), X2
-	MOV  (const_numGPRS*8-16)(A0), g
-	MOV  (const_numGPRS*8-8)(A0), A0
+	MOV  (m_mOS+const_numGPRS*8-32)(A0), LR
+	MOV  (m_mOS+const_numGPRS*8-24)(A0), X2
+	MOV  (m_mOS+const_numGPRS*8-16)(A0), g
+	MOV  (m_mOS+const_numGPRS*8-8)(A0), A0
 
 	MRET
 
@@ -270,13 +264,13 @@ TEXT runtime·timerInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOV   $1, LR
 	MOVW  LR, (A0)
 
-	JMP  ·interruptReturn(SB)
+	INTERRUPT_RETURN
 
 
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	EBREAK
 	JMP  -1(PC)
-	JMP  ·interruptReturn(SB)
+	INTERRUPT_RETURN
 
 
 // System call is like oridnary function call so all registers except LR are
@@ -393,161 +387,98 @@ TEXT runtime·defaultHandler(SB),NOSPLIT|NOFRAME,$0
 	JMP  -1(PC)
 
 
-// saveGPRs saves general purpose registers to the memory pointed by A0
-TEXT runtime·saveGPRs(SB),NOSPLIT|NOFRAME,$0
-	// LR saved separately
-	// SP saved separately
-	MOV  GP, (0*8)(A0)
-	// g saved separately
-	MOV  T0, (1*8)(A0)
-	MOV  T1, (2*8)(A0)
-	MOV  T2, (3*8)(A0)
-	MOV  S0, (4*8)(A0)
-	MOV  S1, (5*8)(A0)
-	// A0 saved separately
-	MOV  A1, (6*8)(A0)
-	MOV  A2, (7*8)(A0)
-	MOV  A3, (8*8)(A0)
-	MOV  A4, (9*8)(A0)
-	MOV  A5, (10*8)(A0)
-	MOV  A6, (11*8)(A0)
-	MOV  A7, (12*8)(A0)
-	MOV  S2, (13*8)(A0)
-	MOV  S3, (14*8)(A0)
-	MOV  S4, (15*8)(A0)
-	MOV  S5, (16*8)(A0)
-	MOV  S6, (17*8)(A0)
-	MOV  S7, (18*8)(A0)
-	MOV  S8, (19*8)(A0)
-	MOV  S9, (20*8)(A0)
-	MOV  S10, (21*8)(A0)
-	MOV  S11, (22*8)(A0)
-	MOV  T3, (23*8)(A0)
-	MOV  T4, (24*8)(A0)
-	MOV  T5, (25*8)(A0)
-	MOV  TMP, (26*8)(A0)
-	RET
-
-
-TEXT runtime·restoreGPRs(SB),NOSPLIT|NOFRAME,$0
-	// LR loaded separately
-	// SP loaded separately
-	MOV  (0*8)(A0), GP
-	// g loaded separately
-	MOV  (1*8)(A0), T0
-	MOV  (2*8)(A0), T1
-	MOV  (3*8)(A0), T2
-	MOV  (4*8)(A0), S0
-	MOV  (5*8)(A0), S1
-	// A0 loaded separately
-	MOV  (6*8)(A0), A1
-	MOV  (7*8)(A0), A2
-	MOV  (8*8)(A0), A3
-	MOV  (9*8)(A0), A4
-	MOV  (10*8)(A0), A5
-	MOV  (11*8)(A0), A6
-	MOV  (12*8)(A0), A7
-	MOV  (13*8)(A0), S2
-	MOV  (14*8)(A0), S3
-	MOV  (15*8)(A0), S4
-	MOV  (16*8)(A0), S5
-	MOV  (17*8)(A0), S6
-	MOV  (18*8)(A0), S7
-	MOV  (19*8)(A0), S8
-	MOV  (20*8)(A0), S9
-	MOV  (21*8)(A0), S10
-	MOV  (22*8)(A0), S11
-	MOV  (23*8)(A0), T3
-	MOV  (24*8)(A0), T4
-	MOV  (25*8)(A0), T5
-	MOV  (26*8)(A0), TMP
-	RET
-
-
-// curcpuSavectxSched saves floating-point registers to the memory at
-// A0 + numGPRS*8 using S0 as scratch register
+// curcpuSavectxSched saves floating-point registers to memory at
+// A0 + m_mOS + numGPRS*8 using TMP (T6) as scratch register
 TEXT ·curcpuSavectxSched(SB),NOSPLIT|NOFRAME,$0
-	MOVW  (cpuctx_exe)(g), A0
-	ADD   $m_mOS, A0
-saveFPRs: // calls from assembly functions can enter here
-	CSRR  (fcsr, s0)
-	MOV   S0, ((0+const_numGPRS)*8)(A0)
-	MOVD  F0, ((1+const_numGPRS)*8)(A0)
-	MOVD  F1, ((2+const_numGPRS)*8)(A0)
-	MOVD  F2, ((3+const_numGPRS)*8)(A0)
-	MOVD  F3, ((4+const_numGPRS)*8)(A0)
-	MOVD  F4, ((5+const_numGPRS)*8)(A0)
-	MOVD  F5, ((6+const_numGPRS)*8)(A0)
-	MOVD  F6, ((7+const_numGPRS)*8)(A0)
-	MOVD  F7, ((8+const_numGPRS)*8)(A0)
-	MOVD  F8, ((9+const_numGPRS)*8)(A0)
-	MOVD  F9, ((10+const_numGPRS)*8)(A0)
-	MOVD  F10, ((11+const_numGPRS)*8)(A0)
-	MOVD  F11, ((12+const_numGPRS)*8)(A0)
-	MOVD  F12, ((13+const_numGPRS)*8)(A0)
-	MOVD  F13, ((14+const_numGPRS)*8)(A0)
-	MOVD  F14, ((15+const_numGPRS)*8)(A0)
-	MOVD  F15, ((16+const_numGPRS)*8)(A0)
-	MOVD  F16, ((17+const_numGPRS)*8)(A0)
-	MOVD  F17, ((18+const_numGPRS)*8)(A0)
-	MOVD  F18, ((19+const_numGPRS)*8)(A0)
-	MOVD  F19, ((20+const_numGPRS)*8)(A0)
-	MOVD  F20, ((21+const_numGPRS)*8)(A0)
-	MOVD  F21, ((22+const_numGPRS)*8)(A0)
-	MOVD  F22, ((23+const_numGPRS)*8)(A0)
-	MOVD  F23, ((24+const_numGPRS)*8)(A0)
-	MOVD  F24, ((25+const_numGPRS)*8)(A0)
-	MOVD  F25, ((26+const_numGPRS)*8)(A0)
-	MOVD  F26, ((27+const_numGPRS)*8)(A0)
-	MOVD  F27, ((28+const_numGPRS)*8)(A0)
-	MOVD  F28, ((29+const_numGPRS)*8)(A0)
-	MOVD  F29, ((30+const_numGPRS)*8)(A0)
-	MOVD  F30, ((31+const_numGPRS)*8)(A0)
-	MOVD  F31, ((32+const_numGPRS)*8)(A0)
+	MOV  (cpuctx_exe)(g), A0
+saveFPRs: // calls from assembly can enter here
+	CSRR  (fcsr, tmp)
+	MOV   TMP, ((0+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F0, ((1+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F1, ((2+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F2, ((3+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F3, ((4+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F4, ((5+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F5, ((6+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F6, ((7+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F7, ((8+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F8, ((9+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F9, ((10+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F10, ((11+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F11, ((12+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F12, ((13+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F13, ((14+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F14, ((15+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F15, ((16+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F16, ((17+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F17, ((18+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F18, ((19+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F19, ((20+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F20, ((21+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F21, ((22+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F22, ((23+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F23, ((24+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F24, ((25+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F25, ((26+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F26, ((27+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F27, ((28+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F28, ((29+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F29, ((30+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F30, ((31+const_numGPRS)*8+m_mOS)(A0)
+	MOVD  F31, ((32+const_numGPRS)*8+m_mOS)(A0)
 	RET
 
 
+// restoreFPRs restores floating-point registers from memory at
+// A0 + m_mOS + numGPRS*8 using TMP (T6) as scratch register
 TEXT runtime·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
-	MOV   ((0+const_numGPRS)*8)(A0), S0
-	CSRW  (s0, fcsr)
-	MOVD  ((1+const_numGPRS)*8)(A0), F0
-	MOVD  ((2+const_numGPRS)*8)(A0), F1
-	MOVD  ((3+const_numGPRS)*8)(A0), F2
-	MOVD  ((4+const_numGPRS)*8)(A0), F3
-	MOVD  ((5+const_numGPRS)*8)(A0), F4
-	MOVD  ((6+const_numGPRS)*8)(A0), F5
-	MOVD  ((7+const_numGPRS)*8)(A0), F6
-	MOVD  ((8+const_numGPRS)*8)(A0), F7
-	MOVD  ((9+const_numGPRS)*8)(A0), F8
-	MOVD  ((10+const_numGPRS)*8)(A0), F9
-	MOVD  ((11+const_numGPRS)*8)(A0), F10
-	MOVD  ((12+const_numGPRS)*8)(A0), F11
-	MOVD  ((13+const_numGPRS)*8)(A0), F12
-	MOVD  ((14+const_numGPRS)*8)(A0), F13
-	MOVD  ((15+const_numGPRS)*8)(A0), F14
-	MOVD  ((16+const_numGPRS)*8)(A0), F15
-	MOVD  ((17+const_numGPRS)*8)(A0), F16
-	MOVD  ((18+const_numGPRS)*8)(A0), F17
-	MOVD  ((19+const_numGPRS)*8)(A0), F18
-	MOVD  ((20+const_numGPRS)*8)(A0), F19
-	MOVD  ((21+const_numGPRS)*8)(A0), F20
-	MOVD  ((22+const_numGPRS)*8)(A0), F21
-	MOVD  ((23+const_numGPRS)*8)(A0), F22
-	MOVD  ((24+const_numGPRS)*8)(A0), F23
-	MOVD  ((25+const_numGPRS)*8)(A0), F24
-	MOVD  ((26+const_numGPRS)*8)(A0), F25
-	MOVD  ((27+const_numGPRS)*8)(A0), F26
-	MOVD  ((28+const_numGPRS)*8)(A0), F27
-	MOVD  ((29+const_numGPRS)*8)(A0), F26
-	MOVD  ((30+const_numGPRS)*8)(A0), F29
-	MOVD  ((31+const_numGPRS)*8)(A0), F30
-	MOVD  ((32+const_numGPRS)*8)(A0), F31
+	MOV   ((0+const_numGPRS)*8+m_mOS)(A0), TMP
+	CSRW  (tmp, fcsr)
+	MOVD  ((1+const_numGPRS)*8+m_mOS)(A0), F0
+	MOVD  ((2+const_numGPRS)*8+m_mOS)(A0), F1
+	MOVD  ((3+const_numGPRS)*8+m_mOS)(A0), F2
+	MOVD  ((4+const_numGPRS)*8+m_mOS)(A0), F3
+	MOVD  ((5+const_numGPRS)*8+m_mOS)(A0), F4
+	MOVD  ((6+const_numGPRS)*8+m_mOS)(A0), F5
+	MOVD  ((7+const_numGPRS)*8+m_mOS)(A0), F6
+	MOVD  ((8+const_numGPRS)*8+m_mOS)(A0), F7
+	MOVD  ((9+const_numGPRS)*8+m_mOS)(A0), F8
+	MOVD  ((10+const_numGPRS)*8+m_mOS)(A0), F9
+	MOVD  ((11+const_numGPRS)*8+m_mOS)(A0), F10
+	MOVD  ((12+const_numGPRS)*8+m_mOS)(A0), F11
+	MOVD  ((13+const_numGPRS)*8+m_mOS)(A0), F12
+	MOVD  ((14+const_numGPRS)*8+m_mOS)(A0), F13
+	MOVD  ((15+const_numGPRS)*8+m_mOS)(A0), F14
+	MOVD  ((16+const_numGPRS)*8+m_mOS)(A0), F15
+	MOVD  ((17+const_numGPRS)*8+m_mOS)(A0), F16
+	MOVD  ((18+const_numGPRS)*8+m_mOS)(A0), F17
+	MOVD  ((19+const_numGPRS)*8+m_mOS)(A0), F18
+	MOVD  ((20+const_numGPRS)*8+m_mOS)(A0), F19
+	MOVD  ((21+const_numGPRS)*8+m_mOS)(A0), F20
+	MOVD  ((22+const_numGPRS)*8+m_mOS)(A0), F21
+	MOVD  ((23+const_numGPRS)*8+m_mOS)(A0), F22
+	MOVD  ((24+const_numGPRS)*8+m_mOS)(A0), F23
+	MOVD  ((25+const_numGPRS)*8+m_mOS)(A0), F24
+	MOVD  ((26+const_numGPRS)*8+m_mOS)(A0), F25
+	MOVD  ((27+const_numGPRS)*8+m_mOS)(A0), F26
+	MOVD  ((28+const_numGPRS)*8+m_mOS)(A0), F27
+	MOVD  ((29+const_numGPRS)*8+m_mOS)(A0), F26
+	MOVD  ((30+const_numGPRS)*8+m_mOS)(A0), F29
+	MOVD  ((31+const_numGPRS)*8+m_mOS)(A0), F30
+	MOVD  ((32+const_numGPRS)*8+m_mOS)(A0), F31
 	RET
 
 
 // func curcpuSleep()
 TEXT ·curcpuSleep(SB),NOSPLIT|NOFRAME,$0-0
-	WFI
+	//WFI
+
+	CSRR  (mie, s0)
+
+	CSRR  (mip, s1)
+	AND   S0, S1
+	BEQ   ZERO, S1, -2(PC)
+
 	RET
 
 

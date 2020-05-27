@@ -94,4 +94,68 @@
 #define t5  30
 #define tmp 31
 
+#define SAVE_GPRS(mp) \
+\ // LR saved separately
+\ // SP saved separately
+MOV  GP, (0*8+m_mOS)(mp) \
+\ // g saved separately
+MOV  T0, (1*8+m_mOS)(mp) \
+MOV  T1, (2*8+m_mOS)(mp) \
+MOV  T2, (3*8+m_mOS)(mp) \
+MOV  S0, (4*8+m_mOS)(mp) \
+MOV  S1, (5*8+m_mOS)(mp) \
+\ // A0 saved separately
+MOV  A1, (6*8+m_mOS)(mp) \
+MOV  A2, (7*8+m_mOS)(mp) \
+MOV  A3, (8*8+m_mOS)(mp) \
+MOV  A4, (9*8+m_mOS)(mp) \
+MOV  A5, (10*8+m_mOS)(mp) \
+MOV  A6, (11*8+m_mOS)(mp) \
+MOV  A7, (12*8+m_mOS)(mp) \
+MOV  S2, (13*8+m_mOS)(mp) \
+MOV  S3, (14*8+m_mOS)(mp) \
+MOV  S4, (15*8+m_mOS)(mp) \
+MOV  S5, (16*8+m_mOS)(mp) \
+MOV  S6, (17*8+m_mOS)(mp) \
+MOV  S7, (18*8+m_mOS)(mp) \
+MOV  S8, (19*8+m_mOS)(mp) \
+MOV  S9, (20*8+m_mOS)(mp) \
+MOV  S10, (21*8+m_mOS)(mp) \
+MOV  S11, (22*8+m_mOS)(mp) \
+MOV  T3, (23*8+m_mOS)(mp) \
+MOV  T4, (24*8+m_mOS)(mp) \
+MOV  T5, (25*8+m_mOS)(mp) \
+MOV  TMP, (26*8+m_mOS)(mp)
 
+#define RESTORE_GPRS(mp) \
+\ // LR loaded separately
+\ // SP loaded separately
+MOV  (0*8+m_mOS)(mp), GP \
+\ // g loaded separately
+MOV  (1*8+m_mOS)(mp), T0 \
+MOV  (2*8+m_mOS)(mp), T1 \
+MOV  (3*8+m_mOS)(mp), T2 \
+MOV  (4*8+m_mOS)(mp), S0 \
+MOV  (5*8+m_mOS)(mp), S1 \
+\ // A0 loaded separately
+MOV  (6*8+m_mOS)(mp), A1 \
+MOV  (7*8+m_mOS)(mp), A2 \
+MOV  (8*8+m_mOS)(mp), A3 \
+MOV  (9*8+m_mOS)(mp), A4 \
+MOV  (10*8+m_mOS)(mp), A5 \
+MOV  (11*8+m_mOS)(mp), A6 \
+MOV  (12*8+m_mOS)(mp), A7 \
+MOV  (13*8+m_mOS)(mp), S2 \
+MOV  (14*8+m_mOS)(mp), S3 \
+MOV  (15*8+m_mOS)(mp), S4 \
+MOV  (16*8+m_mOS)(mp), S5 \
+MOV  (17*8+m_mOS)(mp), S6 \
+MOV  (18*8+m_mOS)(mp), S7 \
+MOV  (19*8+m_mOS)(mp), S8 \
+MOV  (20*8+m_mOS)(mp), S9 \
+MOV  (21*8+m_mOS)(mp), S10 \
+MOV  (22*8+m_mOS)(mp), S11 \
+MOV  (23*8+m_mOS)(mp), T3 \
+MOV  (24*8+m_mOS)(mp), T4 \
+MOV  (25*8+m_mOS)(mp), T5 \
+MOV  (26*8+m_mOS)(mp), TMP
