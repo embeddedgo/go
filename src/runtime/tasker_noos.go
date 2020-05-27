@@ -86,6 +86,7 @@ type cpuctx struct {
 	t        *tasker         // points to thetasker
 	exe      muintptr        // m currently executed by CPU
 	newexe   bool            // for architecture-dependent code: exe changed
+	schedule bool            // for architecture-dependent code: run scheduler
 	runnable mq              // threads in runnable state
 	waitingt msl             // threads waiting until some time elapses
 	wakerq   [fbnum]notelist // futex wakeup request from interrupt handlers

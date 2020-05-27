@@ -47,6 +47,7 @@ func curcpuSchedule() {
 	// job.
 	//
 	// Caution! You can't rely on tail-chaining in case of debuging.
+	curcpu().schedule = true
 	scb.SCB().ICSR.Store(scb.PENDSVSET)
 }
 

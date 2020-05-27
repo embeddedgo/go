@@ -21,24 +21,7 @@ func (cpu *cpuctx) wakeup() {
 }
 
 //go:nosplit
-func curcpuSchedule() {
-	// We follow the thumb way of running the scheduler by simply rise the
-	// software interrupt (see tasker_noos_thumb.go:/curcpuSchedule) and rely on
-	// the CPU to run the software interrupt handler just after exiting from the
-	// syscall trap without executing any thread instruction. Caution! This may
-	// not work during debugging.
-	//
-	// This approach has the adventage to always run the scheduler the same way
-	// regardless of it was caused by syscall, timer interrupt or both
-	// simultaneously. The disadventage is the overhead caused by the trap exit
-	// and reentry.
-	//
-	// The alternate approach can be calling the sheduler from here (requires
-	// more space on the handler stack) or leave this function unchanged but
-	// check the mstatus.MSIP flag before return from the environmentCallHandler
-	// and run the scheduler if the software interrupt is pending.
-	curcpu().wakeup()
-}
+func curcpuSchedule() { curcpu().schedule = true }
 
 const thrSmallCtx = 1 // context saved in mOS contains only LR, SP, g
 

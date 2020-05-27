@@ -168,10 +168,11 @@ unsupported:
 
 TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
-	// if cpuctx.exe == nil then context saved by environmentCallHandler
-	MOV  (cpuctx_exe)(g), A0
-	BEQ  ZERO, A0, contextSaved
+	// if cpuctx.schedule then context saved by environmentCallHandler
+	MOVB  (cpuctx_schedule)(g), A0
+	BNE   ZERO, A0, contextSaved
 
+	MOV        (cpuctx_exe)(g), A0
 	SAVE_GPRS  (A0)  // save most of GPRs
 
 	// save the remaining registers: LR, SP, g, status, mepc
@@ -191,6 +192,8 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOV  S1, (m_tls+const_mepc*8)(A0)
 
 contextSaved:
+	MOVB  ZERO, (cpuctx_schedule)(g)
+
 	// clear software interrupt
 	MOV    $msip, A0
 	CSRR   (mhartid, a1)
@@ -348,9 +351,14 @@ continue:
 	SUB   A4, A2
 	CALL  A2
 nothingToCopy:
+	ADD  $envCallFrameSize, X2
+
+	// run the scheduler if the syscall wants it
+	MOVB  cpuctx_schedule(g), S0
+	BEQ   ZERO, S0, 2(PC)
+	JMP   ·softwareInterruptHandler(SB)
 
 	// pop everything from the stack
-	ADD  $envCallFrameSize, X2
 	MOV  _LR(X2), LR
 	MOV  _mstatus(X2), A0
 	MOV  _mepc(X2), A1
@@ -471,13 +479,23 @@ TEXT runtime·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
 
 // func curcpuSleep()
 TEXT ·curcpuSleep(SB),NOSPLIT|NOFRAME,$0-0
-	//WFI
+	CSRR  (mip, s0)
+	AND   $8, S0
+	BEQ   ZERO, S0, -2(PC)
+	RET
 
-	CSRR  (mie, s0)
+	CSRC   ((1<<MIEn), mstatus)  // disable interrupts globally to prevent MSI handler loop
+	CSRSI  (MSI, mie)            // enable MSI before WFI to allow waking by pending MSI
+	WFI
+	CSRCI  (MSI, mie)
+	CSRS   ((1<<MIEn), mstatus)
 
-	CSRR  (mip, s1)
-	AND   S0, S1
-	BEQ   ZERO, S1, -2(PC)
+	// clear MSI before return
+	MOV   $msip, A0
+	CSRR  (mhartid, s0)
+	SLL   $2, S0  // msip registers are 32-bit
+	ADD   S0, A0
+	MOVW  ZERO, (A0)
 
 	RET
 

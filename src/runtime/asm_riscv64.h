@@ -30,9 +30,9 @@
 
 // mip/mie bits
 
-#define MSI 1<<3
-#define MTI 1<<7
-#define MEI 1<<11
+#define MSI (1<<3)
+#define MTI (1<<7)
+#define MEI (1<<11)
 
 // core peripherals
 

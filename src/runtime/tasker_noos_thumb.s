@@ -230,13 +230,12 @@ TEXT runtime·pendsvHandler(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  LR, R12
 	BL    ·identcurcpu(SB)  // current CPU context to R0
 
-	// load cpuctx.exe
-	MOVW  (cpuctx_exe)(R0), R3
-
-	// if cpuctx.exe == nil then context saved by syscall
-	CBZ  R3, contextSaved
+	// if cpuctx.schedule then context saved by syscall
+	MOVB  (cpuctx_schedule)(R0), R3
+	CBNZ  R3, contextSaved
 
 	// save not stacked registers (R4-R11), SP, CONTROL[nPRIV], EXC_RETURN
+	MOVW     (cpuctx_exe)(R0), R3
 	TST      $(1<<2), R12
 	MOVW.EQ  MSP, R1
 	MOVW.NE  PSP, R1
@@ -249,6 +248,9 @@ TEXT runtime·pendsvHandler(SB),NOSPLIT|NOFRAME,$0-0
 	MOVM.IA  [R4-R11], (R3)
 
 contextSaved:
+	MOVW  $0, R3
+	MOVB  R3, (cpuctx_schedule)(R0)
+
 	// clear PendSV if set again to avoid unnecessary reentry to this handler
 	MOVW  $ICSR_ADDR, R1
 	MOVW  $ICSR_PENDSVCLR, R2
