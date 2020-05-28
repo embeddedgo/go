@@ -113,8 +113,8 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 
 continue:
 
-	// can enable software and timer interrupts
-	MOV   $(MSI+MTI), S1
+	// can enable timer interrupts
+	MOV   $MTI, S1
 	CSRW  (s1, mie)
 
 	// setup handler stack in harts[mhartid].gh

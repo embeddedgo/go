@@ -19,11 +19,11 @@ TEXT ·cpuid(SB),NOSPLIT|NOFRAME,$0
 DATA runtime·interruptHandlers+(0*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(1*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(2*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(3*8)(SB)/8, $·softwareInterruptHandler(SB)
+DATA runtime·interruptHandlers+(3*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(4*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(5*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(6*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(7*8)(SB)/8, $·timerInterruptHandler(SB)
+DATA runtime·interruptHandlers+(7*8)(SB)/8, $·enterScheduler(SB)
 DATA runtime·interruptHandlers+(8*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(9*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(10*8)(SB)/8, $·defaultHandler(SB)
@@ -69,9 +69,18 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 // The trapHandler supports nested interrupts and implements slightly different
 // software order using mie register to mask lower priority interrupts:
 //
-// MEI, MTI, MSI
+// MEI - external interrupt has the highest priority, it can preempt and wakeup
+//       the scheduler
 //
-// We don't support supervisor or user mode interrupts.
+// MTI - lowest priority interrupt that can be taken, used to run or wake up the
+//       scheduler at a predetermined time
+//
+// MSI - never taken, enabled only during WFI to allow the other harts to wake
+//       up the hart sleeping in scheduler
+//
+// We don't support supervisor or user mode interrupts. The platform-specific
+// interrupts with id >= 16 (local interrupts) are probably supported but not
+// tested.
 TEXT runtime·trapHandler(SB),NOSPLIT|NOFRAME,$0
 	// At this point the interrupts are globaly disabled (mstatus.MIE=0).
 	// We want to enable higher priority interrupts as soon as possible.
@@ -102,21 +111,22 @@ nestedTrap:
 	MOV     A0, _mepc(X2)
 	// mie will be saved below
 
-	// mask same or lower priority interrupts (always mask software interrupts)
+	// mask same or lower priority interrupts (always mask MSI and MTI)
 	CSRR  (mcause, a0)
 	SRA   $63, A0, LR
 	AND   LR, A0  // interrupt: A0=mcause, exception: A0=0
 	MOV   $~1, LR
-	SLL   A0, LR     // only 6 lower bits of A0 are used as shift amount
-	AND   $~0xF, LR  // always mask software interrupts
-	CSRR  (mie, a0)
-	MOV   A0, _mie(X2)
+	SLL   A0, LR      // only 6 lower bits of A0 are used as shift amount
+	AND   $~0xFF, LR  // always mask software and timer interrupts
+	CSRR  (mie, lr)
 	AND   LR, A0
 	CSRW  (a0, mie)
 
 	// enable interrupts
 	CSRR   (mcause, a0)  // read mcause before enable interrupts
 	CSRSI  ((1<<MIEn), mstatus)
+
+	MOV  LR, _mie(X2)
 
 	// jump to the exception/interrupt handler passing mcause*8 in A0
 	BGE  A0, ZERO, handleException
@@ -142,31 +152,8 @@ unsupported:
 	JMP  -1(PC)
 
 
-#define INTERRUPT_RETURN \
-	MOV  _LR(X2), LR \  // restore LR
-	\
-	\     // restore CSRs
-	MOV   _mstatus(X2), A0 \
-	CSRW  (a0, mstatus) \  // disables interrupts
-	MOV   _mie(X2), A0 \
-	CSRW  (a0, mie) \
-	MOV   _mepc(X2), A0 \
-	CSRW  (a0, mepc) \
-	AND   $1, A0 \
-	BEQ   ZERO, A0, 6(PC) \
-	\     // return to thread
-	MOV   _A0(X2), A0 \                // restore A0
-	MOV   (g_sched+gobuf_sp)(g), X2 \  // restore thread SP
-	CSRW  (G, mscratch) \              // cpuctx to mscratch
-	MOV   (g_sched+gobuf_g)(g), g \    // restore thread g
-	MRET  \
-	\     // return to handler
-	MOV   _A0(X2), A0 \  // restore A0
-	ADD   $trapCtxSize, X2 \
-	MRET
-
-
-TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
+// enterScheduler is caled by timer interrupt or environment call trap
+TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 
 	// if cpuctx.schedule then context saved by environmentCallHandler
 	MOVB  (cpuctx_schedule)(g), A0
@@ -194,12 +181,18 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 contextSaved:
 	MOVB  ZERO, (cpuctx_schedule)(g)
 
-	// clear software interrupt
-	MOV    $msip, A0
-	CSRR   (mhartid, a1)
-	SLL    $2, A1  // msip registers are 32-bit
-	ADD    A1, A0
-	MOVW   ZERO, (A0)
+	// clear MSI, MTI
+	MOV   $msip, A0
+	CSRR  (mhartid, s0)
+	SLL   $2, S0
+	ADD   S0, A0
+	MOVW  ZERO, (A0)
+	MOV   $mtimecmp, A0
+	SLL   $1, S0
+	ADD   S0, A0
+	MOV   $-1, S0
+	MOV   S0, (A0)
+
 	FENCE  // ensure clearing happens before checking nanotime and futexes
 
 	// enter scheduler
@@ -219,8 +212,7 @@ contextSaved:
 smallCtx:
 	MOVB  ZERO, (cpuctx_newexe)(g)  // clear cpuctx.newexe
 
-	// tasker works at lowest interrupt priority level so it always
-	// returns to the thread mode
+	// scheduler always returns to the thread mode
 
 	// restore mstatus
 	MOV   _mstatus(X2), LR
@@ -249,15 +241,10 @@ smallCtx:
 	MRET
 
 
-TEXT runtime·timerInterruptHandler(SB),NOSPLIT|NOFRAME,$0
+TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
-	// clear timer interrupt
-	MOV   $mtimecmp, A0
-	CSRR  (mhartid, lr)
-	SLL   $3, LR
-	ADD   LR, A0
-	MOV   $-1, LR
-	MOV   LR, (A0)
+	EBREAK
+	JMP  -1(PC)
 
 	// rise software interrupt
 	MOV   $msip, A0
@@ -267,13 +254,29 @@ TEXT runtime·timerInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOV   $1, LR
 	MOVW  LR, (A0)
 
-	INTERRUPT_RETURN
+	MOV  _LR(X2), LR  // restore LR
 
+	// restore CSRs
+	MOV   _mstatus(X2), A0
+	CSRW  (a0, mstatus)  // disables interrupts
+	MOV   _mie(X2), A0
+	CSRW  (a0, mie)
+	MOV   _mepc(X2), A0
+	CSRW  (a0, mepc)
+	AND   $1, A0
+	BEQ   ZERO, A0, 6(PC)
 
-TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
-	EBREAK
-	JMP  -1(PC)
-	INTERRUPT_RETURN
+	// return to thread
+	MOV   _A0(X2), A0                // restore A0
+	MOV   (g_sched+gobuf_sp)(g), X2  // restore thread SP
+	CSRW  (G, mscratch)              // cpuctx to mscratch
+	MOV   (g_sched+gobuf_g)(g), g    // restore thread g
+	MRET
+
+	// return to handler
+	MOV  _A0(X2), A0  // restore A0
+	ADD  $trapCtxSize, X2
+	MRET
 
 
 // System call is like oridnary function call so all registers except LR are
@@ -356,7 +359,7 @@ nothingToCopy:
 	// run the scheduler if the syscall wants it
 	MOVB  cpuctx_schedule(g), S0
 	BEQ   ZERO, S0, 2(PC)
-	JMP   ·softwareInterruptHandler(SB)
+	JMP   ·enterScheduler(SB)
 
 	// pop everything from the stack
 	MOV  _LR(X2), LR
@@ -477,25 +480,33 @@ TEXT runtime·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
 	RET
 
 
+//#define WFI CSRR(mie, s1); CSRR(mip, a0); AND S1, A0; BEQ ZERO, A0, -2(PC)
+
+
 // func curcpuSleep()
 TEXT ·curcpuSleep(SB),NOSPLIT|NOFRAME,$0-0
-	CSRR  (mip, s0)
-	AND   $8, S0
-	BEQ   ZERO, S0, -2(PC)
-	RET
 
-	CSRC   ((1<<MIEn), mstatus)  // disable interrupts globally to prevent MSI handler loop
-	CSRSI  (MSI, mie)            // enable MSI before WFI to allow waking by pending MSI
+	// We want MSI, MTI to wake up the hart from WFI so they must be enabled in
+	// the mie register. Unfortunately, it means that we need to disable
+	// interrupts globally which adds a few cycles to the interrupt latency.
+	MOV    $(MSI+MTI), S0
+	CSRCI  ((1<<MIEn), mstatus)
+	CSRS   (s0, mie)
 	WFI
-	CSRCI  (MSI, mie)
-	CSRS   ((1<<MIEn), mstatus)
+	CSRC   (s0, mie)
+	CSRSI  ((1<<MIEn), mstatus)
 
-	// clear MSI before return
+	// clear MSI, MTI
 	MOV   $msip, A0
 	CSRR  (mhartid, s0)
-	SLL   $2, S0  // msip registers are 32-bit
+	SLL   $2, S0
 	ADD   S0, A0
 	MOVW  ZERO, (A0)
+	MOV   $mtimecmp, A0
+	SLL   $1, S0
+	ADD   S0, A0
+	MOV   $-1, S0
+	MOV   S0, (A0)
 
 	RET
 
