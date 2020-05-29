@@ -98,9 +98,9 @@ pkg embedded/rtos, method (*Error) Error() string
 pkg embedded/rtos, method (*Note) Clear()
 pkg embedded/rtos, method (*Note) Sleep(time.Duration) bool
 pkg embedded/rtos, method (*Note) Wakeup()
-pkg embedded/rtos, method (IRQ) Disable() error
-pkg embedded/rtos, method (IRQ) Enable(int) error
-pkg embedded/rtos, method (IRQ) Status() (bool, int, error)
+pkg embedded/rtos, method (IRQ) Disable(int) error
+pkg embedded/rtos, method (IRQ) Enable(int, int) error
+pkg embedded/rtos, method (IRQ) Status(int) (bool, int, error)
 pkg embedded/rtos, type Error struct
 pkg embedded/rtos, type IRQ int
 pkg embedded/rtos, type Note struct

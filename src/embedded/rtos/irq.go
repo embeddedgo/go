@@ -36,23 +36,26 @@ const (
 )
 
 // IRQ represents an user accessible interrupt. It provides interface to basic
-// operations such as enabling/disabling handling of interrupt requests and
+// operations such as enabling/disabling handling of the interrupt requests and
 // setting interrupt priorities. There can be other (system) interrupts not
 // exposed by this interface.
 type IRQ int
 
-// Enable sets the priority of interrupt and enables handling of interrupt
-// requests.
-func (irq IRQ) Enable(prio int) error {
+// Enable sets the priority of the interrupt and enables handling interrupt
+// requests on the CPU (core/hart) specified by cpuid. The special cpuid -1 lets
+// the Enable to select one or more CPUs automaticaly.
+func (irq IRQ) Enable(prio, cpuid int) error {
 	return irqEnable(irq, prio)
 }
 
-// Disable disables handling of interrupt requests.
-func (irq IRQ) Disable() error {
+// Disable disables handling of interrupt requests by the CPU (core/hart)
+// specified by cpuid. The special cpuid -1 disables irq on all CPUs.
+func (irq IRQ) Disable(cpuid int) error {
 	return irqDisable(irq)
 }
 
-// Status reports whether the irq is enabled and returns its priority.
-func (irq IRQ) Status() (enabled bool, prio int, err error) {
+// Status reports whether the irq is enabled on the CPU (core/hart) specifie by
+// cpuid and returns its priority.
+func (irq IRQ) Status(cpuid int) (enabled bool, prio int, err error) {
 	return irqStatus(irq)
 }
