@@ -261,24 +261,27 @@ contextSaved:
 	MOVW  R0, g
 	BL    ·curcpuRunScheduler(SB)
 
-	// load cpuctx.exe and cpuctx.newexe
-	MOVW   (cpuctx_exe)(g), R3
-	MOVBU  (cpuctx_newexe)(g), R0
+	// load SP+CONTROL[nPRIV], EXC_RETURN from new/old context pointed by exe
+	MOVW  (cpuctx_exe)(g), R3
+	MOVW  (m_tls+const_msp*4)(R3), R0
+	MOVW  (m_tls+const_mer*4)(R3), R1
+
+	// check does the context changed
+	MOVBU  (cpuctx_newexe)(g), R2
+	CBNZ   R2, newexe
 
 	// fast path if exe did not changed (cpuctx.newexe == false)
-	CBNZ     R0, newexe
-	ADD      $m_libcall, R3, R1
-	MOVM.IA  (R1), [R4-R11]
-	MOVW     (m_tls+const_mer*4)(R3), R15
+	TST      $const_thrSmallCtx, R0
+	MOVW.NE  (m_libcall)(R3), g
+	B.NE     (R1)
+	ADD      $m_libcall, R3
+	MOVM.IA  (R3), [R4-R11]
+	B        (R1)
 
 newexe:
 	// clear cpuctx.newexe
-	MOVW  $0, R0
-	MOVB  R0, (cpuctx_newexe)(g)
-
-	// load SP+CONTROL[nPRIV] and EXC_RETURN from new context
-	MOVW  (m_tls+const_msp*4)(R3), R0
-	MOVW  (m_tls+const_mer*4)(R3), R1
+	MOVW  $0, R2
+	MOVB  R2, (cpuctx_newexe)(g)
 
 	// restore privilege level
 	MOVW  CONTROL, R2
