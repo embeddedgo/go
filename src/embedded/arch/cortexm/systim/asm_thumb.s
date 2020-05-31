@@ -12,6 +12,7 @@ TEXT SysTick_Handler(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  $ICSR_ADDR, R0
 	MOVW  $ICSR_PENDSVSET, R1
 	MOVW  R1, (R0)
+	SEV   // see ARM Errata 563915
 
 	// increment systim.reloadcnt (64-bit counter)
 	MOVW   $·systim(SB), R0
@@ -22,5 +23,4 @@ TEXT SysTick_Handler(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  4(R0), R1
 	ADD   $1, R1
 	MOVW  R1, 4(R0)
-
 	RET
