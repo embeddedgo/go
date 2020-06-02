@@ -59,6 +59,11 @@
 #define CSRRWI(U5,CSR,RD) WORD $(0x5073 + RD<<7 + U5<<15 + CSR<<20)
 #define CSRRCI(U5,CSR,RD) WORD $(0x7073 + RD<<7 + U5<<15 + CSR<<20)
 
+#define LRW(RA, RD)     WORD $(0x1600202F + RD<<7 + RA<<15)
+#define LRD(RA, RD)     WORD $(0x1600302F + RD<<7 + RA<<15)
+#define SCW(RS, RD, RA) WORD $(0x1E00202F + RD<<7 + RA<<15 + RS<<20)
+#define SCD(RS, RD, RA) WORD $(0x1E00302F + RD<<7 + RA<<15 + RS<<20)
+
 // register numbers for above CSR* macros
 
 #define zero 0
@@ -93,6 +98,14 @@
 #define t4  29
 #define t5  30
 #define tmp 31
+
+// trap context on the stack
+#define _LR (0*8)
+#define _A0 (1*8)
+#define _mstatus (2*8) // cannot be zero, see: tasker_noos_riscv64.s:/SCW
+#define _mepc (3*8)
+#define _mie (4*8) // cannot be zero, see: tasker_noos_riscv64.s:/SCW
+#define trapCtxSize (5*8)
 
 #define SAVE_GPRS(mp) \
 \ // LR saved separately

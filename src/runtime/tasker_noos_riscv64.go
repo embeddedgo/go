@@ -43,19 +43,18 @@ var (
 //go:nowritebarrierrec
 //go:nosplit
 func taskerinit() {
-	if cpuid() == 0 {
-		uharts := (*[maxHarts]uintptr)(unsafe.Pointer(&pharts))
-		for i := range harts {
-			hart := &harts[i]
-			*(*uintptr)(unsafe.Pointer(&hart.t)) = uintptr(unsafe.Pointer(&thetasker))
-			uharts[i] = uintptr(unsafe.Pointer(hart))
-		}
-		allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
-		*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(uharts))
-		allcpu.len = 1
-		allcpu.cap = maxHarts
-		curcpu().exe.set(getg().m)
+	// only hart0 runs this function
+	uharts := (*[maxHarts]uintptr)(unsafe.Pointer(&pharts))
+	for i := range harts {
+		hart := &harts[i]
+		*(*uintptr)(unsafe.Pointer(&hart.t)) = uintptr(unsafe.Pointer(&thetasker))
+		uharts[i] = uintptr(unsafe.Pointer(hart))
 	}
+	allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
+	*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(uharts))
+	allcpu.len = 1
+	allcpu.cap = maxHarts
+	curcpu().exe.set(getg().m)
 }
 
 const (

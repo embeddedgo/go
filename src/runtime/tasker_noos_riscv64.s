@@ -11,8 +11,8 @@
 
 // func cpuid() int
 TEXT ·cpuid(SB),NOSPLIT|NOFRAME,$0
-	CSRR  (mhartid, a0)
-	MOV   A0, ret+0(FP)
+	CSRR  (mhartid, s0)
+	MOV   S0, ret+0(FP)
 	RET
 
 
@@ -50,13 +50,6 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 #define sysMaxArgs (24+8)
 #define envCallFrameSize (sysMaxArgs+3*8)
 
-#define _LR (0*8)
-#define _A0 (1*8)
-#define _mstatus (2*8)
-#define _mepc (3*8)
-#define _mie (4*8)
-#define trapCtxSize (5*8)
-
 
 // The RISC-V Instruction Set Manual Volume II: Privileged Architecture defines
 // the following decreasing interrupt priority order:
@@ -89,7 +82,7 @@ TEXT runtime·trapHandler(SB),NOSPLIT|NOFRAME,$0
 	// mscratch contains &cpuctx if trap from thread mode, 0 for nested trap
 	CSRRW  (a0, mscratch, a0)  // swap A0 with cpuctx in mscratch
 
-	// setup g and SP for handler mode, save thread ones to cpuctx.gh.sched
+	// setup g and SP for handler mode, save thread ones to the cpuctx.gh.sched
 	BEQ  ZERO, A0, nestedTrap
 	MOV  X2, (g_sched+gobuf_sp)(A0)
 	MOV  g, (g_sched+gobuf_g)(A0)
@@ -211,6 +204,7 @@ contextSaved:
 	RESTORE_GPRS  (A0)              // restore most of GPRs
 smallCtx:
 	MOVB  ZERO, (cpuctx_newexe)(g)  // clear cpuctx.newexe
+	SCW   (zero, zero, x2)          // invalidate dangling LR
 
 	// scheduler always returns to the thread mode
 

@@ -93,6 +93,8 @@ type cpuctx struct {
 	mh       m               // for ISRs, mostly not written so works as cache line pad
 }
 
+// id returns CPU identifier. It must be a positive integer from 0 to the
+// number of CPUs/cores/harts.
 func (cpu *cpuctx) id() int { return int(cpu.gh.goid) }
 
 type tasker struct {

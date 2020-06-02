@@ -22,32 +22,29 @@
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
 #define persistAllocMin 64*1024
 
-DATA runtime·waitInit+0(SB)/4, $1
+DATA runtime·waitInit+0(SB)/4, $-1
 GLOBL runtime·waitInit(SB), NOPTR, $4
 
 // _rt0_riscv64_noos initializs all running cores
 TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
-	// Disable interrupts locally and set a temporary trap handler.
-	CSRWI  (0, mie)
-	MOV    $·defaultHandler(SB), S0
-	CSRW   (s0, mtvec)
-
-	//MOV $1, S0
-	//BNE ZERO, S0, -1(PC)
-
-	// Enable interrupts globally (interrupts are still disabled in mie
-	// register), enable FPU (Kendryte K210 supports only FS=0(off)/3(dirty),
-	// this is a weakness of the Rocket Chip Generator used to generate K210
-	// cores).
+	// Disable interrupts globally, enable FPU (Kendryte K210 supports only
+	// FS=0(off)/3(dirty), this is a weakness of the Rocket Chip Generator used
+	// to generate K210 cores).
 	MOV   $0x7FFF, S0
 	CSRC  (s0, mstatus)
-	MOV   $(1<<FSn + 1<<MIEn), S0
+	MOV   $(1<<FSn), S0 // set FS to init
 	CSRS  (s0, mstatus)
 
+	// Set a temporary trap handler.
+	MOV   $·defaultHandler(SB), S0
+	CSRW  (s0, mtvec)
+
+	// Clear some other CSRs
 	CSRWI  (0, mideleg)
 	CSRWI  (0, medeleg)
 	CSRWI  (0, mscratch)
 	CSRWI  (0, fcsr)
+	CSRWI  (0, mie)  // disable interrupts locally
 
 	//MOV  ZERO, X1
 	//...
@@ -60,7 +57,7 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	// park excess harts
 	CSRR  (mhartid, s0)  // from now S0 used only to provide hart id
 	MOV   $const_maxHarts, S1
-	BGE   S0, S1, parkHart
+	BGEU  S0, S1, parkHart
 
 	// ensure handler stacks are 16 byte aligned (may be required in the future)
 	MOV  $runtime·end(SB), A0
@@ -85,9 +82,15 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	MOV  $-1, A1
 	MOV  A1, (A0)
 
-	// other harts have to wait for hart0 to initaialize all shared components
-	BNE  ZERO, S0, waitInit
+	BEQ  ZERO, S0, clear
 
+	// Other harts have to wait for hart0 to initaialize all shared components
+	MOV   $·waitInit(SB), A0
+	MOVW  (A0), S1
+	BNE   ZERO, S1, -1(PC)
+	JMP   cleared
+
+clear:
 	// clear mtime register
 	MOV  $mtime, A0
 	SLL  $3, S0, A1
@@ -111,37 +114,53 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	CALL  runtime·memclrNoHeapPointers(SB)
 	ADD   $24, X2
 
-continue:
-
-	// can enable timer interrupts
-	MOV   $MTI, S1
-	CSRW  (s1, mie)
-
+cleared:
 	// setup handler stack in harts[mhartid].gh
-	MOV   $runtime·harts(SB), g
-	MOV   $cpuctx__size, A1
-	MUL   S0, A1
-	ADD   A1, g  // gh is the first field of the cpuctx struct
-	ADD   $-handlerStackSize, X2, A1
-	MOVW  A1, (g_stack+stack_lo)(g)
-	MOVW  X2, (g_stack+stack_hi)(g)
+	MOV  $runtime·harts(SB), g
+	MOV  $cpuctx__size, A0
+	MUL  S0, A0
+	ADD  A0, g  // gh is the first field of the cpuctx struct
+	ADD  $-handlerStackSize, X2, A0
+	MOV  A0, (g_stack+stack_lo)(g)
+	MOV  X2, (g_stack+stack_hi)(g)
 
-	// as we have SP and g set we can set real trap handler in mtvec
-	MOV   $·trapHandler(SB), S1
-	CSRW  (s1, mtvec)
+	// setup gh and mh
+	ADD  $cpuctx_mh, g, A0
+	MOV  g, m_g0(A0)  // harts[mhartid].mh.g0 = harts[mhartid].gh
+	MOV  A0, g_m(g)   // harts[mhartid].gh.m = harts[mhartid].mh
 
-	// enable
+	// as we have SP and g set we can set the real trap handler in mtvec
+	MOV   $·trapHandler(SB), A0
+	CSRW  (a0, mtvec)
 
-	BNE  ZERO, S0, parkHart
-
+	// hart0 runs the m0
+	BNE  ZERO, S0, 2(PC)
 	JMP  runtime·rt0_go(SB)
 
-waitInit:
-	JMP   parkHart
-	MOV   $·waitInit(SB), A0
-	MOVW  (A0), S1
-	BEQ   ZERO, S1, continue
-	JMP   -2(PC)
+	// set thetasker.allcpu.len to hartid+1 if lower
+	MOV  cpuctx_t(g), A0         // &thetasker
+	ADD  $(tasker_allcpu+8), A0  // &thetasker.allcpu.len
+	ADD  $1, S0
+again:
+	LRD   (a0, s1)
+	BGEU  S1, S0, runScheduler
+	SCD   (s0, s1, a0)
+	BNE   ZERO, S1, again
+
+runScheduler:
+	// prepare trap context (only mstatus and mie are required on the stack)
+	ADD    $-trapCtxSize, X2
+	CSRR   (mstatus, s0)
+	OR     $(1<<MPIEn), S0
+	MOV    S0, _mstatus(X2)
+	MOV    $MTI, S0  // TODO: MEI
+	MOV    S0, _mie(X2)
+	CSRWI  (0, mie)  // disable interrupts before enter the scheduler
+
+	// enter scheduler
+	MOV   $1, S0
+	MOVB  S0, (cpuctx_schedule)(g)
+	JMP   ·enterScheduler(SB)
 
 parkHart:
 	WFI
@@ -152,9 +171,9 @@ parkHart:
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// set up m0 (bootstrap thread), temporarily use harts[0].gh as g
-	MOV  $runtime·m0(SB), A1
-	MOV  g, m_g0(A1)  // m0.g0 = harts[mhartid].gh
-	MOV  A1, g_m(g)   // harts[mhartid].gh.m = m0
+	MOV  $runtime·m0(SB), A0
+	MOV  g, m_g0(A0)  // m0.g0 = harts[0].gh
+	MOV  A0, g_m(g)   // harts[0].gh.m = m0
 
 	CALL  runtime·check(SB)
 	CALL  runtime·osinit(SB)
@@ -199,12 +218,14 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV  A5, 40(S0)
 
 	// initialize noos tasker and Go scheduler
-
 	CALL  runtime·taskerinit(SB)
 	CALL  runtime·schedinit(SB)
 
-	// allocate g0 for m0 and leave gh
+	// run other harts (TODO: setup PLIC, to allow all harts to enable MEI+MTI)
+	MOV   $·waitInit(SB), A0
+	MOVW  ZERO, (A0)
 
+	// allocate g0 for m0
 	MOV   $(2*const__FixedStack), A0
 	ADD   $-24, X2
 	MOV   ZERO, 0(X2)
@@ -222,25 +243,28 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV  A0, m_g0(A1)  // m0.g0 = newg
 	MOV  A1, g_m(A0)   // newg.m = m0
 
+	// disable interrupts globally to ensure exclusive access to g, SP and CSRs
+	CSRCI  ((1<<MIEn), mstatus)
+
 	// newg stack pointer to X2
 	MOV  (g_stack+stack_hi)(A0), X2
 
+	// newg to g
 	MOV  g, A1
 	MOV  A0, g
 
-	// fix harts[0].gh, harts[0].mh
-
+	// fix harts[0].gh
 	ADD   $cpuctx_mh, A1, A0
-	MOV   A1, m_g0(A0)  // harts[0].mh.g0 = harts[0].gh
-	MOV   A0, g_m(A1)   // harts[0].gh.m = harts[0].mh
+	MOV   A0, g_m(A1)  // harts[0].gh.m = harts[0].mh
 	CSRW  (a1, mscratch)
 
-	// disable interrupts globally to ensure exclusive access to mstatus, mepc
-	CSRCI  ((1<<MIEn), mstatus)
+	// enable timer interrupt
+	MOV   $MTI, S0  // TODO: MEI
+	CSRS  (s0, mie)
 
-	// switch to user mode
-	MOV    $(1<<MPIEn), A0
-	CSRS   (a0, mstatus)
+	// switch to the user mode
+	MOV    $(1<<MPIEn), S0
+	CSRS   (s0, mstatus)
 	AUIPC  $0, A0
 	ADD    $16, A0  // A0 must point just after MRET
 	CSRW   (a0, mepc)
