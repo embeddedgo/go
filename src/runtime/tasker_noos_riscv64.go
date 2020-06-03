@@ -16,7 +16,7 @@ func curcpuWakeup()      {}
 func curcpuSavectxCall() {} // all registars saved on caller's stack
 
 //go:nosplit
-func (cpu *cpuctx) wakeup() {
+func (cpu *cpuctx) newwork() {
 	clint.CLINT().MSIP[cpu.id()].Store(1)
 }
 

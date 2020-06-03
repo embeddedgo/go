@@ -46,12 +46,18 @@ import (
 // Go scheduler and memory allocator are ready. It should setup a minimal
 // enviroment for them.
 //
-// curcpuSleep, cpuctx.wakeup
+// curcpuSleep
 //
-// These functions are called to put the CPU to sleep and wake up it. If the
-// CPU is running the wakeup command must be registered so the subsequent sleep
-// will not happen (to avoid race condition). It is allowed that both of these
-// functions do nothing.
+// This functions is called to put the CPU to sleep. It is allowed it does
+// nothing.
+//
+// cpuctx.newwork
+//
+// This function is used to inform the another CPU that there is a new thread
+// added to its runnable queue. It should wake up the sleeping CPU or preempt
+// the currently running thread to run the scheduler. The thread preemption can
+// be set as delayed to allow a running thread to run for a minimum period of
+// time.
 //
 // curcpuSavectxCall, curcpuSavectxSched
 //
@@ -163,11 +169,10 @@ byid:
 	bestcpu = allcpu[int(p.ptr().id)%len(allcpu)]
 end:
 	bestcpu.runnable.lock()
-	n := bestcpu.runnable.n
 	bestcpu.runnable.push(m)
 	bestcpu.runnable.unlock()
-	if bestcpu != curcpu && n == 0 {
-		bestcpu.wakeup()
+	if bestcpu != curcpu {
+		bestcpu.newwork()
 	}
 }
 

@@ -32,7 +32,7 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	// to generate K210 cores).
 	MOV   $0x7FFF, S0
 	CSRC  (s0, mstatus)
-	MOV   $(1<<FSn), S0 // set FS to init
+	MOV   $(1<<FSn), S0  // set FS to init
 	CSRS  (s0, mstatus)
 
 	// Set a temporary trap handler.
@@ -136,6 +136,8 @@ cleared:
 	// hart0 runs the m0
 	BNE  ZERO, S0, 2(PC)
 	JMP  runtime·rt0_go(SB)
+
+	MOV  S0, g_goid(g)  // set cpuctx.gh.goid to mhartid
 
 	// set thetasker.allcpu.len to hartid+1 if lower
 	MOV  cpuctx_t(g), A0         // &thetasker

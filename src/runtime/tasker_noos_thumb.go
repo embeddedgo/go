@@ -29,10 +29,13 @@ func cpuid() int {
 }
 
 //go:nosplit
-func (cpu *cpuctx) wakeup() { sev() }
+func curcpuWakeup() { sev() } // see ARM Errata 563915, STM32F10xx Errata 1.1.2
 
 //go:nosplit
-func curcpuWakeup() { sev() } // see ARM Errata 563915, STM32F10xx Errata 1.1.2
+func (cpu *cpuctx) newwork() {
+	scb.SCB().ICSR.Store(scb.PENDSVSET)
+	sev()
+}
 
 //go:nosplit
 func curcpuSchedule() {
