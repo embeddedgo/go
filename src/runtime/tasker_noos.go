@@ -233,7 +233,7 @@ func curcpuRunScheduler() {
 			}
 		}
 
-		var sleepuntil int64
+		var nextschedt int64
 
 		// waking up the threads sleeping in the curcpu.waitingt
 		now := curcpu.t.nanotime()
@@ -242,11 +242,11 @@ func curcpuRunScheduler() {
 			wt.lock()
 			m := wt.first()
 			if m == nil {
-				sleepuntil = -1
+				nextschedt = -1
 				break
 			}
-			sleepuntil = mval(m)
-			if sleepuntil > now {
+			nextschedt = mval(m)
+			if nextschedt > now {
 				break
 			}
 			owned := true
@@ -282,9 +282,9 @@ func curcpuRunScheduler() {
 		curcpu.runnable.unlock()
 
 		if n != 0 {
-			sleepuntil = now + 2e6
+			nextschedt = now + 2e6
 		}
-		curcpu.t.setalarm(sleepuntil)
+		curcpu.t.setalarm(nextschedt)
 
 		if next != nil {
 			curcpu.exe.set(next)
