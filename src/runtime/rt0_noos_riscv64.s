@@ -22,6 +22,8 @@
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
 #define persistAllocMin 64*1024
 
+#define intEnabled (MTI+MSI) // TODO: MEI
+
 DATA runtime·waitInit+0(SB)/4, $-1
 GLOBL runtime·waitInit(SB), NOPTR, $4
 
@@ -35,6 +37,10 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	MOV   $(1<<FSn), S0  // set FS to init
 	CSRS  (s0, mstatus)
 
+	// enable interrupts locally
+	MOV   $intEnabled, S0
+	CSRW  (s0, mie)
+
 	// Set a temporary trap handler.
 	MOV   $·defaultHandler(SB), S0
 	CSRW  (s0, mtvec)
@@ -44,7 +50,6 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	CSRWI  (0, medeleg)
 	CSRWI  (0, mscratch)
 	CSRWI  (0, fcsr)
-	CSRWI  (0, mie)  // disable interrupts locally
 
 	//MOV  ZERO, X1
 	//...
@@ -139,8 +144,6 @@ cleared:
 
 	MOV  S0, g_goid(g)  // set cpuctx.gh.goid to mhartid
 
-	JMP parkHart
-
 	// set thetasker.allcpu.len to hartid+1 if lower
 	MOV  cpuctx_t(g), A0         // &thetasker
 	ADD  $(tasker_allcpu+8), A0  // &thetasker.allcpu.len
@@ -153,13 +156,14 @@ again:
 
 runScheduler:
 	// prepare trap context (only mstatus and mie are required on the stack)
-	ADD    $-trapCtxSize, X2
-	CSRR   (mstatus, s0)
-	OR     $(1<<MPIEn), S0
-	MOV    S0, _mstatus(X2)
-	MOV    $(MTI+MSI), S0  // TODO: MEI
-	MOV    S0, _mie(X2)
-	CSRWI  (0, mie)  // disable interrupts before enter the scheduler
+	ADD   $-trapCtxSize, X2
+	CSRR  (mstatus, s0)
+	OR    $(1<<MPIEn), S0
+	MOV   S0, _mstatus(X2)
+	MOV   $intEnabled, S0
+	MOV   S0, _mie(X2)
+	MOV   $0xFF, S0
+	CSRC  (s0, mie)  // disable MTI+MSI before enter the scheduler
 
 	// enter scheduler
 	MOV   $1, S0
@@ -247,9 +251,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV  A0, m_g0(A1)  // m0.g0 = newg
 	MOV  A1, g_m(A0)   // newg.m = m0
 
-	// disable interrupts globally to ensure exclusive access to g, SP and CSRs
-	CSRCI  ((1<<MIEn), mstatus)
-
 	// newg stack pointer to X2
 	MOV  (g_stack+stack_hi)(A0), X2
 
@@ -261,10 +262,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	ADD   $cpuctx_mh, A1, A0
 	MOV   A0, g_m(A1)  // harts[0].gh.m = harts[0].mh
 	CSRW  (a1, mscratch)
-
-	// enable interrupts
-	MOV   $(MTI+MSI), S0  // TODO: MEI
-	CSRS  (s0, mie)
 
 	// switch to the user mode
 	MOV    $(1<<MPIEn), S0
