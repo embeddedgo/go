@@ -19,7 +19,7 @@ TEXT ·cpuid(SB),NOSPLIT|NOFRAME,$0
 DATA runtime·interruptHandlers+(0*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(1*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(2*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(3*8)(SB)/8, $·defaultHandler(SB)
+DATA runtime·interruptHandlers+(3*8)(SB)/8, $·enterScheduler(SB)
 DATA runtime·interruptHandlers+(4*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(5*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(6*8)(SB)/8, $·defaultHandler(SB)
@@ -52,28 +52,25 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 
 
 // The RISC-V Instruction Set Manual Volume II: Privileged Architecture defines
-// the following decreasing interrupt priority order:
+// the following increasing interrupt priority order:
 //
-// MEI, MSI, MTI, SEI, SSI, STI, UEI, USI, UTI
+// UTI, USI, UEI, STI, SSI, SEI, MTI, MSI, MEI
 //
 // That's a hardware priority order conclusive in case of multiple simultaneous
 // pending interrupts provided that all are enabled in the mie register.
 //
-// The trapHandler supports nested interrupts and implements slightly different
+// The trapHandler supports nested interrupts and implements different
 // software order using mie register to mask lower priority interrupts:
 //
-// MEI - external interrupt has the highest priority, it can preempt and wakeup
-//       the scheduler
+// MTI, MSI - timer and software interrupts have the same, lowest priority,
+//            both used to enter or wakeup the scheduler,
 //
-// MTI - lowest priority interrupt that can be taken, used to run or wake up the
-//       scheduler at a predetermined time
-//
-// MSI - never taken, enabled only during WFI to allow the other harts to wake
-//       up the hart sleeping in scheduler
+// MEI      - external interrupt has higher priority than MTI and MSI, it can
+//            preempt and wakeup the scheduler.
 //
 // We don't support supervisor or user mode interrupts. The platform-specific
-// interrupts with id >= 16 (local interrupts) are probably supported but not
-// tested.
+// interrupts with id >= 16 (local interrupts) are probably supported (with
+// higher priority than MEI) but not tested.
 TEXT runtime·trapHandler(SB),NOSPLIT|NOFRAME,$0
 	// At this point the interrupts are globaly disabled (mstatus.MIE=0).
 	// We want to enable higher priority interrupts as soon as possible.
@@ -174,7 +171,7 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 contextSaved:
 	MOVB  ZERO, (cpuctx_schedule)(g)
 
-	// clear MSI, MTI
+	// clear MSI and MTI
 	MOV   $msip, A0
 	CSRR  (mhartid, s0)
 	SLL   $2, S0

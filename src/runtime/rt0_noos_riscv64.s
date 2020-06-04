@@ -139,6 +139,8 @@ cleared:
 
 	MOV  S0, g_goid(g)  // set cpuctx.gh.goid to mhartid
 
+	JMP parkHart
+
 	// set thetasker.allcpu.len to hartid+1 if lower
 	MOV  cpuctx_t(g), A0         // &thetasker
 	ADD  $(tasker_allcpu+8), A0  // &thetasker.allcpu.len
@@ -155,7 +157,7 @@ runScheduler:
 	CSRR   (mstatus, s0)
 	OR     $(1<<MPIEn), S0
 	MOV    S0, _mstatus(X2)
-	MOV    $MTI, S0  // TODO: MEI
+	MOV    $(MTI+MSI), S0  // TODO: MEI
 	MOV    S0, _mie(X2)
 	CSRWI  (0, mie)  // disable interrupts before enter the scheduler
 
@@ -223,7 +225,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	CALL  runtime·taskerinit(SB)
 	CALL  runtime·schedinit(SB)
 
-	// run other harts (TODO: setup PLIC, to allow all harts to enable MEI+MTI)
+	// run other harts (TODO: setup PLIC, to allow all harts to enable also MEI)
 	MOV   $·waitInit(SB), A0
 	MOVW  ZERO, (A0)
 
@@ -260,8 +262,8 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV   A0, g_m(A1)  // harts[0].gh.m = harts[0].mh
 	CSRW  (a1, mscratch)
 
-	// enable timer interrupt
-	MOV   $MTI, S0  // TODO: MEI
+	// enable interrupts
+	MOV   $(MTI+MSI), S0  // TODO: MEI
 	CSRS  (s0, mie)
 
 	// switch to the user mode
