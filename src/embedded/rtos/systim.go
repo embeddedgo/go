@@ -12,7 +12,8 @@ package rtos
 // Setalarm is called by the scheduler with the ns >= 0 to ask the system timer
 // to wake the current CPU at the specified time. Sheduler can also pass ns < 0
 // if it do not want to be woken up by the system timer. A spurious or
-// inaccurate wakeups are acceptable.
+// inaccurate wakeups are acceptable. Setalarm reports whether the scheduler
+// can put itself to sleep.
 //
 // There are two main types of system timer implementations.
 //
