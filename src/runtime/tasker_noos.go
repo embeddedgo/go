@@ -136,7 +136,7 @@ func (t *tasker) fbucketbyaddr(addr uintptr) *mcl {
 func curcpu() *cpuctx { return (*cpuctx)(unsafe.Pointer(getg())) }
 
 //go:nosplit
-func taskerSetrunnable(m *m) {
+func taskerSetrunnable(m *m) bool {
 	curcpu := curcpu()
 	allcpu := curcpu.t.allcpu
 	var (
@@ -169,15 +169,22 @@ byid:
 	bestcpu = allcpu[int(p.ptr().id)%len(allcpu)]
 end:
 	bestcpu.runnable.lock()
+	n := bestcpu.runnable.n
 	bestcpu.runnable.push(m)
 	bestcpu.runnable.unlock()
+	if n != 0 {
+		return false
+	}
 	if bestcpu != curcpu {
 		bestcpu.newwork()
+		return false
 	}
+	return true
 }
 
 //go:nosplit
 func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) {
+	schedule := false
 	for ; cnt != 0; cnt-- {
 		fb.lock()
 		m := fb.find(uintptr(unsafe.Pointer(addr)))
@@ -201,8 +208,11 @@ func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) {
 				wt.remove(m)
 				wt.unlock()
 			}
-			taskerSetrunnable(m)
+			schedule = schedule || taskerSetrunnable(m)
 		}
+	}
+	if schedule {
+		curcpuSchedule()
 	}
 	return
 }
@@ -270,12 +280,15 @@ func curcpuRunScheduler() {
 		}
 		n := curcpu.runnable.n
 		curcpu.runnable.unlock()
+
+		if n != 0 {
+			sleepuntil = now + 2e6
+		}
+		curcpu.t.setalarm(sleepuntil)
+
 		if next != nil {
 			curcpu.exe.set(next)
 			curcpu.newexe = true
-			if n != 0 {
-				curcpu.t.setalarm(now + 2e6)
-			}
 			return
 		}
 		if exe != nil {
@@ -284,9 +297,7 @@ func curcpuRunScheduler() {
 
 		// Nothing to execute. If this will be a work-stealing scheduler it will
 		// try to steal some work from some other CPU here.
-		if curcpu.t.setalarm(sleepuntil) {
-			curcpuSleep()
-		}
+		curcpuSleep()
 	}
 }
 
@@ -400,7 +411,9 @@ func sysnewosproc(m *m) {
 	curcpu := curcpu()
 	m.procid = uint64(atomic.Xadduintptr(&curcpu.t.tidgen, 1))
 	archnewm(m)
-	taskerSetrunnable(m)
+	if taskerSetrunnable(m) {
+		curcpuSchedule()
+	}
 }
 
 //go:nowritebarrierrec
