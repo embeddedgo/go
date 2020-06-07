@@ -393,10 +393,11 @@ func (l *notelist) removeall() *notel {
 //go:nosplit
 func syssetsystim1() {
 	t := curcpu().t
+	// TODO(md): this code doesn't look good, requires some thought
 	const n = unsafe.Sizeof(t.nanotime) / unsafe.Sizeof(uintptr(0))
 	*(*[n]uintptr)(unsafe.Pointer(&t.nanotime)) = *(*[n]uintptr)(unsafe.Pointer(&t.newnanotime))
 	*(*[n]uintptr)(unsafe.Pointer(&t.setalarm)) = *(*[n]uintptr)(unsafe.Pointer(&t.newsetalarm))
-	curcpuSchedule() // ensure scheduler uses new timer
+	curcpuSchedule() // ensure scheduler uses new timer: BUG(md): other CPUs?
 }
 
 //go:nowritebarrierrec
