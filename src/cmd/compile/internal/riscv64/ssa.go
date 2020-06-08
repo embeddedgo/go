@@ -10,6 +10,7 @@ import (
 	"cmd/compile/internal/types"
 	"cmd/internal/obj"
 	"cmd/internal/obj/riscv"
+	"cmd/internal/objabi"
 )
 
 // ssaRegToReg maps ssa register numbers to obj register numbers.
@@ -400,16 +401,20 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		gc.Patch(p5, p)
 
 	case ssa.OpRISCV64LoweredNilCheck:
-		// Issue a load which will fault if arg is nil.
-		// TODO: optimizations. See arm and amd64 LoweredNilCheck.
-		p := s.Prog(riscv.AMOVB)
-		p.From.Type = obj.TYPE_MEM
-		p.From.Reg = v.Args[0].Reg()
-		gc.AddAux(&p.From, v)
-		p.To.Type = obj.TYPE_REG
-		p.To.Reg = riscv.REG_ZERO
-		if gc.Debug_checknil != 0 && v.Pos.Line() > 1 { // v.Pos == 1 in generated wrappers
-			gc.Warnl(v.Pos, "generated nil check")
+		if objabi.GOOS == "noos" {
+			// BUG: avoid nil check because of MMIO
+		} else {
+			// Issue a load which will fault if arg is nil.
+			// TODO: optimizations. See arm and amd64 LoweredNilCheck.
+			p := s.Prog(riscv.AMOVB)
+			p.From.Type = obj.TYPE_MEM
+			p.From.Reg = v.Args[0].Reg()
+			gc.AddAux(&p.From, v)
+			p.To.Type = obj.TYPE_REG
+			p.To.Reg = riscv.REG_ZERO
+			if gc.Debug_checknil != 0 && v.Pos.Line() > 1 { // v.Pos == 1 in generated wrappers
+				gc.Warnl(v.Pos, "generated nil check")
+			}
 		}
 
 	case ssa.OpRISCV64LoweredGetClosurePtr:
