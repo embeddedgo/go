@@ -1958,6 +1958,8 @@ const (
 	OpRISCV64CALLstatic
 	OpRISCV64CALLclosure
 	OpRISCV64CALLinter
+	OpRISCV64DUFFZERO
+	OpRISCV64DUFFCOPY
 	OpRISCV64LoweredZero
 	OpRISCV64LoweredMove
 	OpRISCV64LoweredNilCheck
@@ -26009,6 +26011,32 @@ var opcodeTable = [...]opInfo{
 				{0, 1073741812}, // X3 X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X15 X16 X17 X18 X19 X20 X21 X22 X23 X24 X25 X26 X27 X28 X29 X30
 			},
 			clobbers: 9223372035781033980, // X3 g X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X15 X16 X17 X18 X19 X20 X21 X22 X23 X24 X25 X26 X27 X28 X29 X30 F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15 F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 F31
+		},
+	},
+	{
+		name:           "DUFFZERO",
+		auxType:        auxInt64,
+		argLen:         2,
+		faultOnNilArg0: true,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 512}, // X10
+			},
+			clobbers: 512, // X10
+		},
+	},
+	{
+		name:           "DUFFCOPY",
+		auxType:        auxInt64,
+		argLen:         3,
+		faultOnNilArg0: true,
+		faultOnNilArg1: true,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 1024}, // X11
+				{1, 512},  // X10
+			},
+			clobbers: 3584, // X10 X11 X12
 		},
 	},
 	{

@@ -204,6 +204,42 @@ func init() {
 		{name: "CALLclosure", argLength: 3, reg: callClosure, aux: "Int64", call: true},             // call function via closure. arg0=codeptr, arg1=closure, arg2=mem, auxint=argsize, returns mem
 		{name: "CALLinter", argLength: 2, reg: callInter, aux: "Int64", call: true},                 // call fn by pointer. arg0=codeptr, arg1=mem, auxint=argsize, returns mem
 
+		// duffzero
+		// arg0 = address of memory to zero (A0, changed as side effect)
+		// arg1 = mem
+		// auxint = offset into duffzero code to start executing
+		// returns mem
+		{
+			name:      "DUFFZERO",
+			aux:       "Int64",
+			argLength: 2,
+			reg: regInfo{
+				inputs:   []regMask{regNamed["X10"]},
+				clobbers: regNamed["X1"] | regNamed["X10"],
+			},
+			typ:            "Mem",
+			faultOnNilArg0: true,
+		},
+
+		// duffcopy
+		// arg0 = address of dst memory (in X11, changed as side effect)
+		// arg1 = address of src memory (in X10, changed as side effect)
+		// arg2 = mem
+		// auxint = offset into duffcopy code to start executing
+		// returns mem
+		{
+			name:      "DUFFCOPY",
+			aux:       "Int64",
+			argLength: 3,
+			reg: regInfo{
+				inputs:   []regMask{regNamed["X11"], regNamed["X10"]},
+				clobbers: regNamed["X1"] | regNamed["X10"] | regNamed["X11"] | regNamed["X12"],
+			},
+			typ:            "Mem",
+			faultOnNilArg0: true,
+			faultOnNilArg1: true,
+		},
+
 		// Generic moves and zeros
 
 		// general unaligned zeroing

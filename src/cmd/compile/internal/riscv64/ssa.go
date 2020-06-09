@@ -435,6 +435,20 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
 
+	case ssa.OpRISCV64DUFFZERO:
+		p := s.Prog(obj.ADUFFZERO)
+		p.To.Type = obj.TYPE_MEM
+		p.To.Name = obj.NAME_EXTERN
+		p.To.Sym = gc.Duffzero
+		p.To.Offset = v.AuxInt
+
+	case ssa.OpRISCV64DUFFCOPY:
+		p := s.Prog(obj.ADUFFCOPY)
+		p.To.Type = obj.TYPE_MEM
+		p.To.Name = obj.NAME_EXTERN
+		p.To.Sym = gc.Duffcopy
+		p.To.Offset = v.AuxInt
+
 	default:
 		v.Fatalf("Unhandled op %v", v.Op)
 	}
@@ -469,7 +483,7 @@ func ssaGenBlock(s *gc.SSAGenState, b, next *ssa.Block) {
 	case ssa.BlockRet:
 		s.Prog(obj.ARET)
 	case ssa.BlockRetJmp:
-		p := s.Prog(obj.AJMP)
+		p := s.Prog(obj.ARET)
 		p.To.Type = obj.TYPE_MEM
 		p.To.Name = obj.NAME_EXTERN
 		p.To.Sym = b.Aux.(*obj.LSym)

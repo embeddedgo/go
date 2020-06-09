@@ -33,7 +33,7 @@ func buildop(ctxt *obj.Link) {}
 // lr is the link register to use for the JALR.
 // p must be a CALL, JMP or RET.
 func jalrToSym(ctxt *obj.Link, p *obj.Prog, newprog obj.ProgAlloc, lr int16) *obj.Prog {
-	if p.As != obj.ACALL && p.As != obj.AJMP && p.As != obj.ARET {
+	if p.As != obj.ACALL && p.As != obj.AJMP && p.As != obj.ARET && p.As != obj.ADUFFZERO && p.As != obj.ADUFFCOPY {
 		ctxt.Diag("unexpected Prog in jalrToSym: %v", p)
 		return p
 	}
@@ -512,7 +512,7 @@ func containsCall(sym *obj.LSym) bool {
 	// CALLs are CALL or JAL(R) with link register LR.
 	for p := sym.Func.Text; p != nil; p = p.Link {
 		switch p.As {
-		case obj.ACALL:
+		case obj.ACALL, obj.ADUFFZERO, obj.ADUFFCOPY:
 			return true
 		case AJAL, AJALR:
 			if p.To.Type == obj.TYPE_REG && p.To.Reg == REG_LR {
@@ -759,7 +759,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.From.Reg = REG_SP
 			}
 
-		case obj.ACALL:
+		case obj.ACALL, obj.ADUFFZERO, obj.ADUFFCOPY:
 			switch p.To.Type {
 			case obj.TYPE_MEM:
 				jalrToSym(ctxt, p, newprog, REG_LR)

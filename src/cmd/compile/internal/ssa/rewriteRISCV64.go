@@ -2709,6 +2709,25 @@ func rewriteValueRISCV64_OpMove_0(v *Value) bool {
 		return true
 	}
 	// match: (Move [s] {t} dst src mem)
+	// cond: s%8 == 0 && s >= 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice
+	// result: (DUFFCOPY [16 * (128 - s/8)] dst src mem)
+	for {
+		s := v.AuxInt
+		t := v.Aux
+		mem := v.Args[2]
+		dst := v.Args[0]
+		src := v.Args[1]
+		if !(s%8 == 0 && s >= 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice) {
+			break
+		}
+		v.reset(OpRISCV64DUFFCOPY)
+		v.AuxInt = 16 * (128 - s/8)
+		v.AddArg(dst)
+		v.AddArg(src)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (Move [s] {t} dst src mem)
 	// result: (LoweredMove [t.(*types.Type).Alignment()] dst src (ADDI <src.Type> [s-moveSize(t.(*types.Type).Alignment(), config)] src) mem)
 	for {
 		s := v.AuxInt
@@ -5426,6 +5445,23 @@ func rewriteValueRISCV64_OpZero_0(v *Value) bool {
 		v.AddArg(ptr)
 		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDconst, typ.UInt64)
 		v.AddArg(v0)
+		v.AddArg(mem)
+		return true
+	}
+	// match: (Zero [s] {t} ptr mem)
+	// cond: s%8 == 0 && s > 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice
+	// result: (DUFFZERO [8 * (128 - s/8)] ptr mem)
+	for {
+		s := v.AuxInt
+		t := v.Aux
+		mem := v.Args[1]
+		ptr := v.Args[0]
+		if !(s%8 == 0 && s > 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice) {
+			break
+		}
+		v.reset(OpRISCV64DUFFZERO)
+		v.AuxInt = 8 * (128 - s/8)
+		v.AddArg(ptr)
 		v.AddArg(mem)
 		return true
 	}
