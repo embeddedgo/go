@@ -22,7 +22,7 @@
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
 #define persistAllocMin 64*1024
 
-#define intEnabled (MTI+MSI) // TODO: MEI
+#define intEnabled (MTI+MSI+MEI)
 
 DATA runtime·waitInit+0(SB)/4, $-1
 GLOBL runtime·waitInit(SB), NOPTR, $4
@@ -229,7 +229,24 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	CALL  runtime·taskerinit(SB)
 	CALL  runtime·schedinit(SB)
 
-	// run other harts (TODO: setup PLIC, to allow all harts to enable also MEI)
+	// disable interrupts in PLIC
+	// BUG: tries to disable all possible interrupts in all possible contexts,
+	// it accesses reseved address space, can raise Store Access Fault exception
+	MOV  $PLIC_EN, A0
+	ADD  $(15872*32*4), A0, A1
+plicLoop:
+	MOVW  ZERO, 0(A0)
+	MOVW  ZERO, 4(A0)
+	MOVW  ZERO, 8(A0)
+	MOVW  ZERO, 12(A0)
+	MOVW  ZERO, 16(A0)
+	MOVW  ZERO, 20(A0)
+	MOVW  ZERO, 24(A0)
+	MOVW  ZERO, 28(A0)
+	ADD   $32, A0
+	BNE   A0, A1, plicLoop
+
+	// run other harts
 	MOV   $·waitInit(SB), A0
 	MOVW  ZERO, (A0)
 

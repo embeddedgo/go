@@ -36,10 +36,13 @@
 
 // core peripherals
 
-#define CLINT_BASE 0x2000000 // true for QEMU, K210 but not standardized
+#define CLINT_BASE 0x2000000 // true for Qemu Virt, K210, some SiFive cores
 #define msip     (CLINT_BASE + 0x0000)
 #define mtimecmp (CLINT_BASE + 0x4000)
 #define mtime    (CLINT_BASE + 0xBFF8)
+
+#define PLIC_BASE 0x0C000000 // true for Qemu Virt, K210, some SiFive cores
+#define PLIC_EN   (PLIC_BASE + 0x2000)
 
 // instructinos not implemented by assembly
 

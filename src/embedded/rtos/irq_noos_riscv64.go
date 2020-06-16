@@ -4,7 +4,7 @@
 
 package rtos
 
-// Positive numbers are PLIC priority levels. It seems the lowest number of
+// Positive numbers are PLIC priority levels. It seems the lowest number of the
 // priority levels supported by real hardware is 7. CLIC based designs were not
 // considered.
 const (
