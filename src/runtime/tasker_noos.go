@@ -83,7 +83,11 @@ import (
 func dummyNanotime() int64        { return 1 }
 func dummySetalarm(ns int64) bool { return false }
 
-var thetasker = tasker{nanotime: dummyNanotime, setalarm: dummySetalarm}
+var thetasker = tasker{
+	nanotime: dummyNanotime,
+	setalarm: dummySetalarm,
+	write:    defaultWrite,
+}
 
 const fbnum = 4 // number of futex hash table buckets, must be power of two
 
@@ -116,9 +120,12 @@ type tasker struct {
 
 	nanotime func() int64
 	setalarm func(ns int64) bool
+	write    func(fd int, p []byte) int
+	writemx  cpumtx
 
-	newnanotime func() int64        // see embedded/rtos.SetSystemTimer
-	newsetalarm func(ns int64) bool // see embedded/rtos.SetSystemTimer
+	newnanotime func() int64               // see embedded/rtos.SetSystemTimer
+	newsetalarm func(ns int64) bool        // see embedded/rtos.SetSystemTimer
+	newwrite    func(fd int, p []byte) int // see embedded/rtos.SetSystemWriter
 }
 
 //go:nosplit
@@ -393,11 +400,20 @@ func (l *notelist) removeall() *notel {
 //go:nosplit
 func syssetsystim1() {
 	t := curcpu().t
-	// TODO(md): this code doesn't look good, requires some thought
 	const n = unsafe.Sizeof(t.nanotime) / unsafe.Sizeof(uintptr(0))
+	// BUG: non-atomic writes
 	*(*[n]uintptr)(unsafe.Pointer(&t.nanotime)) = *(*[n]uintptr)(unsafe.Pointer(&t.newnanotime))
 	*(*[n]uintptr)(unsafe.Pointer(&t.setalarm)) = *(*[n]uintptr)(unsafe.Pointer(&t.newsetalarm))
 	curcpuSchedule() // ensure scheduler uses new timer: BUG(md): other CPUs?
+}
+
+//go:nowritebarrierrec
+//go:nosplit
+func syssetsyswriter1() {
+	t := curcpu().t
+	const n = unsafe.Sizeof(t.write) / unsafe.Sizeof(uintptr(0))
+	// BUG: non-atomic write
+	*(*[n]uintptr)(unsafe.Pointer(&t.write)) = *(*[n]uintptr)(unsafe.Pointer(&t.newwrite))
 }
 
 //go:nowritebarrierrec
@@ -529,6 +545,16 @@ func syssetwalltime(sec int64, nsec int32) {
 	t.timestart.sec = sec
 	t.timestart.nsec = nsec
 	t.timestart.mx.unlock()
+}
+
+//go:nowritebarrierrec
+//go:nosplit
+func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 {
+	t := curcpu().t
+	t.writemx.lock()
+	n = int32(t.write(int(fd), (*[1 << 30]byte)(p)[:n]))
+	t.writemx.unlock()
+	return n
 }
 
 // m fields used

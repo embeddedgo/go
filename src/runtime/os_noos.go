@@ -4,7 +4,9 @@
 
 package runtime
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 const (
 	_NSIG             = 0
@@ -67,6 +69,16 @@ func setsystim(nanotime func() int64, setalarm func(ns int64) bool) {
 }
 
 //go:nosplit
+func setsyswriter(w func(fd int, p []byte) int) {
+	if w != nil {
+		thetasker.newwrite = w
+	} else {
+		thetasker.newwrite = defaultWrite
+	}
+	setsyswriter1()
+}
+
+//go:nosplit
 func usleep(usec uint32) {
 	nanosleep(int64(usec) * 1000)
 }
@@ -85,10 +97,17 @@ func osinit() {
 
 //go:nosplit
 func isr() bool {
-	return getg() == &thetasker.allcpu[cpuid()].gh
+	allcpu := thetasker.allcpu
+	for i := 0; i < len(allcpu); i++ {
+		if getg() == &allcpu[i].gh {
+			return true
+		}
+	}
+	return false
 }
 
 func setsystim1()
+func setsyswriter1()
 func newosproc(mp *m)
 func exit(code int32)
 func osyield()

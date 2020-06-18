@@ -57,6 +57,10 @@ func taskerinit() {
 	curcpu().exe.set(getg().m)
 }
 
+//go:nowritebarrierrec
+//go:nosplit
+func defaultWrite(fd int, p []byte) int { return len(p) }
+
 const (
 	// m.tls fields
 	mstatus = 4 // privilege level (MPP>>7), thrSmallCtx
@@ -73,5 +77,4 @@ type mOS struct {
 
 func syssetprivlevel(newlevel int) (oldlevel, errno int)
 
-func sysirqctl(irq, ctl int) (enabled, prio, errno int)    { breakpoint(); return }
-func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 { breakpoint(); return -1 }
+func sysirqctl(irq, ctl int) (enabled, prio, errno int) { breakpoint(); return }

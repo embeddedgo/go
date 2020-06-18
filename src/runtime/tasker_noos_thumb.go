@@ -149,38 +149,35 @@ func taskerinit() {
 	mmio.MB()
 }
 
-// syscall handlers (architecture specific code)
-
 //go:nowritebarrierrec
 //go:nosplit
-func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 {
+func defaultWrite(fd int, p []byte) int {
 	ITM := itm.ITM()
 	itmena := ITM.ITMENA()
 	port := &ITM.STIM[fd]
 	portena := mmio.UM32{&ITM.TER[fd>>5].U32, 1 << (fd & 31)}
-	s := (*[1 << 30]byte)(p)
-	for i := 0; i < int(n); {
+	for i := 0; i < len(p); {
 		for port.LoadBit(0) == 0 {
 			if portena.Load() == 0 || itmena.Load() == 0 {
-				return n // do not block on disabled port/ITM
+				return len(p) // do not block on disabled port/ITM
 			}
 		}
-		switch m := int(n) - i; {
+		switch m := len(p) - i; {
 		case m >= 4:
-			port.U32.Store(uint32(s[i]) + uint32(s[i+1])<<8 |
-				uint32(s[i+2])<<16 | uint32(s[i+3])<<24)
+			port.U32.Store(uint32(p[i]) + uint32(p[i+1])<<8 |
+				uint32(p[i+2])<<16 | uint32(p[i+3])<<24)
 			i += 4
 		case m >= 2:
-			p := (*mmio.U16)(unsafe.Pointer(&port.U32))
-			p.Store(uint16(s[i]) | uint16(s[i+1])<<8)
+			port16 := (*mmio.U16)(unsafe.Pointer(&port.U32))
+			port16.Store(uint16(p[i]) | uint16(p[i+1])<<8)
 			i += 2
 		default:
-			p := (*mmio.U8)(unsafe.Pointer(&port.U32))
-			p.Store(s[i])
+			port8 := (*mmio.U8)(unsafe.Pointer(&port.U32))
+			port8.Store(p[i])
 			i++
 		}
 	}
-	return n
+	return len(p)
 }
 
 // syscalls not used by runtime

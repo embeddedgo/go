@@ -19,6 +19,7 @@ DATA runtime·syscalls+(SYS_write*4)(SB)/4, $·syswrite(SB)
 
 // syscalls disallowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_setsystim1*4)(SB)/4, $·syssetsystim1(SB)
+DATA runtime·syscalls+(SYS_setsyswriter1*4)(SB)/4, $·syssetsyswriter1(SB)
 DATA runtime·syscalls+(SYS_newosproc*4)(SB)/4, $·sysnewosproc(SB)
 DATA runtime·syscalls+(SYS_exitThread*4)(SB)/4, $·sysexitThread(SB)
 DATA runtime·syscalls+(SYS_futexsleep*4)(SB)/4, $·sysfutexsleep(SB)
@@ -79,6 +80,15 @@ TEXT ·write1(SB),NOSPLIT|NOFRAME,$0-16
 // func setsystim1()
 TEXT ·setsystim1(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  $SYS_setsystim1, R4
+	MOVW  $(0+4), R5
+	MOVW  $0, R6
+	SWI
+	RET
+
+
+// func setsyswriter1()
+TEXT ·setsyswriter1(SB),NOSPLIT|NOFRAME,$0-0
+	MOVW  $SYS_setsyswriter1, R4
 	MOVW  $(0+4), R5
 	MOVW  $0, R6
 	SWI

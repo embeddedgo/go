@@ -19,6 +19,7 @@ DATA runtime·syscalls+(SYS_write*8)(SB)/8, $·syswrite(SB)
 
 // syscalls disallowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_setsystim1*8)(SB)/8, $·syssetsystim1(SB)
+DATA runtime·syscalls+(SYS_setsyswriter1*8)(SB)/8, $·syssetsyswriter1(SB)
 DATA runtime·syscalls+(SYS_newosproc*8)(SB)/8, $·sysnewosproc(SB)
 DATA runtime·syscalls+(SYS_exitThread*8)(SB)/8, $·sysexitThread(SB)
 DATA runtime·syscalls+(SYS_futexsleep*8)(SB)/8, $·sysfutexsleep(SB)
@@ -71,16 +72,24 @@ TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
 	RET
 
 // func write1(fd uintptr, p unsafe.Pointer, n int32) int32
-TEXT ·write1(SB),NOSPLIT|NOFRAME,$0-28
+TEXT ·write1(SB),NOSPLIT|NOFRAME,$0-32
 	MOV  $SYS_write, A3
 	MOV  $(24+8), A4
-	MOV  $4, A5  // BUG: if not n*8 we can't use duffcopy!
-	EBREAK
-	JMP  -1(PC)
+	MOV  $8, A5
+	ECALL
+	RET
 
 // func setsystim1()
 TEXT ·setsystim1(SB),NOSPLIT|NOFRAME,$0-0
 	MOV  $SYS_setsystim1, A3
+	MOV  $(0+8), A4
+	MOV  $0, A5
+	ECALL
+	RET
+
+// func setsyswriter1()
+TEXT ·setsyswriter1(SB),NOSPLIT|NOFRAME,$0-0
+	MOV  $SYS_setsyswriter1, A3
 	MOV  $(0+8), A4
 	MOV  $0, A5
 	ECALL
