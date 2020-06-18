@@ -47,7 +47,7 @@ DATA runtime·exceptionHandlers+(11*8)(SB)/8, $·environmentCallHandler(SB)
 GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 
 
-#define sysMaxArgs (24+8)
+#define sysMaxArgs (32+8)
 #define envCallFrameSize (sysMaxArgs+3*8)
 
 
