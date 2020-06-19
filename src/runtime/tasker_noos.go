@@ -40,12 +40,6 @@ import (
 //
 // Tasker relies on the following architecture-specific functions:
 //
-// taskerpreinit, taskerinit
-//
-// These functions should initialize the tasker. Taskerpreinit is run before the
-// Go scheduler and memory allocator are ready. It should setup a minimal
-// enviroment for them.
-//
 // curcpuSleep
 //
 // This functions is called to put the CPU to sleep. It is allowed it does
