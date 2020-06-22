@@ -209,24 +209,28 @@ func sysirqenabled(irq int) (enabled, errno int) {
 
 //go:nowritebarrierrec
 //go:nosplit
-func sysirqctl(irq, ctl int) (enabled, prio, errno int) {
+func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	if uint(irq) >= irqNum() {
 		errno = 4 // rtos.ErrBadIntNumber
 		return
+	}
+	if uint(ctxid) > 0 {
+		errno = 6 // rtos.ErrBadIntCtx
 	}
 	NVIC := nvic.NVIC()
 	// rtos package ensures valid ctl
 	if ctl >= 0 {
 		NVIC.IPR[irq].Store(nvic.IPR(255 - ctl))
 	}
-	rn, bo := irq>>5, uint(irq&31)
+	rn, bn := irq>>5, uint(irq&31)
 	switch {
 	case ctl >= -1:
-		NVIC.ISER[rn].Store(1 << bo)
+		NVIC.ISER[rn].Store(1 << bn)
 	case ctl == -2:
-		NVIC.ICER[rn].Store(1 << bo)
+		NVIC.ICER[rn].Store(1 << bn)
 	default:
-		enabled = int(NVIC.ISER[irq>>5].Load()) >> bo
+		enabled = int(NVIC.ISER[irq>>5].Load()) >> bn & 1
+		prio = 255 - int(NVIC.IPR[irq].Load())
 	}
 	return
 }

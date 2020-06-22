@@ -14,6 +14,6 @@ const (
 	intPrioLow      = 2
 	intPrioLowest   = 1
 	intPrioCurrent  = 0
-	intPrioSysTimer = -1
-	intPrioSysCall  = -2
+	intPrioSysTimer = intPrioHighest + 1
+	intPrioSysCall  = intPrioHighest + 1
 )

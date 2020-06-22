@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"internal/cpu/riscv/clint"
+	"internal/cpu/riscv/plic"
 	"unsafe"
 )
 
@@ -44,6 +45,7 @@ var (
 //go:nosplit
 func taskerinit() {
 	// only hart0 runs this function
+
 	uharts := (*[maxHarts]uintptr)(unsafe.Pointer(&pharts))
 	for i := range harts {
 		hart := &harts[i]
@@ -55,6 +57,17 @@ func taskerinit() {
 	allcpu.len = 1
 	allcpu.cap = maxHarts
 	curcpu().exe.set(getg().m)
+
+	// disable interrupts in PLIC
+	// BUG: tries to disable all possible interrupts in all possible contexts,
+	// accesses reseved address space, can raise Store Access Fault exception
+	PLIC := plic.PLIC()
+	for ctxid := range PLIC.EN {
+		for i := range PLIC.EN[ctxid] {
+			PLIC.EN[ctxid][i].Store(0)
+		}
+		PLIC.TC[ctxid].THR.Store(0)
+	}
 }
 
 //go:nowritebarrierrec
@@ -77,4 +90,36 @@ type mOS struct {
 
 func syssetprivlevel(newlevel int) (oldlevel, errno int)
 
-func sysirqctl(irq, ctl int) (enabled, prio, errno int) { breakpoint(); return }
+var plicmx cpumtx
+
+//go:nowritebarrierrec
+//go:nosplit
+func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
+	PLIC := plic.PLIC()
+	if uint(irq) > uint(len(PLIC.PRIO)) {
+		errno = 4 // rtos.ErrBadIntNumber
+		return
+	}
+	if uint(ctxid) > uint(len(PLIC.EN)) {
+		errno = 6 // rtos.ErrBadIntCtx
+	}
+	// rtos package ensures valid ctl
+	if ctl >= 0 {
+		PLIC.PRIO[irq].Store(uint32(ctl))
+	}
+	rn, bn := irq>>5, irq&31
+	switch {
+	case ctl >= -1:
+		plicmx.lock()
+		PLIC.EN[ctxid][rn].SetBit(bn)
+		plicmx.unlock()
+	case ctl == -2:
+		plicmx.lock()
+		PLIC.EN[ctxid][rn].ClearBit(bn)
+		plicmx.unlock()
+	default:
+		enabled = int(PLIC.EN[ctxid][rn].Load()) >> bn & 1
+		prio = int(PLIC.PRIO[irq].Load())
+	}
+	return
+}

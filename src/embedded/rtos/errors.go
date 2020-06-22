@@ -15,4 +15,5 @@ var (
 	ErrInsufPrivLevel = &Error{"rtos: insufficient privilege level"}
 	ErrBadIntNumber   = &Error{"rtos: bad interrupt number"}
 	ErrBadIntPrio     = &Error{"rtos: bad interrupt priority"}
+	ErrBadIntCtx      = &Error{"rtos: bad interrupt context"}
 )

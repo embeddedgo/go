@@ -53,10 +53,10 @@ TEXT ·setwalltime(SB),NOSPLIT|NOFRAME,$0-12
 	SWI
 	RET
 
-// func irqctl(irq, ctl int) (enabled, prio, errno int)
-TEXT ·irqctl(SB),NOSPLIT|NOFRAME,$0-20
+// func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
+TEXT ·irqctl(SB),NOSPLIT|NOFRAME,$0-24
 	MOVW  $SYS_irqctl, R4
-	MOVW  $(8+4), R5
+	MOVW  $(12+4), R5
 	MOVW  $12, R6
 	SWI
 	RET

@@ -11,6 +11,7 @@ var errorsByNumber = [...]*Error{
 	3: ErrInsufPrivLevel,
 	4: ErrBadIntNumber,
 	5: ErrBadIntPrio,
+	6: ErrBadIntCtx,
 }
 
 func errnoError(errno int) error {

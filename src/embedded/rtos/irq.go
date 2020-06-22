@@ -44,20 +44,18 @@ type IRQ int
 // Enable sets the priority of the interrupt and enables interrupt requests in
 // the context specified by ctxid. The context has implementation specific
 // meaning, can correspond to CPU, core, hardware thread, privilege level or any
-// combination thereof. The special ctxid=-1 allows the Enable to select one or
-// more contexts automaticaly.
+// combination thereof.
 func (irq IRQ) Enable(prio, ctxid int) error {
-	return irqEnable(irq, prio)
+	return irqEnable(irq, prio, ctxid)
 }
 
-// Disable disables interrupt requests int the context specified by ctxid. The
-// special ctxid=-1 disables irq in all contexts.
+// Disable disables interrupt requests int the context specified by ctxid.
 func (irq IRQ) Disable(ctxid int) error {
-	return irqDisable(irq)
+	return irqDisable(irq, ctxid)
 }
 
-// Status reports whether the irq is enabled in context ctxi and returns its
+// Status reports whether the irq is enabled in context ctxid and returns its
 // priority.
 func (irq IRQ) Status(ctxid int) (enabled bool, prio int, err error) {
-	return irqStatus(irq)
+	return irqStatus(irq, ctxid)
 }

@@ -58,10 +58,13 @@ TEXT ·setwalltime(SB),NOSPLIT|NOFRAME,$0-12
 	EBREAK
 	JMP  -1(PC)
 
-// func irqctl(irq, ctl int) (enabled, prio, errno int)
-TEXT ·irqctl(SB),NOSPLIT|NOFRAME,$0-20
-	EBREAK
-	JMP  -1(PC)
+// func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
+TEXT ·irqctl(SB),NOSPLIT|NOFRAME,$0-48
+	MOV  $SYS_irqctl, A3
+	MOV  $(24+8), A4
+	MOV  $24, A5
+	ECALL
+	RET
 
 // func setprivlevel(newlevel int) (oldlevel, errno int)
 TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
