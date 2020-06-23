@@ -276,7 +276,7 @@ var cortexmSystemHandlers = [...]string{
 	"SysTick_Handler",
 }
 
-func CortexmHandler(irqn int) string {
+func InterruptHandler(irqn int) string {
 	if irqn < 0 {
 		return cortexmSystemHandlers[irqn+14]
 	}
@@ -289,11 +289,16 @@ func (d *deadcodepass) init() {
 	var names []string
 
 	if d.ctxt.HeadType == objabi.Hnoos {
-		if d.ctxt.Arch.Family == sys.Thumb {
-			// mark exception handlers
-			for irqn := -14; irqn < 480; irqn++ {
-				names = append(names, CortexmHandler(irqn))
-			}
+		// mark interrupt handlers
+		var first, last int
+		switch d.ctxt.Arch.Family {
+		case sys.Thumb:
+			first, last = -14, 479
+		case sys.RISCV64:
+			first, last = 1, 1023
+		}
+		for i := first; i <= last; i++ {
+			names = append(names, InterruptHandler(i))
 		}
 	}
 	if d.ctxt.BuildMode == BuildModeShared {

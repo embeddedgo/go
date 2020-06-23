@@ -80,14 +80,14 @@ func gentext(ctxt *ld.Link) {
 
 	// system exception handlers
 	for irqn := -14; irqn < 0; irqn++ {
-		vectorsAdd(ld.CortexmHandler(irqn))
+		vectorsAdd(ld.InterruptHandler(irqn))
 	}
 
 	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
 	var irqHandlers [480]*sym.Symbol
 	irqNum := 0
 	for i := range irqHandlers {
-		s := lookupFuncSym(ctxt.Syms, ld.CortexmHandler(i))
+		s := lookupFuncSym(ctxt.Syms, ld.InterruptHandler(i))
 		if s != nil {
 			irqHandlers[i] = s
 			irqNum = i + 1

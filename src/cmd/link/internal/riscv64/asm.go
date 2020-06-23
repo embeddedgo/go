@@ -14,25 +14,64 @@ import (
 	"log"
 )
 
-func gentext(ctxt *ld.Link) {
-	if ctxt.HeadType == objabi.Hnoos {
-		// move entry symbol on the beggining of text segment
-		entry := ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABI0)
-		if entry == nil || entry.FuncInfo == nil {
-			entry = ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABIInternal)
-			if entry == nil || entry.FuncInfo == nil {
-				ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
-			}
-		}
-		for i, s := range ctxt.Textp {
-			if s == entry {
-				copy(ctxt.Textp[1:], ctxt.Textp[:i])
-				ctxt.Textp[0] = s
-				return
-			}
-		}
-		ld.Errorf(entry, "cannot find symbol in ctxt.Textp")
+func lookupFuncSym(syms *sym.Symbols, name string) *sym.Symbol {
+	if s := syms.ROLookup(name, sym.SymVerABI0); s != nil && s.FuncInfo != nil {
+		return s
 	}
+	if s := syms.ROLookup(name, sym.SymVerABIInternal); s != nil && s.FuncInfo != nil {
+		return s
+	}
+	return nil
+}
+
+func gentext(ctxt *ld.Link) {
+	if ctxt.HeadType != objabi.Hnoos {
+		return
+	}
+	vectors := ctxt.Syms.Lookup("runtime.vectors", 0)
+	vectors.Type = sym.STEXT
+	vectors.Attr |= sym.AttrReachable
+	vectors.Align = 8
+
+	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
+	var irqHandlers [1023]*sym.Symbol // BUG: 1023 is PLIC specific
+	irqNum := 0
+	for i := range irqHandlers {
+		s := lookupFuncSym(ctxt.Syms, ld.InterruptHandler(i+1))
+		if s != nil {
+			irqHandlers[i] = s
+			irqNum = i + 1
+		}
+	}
+	for _, s := range irqHandlers[:irqNum] {
+		if s != nil {
+			s.Attr |= sym.AttrReachable
+			rel := vectors.AddRel()
+			rel.Off = int32(len(vectors.P))
+			rel.Siz = 8
+			rel.Type = objabi.R_ADDR
+			rel.Sym = s
+		}
+		vectors.AddUint64(ctxt.Arch, 0)
+	}
+	ctxt.Textp = append(ctxt.Textp, vectors)
+
+	// move entry symbol on the beggining of text segment
+	entry := ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABI0)
+	if entry == nil || entry.FuncInfo == nil {
+		entry = ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABIInternal)
+		if entry == nil || entry.FuncInfo == nil {
+			ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
+		}
+	}
+	for i, s := range ctxt.Textp {
+		if s == entry {
+			copy(ctxt.Textp[1:], ctxt.Textp[:i])
+			ctxt.Textp[0] = s
+			return
+		}
+	}
+	ld.Errorf(entry, "cannot find symbol in ctxt.Textp")
 }
 
 func adddynrela(ctxt *ld.Link, rel *sym.Symbol, s *sym.Symbol, r *sym.Reloc) {
