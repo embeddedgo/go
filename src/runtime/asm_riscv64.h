@@ -110,68 +110,140 @@
 #define _mie (4*8) // cannot be zero, see: tasker_noos_riscv64.s:/SCW
 #define trapCtxSize (5*8)
 
-#define SAVE_GPRS(mp) \
-\ // LR saved separately
+#define SAVE_GPRS(base,offset) \
+	\ // LR saved separately
 \ // SP saved separately
-MOV  GP, (0*8+m_mOS)(mp) \
+MOV  GP, (0*8+offset)(base) \
 \ // g saved separately
-MOV  T0, (1*8+m_mOS)(mp) \
-MOV  T1, (2*8+m_mOS)(mp) \
-MOV  T2, (3*8+m_mOS)(mp) \
-MOV  S0, (4*8+m_mOS)(mp) \
-MOV  S1, (5*8+m_mOS)(mp) \
+MOV  T0, (1*8+offset)(base) \
+MOV  T1, (2*8+offset)(base) \
+MOV  T2, (3*8+offset)(base) \
+MOV  S0, (4*8+offset)(base) \
+MOV  S1, (5*8+offset)(base) \
 \ // A0 saved separately
-MOV  A1, (6*8+m_mOS)(mp) \
-MOV  A2, (7*8+m_mOS)(mp) \
-MOV  A3, (8*8+m_mOS)(mp) \
-MOV  A4, (9*8+m_mOS)(mp) \
-MOV  A5, (10*8+m_mOS)(mp) \
-MOV  A6, (11*8+m_mOS)(mp) \
-MOV  A7, (12*8+m_mOS)(mp) \
-MOV  S2, (13*8+m_mOS)(mp) \
-MOV  S3, (14*8+m_mOS)(mp) \
-MOV  S4, (15*8+m_mOS)(mp) \
-MOV  S5, (16*8+m_mOS)(mp) \
-MOV  S6, (17*8+m_mOS)(mp) \
-MOV  S7, (18*8+m_mOS)(mp) \
-MOV  S8, (19*8+m_mOS)(mp) \
-MOV  S9, (20*8+m_mOS)(mp) \
-MOV  S10, (21*8+m_mOS)(mp) \
-MOV  S11, (22*8+m_mOS)(mp) \
-MOV  T3, (23*8+m_mOS)(mp) \
-MOV  T4, (24*8+m_mOS)(mp) \
-MOV  T5, (25*8+m_mOS)(mp) \
-MOV  TMP, (26*8+m_mOS)(mp)
+MOV  A1, (6*8+offset)(base) \
+MOV  A2, (7*8+offset)(base) \
+MOV  A3, (8*8+offset)(base) \
+MOV  A4, (9*8+offset)(base) \
+MOV  A5, (10*8+offset)(base) \
+MOV  A6, (11*8+offset)(base) \
+MOV  A7, (12*8+offset)(base) \
+MOV  S2, (13*8+offset)(base) \
+MOV  S3, (14*8+offset)(base) \
+MOV  S4, (15*8+offset)(base) \
+MOV  S5, (16*8+offset)(base) \
+MOV  S6, (17*8+offset)(base) \
+MOV  S7, (18*8+offset)(base) \
+MOV  S8, (19*8+offset)(base) \
+MOV  S9, (20*8+offset)(base) \
+MOV  S10, (21*8+offset)(base) \
+MOV  S11, (22*8+offset)(base) \
+MOV  T3, (23*8+offset)(base) \
+MOV  T4, (24*8+offset)(base) \
+MOV  T5, (25*8+offset)(base) \
+MOV  TMP, (26*8+offset)(base)
 
-#define RESTORE_GPRS(mp) \
+#define RESTORE_GPRS(base,offset) \
 \ // LR loaded separately
 \ // SP loaded separately
-MOV  (0*8+m_mOS)(mp), GP \
+MOV  (0*8+offset)(base), GP \
 \ // g loaded separately
-MOV  (1*8+m_mOS)(mp), T0 \
-MOV  (2*8+m_mOS)(mp), T1 \
-MOV  (3*8+m_mOS)(mp), T2 \
-MOV  (4*8+m_mOS)(mp), S0 \
-MOV  (5*8+m_mOS)(mp), S1 \
+MOV  (1*8+offset)(base), T0 \
+MOV  (2*8+offset)(base), T1 \
+MOV  (3*8+offset)(base), T2 \
+MOV  (4*8+offset)(base), S0 \
+MOV  (5*8+offset)(base), S1 \
 \ // A0 loaded separately
-MOV  (6*8+m_mOS)(mp), A1 \
-MOV  (7*8+m_mOS)(mp), A2 \
-MOV  (8*8+m_mOS)(mp), A3 \
-MOV  (9*8+m_mOS)(mp), A4 \
-MOV  (10*8+m_mOS)(mp), A5 \
-MOV  (11*8+m_mOS)(mp), A6 \
-MOV  (12*8+m_mOS)(mp), A7 \
-MOV  (13*8+m_mOS)(mp), S2 \
-MOV  (14*8+m_mOS)(mp), S3 \
-MOV  (15*8+m_mOS)(mp), S4 \
-MOV  (16*8+m_mOS)(mp), S5 \
-MOV  (17*8+m_mOS)(mp), S6 \
-MOV  (18*8+m_mOS)(mp), S7 \
-MOV  (19*8+m_mOS)(mp), S8 \
-MOV  (20*8+m_mOS)(mp), S9 \
-MOV  (21*8+m_mOS)(mp), S10 \
-MOV  (22*8+m_mOS)(mp), S11 \
-MOV  (23*8+m_mOS)(mp), T3 \
-MOV  (24*8+m_mOS)(mp), T4 \
-MOV  (25*8+m_mOS)(mp), T5 \
-MOV  (26*8+m_mOS)(mp), TMP
+MOV  (6*8+offset)(base), A1 \
+MOV  (7*8+offset)(base), A2 \
+MOV  (8*8+offset)(base), A3 \
+MOV  (9*8+offset)(base), A4 \
+MOV  (10*8+offset)(base), A5 \
+MOV  (11*8+offset)(base), A6 \
+MOV  (12*8+offset)(base), A7 \
+MOV  (13*8+offset)(base), S2 \
+MOV  (14*8+offset)(base), S3 \
+MOV  (15*8+offset)(base), S4 \
+MOV  (16*8+offset)(base), S5 \
+MOV  (17*8+offset)(base), S6 \
+MOV  (18*8+offset)(base), S7 \
+MOV  (19*8+offset)(base), S8 \
+MOV  (20*8+offset)(base), S9 \
+MOV  (21*8+offset)(base), S10 \
+MOV  (22*8+offset)(base), S11 \
+MOV  (23*8+offset)(base), T3 \
+MOV  (24*8+offset)(base), T4 \
+MOV  (25*8+offset)(base), T5 \
+MOV  (26*8+offset)(base), TMP
+
+#define SAVE_FPRS(base,offset) \
+CSRR  (fcsr, tmp) \
+MOV   TMP, (0*8+offset)(base) \
+MOVD  F0, (1*8+offset)(base) \
+MOVD  F1, (2*8+offset)(base) \
+MOVD  F2, (3*8+offset)(base) \
+MOVD  F3, (4*8+offset)(base) \
+MOVD  F4, (5*8+offset)(base) \
+MOVD  F5, (6*8+offset)(base) \
+MOVD  F6, (7*8+offset)(base) \
+MOVD  F7, (8*8+offset)(base) \
+MOVD  F8, (9*8+offset)(base) \
+MOVD  F9, (10*8+offset)(base) \
+MOVD  F10, (11*8+offset)(base) \
+MOVD  F11, (12*8+offset)(base) \
+MOVD  F12, (13*8+offset)(base) \
+MOVD  F13, (14*8+offset)(base) \
+MOVD  F14, (15*8+offset)(base) \
+MOVD  F15, (16*8+offset)(base) \
+MOVD  F16, (17*8+offset)(base) \
+MOVD  F17, (18*8+offset)(base) \
+MOVD  F18, (19*8+offset)(base) \
+MOVD  F19, (20*8+offset)(base) \
+MOVD  F20, (21*8+offset)(base) \
+MOVD  F21, (22*8+offset)(base) \
+MOVD  F22, (23*8+offset)(base) \
+MOVD  F23, (24*8+offset)(base) \
+MOVD  F24, (25*8+offset)(base) \
+MOVD  F25, (26*8+offset)(base) \
+MOVD  F26, (27*8+offset)(base) \
+MOVD  F27, (28*8+offset)(base) \
+MOVD  F28, (29*8+offset)(base) \
+MOVD  F29, (30*8+offset)(base) \
+MOVD  F30, (31*8+offset)(base) \
+MOVD  F31, (32*8+offset)(base)
+
+#define RESTORE_FPRS(base,offset) \
+MOV   (0*8+offset)(base), TMP \
+CSRW  (tmp, fcsr) \
+MOVD  (1*8+offset)(base), F0 \
+MOVD  (2*8+offset)(base), F1 \
+MOVD  (3*8+offset)(base), F2 \
+MOVD  (4*8+offset)(base), F3 \
+MOVD  (5*8+offset)(base), F4 \
+MOVD  (6*8+offset)(base), F5 \
+MOVD  (7*8+offset)(base), F6 \
+MOVD  (8*8+offset)(base), F7 \
+MOVD  (9*8+offset)(base), F8 \
+MOVD  (10*8+offset)(base), F9 \
+MOVD  (11*8+offset)(base), F10 \
+MOVD  (12*8+offset)(base), F11 \
+MOVD  (13*8+offset)(base), F12 \
+MOVD  (14*8+offset)(base), F13 \
+MOVD  (15*8+offset)(base), F14 \
+MOVD  (16*8+offset)(base), F15 \
+MOVD  (17*8+offset)(base), F16 \
+MOVD  (18*8+offset)(base), F17 \
+MOVD  (19*8+offset)(base), F18 \
+MOVD  (20*8+offset)(base), F19 \
+MOVD  (21*8+offset)(base), F20 \
+MOVD  (22*8+offset)(base), F21 \
+MOVD  (23*8+offset)(base), F22 \
+MOVD  (24*8+offset)(base), F23 \
+MOVD  (25*8+offset)(base), F24 \
+MOVD  (26*8+offset)(base), F25 \
+MOVD  (27*8+offset)(base), F26 \
+MOVD  (28*8+offset)(base), F27 \
+MOVD  (29*8+offset)(base), F26 \
+MOVD  (30*8+offset)(base), F29 \
+MOVD  (31*8+offset)(base), F30 \
+MOVD  (32*8+offset)(base), F31

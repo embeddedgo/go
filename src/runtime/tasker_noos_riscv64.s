@@ -150,7 +150,7 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	BNE   ZERO, A0, contextSaved
 
 	MOV        (cpuctx_exe)(g), A0
-	SAVE_GPRS  (A0)  // save most of GPRs
+	SAVE_GPRS  (A0, m_mOS)  // save most of GPRs
 
 	// save the remaining registers: LR, SP, g, status, mepc
 	MOV  _LR(X2), A1
@@ -197,8 +197,8 @@ contextSaved:
 	// no need to restore FPRs if exe didn't changed
 	MOVB          (cpuctx_newexe)(g), A1
 	BEQ           ZERO, A1, 2(PC)
-	CALL          ·restoreFPRs(SB)  // clobbers LR, TMP
-	RESTORE_GPRS  (A0)              // restore most of GPRs
+	RESTORE_FPRS  (A0, m_mOS+const_numGPRS*8)  // clobbers TMP
+	RESTORE_GPRS  (A0, m_mOS)                  // restore most of GPRs
 smallCtx:
 	MOVB  ZERO, (cpuctx_newexe)(g)  // clear cpuctx.newexe
 	SCW   (zero, zero, x2)          // invalidate dangling LR
@@ -233,6 +233,9 @@ smallCtx:
 
 
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
+	ADD        $-(const_numGPRS+33)*8, X2
+	SAVE_GPRS  (X2, 0)
+	SAVE_FPRS  (X2, const_numGPRS*8)
 
 	EBREAK
 	JMP  -1(PC)
@@ -389,85 +392,10 @@ TEXT runtime·defaultHandler(SB),NOSPLIT|NOFRAME,$0
 	JMP  -1(PC)
 
 
-// curcpuSavectxSched saves floating-point registers to memory at
-// A0 + m_mOS + numGPRS*8 using TMP (T6) as scratch register
+// curcpuSavectxSched saves floating-point registers to m.mOS
 TEXT ·curcpuSavectxSched(SB),NOSPLIT|NOFRAME,$0
-	MOV  (cpuctx_exe)(g), A0
-saveFPRs: // calls from assembly can enter here
-	CSRR  (fcsr, tmp)
-	MOV   TMP, ((0+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F0, ((1+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F1, ((2+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F2, ((3+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F3, ((4+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F4, ((5+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F5, ((6+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F6, ((7+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F7, ((8+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F8, ((9+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F9, ((10+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F10, ((11+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F11, ((12+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F12, ((13+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F13, ((14+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F14, ((15+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F15, ((16+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F16, ((17+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F17, ((18+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F18, ((19+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F19, ((20+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F20, ((21+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F21, ((22+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F22, ((23+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F23, ((24+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F24, ((25+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F25, ((26+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F26, ((27+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F27, ((28+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F28, ((29+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F29, ((30+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F30, ((31+const_numGPRS)*8+m_mOS)(A0)
-	MOVD  F31, ((32+const_numGPRS)*8+m_mOS)(A0)
-	RET
-
-
-// restoreFPRs restores floating-point registers from memory at
-// A0 + m_mOS + numGPRS*8 using TMP (T6) as scratch register
-TEXT runtime·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
-	MOV   ((0+const_numGPRS)*8+m_mOS)(A0), TMP
-	CSRW  (tmp, fcsr)
-	MOVD  ((1+const_numGPRS)*8+m_mOS)(A0), F0
-	MOVD  ((2+const_numGPRS)*8+m_mOS)(A0), F1
-	MOVD  ((3+const_numGPRS)*8+m_mOS)(A0), F2
-	MOVD  ((4+const_numGPRS)*8+m_mOS)(A0), F3
-	MOVD  ((5+const_numGPRS)*8+m_mOS)(A0), F4
-	MOVD  ((6+const_numGPRS)*8+m_mOS)(A0), F5
-	MOVD  ((7+const_numGPRS)*8+m_mOS)(A0), F6
-	MOVD  ((8+const_numGPRS)*8+m_mOS)(A0), F7
-	MOVD  ((9+const_numGPRS)*8+m_mOS)(A0), F8
-	MOVD  ((10+const_numGPRS)*8+m_mOS)(A0), F9
-	MOVD  ((11+const_numGPRS)*8+m_mOS)(A0), F10
-	MOVD  ((12+const_numGPRS)*8+m_mOS)(A0), F11
-	MOVD  ((13+const_numGPRS)*8+m_mOS)(A0), F12
-	MOVD  ((14+const_numGPRS)*8+m_mOS)(A0), F13
-	MOVD  ((15+const_numGPRS)*8+m_mOS)(A0), F14
-	MOVD  ((16+const_numGPRS)*8+m_mOS)(A0), F15
-	MOVD  ((17+const_numGPRS)*8+m_mOS)(A0), F16
-	MOVD  ((18+const_numGPRS)*8+m_mOS)(A0), F17
-	MOVD  ((19+const_numGPRS)*8+m_mOS)(A0), F18
-	MOVD  ((20+const_numGPRS)*8+m_mOS)(A0), F19
-	MOVD  ((21+const_numGPRS)*8+m_mOS)(A0), F20
-	MOVD  ((22+const_numGPRS)*8+m_mOS)(A0), F21
-	MOVD  ((23+const_numGPRS)*8+m_mOS)(A0), F22
-	MOVD  ((24+const_numGPRS)*8+m_mOS)(A0), F23
-	MOVD  ((25+const_numGPRS)*8+m_mOS)(A0), F24
-	MOVD  ((26+const_numGPRS)*8+m_mOS)(A0), F25
-	MOVD  ((27+const_numGPRS)*8+m_mOS)(A0), F26
-	MOVD  ((28+const_numGPRS)*8+m_mOS)(A0), F27
-	MOVD  ((29+const_numGPRS)*8+m_mOS)(A0), F26
-	MOVD  ((30+const_numGPRS)*8+m_mOS)(A0), F29
-	MOVD  ((31+const_numGPRS)*8+m_mOS)(A0), F30
-	MOVD  ((32+const_numGPRS)*8+m_mOS)(A0), F31
+	MOV        (cpuctx_exe)(g), A0
+	SAVE_FPRS  (A0, m_mOS+const_numGPRS*8)
 	RET
 
 
