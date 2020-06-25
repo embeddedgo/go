@@ -32,6 +32,7 @@
 
 #define MSI (1<<3)
 #define MTI (1<<7)
+#define SEI (1<<9)
 #define MEI (1<<11)
 
 // core peripherals
@@ -42,7 +43,8 @@
 #define mtime    (CLINT_BASE + 0xBFF8)
 
 #define PLIC_BASE 0x0C000000 // true for Qemu Virt, K210, some SiFive cores
-#define PLIC_EN   (PLIC_BASE + 0x2000)
+#define PLIC_EN   (PLIC_BASE + 0x002000)
+#define PLIC_CC   (PLIC_BASE + 0x200000)
 
 // instructinos not implemented by assembly
 

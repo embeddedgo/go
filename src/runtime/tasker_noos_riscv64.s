@@ -25,7 +25,7 @@ DATA runtime·interruptHandlers+(5*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(6*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(7*8)(SB)/8, $·enterScheduler(SB)
 DATA runtime·interruptHandlers+(8*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(9*8)(SB)/8, $·defaultHandler(SB)
+DATA runtime·interruptHandlers+(9*8)(SB)/8, $·externalInterruptHandler(SB)
 DATA runtime·interruptHandlers+(10*8)(SB)/8, $·defaultHandler(SB)
 DATA runtime·interruptHandlers+(11*8)(SB)/8, $·externalInterruptHandler(SB)
 #define interruptHandlersSize (12*8)
@@ -65,8 +65,9 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 // MTI, MSI - timer and software interrupts have the same, lowest priority,
 //            both used to enter or wakeup the scheduler,
 //
-// MEI      - external interrupt has higher priority than MTI and MSI, it can
-//            preempt and wakeup the scheduler.
+// SEI, MEI - external interrupts have higher priority than MTI and MSI, they
+//            can preempt and wakeup the scheduler, MEI has higher priority
+//            than SEI.
 //
 // We don't support supervisor or user mode interrupts. The platform-specific
 // interrupts with id >= 16 (local interrupts) are probably supported (with
@@ -108,7 +109,7 @@ nestedTrap:
 	MOV   $~1, LR
 	SLL   A0, LR      // only 6 lower bits of A0 are used as shift amount
 	AND   $~0xFF, LR  // always mask software and timer interrupts
-	CSRR  (mie, lr)
+	CSRR  (mie, a0)
 	AND   LR, A0
 	CSRW  (a0, mie)
 
@@ -237,16 +238,21 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	SAVE_GPRS  (X2, 0)
 	SAVE_FPRS  (X2, const_numGPRS*8)
 
-	EBREAK
-	JMP  -1(PC)
+	// BUG: the following code assumes two (M, S) PLIC contexts per hart
+	// ctxid = mhartid*2+(11-mcause)/2
+	CSRR  (mhartid, a1)
+	SLL   $5, A1
+	SUB   A0, A1  // mhartid*32 - mcause*8
+	SLL   $8, A1
+	ADD   $(PLIC_CC+4+11*0x1000/2), A1
+	MOVW  (A1), S0
 
-	// rise software interrupt
-	MOV   $msip, A0
-	CSRR  (mhartid, lr)
-	SLL   $2, LR  // msip registers are 32-bit
-	ADD   LR, A0
-	MOV   $1, LR
-	MOVW  LR, (A0)
+	MOV   $runtime·vectors(SB), A0
+	SLL   $3, S0
+	ADD   S0, A0
+	CALL  A0
+
+	EBREAK
 
 	MOV  _LR(X2), LR  // restore LR
 

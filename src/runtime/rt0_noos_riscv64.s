@@ -22,7 +22,7 @@
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
 #define persistAllocMin 64*1024
 
-#define intEnabled (MTI+MSI+MEI)
+#define intEnabled (MTI+MSI+SEI+MEI)
 
 DATA runtime·waitInit+0(SB)/4, $-1
 GLOBL runtime·waitInit(SB), NOPTR, $4
