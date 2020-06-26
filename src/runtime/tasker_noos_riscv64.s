@@ -234,9 +234,9 @@ smallCtx:
 
 
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
-	ADD        $-(const_numGPRS+33)*8, X2
-	SAVE_GPRS  (X2, 0)
-	SAVE_FPRS  (X2, const_numGPRS*8)
+	ADD        $-(const_numGPRS+33+2)*8, X2
+	SAVE_GPRS  (X2, 2*8)
+	SAVE_FPRS  (X2, (2+const_numGPRS)*8)
 
 	// BUG: the following code assumes two (M, S) PLIC contexts per hart
 	// ctxid = mhartid*2+(11-mcause)/2
@@ -245,21 +245,31 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	SUB   A0, A1  // mhartid*32 - mcause*8
 	SLL   $8, A1
 	ADD   $(PLIC_CC+4+11*0x1000/2), A1
-	MOVW  (A1), S0
+	MOV   A1, (X2)
 
-	BEQ  ZERO, S0, done
+loop:
+	MOVW  (A1), S0  // claim
+	BEQ   ZERO, S0, done
+	MOV   S0, 8(X2)
 
-	MOV   $runtime·vectors(SB), A0
-	MOV   (A0), S1
-	BGE   S0, S1, noHandler
-	SLL   $3, S0
-	ADD   S0, A0
-	MOV   (A0), A0
-	CALL  A0
+	MOV  $runtime·vectors(SB), A0
+	MOV  (A0), S1
+	BGE  S0, S1, noHandler
+	SLL  $3, S0
+	ADD  S0, A0
+	MOV  (A0), A0
+
+	CALL  A0  // call user handler (IRQn_Handler)
+
+	MOV   (X2), A1
+	MOV   8(X2), S0
+	MOVW  S0, (A1)  // complete
+	JMP   loop
 
 done:
-
-	EBREAK
+	RESTORE_FPRS  (X2, (2+const_numGPRS)*8)
+	RESTORE_GPRS  (X2, 2*8)
+	ADD           $(const_numGPRS+33+2)*8, X2
 
 	MOV  _LR(X2), LR  // restore LR
 
@@ -286,7 +296,8 @@ done:
 	MRET
 
 noHandler:
-	JMP ·unhandledExternalInterrupt(SB)
+	JMP  ·unhandledExternalInterrupt(SB)
+
 
 // System call is like oridnary function call so all registers except LR are
 // caller save (Go ABI0). The tiny wrapper over ECALL instruction add
