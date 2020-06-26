@@ -103,13 +103,13 @@ nestedTrap:
 	// mie will be saved below
 
 	// mask same or lower priority interrupts (always mask MSI and MTI)
-	CSRR  (mcause, a0)
-	SRA   $63, A0, LR
-	AND   LR, A0  // interrupt: A0=mcause, exception: A0=0
-	MOV   $~1, LR
-	SLL   A0, LR      // only 6 lower bits of A0 are used as shift amount
-	AND   $~0xFF, LR  // always mask software and timer interrupts
-	CSRR  (mie, a0)
+	CSRR  (mcause, lr)
+	SRA   $63, LR, A0
+	AND   A0, LR  // interrupt: LR=mcause, exception: LR=0
+	MOV   $~1, A0
+	SLL   LR, A0      // only 6 lower bits of LR are used as shift amount
+	AND   $~0xFF, A0  // always mask software and timer interrupts
+	CSRR  (mie, lr)
 	AND   LR, A0
 	CSRW  (a0, mie)
 
@@ -239,7 +239,7 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	SAVE_FPRS  (X2, (2+const_numGPRS)*8)
 
 	// BUG: the following code assumes two (M, S) PLIC contexts per hart
-	// ctxid = mhartid*2+(11-mcause)/2
+	// ctxid = mhartid*2 + (11-mcause)/2
 	CSRR  (mhartid, a1)
 	SLL   $5, A1
 	SUB   A0, A1  // mhartid*32 - mcause*8
