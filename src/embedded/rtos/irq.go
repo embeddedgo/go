@@ -35,27 +35,32 @@ const (
 	IntPrioCurrent = intPrioCurrent
 )
 
-// IRQ represents an user accessible interrupt. It provides interface to basic
-// operations such as enabling/disabling the interrupt requests and setting
-// interrupt priorities. There can be other (system) interrupts not exposed by
-// this interface.
+// IRQ represents a source of interrupts. It provides interface to basic
+// operations such as enabling/disabling handling interrupts from this source
+// and setting its priority. There can be other (system) interrupt/exception
+// sources not exposed by this interface.
 type IRQ int
+
+// IntCtx represents an interrupt context. The context has implementation
+// specific meaning, can correspond to CPU, core, hardware thread, privilege
+// level or any combination thereof.
+type IntCtx intCtx
 
 // Enable sets the priority of the interrupt and enables interrupt requests in
 // the context specified by ctxid. The context has implementation specific
 // meaning, can correspond to CPU, core, hardware thread, privilege level or any
 // combination thereof.
-func (irq IRQ) Enable(prio, ctxid int) error {
-	return irqEnable(irq, prio, ctxid)
+func (irq IRQ) Enable(prio int, ctx IntCtx) error {
+	return irqEnable(irq, prio, ctx)
 }
 
 // Disable disables interrupt requests int the context specified by ctxid.
-func (irq IRQ) Disable(ctxid int) error {
-	return irqDisable(irq, ctxid)
+func (irq IRQ) Disable(ctx IntCtx) error {
+	return irqDisable(irq, ctx)
 }
 
 // Status reports whether the irq is enabled in context ctxid and returns its
 // priority.
-func (irq IRQ) Status(ctxid int) (enabled bool, prio int, err error) {
-	return irqStatus(irq, ctxid)
+func (irq IRQ) Status(ctx IntCtx) (enabled bool, prio int, err error) {
+	return irqStatus(irq, ctx)
 }

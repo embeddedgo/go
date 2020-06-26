@@ -247,10 +247,17 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	ADD   $(PLIC_CC+4+11*0x1000/2), A1
 	MOVW  (A1), S0
 
+	BEQ  ZERO, S0, done
+
 	MOV   $runtime·vectors(SB), A0
+	MOV   (A0), S1
+	BGE   S0, S1, noHandler
 	SLL   $3, S0
 	ADD   S0, A0
+	MOV   (A0), A0
 	CALL  A0
+
+done:
 
 	EBREAK
 
@@ -278,6 +285,8 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	ADD  $trapCtxSize, X2
 	MRET
 
+noHandler:
+	JMP ·unhandledExternalInterrupt(SB)
 
 // System call is like oridnary function call so all registers except LR are
 // caller save (Go ABI0). The tiny wrapper over ECALL instruction add
@@ -394,6 +403,11 @@ slowSyscallFromHandler:
 
 
 TEXT runtime·defaultHandler(SB),NOSPLIT|NOFRAME,$0
+	EBREAK
+	JMP  -1(PC)
+
+
+TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
 	EBREAK
 	JMP  -1(PC)
 

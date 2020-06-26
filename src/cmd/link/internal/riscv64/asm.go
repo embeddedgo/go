@@ -33,25 +33,31 @@ func gentext(ctxt *ld.Link) {
 	vectors.Attr |= sym.AttrReachable
 	vectors.Align = 8
 
+	unhandledInterrupt := ctxt.Syms.Lookup("runtime.unhandledExternalInterrupt", 0)
+	if unhandledInterrupt == nil {
+		ld.Errorf(nil, "runtime.unhandledExternalInterrupt not defined")
+	}
+
 	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
-	var irqHandlers [1023]*sym.Symbol // BUG: 1023 is PLIC specific
+	var irqHandlers [1024]*sym.Symbol // BUG: 1024 is PLIC specific
 	irqNum := 0
-	for i := range irqHandlers {
-		s := lookupFuncSym(ctxt.Syms, ld.InterruptHandler(i+1))
-		if s != nil {
+	for i := 1; i < len(irqHandlers); i++ {
+		s := lookupFuncSym(ctxt.Syms, ld.InterruptHandler(i))
+		if s == nil {
+			irqHandlers[i] = unhandledInterrupt
+		} else {
 			irqHandlers[i] = s
 			irqNum = i + 1
 		}
 	}
-	for _, s := range irqHandlers[:irqNum] {
-		if s != nil {
-			s.Attr |= sym.AttrReachable
-			rel := vectors.AddRel()
-			rel.Off = int32(len(vectors.P))
-			rel.Siz = 8
-			rel.Type = objabi.R_ADDR
-			rel.Sym = s
-		}
+	vectors.AddUint64(ctxt.Arch, uint64(irqNum))
+	for _, s := range irqHandlers[1:irqNum] {
+		s.Attr |= sym.AttrReachable
+		rel := vectors.AddRel()
+		rel.Off = int32(len(vectors.P))
+		rel.Siz = 8
+		rel.Type = objabi.R_ADDR
+		rel.Sym = s
 		vectors.AddUint64(ctxt.Arch, 0)
 	}
 	ctxt.Textp = append(ctxt.Textp, vectors)

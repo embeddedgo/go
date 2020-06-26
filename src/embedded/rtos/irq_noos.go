@@ -6,21 +6,23 @@ package rtos
 
 import _ "unsafe"
 
-func irqEnable(irq IRQ, prio, ctxid int) error {
+type intCtx int
+
+func irqEnable(irq IRQ, prio int, ctx IntCtx) error {
 	if uint(prio+1) > intPrioHighest+1 {
 		return ErrBadIntPrio
 	}
-	_, _, errno := runtime_irqctl(int(irq), prio, ctxid)
+	_, _, errno := runtime_irqctl(int(irq), prio, int(ctx))
 	return errnoError(errno)
 }
 
-func irqDisable(irq IRQ, ctxid int) error {
-	_, _, errno := runtime_irqctl(int(irq), -2, ctxid)
+func irqDisable(irq IRQ, ctx IntCtx) error {
+	_, _, errno := runtime_irqctl(int(irq), -2, int(ctx))
 	return errnoError(errno)
 }
 
-func irqStatus(irq IRQ, ctxid int) (enabled bool, prio int, err error) {
-	en, prio, errno := runtime_irqctl(int(irq), -3, ctxid)
+func irqStatus(irq IRQ, ctx IntCtx) (enabled bool, prio int, err error) {
+	en, prio, errno := runtime_irqctl(int(irq), -3, int(ctx))
 	return en != 0, prio, errnoError(errno)
 }
 

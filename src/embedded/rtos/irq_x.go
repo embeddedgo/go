@@ -17,14 +17,16 @@ const (
 	intPrioCurrent  = -1
 )
 
-func irqEnable(irq IRQ, prio, ctxid int) error {
+type intCtx int
+
+func irqEnable(irq IRQ, prio int, ctx IntCtx) error {
 	return ErrNotSuppoted
 }
 
-func irqDisable(irq IRQ, ctxid int) error {
+func irqDisable(irq IRQ, ctx IntCtx) error {
 	return ErrNotSuppoted
 }
 
-func irqStatus(irq IRQ, ctxid int) (enabled bool, prio int, err error) {
+func irqStatus(irq IRQ, ctx IntCtx) (enabled bool, prio int, err error) {
 	return false, 0, ErrNotSuppoted
 }
