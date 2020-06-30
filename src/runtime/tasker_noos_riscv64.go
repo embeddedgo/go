@@ -58,9 +58,9 @@ func taskerinit() {
 	allcpu.cap = maxHarts
 	curcpu().exe.set(getg().m)
 
-	// disable interrupts in PLIC
-	// BUG: tries to disable all possible interrupts in all possible contexts,
-	// accesses reseved address space, can raise Store Access Fault exception
+	// reset PLIC to known state
+	// BUG: tries to reset all possible interrupts and all possible contexts,
+	// can raise Store Access Fault exception
 	PLIC := plic.PLIC()
 	for ctxid := range PLIC.EN {
 		for i := range PLIC.EN[ctxid] {

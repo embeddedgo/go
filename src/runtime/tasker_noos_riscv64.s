@@ -234,26 +234,40 @@ smallCtx:
 
 
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
-	ADD        $-(const_numGPRS+33+2)*8, X2
-	SAVE_GPRS  (X2, 2*8)
-	SAVE_FPRS  (X2, (2+const_numGPRS)*8)
+	ADD        $-(const_numGPRS+33+3)*8, X2
+	SAVE_GPRS  (X2, 3*8)
+	SAVE_FPRS  (X2, (const_numGPRS+3)*8)
 
 	// BUG: the following code assumes two (M,S) PLIC contexts per hart
 	// ctxid = mhartid*2 + (11-mcause)/2
-	// SiFive U54-MC as example has one minion core (M) and four app cores (M,S)
 	SRL   $3, A0  // mcause
 	CSRR  (mhartid, a1)
 	SLL   $2, A1
-	SUB   A0, A1  // mhartid*4 - mcause
-	SLL   $11, A1
+	SUB   A0, A1   // mhartid*4 - mcause
+	SLL   $11, A1  // 0x1000*mhartid*2 - 0x1000*mcause/2
 	ADD   $(PLIC_TC+11*0x1000/2), A1
 	MOV   A1, (X2)
+	MOV   $1, S1
+	SLL   A0, S1  // 1<<mcause
+	MOVW  S1, 12(X2)
+	MOVW  (A1), A3    // PLIC.TC[ctxid].THR
+	MOVW  A3, 16(X2)  // save current priority threshold
 
 loop:
 	MOVW  4(A1), S0  // claim
 	BEQ   ZERO, S0, done
 	MOVW  S0, 8(X2)
 
+	// allow nested interrupts
+	MOV   $PLIC_BASE, A0
+	SLL   $2, S0, A2
+	ADD   A2, A0
+	MOVW  (A0), A2
+	MOVW  A2, (A1)  // PLIC.TC[ctxid].THR = PLIC.PRIO[claim]
+	FENCE
+	CSRS  (s1, mie)
+
+	// get interrupt vector
 	MOV  $runtime·vectors(SB), A0
 	MOV  (A0), S1
 	BGE  S0, S1, noHandler
@@ -264,14 +278,21 @@ loop:
 	CALL  A0  // call user handler (IRQn_Handler)
 
 	MOV   (X2), A1
-	MOVW  8(X2), S0
+	MOV   8(X2), S0
+	SRL   $32, S0, S1
+	CSRC  (s1, mie)  // disallow nested interrupts
+	FENCE
 	MOVW  S0, 4(A1)  // complete
-	JMP   loop
+
+	MOVW  16(X2), A3      // saved priority threshold
+	BEQ   ZERO, A3, loop  // nested handler can handle only one interrupt
 
 done:
-	RESTORE_FPRS  (X2, (2+const_numGPRS)*8)
-	RESTORE_GPRS  (X2, 2*8)
-	ADD           $(const_numGPRS+33+2)*8, X2
+	MOVW  A3, (A1)  // restore priority threshold
+
+	RESTORE_FPRS  (X2, (const_numGPRS+3)*8)
+	RESTORE_GPRS  (X2, 3*8)
+	ADD           $(const_numGPRS+33+3)*8, X2
 
 	MOV  _LR(X2), LR  // restore LR
 
