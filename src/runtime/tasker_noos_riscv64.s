@@ -238,19 +238,21 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	SAVE_GPRS  (X2, 2*8)
 	SAVE_FPRS  (X2, (2+const_numGPRS)*8)
 
-	// BUG: the following code assumes two (M, S) PLIC contexts per hart
+	// BUG: the following code assumes two (M,S) PLIC contexts per hart
 	// ctxid = mhartid*2 + (11-mcause)/2
+	// SiFive U54-MC as example has one minion core (M) and four app cores (M,S)
+	SRL   $3, A0  // mcause
 	CSRR  (mhartid, a1)
-	SLL   $5, A1
-	SUB   A0, A1  // mhartid*32 - mcause*8
-	SLL   $8, A1
-	ADD   $(PLIC_CC+4+11*0x1000/2), A1
+	SLL   $2, A1
+	SUB   A0, A1  // mhartid*4 - mcause
+	SLL   $11, A1
+	ADD   $(PLIC_TC+11*0x1000/2), A1
 	MOV   A1, (X2)
 
 loop:
-	MOVW  (A1), S0  // claim
+	MOVW  4(A1), S0  // claim
 	BEQ   ZERO, S0, done
-	MOV   S0, 8(X2)
+	MOVW  S0, 8(X2)
 
 	MOV  $runtime·vectors(SB), A0
 	MOV  (A0), S1
@@ -262,8 +264,8 @@ loop:
 	CALL  A0  // call user handler (IRQn_Handler)
 
 	MOV   (X2), A1
-	MOV   8(X2), S0
-	MOVW  S0, (A1)  // complete
+	MOVW  8(X2), S0
+	MOVW  S0, 4(A1)  // complete
 	JMP   loop
 
 done:
