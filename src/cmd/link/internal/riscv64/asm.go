@@ -40,7 +40,7 @@ func gentext(ctxt *ld.Link) {
 
 	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
 	var irqHandlers [1024]*sym.Symbol // BUG: 1024 is PLIC specific
-	irqNum := 0
+	irqNum := 1
 	for i := 1; i < len(irqHandlers); i++ {
 		s := lookupFuncSym(ctxt.Syms, ld.InterruptHandler(i))
 		if s == nil {
