@@ -202,7 +202,7 @@ contextSaved:
 	RESTORE_GPRS  (A0, m_mOS)                  // restore most of GPRs
 smallCtx:
 	MOVB  ZERO, (cpuctx_newexe)(g)  // clear cpuctx.newexe
-	SCW   (zero, zero, x2)          // invalidate dangling LR
+	SCW   (zero, zero, x2)          // invalidate dangling LR.x instruction
 
 	// scheduler always returns to the thread mode
 
