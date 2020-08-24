@@ -98,9 +98,11 @@ func (t *tester) run() {
 		os.Setenv("PATH", fmt.Sprintf("%s%c%s", gobin, os.PathListSeparator, os.Getenv("PATH")))
 	}
 
-	slurp, err := exec.Command("go", "env", "CGO_ENABLED").Output()
+	cmd := exec.Command("go", "env", "CGO_ENABLED")
+	cmd.Stderr = new(bytes.Buffer)
+	slurp, err := cmd.Output()
 	if err != nil {
-		fatalf("Error running go env CGO_ENABLED: %v", err)
+		fatalf("Error running go env CGO_ENABLED: %v\n%s", err, cmd.Stderr)
 	}
 	t.cgoEnabled, _ = strconv.ParseBool(strings.TrimSpace(string(slurp)))
 	if flag.NArg() > 0 && t.runRxStr != "" {
@@ -175,15 +177,6 @@ func (t *tester) run() {
 		}
 		return
 	}
-
-	// We must unset GOROOT_FINAL before tests, because runtime/debug requires
-	// correct access to source code, so if we have GOROOT_FINAL in effect,
-	// at least runtime/debug test will fail.
-	// If GOROOT_FINAL was set before, then now all the commands will appear stale.
-	// Nothing we can do about that other than not checking them below.
-	// (We call checkNotStale but only with "std" not "cmd".)
-	os.Setenv("GOROOT_FINAL_OLD", os.Getenv("GOROOT_FINAL")) // for cmd/link test
-	os.Unsetenv("GOROOT_FINAL")
 
 	for _, name := range t.runNames {
 		if !t.isRegisteredTestName(name) {
@@ -457,6 +450,29 @@ func (t *tester) registerTests() {
 		})
 	}
 
+	if t.iOS() && !t.compileOnly {
+		t.tests = append(t.tests, distTest{
+			name:    "x509omitbundledroots",
+			heading: "crypto/x509 without bundled roots",
+			fn: func(dt *distTest) error {
+				t.addCmd(dt, "src", t.goTest(), t.timeout(300), "-tags=x509omitbundledroots", "-run=OmitBundledRoots", "crypto/x509")
+				return nil
+			},
+		})
+	}
+
+	// Test the ios build tag on darwin/amd64 for the iOS simulator.
+	if goos == "darwin" && !t.iOS() {
+		t.tests = append(t.tests, distTest{
+			name:    "amd64ios",
+			heading: "ios tag on darwin/amd64",
+			fn: func(dt *distTest) error {
+				t.addCmd(dt, "src", t.goTest(), t.timeout(300), "-tags=ios", "-run=SystemRoots", "crypto/x509")
+				return nil
+			},
+		})
+	}
+
 	if t.race {
 		return
 	}
@@ -581,7 +597,7 @@ func (t *tester) registerTests() {
 	}
 
 	// Test internal linking of PIE binaries where it is supported.
-	if goos == "linux" && (goarch == "amd64" || goarch == "arm64") {
+	if t.internalLinkPIE() {
 		t.tests = append(t.tests, distTest{
 			name:    "pie_internal",
 			heading: "internal linking of -buildmode=pie",
@@ -739,7 +755,12 @@ func (t *tester) registerTests() {
 			})
 		}
 	}
-	if goos != "android" && !t.iOS() && goos != "js" {
+	// Only run the API check on fast development platforms. Android, iOS, and JS
+	// are always cross-compiled, and the filesystems on our only plan9 builders
+	// are too slow to complete in a reasonable timeframe. Every platform checks
+	// the API on every GOOS/GOARCH/CGO_ENABLED combination anyway, so we really
+	// only need to run this check once anywhere to get adequate coverage.
+	if goos != "android" && !t.iOS() && goos != "js" && goos != "plan9" {
 		t.tests = append(t.tests, distTest{
 			name:    "api",
 			heading: "API check",
@@ -880,7 +901,7 @@ func (t *tester) addCmd(dt *distTest, dir string, cmdline ...interface{}) *exec.
 }
 
 func (t *tester) iOS() bool {
-	return goos == "darwin" && (goarch == "arm" || goarch == "arm64")
+	return goos == "darwin" && goarch == "arm64"
 }
 
 func (t *tester) out(v string) {
@@ -894,8 +915,8 @@ func (t *tester) extLink() bool {
 	pair := gohostos + "-" + goarch
 	switch pair {
 	case "aix-ppc64",
-		"android-arm",
-		"darwin-386", "darwin-amd64", "darwin-arm", "darwin-arm64",
+		"android-arm", "android-arm64",
+		"darwin-amd64", "darwin-arm64",
 		"dragonfly-amd64",
 		"freebsd-386", "freebsd-amd64", "freebsd-arm",
 		"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-mips64", "linux-mips64le", "linux-mips", "linux-mipsle", "linux-s390x",
@@ -920,7 +941,7 @@ func (t *tester) internalLink() bool {
 	if goos == "android" {
 		return false
 	}
-	if goos == "darwin" && (goarch == "arm" || goarch == "arm64") {
+	if t.iOS() {
 		return false
 	}
 	// Internally linking cgo is incomplete on some architectures.
@@ -936,6 +957,17 @@ func (t *tester) internalLink() bool {
 	return true
 }
 
+func (t *tester) internalLinkPIE() bool {
+	switch goos + "-" + goarch {
+	case "linux-amd64", "linux-arm64",
+		"android-arm64":
+		return true
+	case "windows-amd64", "windows-386", "windows-arm":
+		return true
+	}
+	return false
+}
+
 func (t *tester) supportedBuildmode(mode string) bool {
 	pair := goos + "-" + goarch
 	switch mode {
@@ -945,7 +977,7 @@ func (t *tester) supportedBuildmode(mode string) bool {
 		}
 		switch pair {
 		case "aix-ppc64",
-			"darwin-386", "darwin-amd64", "darwin-arm", "darwin-arm64",
+			"darwin-amd64", "darwin-arm64",
 			"linux-amd64", "linux-386", "linux-ppc64le", "linux-s390x",
 			"freebsd-amd64",
 			"windows-amd64", "windows-386":
@@ -955,7 +987,7 @@ func (t *tester) supportedBuildmode(mode string) bool {
 	case "c-shared":
 		switch pair {
 		case "linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-s390x",
-			"darwin-amd64", "darwin-386",
+			"darwin-amd64",
 			"freebsd-amd64",
 			"android-arm", "android-arm64", "android-386",
 			"windows-amd64", "windows-386":
@@ -987,6 +1019,8 @@ func (t *tester) supportedBuildmode(mode string) bool {
 			"android-amd64", "android-arm", "android-arm64", "android-386":
 			return true
 		case "darwin-amd64":
+			return true
+		case "windows-amd64", "windows-386", "windows-arm":
 			return true
 		}
 		return false
@@ -1049,7 +1083,7 @@ func (t *tester) cgoTest(dt *distTest) error {
 
 	pair := gohostos + "-" + goarch
 	switch pair {
-	case "darwin-386", "darwin-amd64",
+	case "darwin-amd64",
 		"openbsd-386", "openbsd-amd64",
 		"windows-386", "windows-amd64":
 		// test linkmode=external, but __thread not supported, so skip testtls.
@@ -1062,7 +1096,7 @@ func (t *tester) cgoTest(dt *distTest) error {
 		cmd = t.addCmd(dt, "misc/cgo/test", t.goTest(), "-ldflags", "-linkmode=external -s")
 
 	case "aix-ppc64",
-		"android-arm",
+		"android-arm", "android-arm64",
 		"dragonfly-amd64",
 		"freebsd-386", "freebsd-amd64", "freebsd-arm",
 		"linux-386", "linux-amd64", "linux-arm", "linux-ppc64le", "linux-s390x",
@@ -1110,6 +1144,9 @@ func (t *tester) cgoTest(dt *distTest) error {
 
 			if t.supportedBuildmode("pie") {
 				t.addCmd(dt, "misc/cgo/test", t.goTest(), "-buildmode=pie")
+				if t.internalLink() && t.internalLinkPIE() {
+					t.addCmd(dt, "misc/cgo/test", t.goTest(), "-buildmode=pie", "-ldflags=-linkmode=internal")
+				}
 				t.addCmd(dt, "misc/cgo/testtls", t.goTest(), "-buildmode=pie")
 				t.addCmd(dt, "misc/cgo/nocgo", t.goTest(), "-buildmode=pie")
 			}
@@ -1509,9 +1546,6 @@ func (t *tester) shouldUsePrecompiledStdTest() bool {
 }
 
 func (t *tester) shouldTestCmd() bool {
-	if t.race {
-		return false
-	}
 	if goos == "js" && goarch == "wasm" {
 		// Issues 25911, 35220
 		return false

@@ -22,10 +22,10 @@ var StackGuard, StackLimit, StackSystem int
 func init() {
 	if GOOS == "noos" && GOARCH == "thumb" {
 		StackSystem = 27 * 4
-		StackGuard = 448 + StackSystem
+		StackGuard = 464 + StackSystem
 	} else {
 		StackSystem = STACKSYSTEM
-		StackGuard = 896*stackGuardMultiplier() + StackSystem
+		StackGuard = 928*stackGuardMultiplier() + StackSystem
 	}
 	StackLimit = StackGuard - StackSystem - StackSmall
 }

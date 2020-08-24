@@ -34,6 +34,7 @@ import (
 	"cmd/internal/objabi"
 	"cmd/internal/sys"
 	"cmd/link/internal/ld"
+	"cmd/link/internal/loader"
 	"cmd/link/internal/sym"
 	"debug/elf"
 	"fmt"
@@ -52,7 +53,7 @@ func lookupFuncSym(syms *sym.Symbols, name string) *sym.Symbol {
 	return nil
 }
 
-func gentext(ctxt *ld.Link) {
+func gentext2(ctxt *ld.Link, ldr *loader.Loader) {
 	if ctxt.HeadType != objabi.Hnoos {
 		return
 	}
@@ -112,7 +113,7 @@ func gentext(ctxt *ld.Link) {
 func elfreloc1(ctxt *ld.Link, r *sym.Reloc, sectoff int64) bool {
 	ctxt.Out.Write32(uint32(sectoff))
 
-	elfsym := r.Xsym.ElfsymForReloc()
+	elfsym := ld.ElfSymForReloc(ctxt, r.Xsym)
 	switch r.Type {
 	default:
 		return false
@@ -149,11 +150,13 @@ func elfreloc1(ctxt *ld.Link, r *sym.Reloc, sectoff int64) bool {
 }
 
 // Convert the direct jump relocation r to refer to a trampoline if the target is too far
-func trampoline(ctxt *ld.Link, r *sym.Reloc, s *sym.Symbol) {
+func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
+	relocs := ldr.Relocs(s)
+	r := relocs.At2(ri)
 	switch r.Type {
 	case objabi.R_CALLARM:
 		var maxoffset int64
-		switch uint32(r.Add>>32) & 0x9000F800 {
+		switch uint32(r.Add()>>32) & 0x9000F800 {
 		case 0x9000F000: // B/BL imm24
 			maxoffset = 1 << 24
 		case 0x8000F000: // Bcond imm20
@@ -161,7 +164,7 @@ func trampoline(ctxt *ld.Link, r *sym.Reloc, s *sym.Symbol) {
 		default:
 			ld.Errorf(s, "bad branch opcode")
 		}
-		t := (ld.Symaddr(r.Sym) + int64(int32(r.Add)) - (s.Value + int64(r.Off)))
+		t := (ldr.SymValue(rs) + int64(int32(r.Add())) - (ldr.SymValue(s) + int64(r.Off())))
 		if -maxoffset <= t && t < maxoffset {
 			return
 		}
@@ -169,58 +172,64 @@ func trampoline(ctxt *ld.Link, r *sym.Reloc, s *sym.Symbol) {
 		// Look up existing trampolines first. If we found one within the range
 		// of direct call, we can reuse it. Otherwise create a new one.
 		offset := t + pcoff
-		var tramp *sym.Symbol
+		var tramp loader.Sym
 		for i := 0; ; i++ {
-			name := r.Sym.Name + fmt.Sprintf("%+d-tramp%d", offset, i)
-			tramp = ctxt.Syms.Lookup(name, int(r.Sym.Version))
-			if tramp.Type == sym.SDYNIMPORT {
+			oName := ldr.SymName(rs)
+			name := oName + fmt.Sprintf("%+d-tramp%d", offset, i)
+			tramp = ldr.LookupOrCreateSym(name, int(ldr.SymVersion(rs)))
+			if ldr.SymType(tramp) == sym.SDYNIMPORT {
 				// don't reuse trampoline defined in other module
 				continue
 			}
-			if tramp.Value == 0 {
-				// Either the trampoline does not exist -- we need to create one,
+			if oName == "runtime.deferreturn" {
+				ldr.SetIsDeferReturnTramp(tramp, true)
+			}
+			if ldr.SymValue(tramp) == 0 {
+				// either the trampoline does not exist -- we need to create one,
 				// or found one the address which is not assigned -- this will be
-				// laid down immediately after the current function. Use this one.
+				// laid down immediately after the current function. use this one.
 				break
 			}
-			t = (ld.Symaddr(tramp) - pcoff - (s.Value + int64(r.Off)))
+			t = (ldr.SymValue(tramp) - pcoff - (ldr.SymValue(s) + int64(r.Off())))
 			if -maxoffset <= t && t < maxoffset {
 				// found an existing trampoline that is not too far
 				// we can just use it
 				break
 			}
 		}
-		if tramp.Type == 0 {
+		if ldr.SymType(tramp) == 0 {
 			// trampoline does not exist, create one
-			ctxt.AddTramp(tramp)
-			gentramp(ctxt.Arch, ctxt.LinkMode, tramp, r.Sym, int64(offset))
+			trampb := ldr.MakeSymbolUpdater(tramp)
+			ctxt.AddTramp(trampb)
+			gentramp(ctxt.Arch, ctxt.LinkMode, ldr, trampb, rs, int64(offset))
 		}
 		// modify reloc to point to tramp, which will be resolved later
-		r.Sym = tramp
-		r.Add = r.Add&^0xFFFFFFFF | int64(-pcoff)&0xFFFFFFFF // clear the offset embedded in the instruction
-		r.Done = false
+		sb := ldr.MakeSymbolUpdater(s)
+		relocs := sb.Relocs()
+		r := relocs.At2(ri)
+		r.SetSym(tramp)
+		r.SetAdd(r.Add()&^0xFFFFFFFF | int64(-pcoff)&0xFFFFFFFF) // clear the offset embedded in the instruction
 	default:
-		ld.Errorf(s, "trampoline called with non-jump reloc: %d (%s)", r.Type, sym.RelocName(ctxt.Arch, r.Type))
+		ld.Errorf(s, "trampoline called with non-jump reloc: %d (%s)", r.Type(), sym.RelocName(ctxt.Arch, r.Type()))
 	}
 }
 
 // generate a trampoline to target+offset
-func gentramp(arch *sys.Arch, linkmode ld.LinkMode, tramp, target *sym.Symbol, offset int64) {
-	t := ld.Symaddr(target) + offset
-
+func gentramp(arch *sys.Arch, linkmode ld.LinkMode, ldr *loader.Loader, tramp *loader.SymbolBuilder, target loader.Sym, offset int64) {
+	tramp.SetSize(8) // 2+1 instructions
+	P := make([]byte, tramp.Size())
+	t := ldr.SymValue(target) + offset
 	o1 := uint16(0x4F00) // MOVW (R15), R7 // R15 is actual pc+4 (points to o3)
 	o2 := uint16(0x4738) // B  (R7)
 	o3 := uint32(t) | 1  // WORD $(target|1)
-
-	tramp.Size = 8
-	tramp.P = make([]byte, tramp.Size)
-	arch.ByteOrder.PutUint16(tramp.P, o1)
-	arch.ByteOrder.PutUint16(tramp.P[2:], o2)
-	arch.ByteOrder.PutUint32(tramp.P[4:], o3)
+	arch.ByteOrder.PutUint16(P, o1)
+	arch.ByteOrder.PutUint16(P[2:], o2)
+	arch.ByteOrder.PutUint32(P[4:], o3)
+	tramp.SetData(P)
 }
 
-func archreloc(ctxt *ld.Link, r *sym.Reloc, s *sym.Symbol, val int64) (int64, bool) {
-	if ctxt.LinkMode == ld.LinkExternal {
+func archreloc(target *ld.Target, syms *ld.ArchSyms, r *sym.Reloc, s *sym.Symbol, val int64) (int64, bool) {
+	if target.IsExternal() {
 		log.Fatalf("BUGL: external linking not supported")
 		return val, false
 	}
@@ -229,7 +238,7 @@ func archreloc(ctxt *ld.Link, r *sym.Reloc, s *sym.Symbol, val int64) (int64, bo
 	case objabi.R_CONST:
 		return r.Add, true
 	case objabi.R_GOTOFF:
-		return ld.Symaddr(r.Sym) + r.Add - ld.Symaddr(ctxt.Syms.Lookup(".got", 0)), true
+		return ld.Symaddr(r.Sym) + r.Add - ld.Symaddr(syms.GOT), true
 	case objabi.R_PLT0, objabi.R_PLT1, objabi.R_PLT2:
 		log.Fatalf("BUGL: PLT not supported")
 	case objabi.R_CALLARM: // B, BL
@@ -267,38 +276,38 @@ func archreloc(ctxt *ld.Link, r *sym.Reloc, s *sym.Symbol, val int64) (int64, bo
 	return val, false
 }
 
-func archrelocvariant(ctxt *ld.Link, r *sym.Reloc, s *sym.Symbol, t int64) int64 {
+func func archrelocvariant(target *ld.Target, syms *ld.ArchSyms, r *sym.Reloc, s *sym.Symbol, t int64) int64 {
 	log.Fatalf("unexpected relocation variant")
 	return t
 }
 
-func asmb(ctxt *ld.Link) {
+func asmb(ctxt *ld.Link, _ *loader.Loader) {
 	if ctxt.IsELF {
 		ld.Asmbelfsetup()
 	}
 
+	var wg sync.WaitGroup
 	sect := ld.Segtext.Sections[0]
-	ctxt.Out.SeekSet(int64(sect.Vaddr - ld.Segtext.Vaddr + ld.Segtext.Fileoff))
-	ld.Codeblk(ctxt, int64(sect.Vaddr), int64(sect.Length))
-	for _, sect = range ld.Segtext.Sections[1:] {
-		ctxt.Out.SeekSet(int64(sect.Vaddr - ld.Segtext.Vaddr + ld.Segtext.Fileoff))
-		ld.Datblk(ctxt, int64(sect.Vaddr), int64(sect.Length))
+	offset := sect.Vaddr - ld.Segtext.Vaddr + ld.Segtext.Fileoff
+	ld.WriteParallel(&wg, ld.Codeblk, ctxt, offset, sect.Vaddr, sect.Length)
+
+	for _, sect := range ld.Segtext.Sections[1:] {
+		offset := sect.Vaddr - ld.Segtext.Vaddr + ld.Segtext.Fileoff
+		ld.WriteParallel(&wg, ld.Datblk, ctxt, offset, sect.Vaddr, sect.Length)
 	}
 
 	if ld.Segrodata.Filelen > 0 {
-		ctxt.Out.SeekSet(int64(ld.Segrodata.Fileoff))
-		ld.Datblk(ctxt, int64(ld.Segrodata.Vaddr), int64(ld.Segrodata.Filelen))
+		ld.WriteParallel(&wg, ld.Datblk, ctxt, ld.Segrodata.Fileoff, ld.Segrodata.Vaddr, ld.Segrodata.Filelen)
 	}
+
 	if ld.Segrelrodata.Filelen > 0 {
-		ctxt.Out.SeekSet(int64(ld.Segrelrodata.Fileoff))
-		ld.Datblk(ctxt, int64(ld.Segrelrodata.Vaddr), int64(ld.Segrelrodata.Filelen))
+		ld.WriteParallel(&wg, ld.Datblk, ctxt, ld.Segrelrodata.Fileoff, ld.Segrelrodata.Vaddr, ld.Segrelrodata.Filelen)
 	}
 
-	ctxt.Out.SeekSet(int64(ld.Segdata.Fileoff))
-	ld.Datblk(ctxt, int64(ld.Segdata.Vaddr), int64(ld.Segdata.Filelen))
+	ld.WriteParallel(&wg, ld.Datblk, ctxt, ld.Segdata.Fileoff, ld.Segdata.Vaddr, ld.Segdata.Filelen)
 
-	ctxt.Out.SeekSet(int64(ld.Segdwarf.Fileoff))
-	ld.Dwarfblk(ctxt, int64(ld.Segdwarf.Vaddr), int64(ld.Segdwarf.Filelen))
+	ld.WriteParallel(&wg, ld.Dwarfblk, ctxt, ld.Segdwarf.Fileoff, ld.Segdwarf.Vaddr, ld.Segdwarf.Filelen)
+	wg.Wait()
 }
 
 func asmb2(ctxt *ld.Link) {
@@ -384,6 +393,89 @@ func asmb2(ctxt *ld.Link) {
 	}
 
 	ctxt.Out.Flush()
+	if *ld.FlagC {
+		fmt.Printf("textsize=%d\n", ld.Segtext.Filelen)
+		fmt.Printf("datsize=%d\n", ld.Segdata.Filelen)
+		fmt.Printf("bsssize=%d\n", ld.Segdata.Length-ld.Segdata.Filelen)
+		fmt.Printf("symsize=%d\n", ld.Symsize)
+		fmt.Printf("lcsize=%d\n", ld.Lcsize)
+		fmt.Printf("total=%d\n", ld.Segtext.Filelen+ld.Segdata.Length+uint64(ld.Symsize)+uint64(ld.Lcsize))
+	}
+}
+
+func asmb2(ctxt *ld.Link) {
+	/* output symbol table */
+	ld.Symsize = 0
+
+	ld.Lcsize = 0
+	symo := uint32(0)
+	if !*ld.FlagS {
+		// TODO: rationalize
+		switch ctxt.HeadType {
+		default:
+			if ctxt.IsELF {
+				symo = uint32(ld.Segdwarf.Fileoff + ld.Segdwarf.Filelen)
+				symo = uint32(ld.Rnd(int64(symo), int64(*ld.FlagRound)))
+			}
+
+		case objabi.Hplan9:
+			symo = uint32(ld.Segdata.Fileoff + ld.Segdata.Filelen)
+
+		case objabi.Hwindows:
+			symo = uint32(ld.Segdwarf.Fileoff + ld.Segdwarf.Filelen)
+			symo = uint32(ld.Rnd(int64(symo), ld.PEFILEALIGN))
+		}
+
+		ctxt.Out.SeekSet(int64(symo))
+		switch ctxt.HeadType {
+		default:
+			if ctxt.IsELF {
+				ld.Asmelfsym(ctxt)
+				ctxt.Out.Write(ld.Elfstrdat)
+
+				if ctxt.LinkMode == ld.LinkExternal {
+					ld.Elfemitreloc(ctxt)
+				}
+			}
+
+		case objabi.Hplan9:
+			ld.Asmplan9sym(ctxt)
+
+			sym := ctxt.Syms.Lookup("pclntab", 0)
+			if sym != nil {
+				ld.Lcsize = int32(len(sym.P))
+				ctxt.Out.Write(sym.P)
+			}
+
+		case objabi.Hwindows:
+			// Do nothing
+		}
+	}
+
+	ctxt.Out.SeekSet(0)
+	switch ctxt.HeadType {
+	default:
+	case objabi.Hplan9: /* plan 9 */
+		ctxt.Out.Write32b(0x647)                      /* magic */
+		ctxt.Out.Write32b(uint32(ld.Segtext.Filelen)) /* sizes */
+		ctxt.Out.Write32b(uint32(ld.Segdata.Filelen))
+		ctxt.Out.Write32b(uint32(ld.Segdata.Length - ld.Segdata.Filelen))
+		ctxt.Out.Write32b(uint32(ld.Symsize))          /* nsyms */
+		ctxt.Out.Write32b(uint32(ld.Entryvalue(ctxt))) /* va of entry */
+		ctxt.Out.Write32b(0)
+		ctxt.Out.Write32b(uint32(ld.Lcsize))
+
+	case objabi.Hlinux,
+		objabi.Hfreebsd,
+		objabi.Hnetbsd,
+		objabi.Hopenbsd,
+		objabi.Hnoos:
+		ld.Asmbelf(ctxt, int64(symo))
+
+	case objabi.Hwindows:
+		ld.Asmbpe(ctxt)
+	}
+
 	if *ld.FlagC {
 		fmt.Printf("textsize=%d\n", ld.Segtext.Filelen)
 		fmt.Printf("datsize=%d\n", ld.Segdata.Filelen)

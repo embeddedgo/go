@@ -640,6 +640,7 @@ func (srv *Server) newConn(rwc net.Conn) *conn {
 }
 
 type readResult struct {
+	_   incomparable
 	n   int
 	err error
 	b   byte // byte read, if n == 1
@@ -1725,9 +1726,9 @@ func (c *conn) closeWriteAndWait() {
 	time.Sleep(rstAvoidanceDelay)
 }
 
-// validNextProto reports whether the proto is not a blacklisted ALPN
-// protocol name. Empty and built-in protocol types are blacklisted
-// and can't be overridden with alternate implementations.
+// validNextProto reports whether the proto is a valid ALPN protocol name.
+// Everything is valid except the empty string and built-in protocol types,
+// so that those can't be overridden with alternate implementations.
 func validNextProto(proto string) bool {
 	switch proto {
 	case "", "http/1.1", "http/1.0":
@@ -2606,8 +2607,9 @@ type Server struct {
 	// value.
 	ConnContext func(ctx context.Context, c net.Conn) context.Context
 
+	inShutdown atomicBool // true when when server is in shutdown
+
 	disableKeepAlives int32     // accessed atomically.
-	inShutdown        int32     // accessed atomically (non-zero means we're in Shutdown)
 	nextProtoOnce     sync.Once // guards setupHTTP2_* init
 	nextProtoErr      error     // result of http2.ConfigureServer if used
 
@@ -2653,7 +2655,7 @@ func (s *Server) closeDoneChanLocked() {
 // Close returns any error returned from closing the Server's
 // underlying Listener(s).
 func (srv *Server) Close() error {
-	atomic.StoreInt32(&srv.inShutdown, 1)
+	srv.inShutdown.setTrue()
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 	srv.closeDoneChanLocked()
@@ -2695,7 +2697,7 @@ var shutdownPollInterval = 500 * time.Millisecond
 // Once Shutdown has been called on a server, it may not be reused;
 // future calls to methods such as Serve will return ErrServerClosed.
 func (srv *Server) Shutdown(ctx context.Context) error {
-	atomic.StoreInt32(&srv.inShutdown, 1)
+	srv.inShutdown.setTrue()
 
 	srv.mu.Lock()
 	lnerr := srv.closeListenersLocked()
@@ -2708,7 +2710,7 @@ func (srv *Server) Shutdown(ctx context.Context) error {
 	ticker := time.NewTicker(shutdownPollInterval)
 	defer ticker.Stop()
 	for {
-		if srv.closeIdleConns() {
+		if srv.closeIdleConns() && srv.numListeners() == 0 {
 			return lnerr
 		}
 		select {
@@ -2728,6 +2730,12 @@ func (srv *Server) RegisterOnShutdown(f func()) {
 	srv.mu.Lock()
 	srv.onShutdown = append(srv.onShutdown, f)
 	srv.mu.Unlock()
+}
+
+func (s *Server) numListeners() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.listeners)
 }
 
 // closeIdleConns closes all idle connections and reports whether the
@@ -2762,7 +2770,6 @@ func (s *Server) closeListenersLocked() error {
 		if cerr := (*ln).Close(); cerr != nil && err == nil {
 			err = cerr
 		}
-		delete(s.listeners, ln)
 	}
 	return err
 }
@@ -3061,9 +3068,7 @@ func (s *Server) doKeepAlives() bool {
 }
 
 func (s *Server) shuttingDown() bool {
-	// TODO: replace inShutdown with the existing atomicBool type;
-	// see https://github.com/golang/go/issues/20239#issuecomment-381434582
-	return atomic.LoadInt32(&s.inShutdown) != 0
+	return s.inShutdown.isSet()
 }
 
 // SetKeepAlivesEnabled controls whether HTTP keep-alives are enabled.

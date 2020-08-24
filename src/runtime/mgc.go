@@ -191,6 +191,9 @@ func gcinit() {
 
 	work.startSema = 1
 	work.markDoneSema = 1
+	lockInit(&work.sweepWaiters.lock, lockRankSweepWaiters)
+	lockInit(&work.assistQueue.lock, lockRankAssistQueue)
+	lockInit(&work.wbufSpans.lock, lockRankWbufSpans)
 }
 
 func readgogc() int32 {
@@ -237,8 +240,6 @@ func setGCPercent(in int32) (out int32) {
 		gcSetTriggerRatio(memstats.triggerRatio)
 		unlock(&mheap_.lock)
 	})
-	// Pacing changed, so the scavenger should be awoken.
-	wakeScavenger()
 
 	// If we just disabled GC, wait for any concurrent GC mark to
 	// finish so we always return with no GC running.
@@ -1281,6 +1282,7 @@ func gcStart(trigger gcTrigger) {
 	}
 
 	// Ok, we're doing it! Stop everybody else
+	semacquire(&gcsema)
 	semacquire(&worldsema)
 
 	if trace.enabled {
@@ -1320,6 +1322,7 @@ func gcStart(trigger gcTrigger) {
 	systemstack(func() {
 		finishsweep_m()
 	})
+
 	// clearpools before we start the GC. If we wait they memory will not be
 	// reclaimed until the next GC cycle.
 	clearpools()
@@ -1373,15 +1376,26 @@ func gcStart(trigger gcTrigger) {
 	// the world.
 	gcController.markStartTime = now
 
+	// In STW mode, we could block the instant systemstack
+	// returns, so make sure we're not preemptible.
+	mp = acquirem()
+
 	// Concurrent mark.
 	systemstack(func() {
 		now = startTheWorldWithSema(trace.enabled)
 		work.pauseNS += now - work.pauseStart
 		work.tMark = now
 	})
-	// In STW mode, we could block the instant systemstack
-	// returns, so don't do anything important here. Make sure we
-	// block rather than returning to user code.
+
+	// Release the world sema before Gosched() in STW mode
+	// because we will need to reacquire it later but before
+	// this goroutine becomes runnable again, and we could
+	// self-deadlock otherwise.
+	semrelease(&worldsema)
+	releasem(mp)
+
+	// Make sure we block instead of returning to user code
+	// in STW mode.
 	if mode != gcBackgroundMode {
 		Gosched()
 	}
@@ -1448,6 +1462,10 @@ top:
 		return
 	}
 
+	// forEachP needs worldsema to execute, and we'll need it to
+	// stop the world later, so acquire worldsema now.
+	semacquire(&worldsema)
+
 	// Flush all local buffers and collect flushedWork flags.
 	gcMarkDoneFlushed = 0
 	systemstack(func() {
@@ -1508,6 +1526,7 @@ top:
 		// work to do. Keep going. It's possible the
 		// transition condition became true again during the
 		// ragged barrier, so re-check it.
+		semrelease(&worldsema)
 		goto top
 	}
 
@@ -1584,6 +1603,7 @@ top:
 				now := startTheWorldWithSema(true)
 				work.pauseNS += now - work.pauseStart
 			})
+			semrelease(&worldsema)
 			goto top
 		}
 	}
@@ -1688,9 +1708,6 @@ func gcMarkTermination(nextTriggerRatio float64) {
 
 	// Update GC trigger and pacing for the next cycle.
 	gcSetTriggerRatio(nextTriggerRatio)
-
-	// Pacing changed, so the scavenger should be awoken.
-	wakeScavenger()
 
 	// Update timing memstats
 	now := nanotime()
@@ -1808,6 +1825,7 @@ func gcMarkTermination(nextTriggerRatio float64) {
 	}
 
 	semrelease(&worldsema)
+	semrelease(&gcsema)
 	// Careful: another GC cycle may start now.
 
 	releasem(mp)
@@ -2130,6 +2148,9 @@ func gcMark(start_time int64) {
 
 // gcSweep must be called on the system stack because it acquires the heap
 // lock. See mheap for details.
+//
+// The world must be stopped.
+//
 //go:systemstack
 func gcSweep(mode gcMode) {
 	if gcphase != _GCoff {
@@ -2139,7 +2160,7 @@ func gcSweep(mode gcMode) {
 	lock(&mheap_.lock)
 	mheap_.sweepgen += 2
 	mheap_.sweepdone = 0
-	if mheap_.sweepSpans[mheap_.sweepgen/2%2].index != 0 {
+	if !go115NewMCentralImpl && mheap_.sweepSpans[mheap_.sweepgen/2%2].index != 0 {
 		// We should have drained this list during the last
 		// sweep phase. We certainly need to start this phase
 		// with an empty swept list.
@@ -2150,6 +2171,10 @@ func gcSweep(mode gcMode) {
 	mheap_.reclaimIndex = 0
 	mheap_.reclaimCredit = 0
 	unlock(&mheap_.lock)
+
+	if go115NewMCentralImpl {
+		sweep.centralIndex.clear()
+	}
 
 	if !_ConcurrentSweep || mode == gcForceBlockMode {
 		// Special case synchronous sweep.

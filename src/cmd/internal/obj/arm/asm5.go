@@ -1,5 +1,5 @@
 // Inferno utils/5l/span.c
-// https://bitbucket.org/inferno-os/inferno-os/src/default/utils/5l/span.c
+// https://bitbucket.org/inferno-os/inferno-os/src/master/utils/5l/span.c
 //
 //	Copyright © 1994-1999 Lucent Technologies Inc.  All rights reserved.
 //	Portions Copyright © 1995-1997 C H Forsyth (forsyth@terzarima.net)
@@ -379,6 +379,11 @@ func checkSuffix(c *ctxt5, p *obj.Prog, o *Optab) {
 }
 
 func span5(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
+	if ctxt.Retpoline {
+		ctxt.Diag("-spectre=ret not supported on arm")
+		ctxt.Retpoline = false // don't keep printing
+	}
+
 	var p *obj.Prog
 	var op *obj.Prog
 
