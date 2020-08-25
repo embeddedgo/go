@@ -4,6 +4,7 @@
 package ssa
 
 import "math"
+import "cmd/compile/internal/types"
 
 func rewriteValueRISCV64(v *Value) bool {
 	switch v.Op {
@@ -1984,6 +1985,23 @@ func rewriteValueRISCV64_OpMove(v *Value) bool {
 		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
 		v0.AddArg2(src, mem)
 		v.AddArg3(dst, v0, mem)
+		return true
+	}
+	// match: (Move [s] {t} dst src mem)
+	// cond: s%8 == 0 && s >= 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice
+	// result: (DUFFCOPY [16 * (128 - s/8)] dst src mem)
+	for {
+		s := v.AuxInt
+		t := v.Aux
+		dst := v_0
+		src := v_1
+		mem := v_2
+		if !(s%8 == 0 && s >= 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice) {
+			break
+		}
+		v.reset(OpRISCV64DUFFCOPY)
+		v.AuxInt = 16 * (128 - s/8)
+		v.AddArg3(dst, src, mem)
 		return true
 	}
 	// match: (Move [s] {t} dst src mem)
@@ -4997,6 +5015,22 @@ func rewriteValueRISCV64_OpZero(v *Value) bool {
 		v.reset(OpRISCV64MOVDstore)
 		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDconst, typ.UInt64)
 		v.AddArg3(ptr, v0, mem)
+		return true
+	}
+	// match: (Zero [s] {t} ptr mem)
+	// cond: s%8 == 0 && s > 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice
+	// result: (DUFFZERO [8 * (128 - s/8)] ptr mem)
+	for {
+		s := v.AuxInt
+		t := v.Aux
+		ptr := v_0
+		mem := v_1
+		if !(s%8 == 0 && s > 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice) {
+			break
+		}
+		v.reset(OpRISCV64DUFFZERO)
+		v.AuxInt = 8 * (128 - s/8)
+		v.AddArg2(ptr, mem)
 		return true
 	}
 	// match: (Zero [s] {t} ptr mem)

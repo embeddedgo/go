@@ -791,12 +791,8 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p := s.Prog(obj.AGETCALLERPC)
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
-	case ssa.OpThumbFlagEQ,
-		ssa.OpThumbFlagLT_ULT,
-		ssa.OpThumbFlagLT_UGT,
-		ssa.OpThumbFlagGT_ULT,
-		ssa.OpThumbFlagGT_UGT:
-		v.Fatalf("Flag* ops should never make it to codegen %v", v.LongString())
+	case ssa.OpThumbFlagConstant:
+		v.Fatalf("FlagConstant op should never make it to codegen %v", v.LongString())
 	case ssa.OpThumbInvertFlags:
 		v.Fatalf("InvertFlags should never make it to codegen %v", v.LongString())
 	case ssa.OpClobber:
@@ -828,16 +824,30 @@ var condBits = map[ssa.Op]uint8{
 var blockJump = map[ssa.BlockKind]struct {
 	asm, invasm obj.As
 }{
-	ssa.BlockThumbEQ:  {thumb.ABEQ, thumb.ABNE},
-	ssa.BlockThumbNE:  {thumb.ABNE, thumb.ABEQ},
-	ssa.BlockThumbLT:  {thumb.ABLT, thumb.ABGE},
-	ssa.BlockThumbGE:  {thumb.ABGE, thumb.ABLT},
-	ssa.BlockThumbLE:  {thumb.ABLE, thumb.ABGT},
-	ssa.BlockThumbGT:  {thumb.ABGT, thumb.ABLE},
-	ssa.BlockThumbULT: {thumb.ABLO, thumb.ABHS},
-	ssa.BlockThumbUGE: {thumb.ABHS, thumb.ABLO},
-	ssa.BlockThumbUGT: {thumb.ABHI, thumb.ABLS},
-	ssa.BlockThumbULE: {thumb.ABLS, thumb.ABHI},
+	ssa.BlockThumbEQ:     {thumb.ABEQ, thumb.ABNE},
+	ssa.BlockThumbNE:     {thumb.ABNE, thumb.ABEQ},
+	ssa.BlockThumbLT:     {thumb.ABLT, thumb.ABGE},
+	ssa.BlockThumbGE:     {thumb.ABGE, thumb.ABLT},
+	ssa.BlockThumbLE:     {thumb.ABLE, thumb.ABGT},
+	ssa.BlockThumbGT:     {thumb.ABGT, thumb.ABLE},
+	ssa.BlockThumbULT:    {thumb.ABLO, thumb.ABHS},
+	ssa.BlockThumbUGE:    {thumb.ABHS, thumb.ABLO},
+	ssa.BlockThumbUGT:    {thumb.ABHI, thumb.ABLS},
+	ssa.BlockThumbULE:    {thumb.ABLS, thumb.ABHI},
+	ssa.BlockThumbLTnoov: {thumb.ABMI, thumb.ABPL},
+	ssa.BlockThumbGEnoov: {thumb.ABPL, thumb.ABMI},
+}
+
+// To model a 'LEnoov' ('<=' without overflow checking) branching
+var leJumps = [2][2]gc.IndexJump{
+	{{Jump: thumb.ABEQ, Index: 0}, {Jump: thumb.ABPL, Index: 1}}, // next == b.Succs[0]
+	{{Jump: thumb.ABMI, Index: 0}, {Jump: thumb.ABEQ, Index: 0}}, // next == b.Succs[1]
+}
+
+// To model a 'GTnoov' ('>' without overflow checking) branching
+var gtJumps = [2][2]gc.IndexJump{
+	{{Jump: thumb.ABMI, Index: 1}, {Jump: thumb.ABEQ, Index: 1}}, // next == b.Succs[0]
+	{{Jump: thumb.ABEQ, Index: 1}, {Jump: thumb.ABPL, Index: 0}}, // next == b.Succs[1]
 }
 
 func ssaGenBlock(s *gc.SSAGenState, b, next *ssa.Block) {
@@ -881,7 +891,8 @@ func ssaGenBlock(s *gc.SSAGenState, b, next *ssa.Block) {
 		ssa.BlockThumbLT, ssa.BlockThumbGE,
 		ssa.BlockThumbLE, ssa.BlockThumbGT,
 		ssa.BlockThumbULT, ssa.BlockThumbUGT,
-		ssa.BlockThumbULE, ssa.BlockThumbUGE:
+		ssa.BlockThumbULE, ssa.BlockThumbUGE,
+		ssa.BlockThumbLTnoov, ssa.BlockThumbGEnoov:
 		jmp := blockJump[b.Kind]
 		switch next {
 		case b.Succs[0].Block():
@@ -897,6 +908,12 @@ func ssaGenBlock(s *gc.SSAGenState, b, next *ssa.Block) {
 				s.Br(obj.AJMP, b.Succs[0].Block())
 			}
 		}
+
+	case ssa.BlockThumbLEnoov:
+		s.CombJump(b, next, &leJumps)
+
+	case ssa.BlockThumbGTnoov:
+		s.CombJump(b, next, &gtJumps)
 
 	default:
 		b.Fatalf("branch not implemented: %s", b.LongString())
