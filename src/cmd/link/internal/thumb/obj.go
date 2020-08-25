@@ -1,5 +1,5 @@
 // Inferno utils/5l/obj.c
-// https://bitbucket.org/inferno-os/inferno-os/src/default/utils/5l/obj.c
+// https://bitbucket.org/inferno-os/inferno-os/src/master/utils/5l/obj.c
 //
 //	Copyright © 1994-1999 Lucent Technologies Inc.  All rights reserved.
 //	Portions Copyright © 1995-1997 C H Forsyth (forsyth@terzarima.net)
@@ -51,7 +51,7 @@ func Init() (*sys.Arch, ld.Arch) {
 		Asmb:             asmb,
 		Asmb2:            asmb2,
 		Elfreloc1:        elfreloc1,
-		Gentext:          gentext,
+		Gentext2:         gentext2,
 
 		//Adddynrel:      adddynrel,
 		//Elfsetupplt:    elfsetupplt,

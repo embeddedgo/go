@@ -16,70 +16,69 @@ import (
 	"sync"
 )
 
-func lookupFuncSym(syms *sym.Symbols, name string) *sym.Symbol {
-	if s := syms.ROLookup(name, sym.SymVerABI0); s != nil && s.FuncInfo != nil {
+func lookupFuncSym(ldr *loader.Loader, name string) loader.Sym {
+	if s := ldr.Lookup(name, sym.SymVerABI0); s != 0 && ldr.SymType(s) == sym.STEXT {
 		return s
 	}
-	if s := syms.ROLookup(name, sym.SymVerABIInternal); s != nil && s.FuncInfo != nil {
+	if s := ldr.Lookup(name, sym.SymVerABIInternal); s != 0 && ldr.SymType(s) == sym.STEXT {
 		return s
 	}
-	return nil
+	return 0
 }
 
 func gentext2(ctxt *ld.Link, ldr *loader.Loader) {
 	if ctxt.HeadType != objabi.Hnoos {
 		return
 	}
-	vectors := ctxt.Syms.Lookup("runtime.vectors", 0)
-	vectors.Type = sym.STEXT
-	vectors.Attr |= sym.AttrReachable
-	vectors.Align = 8
+	vectors := ldr.CreateSymForUpdate("runtime.vectors", sym.SymVerABI0)
+	vectors.SetType(sym.STEXT)
+	vectors.SetReachable(true)
+	vectors.SetAlign(8)
 
-	unhandledInterrupt := ctxt.Syms.Lookup("runtime.unhandledExternalInterrupt", 0)
-	if unhandledInterrupt == nil {
+	unhandledInterrupt := ldr.Lookup("runtime.unhandledExternalInterrupt", sym.SymVerABI0)
+	if unhandledInterrupt == 0 {
 		ld.Errorf(nil, "runtime.unhandledExternalInterrupt not defined")
 	}
 
 	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
-	var irqHandlers [1024]*sym.Symbol // BUG: 1024 is PLIC specific
+	var irqHandlers [1024]loader.Sym // BUG: 1024 is PLIC specific
 	irqNum := 1
 	for i := 1; i < len(irqHandlers); i++ {
-		s := lookupFuncSym(ctxt.Syms, ld.InterruptHandler(i))
-		if s == nil {
+		s := lookupFuncSym(ldr, ld.InterruptHandler(i))
+		if s == 0 {
 			irqHandlers[i] = unhandledInterrupt
 		} else {
 			irqHandlers[i] = s
 			irqNum = i + 1
 		}
 	}
-	vectors.AddUint64(ctxt.Arch, uint64(irqNum))
-	for _, s := range irqHandlers[1:irqNum] {
-		s.Attr |= sym.AttrReachable
-		rel := vectors.AddRel()
-		rel.Off = int32(len(vectors.P))
-		rel.Siz = 8
-		rel.Type = objabi.R_ADDR
-		rel.Sym = s
-		vectors.AddUint64(ctxt.Arch, 0)
-	}
-	ctxt.Textp = append(ctxt.Textp, vectors)
 
-	// move entry symbol on the beggining of text segment
-	entry := ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABI0)
-	if entry == nil || entry.FuncInfo == nil {
-		entry = ctxt.Syms.ROLookup(*ld.FlagEntrySymbol, sym.SymVerABIInternal)
-		if entry == nil || entry.FuncInfo == nil {
-			ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
-		}
+	vectors.AddUint64(ctxt.Arch, uint64(irqNum))
+	relocs := vectors.AddRelocs(irqNum - 1)
+	for i, s := range irqHandlers[1:irqNum] {
+		ldr.MakeSymbolUpdater(s).SetReachable(true)
+		rel := relocs.At2(i)
+		rel.SetSym(s)
+		rel.SetType(objabi.R_ADDR)
+		rel.SetSiz(8)
+		rel.SetOff(int32(vectors.AddUint64(ctxt.Arch, 0)))
 	}
-	for i, s := range ctxt.Textp {
+
+	ctxt.Textp2 = append(ctxt.Textp2, vectors.Sym())
+
+	// move the entry symbol at the beggining of the text segment
+	entry := lookupFuncSym(ldr, *ld.FlagEntrySymbol)
+	if entry == 0 {
+		ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
+	}
+	for i, s := range ctxt.Textp2 {
 		if s == entry {
-			copy(ctxt.Textp[1:], ctxt.Textp[:i])
-			ctxt.Textp[0] = s
+			copy(ctxt.Textp2[1:], ctxt.Textp2[:i])
+			ctxt.Textp2[0] = s
 			return
 		}
 	}
-	ld.Errorf(entry, "cannot find symbol in ctxt.Textp")
+	ldr.Errorf(entry, "cannot find symbol in ctxt.Textp")
 }
 
 func adddynrela(target *ld.Target, syms *ld.ArchSyms, rel *sym.Symbol, s *sym.Symbol, r *sym.Reloc) {

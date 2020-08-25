@@ -76,6 +76,19 @@ func (d *deadcodePass) init() {
 	}
 	heap.Init(&d.wq)
 
+	if d.ctxt.BuildMode == BuildModeShared {
+		// Mark all symbols defined in this library as reachable when
+		// building a shared library.
+		n := d.ldr.NDef()
+		for i := 1; i < n; i++ {
+			s := loader.Sym(i)
+			d.mark(s, 0)
+		}
+		return
+	}
+
+	var names []string
+
 	if d.ctxt.HeadType == objabi.Hnoos {
 		// mark interrupt handlers
 		var first, last int
@@ -89,19 +102,6 @@ func (d *deadcodePass) init() {
 			names = append(names, InterruptHandler(i))
 		}
 	}
-
-	if d.ctxt.BuildMode == BuildModeShared {
-		// Mark all symbols defined in this library as reachable when
-		// building a shared library.
-		n := d.ldr.NDef()
-		for i := 1; i < n; i++ {
-			s := loader.Sym(i)
-			d.mark(s, 0)
-		}
-		return
-	}
-
-	var names []string
 
 	// In a normal binary, start at main.main and the init
 	// functions and mark what is reachable from there.

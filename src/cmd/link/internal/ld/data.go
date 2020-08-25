@@ -150,7 +150,7 @@ func foldSubSymbolOffset(ldr *loader.Loader, s loader.Sym) (loader.Sym, int64) {
 //
 // This is a performance-critical function for the linker; be careful
 // to avoid introducing unnecessary allocations in the main loop.
-func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
+func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 	ldr := st.ldr
 	relocs := ldr.Relocs(s)
 	if relocs.Count() == 0 {
@@ -383,7 +383,7 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 
 			o = ldr.SymValue(rs) + r.Add()
 
-			if !dwarf && ctxt.Arch.Family == sys.Thumb && r.Sym.Type == sym.STEXT {
+			if !dwarf && target.IsThumb() && ldr.SymType(r.Sym()) == sym.STEXT {
 				o += 1 // thumb function call address
 			}
 
@@ -657,7 +657,7 @@ func (ctxt *Link) reloc() {
 		if !ctxt.IsWasm() { // On Wasm, text relocations are applied in Asmb2.
 			st := ctxt.makeRelocSymState()
 			for _, s := range ctxt.Textp2 {
-				st.relocsym(s, ldr.OutData(s))
+				st.relocsym(s, ldr.OutData(s), false)
 			}
 		}
 		wg.Done()
@@ -665,7 +665,7 @@ func (ctxt *Link) reloc() {
 	go func() {
 		st := ctxt.makeRelocSymState()
 		for _, s := range ctxt.datap2 {
-			st.relocsym(s, ldr.OutData(s))
+			st.relocsym(s, ldr.OutData(s), false)
 		}
 		wg.Done()
 	}()
@@ -673,7 +673,7 @@ func (ctxt *Link) reloc() {
 		st := ctxt.makeRelocSymState()
 		for _, si := range dwarfp2 {
 			for _, s := range si.syms {
-				st.relocsym(s, ldr.OutData(s))
+				st.relocsym(s, ldr.OutData(s), true)
 			}
 		}
 		wg.Done()
@@ -1403,6 +1403,7 @@ func (ctxt *Link) dodata2(symGroupType []sym.SymKind) {
 	// Give zeros sized symbols space if necessary.
 	fixZeroSizedSymbols2(ctxt)
 
+/*
 	if ctxt.HeadType == objabi.Hnoos {
 		// leave some read-only variables in Flash (hack to save RAM)
 		for _, s := range ctxt.Syms.Allsym {
@@ -1446,6 +1447,7 @@ func (ctxt *Link) dodata2(symGroupType []sym.SymKind) {
 			}
 		}
 	}
+*/
 
 	// Collect data symbols by type into data.
 	state := dodataState{ctxt: ctxt, symGroupType: symGroupType}
@@ -2696,7 +2698,7 @@ func compressSyms(ctxt *Link, syms []loader.Sym) []byte {
 			relocbuf = append(relocbuf[:0], P...)
 			P = relocbuf
 		}
-		st.relocsym(s, P)
+		st.relocsym(s, P, false)
 		if _, err := z.Write(P); err != nil {
 			log.Fatalf("compression failed: %s", err)
 		}

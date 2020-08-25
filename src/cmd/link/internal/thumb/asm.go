@@ -1,5 +1,5 @@
 // Inferno utils/5l/asm.c
-// https://bitbucket.org/inferno-os/inferno-os/src/default/utils/5l/asm.c
+// https://bitbucket.org/inferno-os/inferno-os/src/master/utils/5l/asm.c
 //
 //	Copyright © 1994-1999 Lucent Technologies Inc.  All rights reserved.
 //	Portions Copyright © 1995-1997 C H Forsyth (forsyth@terzarima.net)
@@ -39,75 +39,86 @@ import (
 	"debug/elf"
 	"fmt"
 	"log"
+	"sync"
 )
 
 const pcoff = 4 // in Thumb mode PC points 4 bytes forward
 
-func lookupFuncSym(syms *sym.Symbols, name string) *sym.Symbol {
-	if s := syms.ROLookup(name, sym.SymVerABI0); s != nil && s.FuncInfo != nil {
+func lookupFuncSym(ldr *loader.Loader, name string) loader.Sym {
+	if s := ldr.Lookup(name, sym.SymVerABI0); s != 0 && ldr.SymType(s) == sym.STEXT {
 		return s
 	}
-	if s := syms.ROLookup(name, sym.SymVerABIInternal); s != nil && s.FuncInfo != nil {
+	if s := ldr.Lookup(name, sym.SymVerABIInternal); s != 0 && ldr.SymType(s) == sym.STEXT {
 		return s
 	}
-	return nil
+	return 0
 }
 
 func gentext2(ctxt *ld.Link, ldr *loader.Loader) {
 	if ctxt.HeadType != objabi.Hnoos {
 		return
 	}
-	vectors := ctxt.Syms.Lookup("runtime.vectors", 0)
-	vectors.Type = sym.STEXT
-	vectors.Attr |= sym.AttrReachable
-	vectors.Align = 4
+	vectors := ldr.CreateSymForUpdate("runtime.vectors", sym.SymVerABI0)
+	vectors.SetType(sym.STEXT)
+	vectors.SetReachable(true)
+	vectors.SetAlign(4)
 
-	vectorsAdd := func(symname string) {
-		if s := lookupFuncSym(ctxt.Syms, symname); s != nil {
-			s.Attr |= sym.AttrReachable
-			rel := vectors.AddRel()
-			rel.Off = int32(len(vectors.P))
-			rel.Siz = 4
-			rel.Type = objabi.R_ADDR
-			rel.Sym = s
+	unhandledException := ldr.Lookup("runtime.unhandledException", sym.SymVerABI0)
+	if unhandledException == 0 {
+		ld.Errorf(nil, "runtime.unhandledException not defined")
+	}
+
+	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
+	var irqHandlers [480]loader.Sym
+	irqNum := 0
+	for i := range irqHandlers {
+		s := lookupFuncSym(ldr, ld.InterruptHandler(i))
+		if s == 0 {
+			irqHandlers[i] = unhandledException
+		} else {
+			irqHandlers[i] = s
+			irqNum = i + 1 // BUG: saves memory but prevents detect all unhandled interrupts
 		}
-		vectors.AddUint32(ctxt.Arch, 0)
 	}
 
 	ld.Segdata.Laddr = 2048 // communicate the main stack size to Link.address()
 	msp := uint32(ld.RAM.Base + ld.Segdata.Laddr)
 	vectors.AddUint32(ctxt.Arch, msp) // Main Stack Pointer after reset
-	vectorsAdd(*ld.FlagEntrySymbol)   // Reset
+
+	relocs := vectors.AddRelocs(irqNum + 15)
+	addHandler := func(irqn int, fname string) {
+		s := lookupFuncSym(ldr, fname)
+		if s == 0 {
+			s = unhandledException
+		}
+		ldr.MakeSymbolUpdater(s).SetReachable(true)
+		rel := relocs.At2(irqn + 15)
+		rel.SetSym(s)
+		rel.SetType(objabi.R_ADDR)
+		rel.SetSiz(4)
+		rel.SetOff(int32(vectors.AddUint32(ctxt.Arch, 0)))
+	}
 
 	// system exception handlers
+	addHandler(-15, *ld.FlagEntrySymbol) // reset handler
 	for irqn := -14; irqn < 0; irqn++ {
-		vectorsAdd(ld.InterruptHandler(irqn))
+		addHandler(irqn, ld.InterruptHandler(irqn)) // exception handler
 	}
 
-	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
-	var irqHandlers [480]*sym.Symbol
-	irqNum := 0
-	for i := range irqHandlers {
-		s := lookupFuncSym(ctxt.Syms, ld.InterruptHandler(i))
-		if s != nil {
-			irqHandlers[i] = s
-			irqNum = i + 1
-		}
+	// external interrupt handlers
+	for i, s := range irqHandlers[:irqNum] {
+		ldr.MakeSymbolUpdater(s).SetReachable(true)
+		rel := relocs.At2(i + 15)
+		rel.SetSym(s)
+		rel.SetType(objabi.R_ADDR)
+		rel.SetSiz(4)
+		rel.SetOff(int32(vectors.AddUint32(ctxt.Arch, 0)))
 	}
-	for _, s := range irqHandlers[:irqNum] {
-		if s != nil {
-			s.Attr |= sym.AttrReachable
-			rel := vectors.AddRel()
-			rel.Off = int32(len(vectors.P))
-			rel.Siz = 4
-			rel.Type = objabi.R_ADDR
-			rel.Sym = s
-		}
-		vectors.AddUint32(ctxt.Arch, 0)
-	}
-	ctxt.Textp = append(ctxt.Textp, nil)
-	copy(ctxt.Textp[1:], ctxt.Textp)
-	ctxt.Textp[0] = vectors
+
+	// add the vectors symbol at the beggining of the text segment
+	ctxt.Textp2 = append(ctxt.Textp2, 0)
+	copy(ctxt.Textp2[1:], ctxt.Textp2)
+	ctxt.Textp2[0] = vectors.Sym()
 }
 
 func elfreloc1(ctxt *ld.Link, r *sym.Reloc, sectoff int64) bool {
@@ -153,7 +164,7 @@ func elfreloc1(ctxt *ld.Link, r *sym.Reloc, sectoff int64) bool {
 func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 	relocs := ldr.Relocs(s)
 	r := relocs.At2(ri)
-	switch r.Type {
+	switch r.Type() {
 	case objabi.R_CALLARM:
 		var maxoffset int64
 		switch uint32(r.Add()>>32) & 0x9000F800 {
@@ -162,7 +173,7 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 		case 0x8000F000: // Bcond imm20
 			maxoffset = 1 << 20
 		default:
-			ld.Errorf(s, "bad branch opcode")
+			ldr.Errorf(s, "bad branch opcode")
 		}
 		t := (ldr.SymValue(rs) + int64(int32(r.Add())) - (ldr.SymValue(s) + int64(r.Off())))
 		if -maxoffset <= t && t < maxoffset {
@@ -210,7 +221,7 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 		r.SetSym(tramp)
 		r.SetAdd(r.Add()&^0xFFFFFFFF | int64(-pcoff)&0xFFFFFFFF) // clear the offset embedded in the instruction
 	default:
-		ld.Errorf(s, "trampoline called with non-jump reloc: %d (%s)", r.Type(), sym.RelocName(ctxt.Arch, r.Type()))
+		ctxt.Errorf(s, "trampoline called with non-jump reloc: %d (%s)", r.Type(), sym.RelocName(ctxt.Arch, r.Type()))
 	}
 }
 
@@ -276,7 +287,7 @@ func archreloc(target *ld.Target, syms *ld.ArchSyms, r *sym.Reloc, s *sym.Symbol
 	return val, false
 }
 
-func func archrelocvariant(target *ld.Target, syms *ld.ArchSyms, r *sym.Reloc, s *sym.Symbol, t int64) int64 {
+func archrelocvariant(target *ld.Target, syms *ld.ArchSyms, r *sym.Reloc, s *sym.Symbol, t int64) int64 {
 	log.Fatalf("unexpected relocation variant")
 	return t
 }
@@ -311,170 +322,27 @@ func asmb(ctxt *ld.Link, _ *loader.Loader) {
 }
 
 func asmb2(ctxt *ld.Link) {
-	machlink := uint32(0)
-	if ctxt.HeadType == objabi.Hdarwin {
-		machlink = uint32(ld.Domacholink(ctxt))
-	}
-
 	/* output symbol table */
 	ld.Symsize = 0
 
 	ld.Lcsize = 0
 	symo := uint32(0)
+
 	if !*ld.FlagS {
 		// TODO: rationalize
-		switch ctxt.HeadType {
-		default:
-			if ctxt.IsELF {
-				symo = uint32(ld.Segdwarf.Fileoff + ld.Segdwarf.Filelen)
-				symo = uint32(ld.Rnd(int64(symo), int64(*ld.FlagRound)))
-			}
-
-		case objabi.Hplan9:
-			symo = uint32(ld.Segdata.Fileoff + ld.Segdata.Filelen)
-
-		case objabi.Hdarwin:
-			symo = uint32(ld.Segdwarf.Fileoff + uint64(ld.Rnd(int64(ld.Segdwarf.Filelen), int64(*ld.FlagRound))) + uint64(machlink))
-		}
-
+		symo = uint32(ld.Segdwarf.Fileoff + ld.Segdwarf.Filelen)
+		symo = uint32(ld.Rnd(int64(symo), int64(*ld.FlagRound)))
 		ctxt.Out.SeekSet(int64(symo))
-		switch ctxt.HeadType {
-		default:
-			if ctxt.IsELF {
-				ld.Asmelfsym(ctxt)
-				ctxt.Out.Flush()
-				ctxt.Out.Write(ld.Elfstrdat)
 
-				if ctxt.LinkMode == ld.LinkExternal {
-					ld.Elfemitreloc(ctxt)
-				}
-			}
-
-		case objabi.Hplan9:
-			ld.Asmplan9sym(ctxt)
-			ctxt.Out.Flush()
-
-			sym := ctxt.Syms.Lookup("pclntab", 0)
-			if sym != nil {
-				ld.Lcsize = int32(len(sym.P))
-				ctxt.Out.Write(sym.P)
-				ctxt.Out.Flush()
-			}
-
-		case objabi.Hdarwin:
-			if ctxt.LinkMode == ld.LinkExternal {
-				ld.Machoemitreloc(ctxt)
-			}
+		ld.Asmelfsym(ctxt)
+		ctxt.Out.Write(ld.Elfstrdat)
+		if ctxt.LinkMode == ld.LinkExternal {
+			ld.Elfemitreloc(ctxt)
 		}
 	}
 
 	ctxt.Out.SeekSet(0)
-	switch ctxt.HeadType {
-	default:
-	case objabi.Hplan9: /* plan 9 */
-		ctxt.Out.Write32b(0x647)                      /* magic */
-		ctxt.Out.Write32b(uint32(ld.Segtext.Filelen)) /* sizes */
-		ctxt.Out.Write32b(uint32(ld.Segdata.Filelen))
-		ctxt.Out.Write32b(uint32(ld.Segdata.Length - ld.Segdata.Filelen))
-		ctxt.Out.Write32b(uint32(ld.Symsize))          /* nsyms */
-		ctxt.Out.Write32b(uint32(ld.Entryvalue(ctxt))) /* va of entry */
-		ctxt.Out.Write32b(0)
-		ctxt.Out.Write32b(uint32(ld.Lcsize))
-
-	case objabi.Hlinux,
-		objabi.Hfreebsd,
-		objabi.Hnetbsd,
-		objabi.Hopenbsd,
-		objabi.Hnoos:
-		ld.Asmbelf(ctxt, int64(symo))
-
-	case objabi.Hdarwin:
-		ld.Asmbmacho(ctxt)
-	}
-
-	ctxt.Out.Flush()
-	if *ld.FlagC {
-		fmt.Printf("textsize=%d\n", ld.Segtext.Filelen)
-		fmt.Printf("datsize=%d\n", ld.Segdata.Filelen)
-		fmt.Printf("bsssize=%d\n", ld.Segdata.Length-ld.Segdata.Filelen)
-		fmt.Printf("symsize=%d\n", ld.Symsize)
-		fmt.Printf("lcsize=%d\n", ld.Lcsize)
-		fmt.Printf("total=%d\n", ld.Segtext.Filelen+ld.Segdata.Length+uint64(ld.Symsize)+uint64(ld.Lcsize))
-	}
-}
-
-func asmb2(ctxt *ld.Link) {
-	/* output symbol table */
-	ld.Symsize = 0
-
-	ld.Lcsize = 0
-	symo := uint32(0)
-	if !*ld.FlagS {
-		// TODO: rationalize
-		switch ctxt.HeadType {
-		default:
-			if ctxt.IsELF {
-				symo = uint32(ld.Segdwarf.Fileoff + ld.Segdwarf.Filelen)
-				symo = uint32(ld.Rnd(int64(symo), int64(*ld.FlagRound)))
-			}
-
-		case objabi.Hplan9:
-			symo = uint32(ld.Segdata.Fileoff + ld.Segdata.Filelen)
-
-		case objabi.Hwindows:
-			symo = uint32(ld.Segdwarf.Fileoff + ld.Segdwarf.Filelen)
-			symo = uint32(ld.Rnd(int64(symo), ld.PEFILEALIGN))
-		}
-
-		ctxt.Out.SeekSet(int64(symo))
-		switch ctxt.HeadType {
-		default:
-			if ctxt.IsELF {
-				ld.Asmelfsym(ctxt)
-				ctxt.Out.Write(ld.Elfstrdat)
-
-				if ctxt.LinkMode == ld.LinkExternal {
-					ld.Elfemitreloc(ctxt)
-				}
-			}
-
-		case objabi.Hplan9:
-			ld.Asmplan9sym(ctxt)
-
-			sym := ctxt.Syms.Lookup("pclntab", 0)
-			if sym != nil {
-				ld.Lcsize = int32(len(sym.P))
-				ctxt.Out.Write(sym.P)
-			}
-
-		case objabi.Hwindows:
-			// Do nothing
-		}
-	}
-
-	ctxt.Out.SeekSet(0)
-	switch ctxt.HeadType {
-	default:
-	case objabi.Hplan9: /* plan 9 */
-		ctxt.Out.Write32b(0x647)                      /* magic */
-		ctxt.Out.Write32b(uint32(ld.Segtext.Filelen)) /* sizes */
-		ctxt.Out.Write32b(uint32(ld.Segdata.Filelen))
-		ctxt.Out.Write32b(uint32(ld.Segdata.Length - ld.Segdata.Filelen))
-		ctxt.Out.Write32b(uint32(ld.Symsize))          /* nsyms */
-		ctxt.Out.Write32b(uint32(ld.Entryvalue(ctxt))) /* va of entry */
-		ctxt.Out.Write32b(0)
-		ctxt.Out.Write32b(uint32(ld.Lcsize))
-
-	case objabi.Hlinux,
-		objabi.Hfreebsd,
-		objabi.Hnetbsd,
-		objabi.Hopenbsd,
-		objabi.Hnoos:
-		ld.Asmbelf(ctxt, int64(symo))
-
-	case objabi.Hwindows:
-		ld.Asmbpe(ctxt)
-	}
+	ld.Asmbelf(ctxt, int64(symo))
 
 	if *ld.FlagC {
 		fmt.Printf("textsize=%d\n", ld.Segtext.Filelen)
