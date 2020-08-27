@@ -396,13 +396,15 @@ func disasm_ppc64(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.By
 	return text, size
 }
 
-func disasm_thumb(code []byte, pc uint64, lookup lookupFunc, _ binary.ByteOrder) (string, int) {
+func disasm_thumb(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.ByteOrder, gnuAsm bool) (string, int) {
 	inst, err := thumbasm.Decode(code)
 	var text string
 	size := inst.Len
 	if err != nil || size == 0 || inst.Op == 0 {
 		size = 2
 		text = "?"
+	} else if gnuAsm {
+		text = fmt.Sprintf("%-36s // %s", thumbasm.GoSyntax(inst, pc, lookup, textReader{code, pc}), thumbasm.GNUSyntax(inst))
 	} else {
 		text = thumbasm.GoSyntax(inst, pc, lookup, textReader{code, pc})
 	}
