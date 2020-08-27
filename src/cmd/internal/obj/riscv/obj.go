@@ -1742,6 +1742,8 @@ var encodings = [ALAST & obj.AMask]encoding{
 	obj.APCDATA:   pseudoOpEncoding,
 	obj.ATEXT:     pseudoOpEncoding,
 	obj.ANOP:      pseudoOpEncoding,
+	obj.ADUFFZERO: pseudoOpEncoding,
+	obj.ADUFFCOPY: pseudoOpEncoding,
 }
 
 // encodingForAs returns the encoding for an obj.As.

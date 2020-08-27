@@ -76,8 +76,27 @@ var depsRules = `
 	  unicode/utf8, unicode/utf16, unicode,
 	  unsafe;
 
+	# MMIO used by noos runtime
+	unsafe
+	< embedded/mmio
+	< internal/cpu/cortexm,
+	  internal/cpu/cortexm/acc,
+	  internal/cpu/cortexm/bitband,
+	  internal/cpu/cortexm/cmt,
+	  internal/cpu/cortexm/debug/itm,
+	  internal/cpu/cortexm/fpu,
+	  internal/cpu/cortexm/mpu,
+	  internal/cpu/cortexm/nvic,
+	  internal/cpu/cortexm/pft,
+	  internal/cpu/cortexm/scb,
+	  internal/cpu/cortexm/scid,
+	  internal/cpu/cortexm/systick,
+	  internal/cpu/riscv/clint,
+	  internal/cpu/riscv/plic
+	< MMIO;
+
 	# RUNTIME is the core runtime group of packages, all of them very light-weight.
-	internal/cpu, unsafe
+	internal/cpu, unsafe, MMIO
 	< internal/bytealg
 	< internal/unsafeheader
 	< runtime/internal/sys
@@ -484,6 +503,17 @@ var depsRules = `
 
 	FMT, container/heap, math/rand
 	< internal/trace;
+
+	# Embedded Go packages
+
+	sync, time, unsafe
+	< embedded/rtos;
+
+	embedded/rtos, internal/cpu/cortexm/scb, internal/cpu/cortexm/systick
+	< embedded/arch/cortexm/systim;
+
+	embedded/rtos, internal/cpu/riscv/clint
+	< embedded/arch/riscv/systim;
 `
 
 // listStdPkgs returns the same list of packages as "go list std".

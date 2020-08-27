@@ -229,7 +229,7 @@ func init() {
 		{name: "CALLinter", argLength: 2, reg: callInter, aux: "Int64", call: true},                 // call fn by pointer. arg0=codeptr, arg1=mem, auxint=argsize, returns mem
 
 		// duffzero
-		// arg0 = address of memory to zero (A0, changed as side effect)
+		// arg0 = address of memory to zero (X10, changed as side effect)
 		// arg1 = mem
 		// auxint = offset into duffzero code to start executing
 		// returns mem
@@ -257,7 +257,7 @@ func init() {
 			argLength: 3,
 			reg: regInfo{
 				inputs:   []regMask{regNamed["X11"], regNamed["X10"]},
-				clobbers: regNamed["X1"] | regNamed["X10"] | regNamed["X11"] | regNamed["X12"],
+				clobbers: regNamed["X1"] | regNamed["X10"] | regNamed["X11"],
 			},
 			typ:            "Mem",
 			faultOnNilArg0: true,

@@ -28117,7 +28117,7 @@ var opcodeTable = [...]opInfo{
 				{0, 1024}, // X11
 				{1, 512},  // X10
 			},
-			clobbers: 3584, // X10 X11 X12
+			clobbers: 1536, // X10 X11
 		},
 	},
 	{

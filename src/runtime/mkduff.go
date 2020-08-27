@@ -250,10 +250,10 @@ func copyRISCV64(w io.Writer) {
 	// A0 and A1 are updated as a side effect
 	fmt.Fprintln(w, "TEXT runtime·duffcopy(SB), NOSPLIT|NOFRAME, $0-0")
 	for i := 0; i < 128; i++ {
-		fmt.Fprintln(w, "\tMOV\t(A0), A2")
-		fmt.Fprintln(w, "\tADD\t$8, A0")
-		fmt.Fprintln(w, "\tMOV\tA2, (A1)")
-		fmt.Fprintln(w, "\tADD\t$8, A1")
+		fmt.Fprintln(w, "\tMOV\t(X10), X31")
+		fmt.Fprintln(w, "\tADD\t$8, X10")
+		fmt.Fprintln(w, "\tMOV\tA2, (X11)")
+		fmt.Fprintln(w, "\tADD\t$8, X11")
 		fmt.Fprintln(w)
 	}
 	fmt.Fprintln(w, "\tRET")

@@ -264,644 +264,644 @@ TEXT runtime·duffzero(SB), NOSPLIT|NOFRAME, $0-0
 	RET
 
 TEXT runtime·duffcopy(SB), NOSPLIT|NOFRAME, $0-0
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
-
-	MOV	(A0), A2
-	ADD	$8, A0
-	MOV	A2, (A1)
-	ADD	$8, A1
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
+
+	MOV	(X10), X31
+	ADD	$8, X10
+	MOV	A2, (X11)
+	ADD	$8, X11
 
 	RET
