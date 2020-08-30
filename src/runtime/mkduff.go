@@ -35,7 +35,6 @@ func main() {
 	gen("amd64", notags, zeroAMD64, copyAMD64)
 	gen("386", notags, zero386, copy386)
 	gen("arm", notags, zeroARM, copyARM)
-	gen("thumb", notags, zeroARM, copyARM)
 	gen("arm64", notags, zeroARM64, copyARM64)
 	gen("ppc64x", tagsPPC64x, zeroPPC64x, copyPPC64x)
 	gen("mips64x", tagsMIPS64x, zeroMIPS64x, copyMIPS64x)
@@ -233,26 +232,25 @@ func copyMIPS64x(w io.Writer) {
 
 func zeroRISCV64(w io.Writer) {
 	// ZERO: always zero
-	// A0: ptr to memory to be zeroed
-	// A0 is updated as a side effect.
+	// X10: ptr to memory to be zeroed
+	// X10 is updated as a side effect.
 	fmt.Fprintln(w, "TEXT runtime·duffzero(SB), NOSPLIT|NOFRAME, $0-0")
 	for i := 0; i < 128; i++ {
-		fmt.Fprintln(w, "\tMOV\tZERO, (A0)")
-		fmt.Fprintln(w, "\tADD\t$8, A0")
+		fmt.Fprintln(w, "\tMOV\tZERO, (X10)")
+		fmt.Fprintln(w, "\tADD\t$8, X10")
 	}
 	fmt.Fprintln(w, "\tRET")
 }
 
 func copyRISCV64(w io.Writer) {
-	// A0: ptr to source memory
-	// A1: ptr to destination memory
-	// A2: scratch space
-	// A0 and A1 are updated as a side effect
+	// X10: ptr to source memory
+	// X11: ptr to destination memory
+	// X10 and X11 are updated as a side effect
 	fmt.Fprintln(w, "TEXT runtime·duffcopy(SB), NOSPLIT|NOFRAME, $0-0")
 	for i := 0; i < 128; i++ {
 		fmt.Fprintln(w, "\tMOV\t(X10), X31")
 		fmt.Fprintln(w, "\tADD\t$8, X10")
-		fmt.Fprintln(w, "\tMOV\tA2, (X11)")
+		fmt.Fprintln(w, "\tMOV\tX31, (X11)")
 		fmt.Fprintln(w, "\tADD\t$8, X11")
 		fmt.Fprintln(w)
 	}

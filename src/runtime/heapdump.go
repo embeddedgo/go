@@ -567,8 +567,8 @@ func dumpmemstats() {
 	dumpint(memstats.next_gc)
 	dumpint(memstats.last_gc_unix)
 	dumpint(memstats.pause_total_ns)
-	for _, ns := range memstats.pause_ns {
-		dumpint(ns)
+	for i := 0; i < 256; i++ {
+		dumpint(memstats.pause_ns[i])
 	}
 	dumpint(uint64(memstats.numgc))
 }

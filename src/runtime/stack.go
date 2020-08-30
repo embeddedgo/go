@@ -952,11 +952,10 @@ func newstack() {
 		gp.syscallsp = morebuf.sp
 		gp.syscallpc = morebuf.pc
 		pcname, pcoff := "(unknown)", uintptr(0)
-		pc := gp.sched.pc
-		f := findfunc(pc)
+		f := findfunc(gp.sched.pc)
 		if f.valid() {
 			pcname = funcname(f)
-			pcoff = pc - f.entry
+			pcoff = gp.sched.pc - f.entry
 		}
 		print("runtime: newstack at ", pcname, "+", hex(pcoff),
 			" sp=", hex(gp.sched.sp), " stack=[", hex(gp.stack.lo), ", ", hex(gp.stack.hi), "]\n",

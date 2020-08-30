@@ -2631,7 +2631,7 @@ func (ctxt *Link) layout(order []*sym.Segment) uint64 {
 				// Assuming the previous segment was
 				// aligned, the following rounding
 				// should ensure that this segment's
-				// VA ��� Fileoff mod FlagRound.
+				// VA ≡ Fileoff mod FlagRound
 				seg.Fileoff = uint64(Rnd(int64(prev.Fileoff+prev.Filelen), int64(*FlagRound)))
 				if seg.Vaddr%uint64(*FlagRound) != seg.Fileoff%uint64(*FlagRound) {
 					Exitf("bad segment rounding (Vaddr=%#x Fileoff=%#x FlagRound=%#x)", seg.Vaddr, seg.Fileoff, *FlagRound)

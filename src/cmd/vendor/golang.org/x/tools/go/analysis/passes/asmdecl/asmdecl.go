@@ -316,7 +316,7 @@ Files:
 				continue
 			}
 
-			if strings.Contains(line, ", "+archDef.stack) || strings.Contains(line, ",\t"+archDef.stack) || (strings.Contains(line, "NOP") && strings.Contains(line, archDef.stack)) {
+			if strings.Contains(line, ", "+archDef.stack) || strings.Contains(line, ",\t"+archDef.stack) || strings.Contains(line, "NOP "+archDef.stack) || strings.Contains(line, "NOP\t"+archDef.stack) {
 				wroteSP = true
 				continue
 			}
