@@ -55,7 +55,7 @@ func symalign(s *sym.Symbol) int32 {
 	return align
 }
 
-func relocsym2(target *Target, ldr *loader.Loader, err *ErrorReporter, syms *ArchSyms, s *sym.Symbol) {
+func relocsym2(target *Target, ldr *loader.Loader, err *ErrorReporter, syms *ArchSyms, s *sym.Symbol, dwarf bool) {
 	if len(s.R) == 0 {
 		return
 	}
@@ -262,6 +262,10 @@ func relocsym2(target *Target, ldr *loader.Loader, err *ErrorReporter, syms *Arc
 			}
 
 			o = Symaddr(r.Sym) + r.Add
+
+			if !dwarf && target.IsThumb() && r.Sym.Type == sym.STEXT {
+				o += 1 // thumb function call address
+			}
 
 			// On amd64, 4-byte offsets will be sign-extended, so it is impossible to
 			// access more than 2GB of static data; fail at link time is better than
@@ -495,21 +499,21 @@ func (ctxt *Link) reloc2() {
 	go func() {
 		if !ctxt.IsWasm() { // On Wasm, text relocations are applied in Asmb2.
 			for _, s := range ctxt.Textp {
-				relocsym2(target, ldr, reporter, syms, s)
+				relocsym2(target, ldr, reporter, syms, s, false)
 			}
 		}
 		wg.Done()
 	}()
 	go func() {
 		for _, s := range ctxt.datap {
-			relocsym2(target, ldr, reporter, syms, s)
+			relocsym2(target, ldr, reporter, syms, s, false)
 		}
 		wg.Done()
 	}()
 	go func() {
 		for _, si := range dwarfp {
 			for _, s := range si.syms {
-				relocsym2(target, ldr, reporter, syms, s)
+				relocsym2(target, ldr, reporter, syms, s, true)
 			}
 		}
 		wg.Done()
