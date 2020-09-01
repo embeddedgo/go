@@ -336,6 +336,9 @@ func (ctxt *Link) pclntab() loader.Bitmap {
 		// TODO: remove the weird thing and remove this condition.
 		setAddr = func(s *loader.SymbolBuilder, arch *sys.Arch, off int64, tgt loader.Sym, add int64) int64 {
 			if v := ldr.SymValue(tgt); v != 0 {
+				if arch.Family == sys.Thumb {
+					add += 1
+				}
 				return s.SetUint(arch, off, uint64(v+add))
 			}
 			return s.SetAddrPlus(arch, off, tgt, add)
