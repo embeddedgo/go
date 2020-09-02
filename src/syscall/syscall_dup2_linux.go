@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // +build !android
-// +build 386 amd64 arm mips mipsle mips64 mips64le ppc64 ppc64le s390x
+// +build 386 amd64 arm mips mipsle mips64 mips64le ppc64 ppc64le s390x thumb
 
 package syscall
 
