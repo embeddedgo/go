@@ -474,7 +474,7 @@ TEXT runtime·clone(SB),NOSPLIT,$0
 	RET
 
 	// Paranoia: check that SP is as we expect. Use R13 to avoid linker 'fixup'
-	NOP   R13  // tell vet SP/R13 changed - stop checking offsets
+	NOP R13  // tell vet SP/R13 changed - stop checking offsets
 	MOVW  12(R13), R0
 	MOVW  $1234, R1
 	CMP   R0, R1
