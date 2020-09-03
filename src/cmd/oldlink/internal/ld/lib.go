@@ -676,7 +676,7 @@ func (ctxt *Link) linksetup() {
 
 		// In addition, on ARM, the runtime depends on the linker
 		// recording the value of GOARM.
-		if ctxt.Arch.Family == sys.ARM {
+		if ctxt.Arch.Family == sys.ARM || ctxt.Arch.Family == sys.Thumb {
 			s := ctxt.Syms.Lookup("runtime.goarm", 0)
 			s.Type = sym.SDATA
 			s.Size = 0
@@ -2582,6 +2582,9 @@ func Entryvalue(ctxt *Link) int64 {
 	}
 	if ctxt.HeadType != objabi.Haix && s.Type != sym.STEXT {
 		Errorf(s, "entry not text")
+	}
+	if ctxt.Arch.Family == sys.Thumb {
+		return s.Value + 1
 	}
 	return s.Value
 }

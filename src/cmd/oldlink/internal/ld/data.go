@@ -126,7 +126,7 @@ func trampoline(ctxt *Link, s *sym.Symbol) {
 //
 // This is a performance-critical function for the linker; be careful
 // to avoid introducing unnecessary allocations in the main loop.
-func relocsym(ctxt *Link, s *sym.Symbol) {
+func relocsym(ctxt *Link, s *sym.Symbol, dwarf bool) {
 	if len(s.R) == 0 {
 		return
 	}
@@ -339,6 +339,10 @@ func relocsym(ctxt *Link, s *sym.Symbol) {
 			}
 
 			o = Symaddr(r.Sym) + r.Add
+
+			if !dwarf && ctxt.Arch.Family == sys.Thumb && r.Sym.Type == sym.STEXT {
+				o += 1 // thumb function call address
+			}
 
 			// On amd64, 4-byte offsets will be sign-extended, so it is impossible to
 			// access more than 2GB of static data; fail at link time is better than
@@ -563,13 +567,13 @@ func relocsym(ctxt *Link, s *sym.Symbol) {
 
 func (ctxt *Link) reloc() {
 	for _, s := range ctxt.Textp {
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, false)
 	}
 	for _, s := range datap {
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, false)
 	}
 	for _, s := range dwarfp {
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, true)
 	}
 }
 
@@ -2464,7 +2468,7 @@ func compressSyms(ctxt *Link, syms []*sym.Symbol) []byte {
 			s.P = ctxt.relocbuf
 			s.Attr.Set(sym.AttrReadOnly, false)
 		}
-		relocsym(ctxt, s)
+		relocsym(ctxt, s, false)
 		if _, err := z.Write(s.P); err != nil {
 			log.Fatalf("compression failed: %s", err)
 		}

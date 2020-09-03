@@ -514,8 +514,8 @@ func Elfinit(ctxt *Link) {
 		ehdr.shentsize = ELF64SHDRSIZE /* Must be ELF64SHDRSIZE */
 
 	// 32-bit architectures
-	case sys.ARM, sys.MIPS:
-		if ctxt.Arch.Family == sys.ARM {
+	case sys.ARM, sys.MIPS, sys.Thumb:
+		if ctxt.Arch.Family == sys.ARM || ctxt.Arch.Family == sys.Thumb {
 			// we use EABI on linux/arm, freebsd/arm, netbsd/arm.
 			if ctxt.HeadType == objabi.Hlinux || ctxt.HeadType == objabi.Hfreebsd || ctxt.HeadType == objabi.Hnetbsd {
 				// We set a value here that makes no indication of which
@@ -1771,7 +1771,7 @@ func Asmbelf(ctxt *Link, symo int64) {
 		Exitf("unknown architecture in asmbelf: %v", ctxt.Arch.Family)
 	case sys.MIPS, sys.MIPS64:
 		eh.machine = EM_MIPS
-	case sys.ARM:
+	case sys.ARM, sys.Thumb:
 		eh.machine = EM_ARM
 	case sys.AMD64:
 		eh.machine = EM_X86_64
