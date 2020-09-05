@@ -121,7 +121,9 @@ func main() {
 	// Max stack size is 1 GB on 64-bit, 250 MB on 32-bit.
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
-	if sys.PtrSize == 8 {
+	if _MCU != 0 {
+		maxstacksize = 16384 * memScale
+	} else if sys.PtrSize == 8 {
 		maxstacksize = 1000000000
 	} else {
 		maxstacksize = 250000000
@@ -1210,7 +1212,7 @@ func mexit(osStack bool) {
 	g := getg()
 	m := g.m
 
-	if m == &m0 {
+	if m == &m0 && _MCU == 0 {
 		// This is the main thread. Just wedge it.
 		//
 		// On Linux, exiting the main thread puts the process
@@ -1455,7 +1457,15 @@ func allocm(_p_ *p, fn func(), id int64) *m {
 				continue
 			}
 			stackfree(freem.g0.stack)
+			cleanm := freem
 			freem = freem.freelink
+			if cleanm == &m0 {
+				// ensure nothing will hang on m0
+				cleanm.g0 = nil
+				cleanm.curg = nil
+				cleanm.freelink = nil
+				// TODO: can we zero allink? any other pointer fields?
+			}
 		}
 		sched.freem = newList
 		unlock(&sched.lock)
@@ -1469,6 +1479,8 @@ func allocm(_p_ *p, fn func(), id int64) *m {
 	// Windows and Plan 9 will layout sched stack on OS stack.
 	if iscgo || GOOS == "solaris" || GOOS == "illumos" || GOOS == "windows" || GOOS == "plan9" || GOOS == "darwin" {
 		mp.g0 = malg(-1)
+	} else if _MCU != 0 {
+		mp.g0 = malg(2 * _FixedStack)
 	} else {
 		mp.g0 = malg(8192 * sys.StackGuardMultiplier)
 	}
@@ -3699,9 +3711,9 @@ func gfput(_p_ *p, gp *g) {
 
 	_p_.gFree.push(gp)
 	_p_.gFree.n++
-	if _p_.gFree.n >= 64 {
+	if _p_.gFree.n >= 64*(1-_MCU)+5*memScale*_MCU {
 		lock(&sched.gFree.lock)
-		for _p_.gFree.n >= 32 {
+		for _p_.gFree.n >= 32*(1-_MCU)+3*memScale*_MCU {
 			_p_.gFree.n--
 			gp = _p_.gFree.pop()
 			if gp.stack.lo == 0 {
@@ -3722,7 +3734,7 @@ retry:
 	if _p_.gFree.empty() && (!sched.gFree.stack.empty() || !sched.gFree.noStack.empty()) {
 		lock(&sched.gFree.lock)
 		// Move a batch of free Gs to the P.
-		for _p_.gFree.n < 32 {
+		for _p_.gFree.n < 32*(1-_MCU)+3*memScale*_MCU {
 			// Prefer Gs with stacks.
 			gp := sched.gFree.stack.pop()
 			if gp == nil {
@@ -3929,7 +3941,7 @@ func sigprof(pc, sp, lr uintptr, gp *g, mp *m) {
 	// As a workaround, create a counter of SIGPROFs while in critical section
 	// to store the count, and pass it to sigprof.add() later when SIGPROF is
 	// received from somewhere else (with _LostSIGPROFDuringAtomic64 as pc).
-	if GOARCH == "mips" || GOARCH == "mipsle" || GOARCH == "arm" {
+	if GOARCH == "mips" || GOARCH == "mipsle" || GOARCH == "arm" || GOARCH == "thumb" {
 		if f := findfunc(pc); f.valid() {
 			if hasPrefix(funcname(f), "runtime/internal/atomic") {
 				cpuprof.lostAtomic++
@@ -5264,7 +5276,7 @@ func runqget(_p_ *p) (gp *g, inheritTime bool) {
 // Batch is a ring buffer starting at batchHead.
 // Returns number of grabbed goroutines.
 // Can be executed by any P.
-func runqgrab(_p_ *p, batch *[256]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
+func runqgrab(_p_ *p, batch *[256*(1-_MCU) + 64*(1+logMemScale/2)*_MCU]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
 	for {
 		h := atomic.LoadAcq(&_p_.runqhead) // load-acquire, synchronize with other consumers
 		t := atomic.LoadAcq(&_p_.runqtail) // load-acquire, synchronize with the producer

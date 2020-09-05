@@ -281,7 +281,7 @@ func (d *Disasm) Decode(start, end uint64, relocs []Reloc, gnuAsm bool, f func(p
 	if end > d.textEnd {
 		end = d.textEnd
 	}
-	var pctoa uint64 // TODO(md) if more such cases this can be a function
+	var pctoa uint64 // TODO(md) if more such cases pctoa can be a function
 	if !d.gofile && d.goarch == "thumb" {
 		pctoa = 1
 	}

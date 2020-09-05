@@ -99,7 +99,7 @@ func (f *elfFile) goarch() string {
 		return "amd64"
 	case elf.EM_ARM:
 		if f.elf.Entry&1 != 0 {
-			return "thumb" // BUG(md): should be per function
+			return "thumb"
 		}
 		return "arm"
 	case elf.EM_AARCH64:
