@@ -375,7 +375,11 @@ func preemptM(mp *m) {
 func sigFetchG(c *sigctxt) *g {
 	switch GOARCH {
 	case "arm", "arm64", "thumb":
-		if !iscgo && inVDSOPage(c.sigpc()) {
+		pc := c.sigpc()
+		if GOARCH == "thumb" {
+			pc &^= 1
+		}
+		if !iscgo && inVDSOPage(pc) {
 			// When using cgo, we save the g on TLS and load it from there
 			// in sigtramp. Just use that.
 			// Otherwise, before making a VDSO call we save the g to the
@@ -630,6 +634,9 @@ func sighandler(sig uint32, info *siginfo, ctxt unsafe.Pointer, gp *g) {
 		// We're assuming here we can read at least the page containing the PC.
 		// I suppose it is possible that the page is mapped executable but not readable?
 		pc := c.sigpc()
+		if GOARCH == "thumb" {
+			pc &^= 1
+		}
 		if n > physPageSize-pc%physPageSize {
 			n = physPageSize - pc%physPageSize
 		}
