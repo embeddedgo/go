@@ -60,8 +60,12 @@ const (
 type traceBufPtr uintptr
 
 var trace struct {
-	enabled  bool
-	shutdown bool
+	lock        mutex
+	stringsLock mutex
+	bufLock     mutex
+	stackTab    struct{ lock mutex }
+	enabled     bool
+	shutdown    bool
 }
 
 func traceGCSweepStart()                  {}

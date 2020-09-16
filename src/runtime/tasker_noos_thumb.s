@@ -325,3 +325,7 @@ TEXT runtime·curcpuSavectxSched(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW   R1, CONTROL  // to avoid stacking again by higher priority handler
 	CPSIE
 	RET
+
+TEXT runtime·unhandledException(SB),NOSPLIT|NOFRAME,$0-0
+	BKPT
+	B   -1(PC)

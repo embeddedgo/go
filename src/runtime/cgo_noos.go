@@ -23,7 +23,7 @@ var (
 
 type cgoCallers [1]uintptr
 
-func cgoCheckSliceCopy(typ *_type, dst slice, src slice, n int) {}
+func cgoCheckSliceCopy(typ *_type, dst, src unsafe.Pointer, n int) {}
 func cgoCheckWriteBarrier(dst *uintptr, src uintptr)            {}
 func cgocall(fn unsafe.Pointer, arg unsafe.Pointer) int32       { return 0 }
 

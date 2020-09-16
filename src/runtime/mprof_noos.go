@@ -11,7 +11,10 @@ const (
 	mutexprofilerate = 0
 )
 
-var MemProfileRate int = 0
+var (
+	proflock       mutex
+	MemProfileRate int = 0
+)
 
 //go:notinheap
 type bucket struct{}
