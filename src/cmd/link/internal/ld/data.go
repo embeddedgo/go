@@ -2601,9 +2601,9 @@ func (ctxt *Link) address() []*sym.Segment {
 	if ctxt.HeadType == objabi.Hnoos {
 		ramstart := int64(RAM.Base)
 		ramend := int64(RAM.Base + RAM.Size)
-		ctxt.xdefine("runtime.ramstart", sym.SRODATA, ramstart)
-		ctxt.xdefine("runtime.ramend", sym.SRODATA, ramend)
-		ctxt.xdefine("runtime.romdata", sym.SRODATA, int64(Segdata.Laddr))
+		ctxt.xdefine2("runtime.ramstart", sym.SRODATA, ramstart)
+		ctxt.xdefine2("runtime.ramend", sym.SRODATA, ramend)
+		ctxt.xdefine2("runtime.romdata", sym.SRODATA, int64(Segdata.Laddr))
 		nodmastart := int64(NoDMA.Base)
 		nodmaend := int64(NoDMA.Base + NoDMA.Size)
 		if nodmastart == 0 && nodmaend == 0 {
@@ -2611,8 +2611,8 @@ func (ctxt *Link) address() []*sym.Segment {
 			nodmastart = ramstart
 			nodmaend = ramstart
 		}
-		ctxt.xdefine("runtime.nodmastart", sym.SRODATA, nodmastart)
-		ctxt.xdefine("runtime.nodmaend", sym.SRODATA, nodmaend)
+		ctxt.xdefine2("runtime.nodmastart", sym.SRODATA, nodmastart)
+		ctxt.xdefine2("runtime.nodmaend", sym.SRODATA, nodmaend)
 	}
 
 	return order
