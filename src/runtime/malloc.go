@@ -322,7 +322,7 @@ const (
 	// and starts at 0, so no offset is necessary.
 	//
 	// In case of ARMv7-M the SRAM region starts at 0x20000000.
-	arenaBaseOffset = 0xffff800000000000*sys.GoarchAmd64 + 0x0a00000000000000*sys.GoosAix + _ARMv7M*(1<<32-0x20000000) + _RV64G*(1<<64-0x80000000)
+	arenaBaseOffset = 0xffff800000000000*sys.GoarchAmd64 + 0x0a00000000000000*sys.GoosAix + 0x20000000*_ARMv7M + 0x80000000*_RV64G
 	// A typed version of this constant that will make it into DWARF (for viewcore).
 	arenaBaseOffsetUintptr = uintptr(arenaBaseOffset)
 
