@@ -1403,55 +1403,60 @@ func (ctxt *Link) dodata2(symGroupType []sym.SymKind) {
 	// Give zeros sized symbols space if necessary.
 	fixZeroSizedSymbols2(ctxt)
 
-	/*
-		if ctxt.HeadType == objabi.Hnoos {
-			// leave some read-only variables in Flash (hack to save RAM)
-			for _, s := range ctxt.Syms.Allsym {
-				if strings.HasPrefix(s.Name, "unicode..stmp_") {
-					s.Type = sym.SRODATA
-					continue
-				}
-				switch s.Name {
-				case "embedded/rtos.errorsByNumber",
-					"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
-					"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
-					"math._lgamV", "math._lgamW", "math._sin", "math._cos",
-					"math.pow10tab", "math.pow10postab32", "math.pow10negtab32",
-					"math.tanhP", "math.tanhQ", "math._gamP", "math._gamQ",
-					"math._gamS",
-					"math/big.pow5tab", "math/big._Accuracy_index",
-					"math/big._RoundingMode_index",
-					"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
-					"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
-					"runtime.zeroVal", "runtime.staticbytes",
-					"runtime.fastlog2Table", "runtime.class_to_size",
-					"runtime.class_to_allocnpages", "runtime.class_to_divmagic",
-					"runtime.size_to_class8", "runtime.size_to_class128",
-					"runtime.waitReasonStrings", "runtime.boundsErrorFmts",
-					"runtime.boundsNegErrorFmts", "runtime.finalizer1",
-					"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
-					"runtime.emptymspan",
-					"runtime/internal/sys.ntz8tab",
-					"strconv.smallPowersOfTen", "strconv.powersOfTen",
-					"strconv.uint64pow10", "strconv.leftcheats",
-					"strconv.isPrint32", "strconv.isPrint16",
-					"strconv.isNotPrint32", "strconv.isNotPrint16",
-					"strconv.isGraphic", "strconv.float64info",
-					"strconv.float32info",
-					"syscall.errors",
-					"time.std0x", "time.months", "time.days", "time.daysBefore",
-					"time.utcLoc",
-					"unicode/utf8.first", "unicode/utf8.acceptRanges":
-
-					s.Type = sym.SRODATA
-				}
-			}
-		}
-	*/
-
-	// Collect data symbols by type into data.
 	state := dodataState{ctxt: ctxt, symGroupType: symGroupType}
 	ldr := ctxt.loader
+
+	if ctxt.HeadType == objabi.Hnoos {
+		// leave some read-only variables in Flash (hack to save RAM)
+		for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
+			if strings.HasPrefix(ldr.SymName(s), "unicode..stmp_") {
+				state.setSymType(s, sym.SRODATA)
+				continue
+			}
+			switch ldr.SymName(s) {
+			case "embedded/rtos.errorsByNumber",
+				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
+				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
+				"math._lgamV", "math._lgamW", "math._sin", "math._cos",
+				"math.pow10tab", "math.pow10postab32", "math.pow10negtab32",
+				"math.tanhP", "math.tanhQ", "math._gamP", "math._gamQ",
+				"math._gamS",
+				"math/big.pow5tab", "math/big._Accuracy_index",
+				"math/big._RoundingMode_index",
+				"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
+				"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
+				"runtime.zeroVal", "runtime.staticuint64s", "runtime.oneptrmask",
+				"runtime.fastlog2Table", "runtime.class_to_size",
+				"runtime.class_to_allocnpages", "runtime.class_to_divmagic",
+				"runtime.size_to_class8", "runtime.size_to_class128",
+				"runtime.waitReasonStrings", "runtime.boundsErrorFmts",
+				"runtime.boundsNegErrorFmts", "runtime.finalizer1",
+				"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
+				"runtime.emptymspan", "runtime.levelBits", "runtime.levelShift",
+				"runtime.levelLogPages", "runtime.consec8tab",
+				"runtime/internal/sys.len8tab","runtime/internal/sys.ntz8tab",
+				"runtime/internal/sys.deBruijn64tab",
+				"runtime/internal/sys.deBruijnIdx64ctz",
+				"runtime/internal/sys.deBruijnIdx32ctz",
+				"strconv.smallPowersOfTen", "strconv.powersOfTen",
+				"strconv.uint64pow10", "strconv.leftcheats",
+				"strconv.isPrint32", "strconv.isPrint16",
+				"strconv.isNotPrint32", "strconv.isNotPrint16",
+				"strconv.isGraphic", "strconv.float64info",
+				"strconv.float32info",
+				"syscall.errors",
+				"time.std0x", "time.longDayNames", "time.shortDayNames",
+				"time.shortMonthNames","time.longMonthNames","time.",
+				"time.daysBefore", "time.utcLoc",
+				"unicode.properties", "unicode.asciiFold", "unicode.caseOrbit",
+				"unicode/utf8.first", "unicode/utf8.acceptRanges":
+
+				state.setSymType(s, sym.SRODATA)
+			}
+		}
+	}
+
+	// Collect data symbols by type into data.
 	for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
 		if !ldr.AttrReachable(s) || ldr.AttrSpecial(s) || ldr.AttrSubSymbol(s) ||
 			!ldr.TopLevelSym(s) {
