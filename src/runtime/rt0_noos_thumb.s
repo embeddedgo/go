@@ -34,7 +34,7 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	B   runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
 
 
-#define PALLOC_MIN 20*1024
+#define PALLOC_MIN 32*1024
 
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
