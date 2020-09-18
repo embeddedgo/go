@@ -1390,12 +1390,14 @@ func (h *mheap) grow(npage uintptr) bool {
 	// By scavenging inline we deal with the failure to allocate out of
 	// memory fragments by scavenging the memory fragments that are least
 	// likely to be re-used.
-	if retained := heapRetained(); retained+uint64(totalGrowth) > h.scavengeGoal {
-		todo := totalGrowth
-		if overage := uintptr(retained + uint64(totalGrowth) - h.scavengeGoal); todo > overage {
-			todo = overage
+	if _MCU == 0 {
+		if retained := heapRetained(); retained+uint64(totalGrowth) > h.scavengeGoal {
+			todo := totalGrowth
+			if overage := uintptr(retained + uint64(totalGrowth) - h.scavengeGoal); todo > overage {
+				todo = overage
+			}
+			h.pages.scavenge(todo, false)
 		}
-		h.pages.scavenge(todo, false)
 	}
 	return true
 }
@@ -1505,7 +1507,9 @@ func (h *mheap) scavengeAll() {
 //go:linkname runtime_debug_freeOSMemory runtime/debug.freeOSMemory
 func runtime_debug_freeOSMemory() {
 	GC()
-	systemstack(func() { mheap_.scavengeAll() })
+	if _MCU == 0 {
+		systemstack(func() { mheap_.scavengeAll() })
+	}
 }
 
 // Initialize a new span with the given start and npages.
