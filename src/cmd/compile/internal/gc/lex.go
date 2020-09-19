@@ -65,7 +65,8 @@ const (
 		Systemstack |
 		Nowritebarrier |
 		Nowritebarrierrec |
-		Yeswritebarrierrec
+		Yeswritebarrierrec |
+		Interrupthandler
 
 	TypePragmas = NotInHeap
 )
