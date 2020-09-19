@@ -73,6 +73,9 @@ var optab = [...]Optab{
 	{obj.AFUNCDATA, C_LCON, C_NONE, C_LOREG, 0, 0, 0, 0, nil},
 	{obj.APCDATA, C_LCON, C_NONE, C_LCON, 0, 0, 0, 0, nil},
 	{obj.ANOP, C_NONE, C_NONE, C_NONE, 0, VALID, 0, 0, nil},
+	{obj.ANOP, C_LCON, C_NONE, C_NONE, 0, VALID, 0, 0, nil},
+	{obj.ANOP, C_REG, C_NONE, C_NONE, 0, VALID, 0, 0, nil},
+	{obj.ANOP, C_FREG, C_NONE, C_NONE, 0, VALID, 0, 0, nil},
 
 	{AWORD, C_NONE, C_NONE, C_LCON, 0x14, 0, 0, 0, _WORD__u32},
 	{AWORD, C_NONE, C_NONE, C_LOREG, 0x14, 0, 0, 0, _WORD__u32},

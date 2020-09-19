@@ -66,32 +66,13 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 		cursym.Func.Text.Mark |= LEAF
 	}
 
-	q := cursym.Func.Text
-	for p := q.Link; p != nil; p = p.Link {
+	for p := cursym.Func.Text; p != nil; p = p.Link {
 		switch {
-		case p.As == obj.ANOP:
-			q1 := p.Link
-			q.Link = q1 /* q is non-nop */
-			if q1 != nil {
-				q1.Mark |= p.Mark
-			}
-			continue
-
 		case AITTTT <= p.As && p.As <= AITEEE:
 			cursym.Func.Text.Mark &^= AUTOIT
-
 		case p.As == ABL:
 			cursym.Func.Text.Mark &^= LEAF
-			fallthrough
-		case p.As == AB || ABEQ <= p.As && p.As <= ACBNZ:
-			if q1 := p.Pcond; q1 != nil {
-				for q1.As == obj.ANOP {
-					q1 = q1.Link
-					p.Pcond = q1
-				}
-			}
 		}
-		q = p
 	}
 
 	var autosize int
