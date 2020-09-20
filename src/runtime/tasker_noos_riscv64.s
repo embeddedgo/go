@@ -16,29 +16,29 @@ TEXT ·cpuid(SB),NOSPLIT|NOFRAME,$0
 	RET
 
 
-DATA runtime·interruptHandlers+(0*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(1*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(2*8)(SB)/8, $·defaultHandler(SB)
+DATA runtime·interruptHandlers+(0*8)(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(1*8)(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(2*8)(SB)/8, $·defaultInterruptHandler(SB)
 DATA runtime·interruptHandlers+(3*8)(SB)/8, $·enterScheduler(SB)
-DATA runtime·interruptHandlers+(4*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(5*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·interruptHandlers+(6*8)(SB)/8, $·defaultHandler(SB)
+DATA runtime·interruptHandlers+(4*8)(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(5*8)(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(6*8)(SB)/8, $·defaultInterruptHandler(SB)
 DATA runtime·interruptHandlers+(7*8)(SB)/8, $·enterScheduler(SB)
-DATA runtime·interruptHandlers+(8*8)(SB)/8, $·defaultHandler(SB)
+DATA runtime·interruptHandlers+(8*8)(SB)/8, $·defaultInterruptHandler(SB)
 DATA runtime·interruptHandlers+(9*8)(SB)/8, $·externalInterruptHandler(SB)
-DATA runtime·interruptHandlers+(10*8)(SB)/8, $·defaultHandler(SB)
+DATA runtime·interruptHandlers+(10*8)(SB)/8, $·defaultInterruptHandler(SB)
 DATA runtime·interruptHandlers+(11*8)(SB)/8, $·externalInterruptHandler(SB)
 #define interruptHandlersSize (12*8)
 GLOBL runtime·interruptHandlers(SB), RODATA, $interruptHandlersSize
 
-DATA runtime·exceptionHandlers+(0*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·exceptionHandlers+(1*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·exceptionHandlers+(2*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·exceptionHandlers+(3*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·exceptionHandlers+(4*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·exceptionHandlers+(5*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·exceptionHandlers+(6*8)(SB)/8, $·defaultHandler(SB)
-DATA runtime·exceptionHandlers+(7*8)(SB)/8, $·defaultHandler(SB)
+DATA runtime·exceptionHandlers+(0*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA runtime·exceptionHandlers+(1*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA runtime·exceptionHandlers+(2*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA runtime·exceptionHandlers+(3*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA runtime·exceptionHandlers+(4*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA runtime·exceptionHandlers+(5*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA runtime·exceptionHandlers+(6*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA runtime·exceptionHandlers+(7*8)(SB)/8, $·defaultExceptionHandler(SB)
 DATA runtime·exceptionHandlers+(8*8)(SB)/8, $·environmentCallHandler(SB)
 DATA runtime·exceptionHandlers+(9*8)(SB)/8, $·environmentCallHandler(SB)
 DATA runtime·exceptionHandlers+(10*8)(SB)/8, $·environmentCallHandler(SB)
@@ -436,7 +436,12 @@ slowSyscallFromHandler:
 	JMP     -1(PC)
 
 
-TEXT runtime·defaultHandler(SB),NOSPLIT|NOFRAME,$0
+TEXT runtime·defaultInterruptHandler(SB),NOSPLIT|NOFRAME,$0
+	EBREAK
+	JMP  -1(PC)
+
+
+TEXT runtime·defaultExceptionHandler(SB),NOSPLIT|NOFRAME,$0
 	EBREAK
 	JMP  -1(PC)
 

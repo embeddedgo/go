@@ -42,7 +42,7 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	CSRW  (s0, mie)
 
 	// Set a temporary trap handler.
-	MOV   $·defaultHandler(SB), S0
+	MOV   $·defaultExceptionHandler(SB), S0
 	CSRW  (s0, mtvec)
 
 	// Clear some other CSRs
