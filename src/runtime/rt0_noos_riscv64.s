@@ -131,8 +131,9 @@ cleared:
 
 	// setup gh and mh
 	ADD  $cpuctx_mh, g, A0
-	MOV  g, m_g0(A0)  // harts[mhartid].mh.g0 = harts[mhartid].gh
-	MOV  A0, g_m(g)   // harts[mhartid].gh.m = harts[mhartid].mh
+	MOV  g, m_g0(A0)       // harts[mhartid].mh.g0 = harts[mhartid].gh
+	MOV  g, m_gsignal(A0)  // harts[mhartid].mh.gsignal = harts[mhartid].gh (to easily check for handler mode)
+	MOV  A0, g_m(g)        // harts[mhartid].gh.m = harts[mhartid].mh
 
 	// as we have SP and g set we can set the real trap handler in mtvec
 	MOV   $·trapHandler(SB), A0

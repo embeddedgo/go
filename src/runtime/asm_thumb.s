@@ -69,7 +69,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOVW  $1234, R0
 	MOVW  $1000, R1
 	MOVW  R0, (R1)  // fail hard
-	
+
 #endif
 
 
@@ -197,11 +197,9 @@ TEXT runtime·systemstack(SB),NOSPLIT,$0-4
 	MOVW  fn+0(FP), R0  // R0 = fn
 	MOVW  g_m(g), R1    // R1 = m
 
-#ifndef GOOS_noos
 	MOVW  m_gsignal(R1), R2  // R2 = gsignal
 	CMP   g, R2
 	B.EQ  noswitch
-#endif
 
 	MOVW  m_g0(R1), R2  // R2 = g0
 	CMP   g, R2
@@ -282,14 +280,12 @@ TEXT runtime·morestack(SB),NOSPLIT|NOFRAME,$0-0
 	BL    runtime·badmorestackg0(SB)
 	B     runtime·abort(SB)
 
-#ifndef GOOS_noos
 	// Cannot grow signal stack (m->gsignal).
 	MOVW  m_gsignal(R8), R4
 	CMP   g, R4
 	BNE   3(PC)
 	BL    runtime·badmorestackgsignal(SB)
 	B     runtime·abort(SB)
-#endif
 
 	// Called from f.
 	// Set g->sched to context in f.

@@ -123,6 +123,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	ADD   $cpuctx_mh, R2, R1  // R2 points to cpu0 (and to cpu0.gh at the same time)
 	MOVW  R2, m_g0(R1)        // cpu0.mh.g0 = cpu0.gh
+	MOVW  R2, m_gsignal(R1)   // cpu0.mh.gsignal = cpu0.gh (to easily check for handler mode)
 	MOVW  R1, g_m(R2)         // cpu0.gh.m = cpu0.mh
 
 	// leave the main stack and the privileged mode
