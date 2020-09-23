@@ -98,7 +98,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	SUB        $4, R13
 	MOVW       $0, R0
-	MOVW       $(2*const__FixedStack), R1
+	MOVW       $(2*const__StackMin), R1
 	MOVM.DB.W  [R0-R1], (R13)
 	BL         runtime·malg(SB)
 	MOVW       8(R13), R0  // newg in R0

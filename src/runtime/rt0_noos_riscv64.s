@@ -235,7 +235,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOVW  ZERO, (A0)
 
 	// allocate g0 for m0
-	MOV   $(2*const__FixedStack), A0
+	MOV   $(2*const__StackMin), A0
 	ADD   $-24, X2
 	MOV   ZERO, 0(X2)
 	MOV   A0, 8(X2)

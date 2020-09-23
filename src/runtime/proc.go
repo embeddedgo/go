@@ -1480,7 +1480,7 @@ func allocm(_p_ *p, fn func(), id int64) *m {
 	if iscgo || GOOS == "solaris" || GOOS == "illumos" || GOOS == "windows" || GOOS == "plan9" || GOOS == "darwin" {
 		mp.g0 = malg(-1)
 	} else if _MCU != 0 {
-		mp.g0 = malg(2 * _FixedStack)
+		mp.g0 = malg(2 * _StackMin)
 	} else {
 		mp.g0 = malg(8192 * sys.StackGuardMultiplier)
 	}

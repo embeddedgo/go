@@ -156,7 +156,7 @@ const (
 	//   windows/32       | 4KB        | 3
 	//   windows/64       | 8KB        | 2
 	//   plan9            | 4KB        | 3
-	//   MCU/32           | 1KB        | 2
+	//   MCU/32           | 2KB        | 2
 	//   MCU/64           | 2KB        | 3
 	_NumStackOrders = 4 - sys.PtrSize/4*sys.GoosWindows - 1*sys.GoosPlan9 - (2-logMemScale/8)*_MCU
 
