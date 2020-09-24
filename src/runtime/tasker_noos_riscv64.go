@@ -123,3 +123,17 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	}
 	return
 }
+
+// keep lr, a0, mstatus, mepc, mie order in sync with asm_riscv64.h
+//go:nosplit
+func fatalException(mcause int, gprs [numGPRS - 4]uintptr, lr, a0, mstatus, mepc, mie uintptr) {
+	mode := "handler"
+	if mepc&1 != 0 {
+		mode = "thread"
+		mepc &^= 1
+	}
+	print("fatal exception in ", mode, " mode: ", mcause, "\n")
+	gp := getg()
+	startpanic_m()
+	dopanic_m(gp, mepc, gp.sched.sp)
+}

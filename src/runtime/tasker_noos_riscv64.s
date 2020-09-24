@@ -442,8 +442,12 @@ TEXT runtime·defaultInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
 
 TEXT runtime·defaultExceptionHandler(SB),NOSPLIT|NOFRAME,$0
-	EBREAK
-	JMP  -1(PC)
+	ADD        $-(const_numGPRS-4+2)*8, X2
+	SAVE_GPRS  (X2, 2*8)
+	SRA        $3, A0
+	MOV        A0, 8(X2)
+	MOV        ZERO, (X2)
+	JMP        ·fatalException(SB)
 
 
 TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
