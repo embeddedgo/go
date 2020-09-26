@@ -124,6 +124,25 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	return
 }
 
+var exceptionNames = [...]string{
+	0:  "instruction address misaligned",
+	1:  "instruction access fault",
+	2:  "illegal instruction",
+	3:  "breakpoint",
+	4:  "load address misaligned",
+	5:  "load access fault",
+	6:  "store/AMO address misaligned",
+	7:  "store/AMO access fault",
+	8:  "environment call from U-mode",
+	9:  "environment call from S-mode",
+	10: "reserved",
+	11: "environment call from M-mode",
+	12: "instruction page fault",
+	13: "load page fault",
+	14: "reserved",
+	15: "store/AMO page fault",
+}
+
 // keep lr, a0, mstatus, mepc, mie order in sync with asm_riscv64.h
 //go:nosplit
 func fatalException(mcause int, gprs [numGPRS - 4]uintptr, lr, a0, mstatus, mepc, mie uintptr) {
@@ -132,8 +151,14 @@ func fatalException(mcause int, gprs [numGPRS - 4]uintptr, lr, a0, mstatus, mepc
 		mode = "thread"
 		mepc &^= 1
 	}
-	print("fatal exception in ", mode, " mode: ", mcause, "\n")
+	print("\nfatal exception in ", mode, " mode: ")
+	if mcause < len(exceptionNames) {
+		print(exceptionNames[mcause])
+	} else {
+		print("reserved")
+	}
+	print(" (", mcause, ")\n\n")
 	gp := getg()
-	startpanic_m()
-	dopanic_m(gp, mepc, gp.sched.sp)
+	traceback1(mepc, gp.sched.sp, lr, gp, _TraceTrap)
+	crash()
 }

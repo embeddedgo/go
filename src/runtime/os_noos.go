@@ -97,13 +97,17 @@ func osinit() {
 
 //go:nosplit
 func isr() bool {
-	allcpu := thetasker.allcpu
-	for i := 0; i < len(allcpu); i++ {
-		if getg() == &allcpu[i].gh {
-			return true
+	gp := getg()
+	return gp == gp.m.gsignal
+	/*
+		allcpu := thetasker.allcpu
+		for i := 0; i < len(allcpu); i++ {
+			if getg() == &allcpu[i].gh {
+				return true
+			}
 		}
-	}
-	return false
+		return false
+	*/
 }
 
 func setsystim1()
