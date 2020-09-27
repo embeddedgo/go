@@ -442,12 +442,17 @@ TEXT runtime·defaultInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
 
 TEXT runtime·defaultExceptionHandler(SB),NOSPLIT|NOFRAME,$0
-	ADD        $-(const_numGPRS-4+2)*8, X2
-	SAVE_GPRS  (X2, 2*8)
-	SRA        $3, A0
-	MOV        A0, 8(X2)
+	ADD  $-16, X2
+	SRA  $3, A0
+	MOV  A0, (X2)
+	ADD  $16+trapCtxSize, X2, A0
+	MOV  A0, 8(X2)
+
+	ADD        $-(const_numGPRS-4+1)*8, X2
+	SAVE_GPRS  (X2, 8)
 	MOV        ZERO, (X2)
-	JMP        ·fatalException(SB)
+
+	JMP  ·fatalException(SB)
 
 
 TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0

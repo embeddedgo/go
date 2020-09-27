@@ -143,22 +143,72 @@ var exceptionNames = [...]string{
 	15: "store/AMO page fault",
 }
 
-// keep lr, a0, mstatus, mepc, mie order in sync with asm_riscv64.h
+func printReg(name string, u uintptr, end string) {
+	const dig = "0123456789abcdef"
+	var buf [19]byte
+	buf[0] = ' '
+	buf[1] = '0'
+	buf[2] = 'x'
+	for i := 0; i < 16; i++ {
+		buf[18-i] = dig[u&15]
+		u >>= 4
+	}
+	print(name, string(buf[:]), end)
+}
+
+// keep lr, a0, mstatus, mepc, mie and rs order in sync with asm_riscv64.h
 //go:nosplit
-func fatalException(mcause int, gprs [numGPRS - 4]uintptr, lr, a0, mstatus, mepc, mie uintptr) {
+func fatalException(rs [numGPRS - 4]uintptr, mcause int, sp, lr, a0, mstatus, mepc, mie uintptr) {
 	mode := "handler"
+	gp := getg()
+	g := gp
 	if mepc&1 != 0 {
 		mode = "thread"
+		g = gp.sched.g.ptr()
+		sp = gp.sched.sp
 		mepc &^= 1
 	}
-	print("\nfatal exception in ", mode, " mode: ")
+	print("\n\nfatal exception in ", mode, " mode at ", hex(mepc), ": ")
 	if mcause < len(exceptionNames) {
 		print(exceptionNames[mcause])
 	} else {
-		print("reserved")
+		print("reserved (", mcause, ")")
 	}
-	print(" (", mcause, ")\n\n")
-	gp := getg()
-	traceback1(mepc, gp.sched.sp, lr, gp, _TraceTrap)
+	print("\n\n")
+
+	print("ZERO                  \t")
+	printReg("LR ", lr, "\n")
+	printReg("SP ", sp, "\t")
+	printReg("GP ", rs[0], "\n")
+	printReg("g  ", uintptr(unsafe.Pointer(g)), "\t")
+	printReg("T0 ", rs[1], "\n")
+	printReg("T1 ", rs[2], "\t")
+	printReg("T2 ", rs[3], "\n")
+	printReg("S0 ", rs[4], "\t")
+	printReg("S1 ", rs[5], "\n")
+	printReg("A0 ", a0, "\t")
+	printReg("A1 ", rs[6], "\n")
+	printReg("A2 ", rs[7], "\t")
+	printReg("A3 ", rs[8], "\n")
+	printReg("A4 ", rs[9], "\t")
+	printReg("A5 ", rs[10], "\n")
+	printReg("A6 ", rs[11], "\t")
+	printReg("A7 ", rs[12], "\n")
+	printReg("S2 ", rs[13], "\t")
+	printReg("S3 ", rs[14], "\n")
+	printReg("S4 ", rs[15], "\t")
+	printReg("S5 ", rs[16], "\n")
+	printReg("S6 ", rs[17], "\t")
+	printReg("S7 ", rs[18], "\n")
+	printReg("S8 ", rs[19], "\t")
+	printReg("S9 ", rs[20], "\n")
+	printReg("S10", rs[21], "\t")
+	printReg("S11", rs[22], "\n")
+	printReg("T3 ", rs[23], "\t")
+	printReg("T4 ", rs[24], "\n")
+	printReg("T5 ", rs[25], "\t")
+	printReg("tmp", rs[26], "\n\n")
+
+	traceback1(mepc, sp, lr, g, _TraceTrap)
 	crash()
 }
