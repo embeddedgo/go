@@ -162,10 +162,10 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	MOV  _mepc(X2), S1
 	MOV  (g_sched+gobuf_sp)(g), A3
 	MOV  (g_sched+gobuf_g)(g), A4
-	MOV  A1, (m_mOS+const_numGPRS*8-32)(A0)  // LR
-	MOV  A3, (m_mOS+const_numGPRS*8-24)(A0)  // SP
-	MOV  A4, (m_mOS+const_numGPRS*8-16)(A0)  // g
-	MOV  A2, (m_mOS+const_numGPRS*8-8)(A0)   // A0
+	MOV  A1, (m_mOS+(const_numGPRS-4)*8)(A0)  // LR
+	MOV  A3, (m_mOS+(const_numGPRS-3)*8)(A0)  // SP
+	MOV  A4, (m_mOS+(const_numGPRS-2)*8)(A0)  // g
+	MOV  A2, (m_mOS+(const_numGPRS-1)*8)(A0)  // A0
 	MOV  S0, (m_tls+const_mstatus*8)(A0)
 	MOV  S1, (m_tls+const_mepc*8)(A0)
 
@@ -202,7 +202,7 @@ contextSaved:
 	RESTORE_GPRS  (A0, m_mOS)                  // restore most of GPRs
 smallCtx:
 	MOVB  ZERO, (cpuctx_newexe)(g)  // clear cpuctx.newexe
-	SCW   (zero, zero, x2)          // invalidate dangling LR.x instruction
+	SCW   (zero, zero, x2)          // invalidate possible dangling LR.x instruction by SC to the free word on top of the stack
 
 	// scheduler always returns to the thread mode
 
@@ -225,18 +225,18 @@ smallCtx:
 	CSRW  (G, mie)
 
 	// restore remaining GPRs
-	MOV  (m_mOS+const_numGPRS*8-32)(A0), LR
-	MOV  (m_mOS+const_numGPRS*8-24)(A0), X2
-	MOV  (m_mOS+const_numGPRS*8-16)(A0), g
-	MOV  (m_mOS+const_numGPRS*8-8)(A0), A0
+	MOV  (m_mOS+(const_numGPRS-4)*8)(A0), LR
+	MOV  (m_mOS+(const_numGPRS-3)*8)(A0), X2
+	MOV  (m_mOS+(const_numGPRS-2)*8)(A0), g
+	MOV  (m_mOS+(const_numGPRS-1)*8)(A0), A0
 
 	MRET
 
 
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
-	ADD        $-(const_numGPRS+33+3)*8, X2
+	ADD        $-(const_numGPRS-4+const_numFPRS+3)*8, X2
 	SAVE_GPRS  (X2, 3*8)
-	SAVE_FPRS  (X2, (const_numGPRS+3)*8)
+	SAVE_FPRS  (X2, (const_numGPRS-4+3)*8)
 
 	// BUG: the following code assumes two (M,S) PLIC contexts per hart
 	// ctxid = mhartid*2 + (11-mcause)/2
@@ -290,9 +290,9 @@ loop:
 done:
 	MOVW  A3, (A1)  // restore priority threshold
 
-	RESTORE_FPRS  (X2, (const_numGPRS+3)*8)
+	RESTORE_FPRS  (X2, (const_numGPRS-4+3)*8)
 	RESTORE_GPRS  (X2, 3*8)
-	ADD           $(const_numGPRS+33+3)*8, X2
+	ADD           $(const_numGPRS-4+const_numFPRS+3)*8, X2
 
 	MOV  _LR(X2), LR  // restore LR
 
@@ -304,7 +304,7 @@ done:
 	MOV   _mepc(X2), A0
 	CSRW  (a0, mepc)
 	AND   $1, A0
-	BEQ   ZERO, A0, 6(PC)
+	BEQ   ZERO, A0, returnToHandler
 
 	// return to thread
 	MOV   _A0(X2), A0                // restore A0
@@ -313,7 +313,7 @@ done:
 	MOV   (g_sched+gobuf_g)(g), g    // restore thread g
 	MRET
 
-	// return to handler
+returnToHandler:
 	MOV  _A0(X2), A0  // restore A0
 	ADD  $trapCtxSize, X2
 	MRET
@@ -322,12 +322,12 @@ noHandler:
 	JMP  ·unhandledExternalInterrupt(SB)
 
 
-// System call is like oridnary function call so all registers except LR are
+// System call is like oridnary function call so all registers are
 // caller save (Go ABI0). The tiny wrapper over ECALL instruction add
 // additional parameters in A3-A5 registers:
 //
 // A3: syscall number
-// A4: argument data size on the stack (+8 for frame-pointer)
+// A4: argument data size on the stack (+8 for caller return address)
 // A5: return data size on the stack
 TEXT runtime·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 
@@ -348,9 +348,9 @@ TEXT runtime·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 	MOV  (g_sched+gobuf_g)(g), A1
 	MOV  _LR(X2), A2
 	MOV  (cpuctx_exe)(g), S0
-	MOV  A2, (m_mOS+const_numGPRS*8-32)(S0)  // LR
-	MOV  A0, (m_mOS+const_numGPRS*8-24)(S0)  // SP
-	MOV  A1, (m_mOS+const_numGPRS*8-16)(S0)  // g
+	MOV  A2, (m_mOS+(const_numGPRS-4)*8)(S0)  // LR
+	MOV  A0, (m_mOS+(const_numGPRS-3)*8)(S0)  // SP
+	MOV  A1, (m_mOS+(const_numGPRS-2)*8)(S0)  // g
 	MOV  _mstatus(X2), A1
 	SRL  $7, A1  // MPP field is in a very unfortunate place
 	AND  $(3<<(MPPn-7)), A1
@@ -417,9 +417,10 @@ nothingToCopy:
 	CSRW  (a1, mepc)
 	CSRW  (a2, mie)
 
+	AND  $1, A1  // fromThread flag
+	BEQ  ZERO, A1, fromHandler
+
 	// restore thread g and SP
-	AND   $1, A1  // fromThread flag
-	BEQ   ZERO, A1, fromHandler
 	MOV   (g_sched+gobuf_sp)(g), X2
 	CSRW  (G, mscratch)
 	MOV   (g_sched+gobuf_g)(g), g

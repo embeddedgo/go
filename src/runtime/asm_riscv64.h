@@ -113,7 +113,7 @@
 #define trapCtxSize (5*8)
 
 #define SAVE_GPRS(base,offset) \
-	\ // LR saved separately
+\ // LR saved separately
 \ // SP saved separately
 MOV  GP, (0*8+offset)(base) \
 \ // g saved separately

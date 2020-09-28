@@ -80,12 +80,15 @@ const (
 	mepc    = 5 // exception return address
 )
 
-const numGPRS = 31
+const (
+	numGPRS = 31
+	numFPRS = 32 + 1 // include fcsr
+)
 
 type mOS struct {
 	x    [numGPRS]uintptr
 	fcsr uintptr
-	f    [32]float64
+	f    [numFPRS - 1]float64
 }
 
 func syssetprivlevel(newlevel int) (oldlevel, errno int)
