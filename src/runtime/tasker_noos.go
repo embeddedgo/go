@@ -65,7 +65,8 @@ import (
 //
 // curcpuSchedule
 //
-// Run scheduler immediately or at syscall exit.
+// Run scheduler immediately or at syscall exit. It's called only just before
+// syscall exit.
 //
 // The actual context switch is performed by architecture specific code at
 // curcpuRunScheduler exit. It should check the cpuctx.newexe variable and if
@@ -184,8 +185,7 @@ end:
 }
 
 //go:nosplit
-func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) {
-	schedule := false
+func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) (schedule bool) {
 	for ; cnt != 0; cnt-- {
 		fb.lock()
 		m := fb.find(uintptr(unsafe.Pointer(addr)))
@@ -211,9 +211,6 @@ func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) {
 			}
 			schedule = schedule || taskerSetrunnable(m)
 		}
-	}
-	if schedule {
-		curcpuSchedule()
 	}
 	return
 }
@@ -480,7 +477,9 @@ func sysfutexsleep(addr *uint32, val uint32, ns int64) {
 //go:nosplit
 func sysfutexwakeup(addr *uint32, cnt uint32) {
 	fb := curcpu().t.fbucketbyaddr(uintptr(unsafe.Pointer(addr)))
-	taskerFutexwakeup(fb, addr, cnt)
+	if taskerFutexwakeup(fb, addr, cnt) {
+		curcpuSchedule()
+	}
 }
 
 //go:nowritebarrierrec
