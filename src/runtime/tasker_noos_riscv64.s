@@ -15,20 +15,28 @@ TEXT ·cpuid(SB),NOSPLIT|NOFRAME,$0
 	MOV   S0, ret+0(FP)
 	RET
 
+#define userPriv 0
+#define supePriv 1
+#define resePriv 2
+#define machPriv 3
 
-DATA runtime·interruptHandlers+(0*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(1*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(2*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(3*8)(SB)/8, $·enterScheduler(SB)
-DATA runtime·interruptHandlers+(4*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(5*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(6*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(7*8)(SB)/8, $·enterScheduler(SB)
-DATA runtime·interruptHandlers+(8*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(9*8)(SB)/8, $·externalInterruptHandler(SB)
-DATA runtime·interruptHandlers+(10*8)(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(11*8)(SB)/8, $·externalInterruptHandler(SB)
-#define interruptHandlersSize (12*8)
+#define softInt 0
+#define timeInt 4
+#define exteInt 8
+
+DATA runtime·interruptHandlers+(softInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(softInt+supePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(softInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(softInt+machPriv)*8(SB)/8, $·enterScheduler(SB)
+DATA runtime·interruptHandlers+(timeInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(timeInt+supePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(timeInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(timeInt+machPriv)*8(SB)/8, $·enterScheduler(SB)
+DATA runtime·interruptHandlers+(exteInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(exteInt+supePriv)*8(SB)/8, $·externalInterruptHandler(SB)
+DATA runtime·interruptHandlers+(exteInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA runtime·interruptHandlers+(exteInt+machPriv)*8(SB)/8, $·externalInterruptHandler(SB)
+#define interruptHandlersSize ((1+exteInt+machPriv)*8)
 GLOBL runtime·interruptHandlers(SB), RODATA, $interruptHandlersSize
 
 DATA runtime·exceptionHandlers+(0*8)(SB)/8, $·defaultExceptionHandler(SB)
