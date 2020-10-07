@@ -79,7 +79,7 @@ func (f *fixalloc) alloc() unsafe.Pointer {
 		return v
 	}
 	if uintptr(f.nchunk) < f.size {
-		if _MCU != 0 {
+		if noos {
 			nchunk := f.size
 			if nchunk == unsafe.Sizeof(mspan{}) {
 				nchunk *= 16 * (1 + _64bit) // more for mspan{} allocator

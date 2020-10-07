@@ -46,7 +46,7 @@ const (
 	//
 	// Must be a multiple of the pageInUse bitmap element size and
 	// must also evenly divide pagesPerArena.
-	pagesPerSpanRoot = 512*(1-_MCU) + pagesPerArena/2*_MCU
+	pagesPerSpanRoot = 512*_OS + pagesPerArena/2*(1-_OS)
 
 	// go115NewMarkrootSpans is a feature flag that indicates whether
 	// to use the new bitmap-based markrootSpans implementation.

@@ -1130,7 +1130,7 @@ func shrinkstack(gp *g) {
 	// Check for self-shrinks while in a libcall. These may have
 	// pointers into the stack disguised as uintptrs, but these
 	// code paths should all be nosplit.
-	if  _MCU == 0 && gp == getg().m.curg && gp.m.libcallsp != 0 {
+	if  !noos && gp == getg().m.curg && gp.m.libcallsp != 0 {
 		throw("shrinking stack in libcall")
 	}
 

@@ -121,7 +121,7 @@ func main() {
 	// Max stack size is 1 GB on 64-bit, 250 MB on 32-bit.
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
-	if _MCU != 0 {
+	if noos {
 		maxstacksize = 16384 * memScale
 	} else if sys.PtrSize == 8 {
 		maxstacksize = 1000000000
@@ -1212,7 +1212,7 @@ func mexit(osStack bool) {
 	g := getg()
 	m := g.m
 
-	if m == &m0 && _MCU == 0 {
+	if m == &m0 && !noos {
 		// This is the main thread. Just wedge it.
 		//
 		// On Linux, exiting the main thread puts the process
@@ -1479,7 +1479,7 @@ func allocm(_p_ *p, fn func(), id int64) *m {
 	// Windows and Plan 9 will layout sched stack on OS stack.
 	if iscgo || GOOS == "solaris" || GOOS == "illumos" || GOOS == "windows" || GOOS == "plan9" || GOOS == "darwin" {
 		mp.g0 = malg(-1)
-	} else if _MCU != 0 {
+	} else if noos {
 		mp.g0 = malg(2 * _StackMin)
 	} else {
 		mp.g0 = malg(8192 * sys.StackGuardMultiplier)

@@ -19,7 +19,7 @@ const (
 	// minPhysPageSize is a lower-bound on the physical page size. The
 	// true physical page size may be larger than this. In contrast,
 	// sys.PhysPageSize is an upper-bound on the physical page size.
-	minPhysPageSize = 4096*(1-_MCU) + 256*_MCU
+	minPhysPageSize = 4096*_OS + noosMinPhysPageSize
 
 	// maxPhysPageSize is the maximum page size the runtime supports.
 	maxPhysPageSize = 512 << 10
@@ -43,7 +43,7 @@ const (
 	//
 	// Must be a multiple of the pageInUse bitmap element size and
 	// must also evenly divid pagesPerArena.
-	pagesPerReclaimerChunk = 512*(1-_MCU) + pagesPerArena*_MCU
+	pagesPerReclaimerChunk = 512*_OS + pagesPerArena*(1-_OS)
 
 	// go115NewMCentralImpl is a feature flag for the new mcentral implementation.
 	//
@@ -1390,7 +1390,7 @@ func (h *mheap) grow(npage uintptr) bool {
 	// By scavenging inline we deal with the failure to allocate out of
 	// memory fragments by scavenging the memory fragments that are least
 	// likely to be re-used.
-	if _MCU == 0 {
+	if !noos {
 		if retained := heapRetained(); retained+uint64(totalGrowth) > h.scavengeGoal {
 			todo := totalGrowth
 			if overage := uintptr(retained + uint64(totalGrowth) - h.scavengeGoal); todo > overage {
@@ -1507,7 +1507,7 @@ func (h *mheap) scavengeAll() {
 //go:linkname runtime_debug_freeOSMemory runtime/debug.freeOSMemory
 func runtime_debug_freeOSMemory() {
 	GC()
-	if _MCU == 0 {
+	if !noos {
 		systemstack(func() { mheap_.scavengeAll() })
 	}
 }
@@ -1876,7 +1876,7 @@ func (b *gcBits) bitp(n uintptr) (bytep *uint8, mask uint8) {
 	return b.bytep(n / 8), 1 << (n % 8)
 }
 
-const gcBitsChunkBytes = uintptr((64*(1-_MCU) + 2*memScale*_MCU) << 10)
+const gcBitsChunkBytes = uintptr(64<<10)*_OS + noosGCBitsChunkBytes
 const gcBitsHeaderBytes = unsafe.Sizeof(gcBitsHeader{})
 
 type gcBitsHeader struct {

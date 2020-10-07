@@ -46,7 +46,7 @@ func NumCPU() int {
 
 // NumCgoCall returns the number of cgo calls made by the current process.
 func NumCgoCall() int64 {
-	if _MCU != 0 {
+	if noos {
 		return 0
 	}
 	var n int64

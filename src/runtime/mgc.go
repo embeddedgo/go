@@ -137,7 +137,7 @@ import (
 const (
 	_DebugGC         = 0
 	_ConcurrentSweep = true
-	_FinBlockSize    = 4*1024*(1-_MCU) + 256*memScale*_MCU
+	_FinBlockSize    = 4*1024*_OS + noosFinBlockSize
 
 	// debugScanConservative enables debug logging for stack
 	// frames that are scanned conservatively.
@@ -146,7 +146,7 @@ const (
 	// sweepMinHeapDistance is a lower bound on the heap distance
 	// (in bytes) reserved for concurrent sweeping between GC
 	// cycles.
-	sweepMinHeapDistance = 1024*1024*(1-_MCU) + 1024*memScale*_MCU
+	sweepMinHeapDistance = 1024*1024*_OS + noosSweepMinHeapDistance
 )
 
 // heapminimum is the minimum heap size at which to trigger GC.
@@ -164,7 +164,7 @@ const (
 var heapminimum uint64 = defaultHeapMinimum
 
 // defaultHeapMinimum is the value of heapminimum for GOGC==100.
-const defaultHeapMinimum = 4<<20*(1-_MCU) + 8<<10*memScale*_MCU
+const defaultHeapMinimum = 4<<20*_OS + noosDefaultHeapMinimum
 
 // Initialized from $GOGC.  GOGC=off means no GC.
 var gcpercent int32
@@ -204,7 +204,7 @@ func readgogc() int32 {
 	if n, ok := atoi32(p); ok {
 		return n
 	}
-	if _MCU != 0 {
+	if noos {
 		return 50
 	} else {
 		return 100
@@ -219,7 +219,7 @@ func gcenable() {
 	// Kick off sweeping and scavenging.
 	c := make(chan int, 2)
 	go bgsweep(c)
-	if _MCU == 0 {
+	if !noos {
 		go bgscavenge(c)
 		<-c
 	}
@@ -431,8 +431,8 @@ func (c *gcControllerState) startCycle() {
 	// GOGC. Assist is proportional to this distance, so enforce a
 	// minimum distance, even if it means going over the GOGC goal
 	// by a tiny bit.
-	if memstats.next_gc < memstats.heap_live+1024*1024*(1-_MCU)+1024*memScale*_MCU {
-		memstats.next_gc = memstats.heap_live + 1024*1024*(1-_MCU) + 1024*memScale*_MCU
+	if memstats.next_gc < memstats.heap_live+1024*1024*_OS+noosHeapGoalInc {
+		memstats.next_gc = memstats.heap_live + 1024*1024*_OS + noosHeapGoalInc
 	}
 
 	// Compute the background mark utilization goal. In general,
@@ -1808,7 +1808,7 @@ func gcMarkTermination(nextTriggerRatio float64) {
 			}
 			print(string(fmtNSAsMS(sbuf[:], uint64(ns))))
 		}
-		if _MCU == 0 {
+		if !noos {
 			print(" ms cpu, ",
 				work.heap0>>20, "->", work.heap1>>20, "->", work.heap2>>20, " MB, ",
 				work.heapGoal>>20, " MB goal, ",
