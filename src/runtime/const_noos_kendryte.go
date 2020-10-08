@@ -10,12 +10,18 @@ package runtime
 const (
 	_OS                        = 0
 	noos                       = true
+	noosScaleDown              = 2
 	noosStackCacheSize         = 16 * 1024
 	noosNumStackOrders         = 3
 	noosHeapAddrBits           = 23 // enough for 8 MiB K210 SRAM
 	noosLogHeapArenaBytes      = 17 // 128 KiB
 	noosArenaBaseOffset        = 0x80000000
 	noosMinPhysPageSize        = 256
+	noosSpanSetBlockEntries    = 128
+	noosSpanSetInitSpineCap    = 64
+	noosStackMin               = 2048
+	noosStackSystem            = 0
+	noosStackGuard             = 928
 	noosFinBlockSize           = 2 * 1024
 	noosSweepMinHeapDistance   = 8 * 1024
 	noosDefaultHeapMinimum     = 64 * 1024
@@ -23,4 +29,5 @@ const (
 	noosGCSweepBlockEntries    = 1024
 	noosGCSweepBufInitSpineCap = 64
 	noosGCBitsChunkBytes       = 16 * 1024
+	noosSemTabSize             = 113
 )

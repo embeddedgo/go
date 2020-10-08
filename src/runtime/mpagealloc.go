@@ -57,7 +57,7 @@ const (
 	// in the bitmap at once.
 	pallocChunkPages    = 1 << logPallocChunkPages
 	pallocChunkBytes    = pallocChunkPages * pageSize
-	logPallocChunkPages = 9*(1-_MCU) + (logHeapArenaBytes-pageShift)*_MCU
+	logPallocChunkPages = 9*_OS + (logHeapArenaBytes-pageShift)*(1-_OS)
 	logPallocChunkBytes = logPallocChunkPages + pageShift
 
 	// The number of radix bits for each level.

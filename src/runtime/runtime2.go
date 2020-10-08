@@ -577,7 +577,7 @@ type p struct {
 	raceprocctx uintptr
 
 	deferpool    [5][]*_defer // pool of available defer structs of different sizes (see panic.go)
-	deferpoolbuf [5][32 - 16*_MCU]*_defer
+	deferpoolbuf [5][32 / noosScaleDown]*_defer
 
 	// Cache of goroutine ids, amortizes accesses to runtime·sched.goidgen.
 	goidcache    uint64
@@ -586,7 +586,7 @@ type p struct {
 	// Queue of runnable goroutines. Accessed without lock.
 	runqhead uint32
 	runqtail uint32
-	runq     [256*(1-_MCU) + 64*(1+logMemScale/2)*_MCU]guintptr
+	runq     [256 / noosScaleDown]guintptr
 	// runnext, if non-nil, is a runnable G that was ready'd by
 	// the current G and should be run next instead of what's in
 	// runq if there's time remaining in the running G's time
@@ -605,7 +605,7 @@ type p struct {
 	}
 
 	sudogcache []*sudog
-	sudogbuf   [128 - 64*_MCU]*sudog
+	sudogbuf   [128 / noosScaleDown]*sudog
 
 	// Cache of mspan objects from the heap.
 	mspancache struct {
@@ -615,7 +615,7 @@ type p struct {
 		// slice updates is tricky, moreso than just managing the length
 		// ourselves.
 		len int
-		buf [128 - 64*_MCU]*mspan
+		buf [128 / noosScaleDown]*mspan
 	}
 
 	tracebuf traceBufPtr

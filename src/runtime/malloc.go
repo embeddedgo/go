@@ -129,12 +129,6 @@ const (
 	// _64bit = 1 on 64-bit systems, 0 on 32-bit systems
 	_64bit = 1 << (^uintptr(0) >> 63) / 2
 
-	_ARMv7M     = sys.GoosNoos * sys.GoarchThumb
-	_RV64G      = sys.GoosNoos * sys.GoarchRiscv64
-	_MCU        = _ARMv7M + _RV64G
-	logMemScale = 0*_ARMv7M + 3*_RV64G
-	memScale    = 1 << logMemScale
-
 	// Tiny allocator parameters, see "Tiny allocator" comment in malloc.go.
 	_TinySize      = 16
 	_TinySizeClass = int8(2)

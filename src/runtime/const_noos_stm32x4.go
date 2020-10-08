@@ -3,19 +3,25 @@
 // license that can be found in the LICENSE file.
 
 // +build noos
-// +build stm32h743
+// +build stm32f215 stm32f407 stm32f412 stm32l4x6
 
 package runtime
 
 const (
 	_OS                        = 0
 	noos                       = true
-	noosStackCacheSize         = 8 * 1024
+	noosScaleDown              = 16
+	noosStackCacheSize         = 4 * 1024
 	noosNumStackOrders         = 2
-	noosHeapAddrBits           = 19         // enough for 512 KiB AXI SRAM (AHB SRAM not supported)
-	noosLogHeapArenaBytes      = 14         // 16 KiB
-	noosArenaBaseOffset        = 0x24000000 // the begginning of AXI SRAM
+	noosHeapAddrBits           = 19 // enough for 320 KiB of STM32L496
+	noosLogHeapArenaBytes      = 14 // 16 KiB
+	noosArenaBaseOffset        = 0x20000000
 	noosMinPhysPageSize        = 256
+	noosSpanSetBlockEntries    = 16
+	noosSpanSetInitSpineCap    = 8
+	noosStackMin               = 1024
+	noosStackSystem            = 27 * 4 // register stacking at exception entry
+	noosStackGuard             = 464
 	noosFinBlockSize           = 256
 	noosSweepMinHeapDistance   = 1024
 	noosDefaultHeapMinimum     = 8 * 1024
@@ -23,4 +29,5 @@ const (
 	noosGCSweepBlockEntries    = 64
 	noosGCSweepBufInitSpineCap = 32
 	noosGCBitsChunkBytes       = 2 * 1024
+	noosSemTabSize             = 31
 )

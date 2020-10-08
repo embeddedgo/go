@@ -66,11 +66,10 @@ const (
 	// to each stack below the usual guard area for OS-specific
 	// purposes like signal handling. Used on Windows, Plan 9,
 	// and iOS because they do not use a separate stack.
-	// Used on ARMv7M due to register stacking at exception entry.
-	_StackSystem = sys.GoosWindows*512*sys.PtrSize + sys.GoosPlan9*512 + sys.GoosDarwin*sys.GoarchArm*1024 + sys.GoosDarwin*sys.GoarchArm64*1024 + _ARMv7M*27*4
+	_StackSystem = sys.GoosWindows*512*sys.PtrSize + sys.GoosPlan9*512 + sys.GoosDarwin*sys.GoarchArm*1024 + sys.GoosDarwin*sys.GoarchArm64*1024 + noosStackSystem
 
 	// The minimum size of stack used by Go code
-	_StackMin = 2048*(1-_MCU) + 512<<(1+logMemScale/2)*_MCU // actual round2(_StackMin+_StackSystem) - _StackSystem
+	_StackMin = 2048*_OS + noosStackMin
 
 	// The minimum stack size to allocate.
 	// The hackery here rounds FixedStack0 up to a power of 2.
@@ -92,7 +91,7 @@ const (
 
 	// The stack guard is a pointer this many bytes above the
 	// bottom of the stack.
-	_StackGuard = 928*sys.StackGuardMultiplier*(1-_ARMv7M) + 448*_ARMv7M + _StackSystem
+	_StackGuard = 928*sys.StackGuardMultiplier*_OS + noosStackGuard + _StackSystem
 
 	// After a stack split check the SP is allowed to be this
 	// many bytes below the stack guard. This saves an instruction
@@ -1130,7 +1129,7 @@ func shrinkstack(gp *g) {
 	// Check for self-shrinks while in a libcall. These may have
 	// pointers into the stack disguised as uintptrs, but these
 	// code paths should all be nosplit.
-	if  !noos && gp == getg().m.curg && gp.m.libcallsp != 0 {
+	if !noos && gp == getg().m.curg && gp.m.libcallsp != 0 {
 		throw("shrinking stack in libcall")
 	}
 

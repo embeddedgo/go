@@ -122,7 +122,7 @@ func main() {
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
 	if noos {
-		maxstacksize = 16384 * memScale
+		maxstacksize = 256000 / noosScaleDown
 	} else if sys.PtrSize == 8 {
 		maxstacksize = 1000000000
 	} else {
@@ -3711,9 +3711,9 @@ func gfput(_p_ *p, gp *g) {
 
 	_p_.gFree.push(gp)
 	_p_.gFree.n++
-	if _p_.gFree.n >= 64*(1-_MCU)+5*memScale*_MCU {
+	if _p_.gFree.n >= 64*_OS+5*16/noosScaleDown {
 		lock(&sched.gFree.lock)
-		for _p_.gFree.n >= 32*(1-_MCU)+3*memScale*_MCU {
+		for _p_.gFree.n >= 32*_OS+3*16/noosScaleDown {
 			_p_.gFree.n--
 			gp = _p_.gFree.pop()
 			if gp.stack.lo == 0 {
@@ -3734,7 +3734,7 @@ retry:
 	if _p_.gFree.empty() && (!sched.gFree.stack.empty() || !sched.gFree.noStack.empty()) {
 		lock(&sched.gFree.lock)
 		// Move a batch of free Gs to the P.
-		for _p_.gFree.n < 32*(1-_MCU)+3*memScale*_MCU {
+		for _p_.gFree.n < 32*_OS+3*16/noosScaleDown {
 			// Prefer Gs with stacks.
 			gp := sched.gFree.stack.pop()
 			if gp == nil {
@@ -5276,7 +5276,7 @@ func runqget(_p_ *p) (gp *g, inheritTime bool) {
 // Batch is a ring buffer starting at batchHead.
 // Returns number of grabbed goroutines.
 // Can be executed by any P.
-func runqgrab(_p_ *p, batch *[256*(1-_MCU) + 64*(1+logMemScale/2)*_MCU]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
+func runqgrab(_p_ *p, batch *[256 / noosScaleDown]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
 	for {
 		h := atomic.LoadAcq(&_p_.runqhead) // load-acquire, synchronize with other consumers
 		t := atomic.LoadAcq(&_p_.runqtail) // load-acquire, synchronize with the producer
