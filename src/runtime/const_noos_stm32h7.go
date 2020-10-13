@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // +build noos
-// +build stm32h743
+// +build stm32h7x3
 
 package runtime
 
