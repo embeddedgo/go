@@ -93,7 +93,7 @@ pkg embedded/rtos, const IntPrioSysTimer = 0
 pkg embedded/rtos, const IntPrioSysTimer ideal-int
 pkg embedded/rtos, func Nanotime() time.Duration
 pkg embedded/rtos, func SetPrivLevel(int) (int, error)
-pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64) bool) error
+pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64)) error
 pkg embedded/rtos, func SetSystemWriter(func(int, []uint8) int) error
 pkg embedded/rtos, method (*Error) Error() string
 pkg embedded/rtos, method (*Note) Clear()
