@@ -17,7 +17,6 @@ const (
 	noosLogHeapArenaBytes      = 14         // 16 KiB
 	noosArenaBaseOffset        = 0x24000000 // the begginning of AXI SRAM
 	noosMinPhysPageSize        = 256
-	noosSpanSetBlockEntries    = 16
 	noosSpanSetInitSpineCap    = 8
 	noosStackMin               = 1024
 	noosStackSystem            = 27 * 4 // register stacking at exception entry

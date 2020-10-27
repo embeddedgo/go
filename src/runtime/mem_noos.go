@@ -106,9 +106,10 @@ func sysPersistentAlloc(size, align uintptr, sysStat *uint64) (p *notInHeap) {
 		}
 		unlock(&sysMem.mx)
 	}
-	if p != nil {
-		mSysStatInc(sysStat, size)
+	if p == nil {
+		throw("runtime: cannot allocate memory")
 	}
+	mSysStatInc(sysStat, size)
 	return
 }
 

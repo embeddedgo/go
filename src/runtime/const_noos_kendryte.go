@@ -17,7 +17,6 @@ const (
 	noosLogHeapArenaBytes      = 17 // 128 KiB
 	noosArenaBaseOffset        = 0x80000000
 	noosMinPhysPageSize        = 256
-	noosSpanSetBlockEntries    = 128
 	noosSpanSetInitSpineCap    = 64
 	noosStackMin               = 2048
 	noosStackSystem            = 0

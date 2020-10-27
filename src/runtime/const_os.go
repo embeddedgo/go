@@ -16,7 +16,6 @@ const (
 	noosLogHeapArenaBytes      = 0
 	noosArenaBaseOffset        = 0
 	noosMinPhysPageSize        = 0
-	noosSpanSetBlockEntries    = 0
 	noosSpanSetInitSpineCap    = 0
 	noosStackMin               = 0
 	noosStackSystem            = 0

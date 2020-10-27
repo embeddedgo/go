@@ -20,7 +20,7 @@
 
 
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
-#define persistAllocMin 64*1024
+#define persistAllocMin 128*1024
 
 #define intEnabled (MTI+MSI+SEI+MEI)
 
