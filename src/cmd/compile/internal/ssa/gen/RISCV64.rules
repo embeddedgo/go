@@ -371,8 +371,8 @@
 // Medium zeroing uses a duff device
 // 8, and 128 are magic constants, see runtime/mkduff.go
 (Zero [s] {t} ptr mem)
-	&& s%8 == 0 && s > 24 && s <= 8*128
-	&& t.(*types.Type).Alignment()%8 == 0 && !config.noDuffDevice ->
+	&& s%8 == 0 && s >= 16 && s <= 8*128
+	&& t.Alignment()%8 == 0 && !config.noDuffDevice =>
 	(DUFFZERO [8 * (128 - s/8)] ptr mem)
 
 // Generic zeroing uses a loop
@@ -412,8 +412,8 @@
 
 // Medium move uses a duff device
 (Move [s] {t} dst src mem)
-	&& s%8 == 0 && s >= 24 && s <= 8*128 && t.(*types.Type).Alignment()%8 == 0
-	&& !config.noDuffDevice && logLargeCopy(v, s) ->
+	&& s%8 == 0 && s >= 16 && s <= 8*128 && t.Alignment()%8 == 0
+	&& !config.noDuffDevice && logLargeCopy(v, s) =>
 	(DUFFCOPY [16 * (128 - s/8)] dst src mem)
 
 // Generic move uses a loop
