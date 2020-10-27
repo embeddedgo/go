@@ -75,8 +75,8 @@ import (
 // Tasker code does not use FPU so the architecture specific context switch
 // code can avoid saving/restoring FPU context if not need.
 
-func dummyNanotime() int64        { return 1 }
-func dummySetalarm(ns int64) bool { return false }
+func dummyNanotime() int64   { return 1 }
+func dummySetalarm(ns int64) {}
 
 var thetasker = tasker{
 	nanotime: dummyNanotime,
@@ -114,12 +114,12 @@ type tasker struct {
 	}
 
 	nanotime func() int64
-	setalarm func(ns int64) bool
+	setalarm func(ns int64)
 	write    func(fd int, p []byte) int
 	writemx  cpumtx
 
 	newnanotime func() int64               // see embedded/rtos.SetSystemTimer
-	newsetalarm func(ns int64) bool        // see embedded/rtos.SetSystemTimer
+	newsetalarm func(ns int64)             // see embedded/rtos.SetSystemTimer
 	newwrite    func(fd int, p []byte) int // see embedded/rtos.SetSystemWriter
 }
 
@@ -294,7 +294,7 @@ func curcpuRunScheduler() {
 		}
 
 		// Nothing to execute. If this will be a work-stealing scheduler it will
-		// try to steal some work from some other CPU here.
+		// try to steal some work from other CPU here.
 		curcpuSleep()
 	}
 }

@@ -26,13 +26,12 @@ func nanotime() int64 {
 }
 
 //go:nosplit
-func setAlarm(ns int64) bool {
+func setAlarm(ns int64) {
 	timecmp := uint64(1<<64 - 1)
 	if ns >= 0 {
 		timecmp = mulDivUp(uint64(ns), timerHz, 1e9)
 	}
 	clint.CLINT().MTIMECMP[cpuid()].U64.Store(timecmp)
-	return true
 }
 
 //go:nosplit
