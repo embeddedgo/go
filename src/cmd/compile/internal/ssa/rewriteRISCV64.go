@@ -4,6 +4,7 @@
 package ssa
 
 import "math"
+import "cmd/compile/internal/types"
 
 func rewriteValueRISCV64(v *Value) bool {
 	switch v.Op {
@@ -1941,8 +1942,126 @@ func rewriteValueRISCV64_OpMove(v *Value) bool {
 		v.AddArg3(dst, v0, mem)
 		return true
 	}
-	// match: (Move [2] dst src mem)
+	// match: (Move [2] {t} dst src mem)
+	// cond: t.Alignment()%2 == 0
 	// result: (MOVHstore dst (MOVHload src mem) mem)
+	for {
+		if auxIntToInt64(v.AuxInt) != 2 {
+			break
+		}
+		t := auxToType(v.Aux)
+		dst := v_0
+		src := v_1
+		mem := v_2
+		if !(t.Alignment()%2 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVHstore)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVHload, typ.Int16)
+		v0.AddArg2(src, mem)
+		v.AddArg3(dst, v0, mem)
+		return true
+	}
+	// match: (Move [4] {t} dst src mem)
+	// cond: t.Alignment()%4 == 0
+	// result: (MOVWstore dst (MOVWload src mem) mem)
+	for {
+		if auxIntToInt64(v.AuxInt) != 4 {
+			break
+		}
+		t := auxToType(v.Aux)
+		dst := v_0
+		src := v_1
+		mem := v_2
+		if !(t.Alignment()%4 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVWstore)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVWload, typ.Int32)
+		v0.AddArg2(src, mem)
+		v.AddArg3(dst, v0, mem)
+		return true
+	}
+	// match: (Move [8] {t} dst src mem)
+	// cond: t.Alignment()%8 == 0
+	// result: (MOVDstore dst (MOVDload src mem) mem)
+	for {
+		if auxIntToInt64(v.AuxInt) != 8 {
+			break
+		}
+		t := auxToType(v.Aux)
+		dst := v_0
+		src := v_1
+		mem := v_2
+		if !(t.Alignment()%8 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVDstore)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v0.AddArg2(src, mem)
+		v.AddArg3(dst, v0, mem)
+		return true
+	}
+	// match: (Move [16] {t} dst src mem)
+	// cond: t.Alignment()%8 == 0
+	// result: (MOVDstore [8] dst (MOVDload [8] src mem) (MOVDstore dst (MOVDload src mem) mem))
+	for {
+		if auxIntToInt64(v.AuxInt) != 16 {
+			break
+		}
+		t := auxToType(v.Aux)
+		dst := v_0
+		src := v_1
+		mem := v_2
+		if !(t.Alignment()%8 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVDstore)
+		v.AuxInt = int32ToAuxInt(8)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v0.AuxInt = int32ToAuxInt(8)
+		v0.AddArg2(src, mem)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVDstore, types.TypeMem)
+		v2 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v2.AddArg2(src, mem)
+		v1.AddArg3(dst, v2, mem)
+		v.AddArg3(dst, v0, v1)
+		return true
+	}
+	// match: (Move [24] {t} dst src mem)
+	// cond: t.Alignment()%8 == 0
+	// result: (MOVDstore [16] dst (MOVDload [16] src mem) (MOVDstore [8] dst (MOVDload [8] src mem) (MOVDstore dst (MOVDload src mem) mem)))
+	for {
+		if auxIntToInt64(v.AuxInt) != 24 {
+			break
+		}
+		t := auxToType(v.Aux)
+		dst := v_0
+		src := v_1
+		mem := v_2
+		if !(t.Alignment()%8 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVDstore)
+		v.AuxInt = int32ToAuxInt(16)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v0.AuxInt = int32ToAuxInt(16)
+		v0.AddArg2(src, mem)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVDstore, types.TypeMem)
+		v1.AuxInt = int32ToAuxInt(8)
+		v2 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v2.AuxInt = int32ToAuxInt(8)
+		v2.AddArg2(src, mem)
+		v3 := b.NewValue0(v.Pos, OpRISCV64MOVDstore, types.TypeMem)
+		v4 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v4.AddArg2(src, mem)
+		v3.AddArg3(dst, v4, mem)
+		v1.AddArg3(dst, v2, v3)
+		v.AddArg3(dst, v0, v1)
+		return true
+	}
+	// match: (Move [2] dst src mem)
+	// result: (MOVBstore [1] dst (MOVBload [1] src mem) (MOVBstore dst (MOVBload src mem) mem))
 	for {
 		if auxIntToInt64(v.AuxInt) != 2 {
 			break
@@ -1950,44 +2069,72 @@ func rewriteValueRISCV64_OpMove(v *Value) bool {
 		dst := v_0
 		src := v_1
 		mem := v_2
-		v.reset(OpRISCV64MOVHstore)
-		v0 := b.NewValue0(v.Pos, OpRISCV64MOVHload, typ.Int16)
+		v.reset(OpRISCV64MOVBstore)
+		v.AuxInt = int32ToAuxInt(1)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVBload, typ.Int8)
+		v0.AuxInt = int32ToAuxInt(1)
 		v0.AddArg2(src, mem)
-		v.AddArg3(dst, v0, mem)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVBstore, types.TypeMem)
+		v2 := b.NewValue0(v.Pos, OpRISCV64MOVBload, typ.Int8)
+		v2.AddArg2(src, mem)
+		v1.AddArg3(dst, v2, mem)
+		v.AddArg3(dst, v0, v1)
 		return true
 	}
-	// match: (Move [4] dst src mem)
-	// result: (MOVWstore dst (MOVWload src mem) mem)
+	// match: (Move [4] {t} dst src mem)
+	// cond: t.Alignment()%2 == 0
+	// result: (MOVHstore [2] dst (MOVHload [2] src mem) (MOVHstore dst (MOVHload src mem) mem))
 	for {
 		if auxIntToInt64(v.AuxInt) != 4 {
 			break
 		}
+		t := auxToType(v.Aux)
 		dst := v_0
 		src := v_1
 		mem := v_2
-		v.reset(OpRISCV64MOVWstore)
-		v0 := b.NewValue0(v.Pos, OpRISCV64MOVWload, typ.Int32)
+		if !(t.Alignment()%2 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVHstore)
+		v.AuxInt = int32ToAuxInt(2)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVHload, typ.Int16)
+		v0.AuxInt = int32ToAuxInt(2)
 		v0.AddArg2(src, mem)
-		v.AddArg3(dst, v0, mem)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVHstore, types.TypeMem)
+		v2 := b.NewValue0(v.Pos, OpRISCV64MOVHload, typ.Int16)
+		v2.AddArg2(src, mem)
+		v1.AddArg3(dst, v2, mem)
+		v.AddArg3(dst, v0, v1)
 		return true
 	}
-	// match: (Move [8] dst src mem)
-	// result: (MOVDstore dst (MOVDload src mem) mem)
+	// match: (Move [8] {t} dst src mem)
+	// cond: t.Alignment()%4 == 0
+	// result: (MOVDstore [4] dst (MOVDload [4] src mem) (MOVDstore dst (MOVDload src mem) mem))
 	for {
 		if auxIntToInt64(v.AuxInt) != 8 {
 			break
 		}
+		t := auxToType(v.Aux)
 		dst := v_0
 		src := v_1
 		mem := v_2
+		if !(t.Alignment()%4 == 0) {
+			break
+		}
 		v.reset(OpRISCV64MOVDstore)
+		v.AuxInt = int32ToAuxInt(4)
 		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v0.AuxInt = int32ToAuxInt(4)
 		v0.AddArg2(src, mem)
-		v.AddArg3(dst, v0, mem)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVDstore, types.TypeMem)
+		v2 := b.NewValue0(v.Pos, OpRISCV64MOVDload, typ.Int64)
+		v2.AddArg2(src, mem)
+		v1.AddArg3(dst, v2, mem)
+		v.AddArg3(dst, v0, v1)
 		return true
 	}
 	// match: (Move [s] {t} dst src mem)
-	// cond: s%8 == 0 && s >= 16 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice && logLargeCopy(v, s)
+	// cond: s%8 == 0 && s > 24 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice && logLargeCopy(v, s)
 	// result: (DUFFCOPY [16 * (128 - s/8)] dst src mem)
 	for {
 		s := auxIntToInt64(v.AuxInt)
@@ -1995,7 +2142,7 @@ func rewriteValueRISCV64_OpMove(v *Value) bool {
 		dst := v_0
 		src := v_1
 		mem := v_2
-		if !(s%8 == 0 && s >= 16 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice && logLargeCopy(v, s)) {
+		if !(s%8 == 0 && s > 24 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice && logLargeCopy(v, s)) {
 			break
 		}
 		v.reset(OpRISCV64DUFFCOPY)
@@ -4977,54 +5124,172 @@ func rewriteValueRISCV64_OpZero(v *Value) bool {
 		v.AddArg3(ptr, v0, mem)
 		return true
 	}
-	// match: (Zero [2] ptr mem)
+	// match: (Zero [2] {t} ptr mem)
+	// cond: t.Alignment()%2 == 0
 	// result: (MOVHstore ptr (MOVHconst) mem)
+	for {
+		if auxIntToInt64(v.AuxInt) != 2 {
+			break
+		}
+		t := auxToType(v.Aux)
+		ptr := v_0
+		mem := v_1
+		if !(t.Alignment()%2 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVHstore)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVHconst, typ.UInt16)
+		v.AddArg3(ptr, v0, mem)
+		return true
+	}
+	// match: (Zero [4] {t} ptr mem)
+	// cond: t.Alignment()%4 == 0
+	// result: (MOVWstore ptr (MOVWconst) mem)
+	for {
+		if auxIntToInt64(v.AuxInt) != 4 {
+			break
+		}
+		t := auxToType(v.Aux)
+		ptr := v_0
+		mem := v_1
+		if !(t.Alignment()%4 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVWstore)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVWconst, typ.UInt32)
+		v.AddArg3(ptr, v0, mem)
+		return true
+	}
+	// match: (Zero [8] {t} ptr mem)
+	// cond: t.Alignment()%8 == 0
+	// result: (MOVDstore ptr (MOVDconst) mem)
+	for {
+		if auxIntToInt64(v.AuxInt) != 8 {
+			break
+		}
+		t := auxToType(v.Aux)
+		ptr := v_0
+		mem := v_1
+		if !(t.Alignment()%8 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVDstore)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDconst, typ.UInt64)
+		v.AddArg3(ptr, v0, mem)
+		return true
+	}
+	// match: (Zero [16] {t} ptr mem)
+	// cond: t.Alignment()%8 == 0
+	// result: (MOVDstore [8] ptr (MOVDconst) (MOVDstore ptr (MOVDconst) mem))
+	for {
+		if auxIntToInt64(v.AuxInt) != 16 {
+			break
+		}
+		t := auxToType(v.Aux)
+		ptr := v_0
+		mem := v_1
+		if !(t.Alignment()%8 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVDstore)
+		v.AuxInt = int32ToAuxInt(8)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDconst, typ.UInt64)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVDstore, types.TypeMem)
+		v1.AddArg3(ptr, v0, mem)
+		v.AddArg3(ptr, v0, v1)
+		return true
+	}
+	// match: (Zero [24] {t} ptr mem)
+	// cond: t.Alignment()%8 == 0
+	// result: (MOVDstore [16] ptr (MOVDconst) (MOVDstore [8] ptr (MOVDconst) (MOVDstore ptr (MOVDconst) mem)))
+	for {
+		if auxIntToInt64(v.AuxInt) != 24 {
+			break
+		}
+		t := auxToType(v.Aux)
+		ptr := v_0
+		mem := v_1
+		if !(t.Alignment()%8 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVDstore)
+		v.AuxInt = int32ToAuxInt(16)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDconst, typ.UInt64)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVDstore, types.TypeMem)
+		v1.AuxInt = int32ToAuxInt(8)
+		v2 := b.NewValue0(v.Pos, OpRISCV64MOVDstore, types.TypeMem)
+		v2.AddArg3(ptr, v0, mem)
+		v1.AddArg3(ptr, v0, v2)
+		v.AddArg3(ptr, v0, v1)
+		return true
+	}
+	// match: (Zero [2] {t} ptr mem)
+	// result: (MOVBstore [1] ptr (MOVBconst) (MOVBstore ptr (MOVBconst) mem))
 	for {
 		if auxIntToInt64(v.AuxInt) != 2 {
 			break
 		}
 		ptr := v_0
 		mem := v_1
-		v.reset(OpRISCV64MOVHstore)
-		v0 := b.NewValue0(v.Pos, OpRISCV64MOVHconst, typ.UInt16)
-		v.AddArg3(ptr, v0, mem)
+		v.reset(OpRISCV64MOVBstore)
+		v.AuxInt = int32ToAuxInt(1)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVBconst, typ.UInt8)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVBstore, types.TypeMem)
+		v1.AddArg3(ptr, v0, mem)
+		v.AddArg3(ptr, v0, v1)
 		return true
 	}
-	// match: (Zero [4] ptr mem)
-	// result: (MOVWstore ptr (MOVWconst) mem)
+	// match: (Zero [4] {t} ptr mem)
+	// cond: t.Alignment()%2 == 0
+	// result: (MOVHstore [2] ptr (MOVHconst) (MOVHstore ptr (MOVHconst) mem))
 	for {
 		if auxIntToInt64(v.AuxInt) != 4 {
 			break
 		}
+		t := auxToType(v.Aux)
 		ptr := v_0
 		mem := v_1
-		v.reset(OpRISCV64MOVWstore)
-		v0 := b.NewValue0(v.Pos, OpRISCV64MOVWconst, typ.UInt32)
-		v.AddArg3(ptr, v0, mem)
+		if !(t.Alignment()%2 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVHstore)
+		v.AuxInt = int32ToAuxInt(2)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVHconst, typ.UInt16)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVHstore, types.TypeMem)
+		v1.AddArg3(ptr, v0, mem)
+		v.AddArg3(ptr, v0, v1)
 		return true
 	}
-	// match: (Zero [8] ptr mem)
-	// result: (MOVDstore ptr (MOVDconst) mem)
+	// match: (Zero [8] {t} ptr mem)
+	// cond: t.Alignment()%4 == 0
+	// result: (MOVWstore [4] ptr (MOVWconst) (MOVWstore ptr (MOVWconst) mem))
 	for {
 		if auxIntToInt64(v.AuxInt) != 8 {
 			break
 		}
+		t := auxToType(v.Aux)
 		ptr := v_0
 		mem := v_1
-		v.reset(OpRISCV64MOVDstore)
-		v0 := b.NewValue0(v.Pos, OpRISCV64MOVDconst, typ.UInt64)
-		v.AddArg3(ptr, v0, mem)
+		if !(t.Alignment()%4 == 0) {
+			break
+		}
+		v.reset(OpRISCV64MOVWstore)
+		v.AuxInt = int32ToAuxInt(4)
+		v0 := b.NewValue0(v.Pos, OpRISCV64MOVWconst, typ.UInt32)
+		v1 := b.NewValue0(v.Pos, OpRISCV64MOVWstore, types.TypeMem)
+		v1.AddArg3(ptr, v0, mem)
+		v.AddArg3(ptr, v0, v1)
 		return true
 	}
 	// match: (Zero [s] {t} ptr mem)
-	// cond: s%8 == 0 && s >= 16 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice
+	// cond: s%8 == 0 && s > 24 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice
 	// result: (DUFFZERO [8 * (128 - s/8)] ptr mem)
 	for {
 		s := auxIntToInt64(v.AuxInt)
 		t := auxToType(v.Aux)
 		ptr := v_0
 		mem := v_1
-		if !(s%8 == 0 && s >= 16 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice) {
+		if !(s%8 == 0 && s > 24 && s <= 8*128 && t.Alignment()%8 == 0 && !config.noDuffDevice) {
 			break
 		}
 		v.reset(OpRISCV64DUFFZERO)
