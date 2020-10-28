@@ -229,9 +229,10 @@ func init() {
 		{name: "CALLinter", argLength: 2, reg: callInter, aux: "Int64", call: true},                 // call fn by pointer. arg0=codeptr, arg1=mem, auxint=argsize, returns mem
 
 		// duffzero
-		// arg0 = address of memory to zero (X10, changed as side effect)
+		// arg0 = address of memory to zero (in X10, changed as side effect)
 		// arg1 = mem
 		// auxint = offset into duffzero code to start executing
+		// X1 (link register) changed because of function call
 		// returns mem
 		{
 			name:      "DUFFZERO",
@@ -249,6 +250,7 @@ func init() {
 		// arg0 = address of dst memory (in X11, changed as side effect)
 		// arg1 = address of src memory (in X10, changed as side effect)
 		// arg2 = mem
+		// X1 (link register) changed because of function call
 		// auxint = offset into duffcopy code to start executing
 		// returns mem
 		{
