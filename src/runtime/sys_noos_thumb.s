@@ -11,8 +11,6 @@
 
 // syscalls allowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_nanotime*4)(SB)/4, $·sysnanotime(SB)
-DATA runtime·syscalls+(SYS_walltime*4)(SB)/4, $·syswalltime(SB)
-DATA runtime·syscalls+(SYS_setwalltime*4)(SB)/4, $·syssetwalltime(SB)
 DATA runtime·syscalls+(SYS_irqctl*4)(SB)/4, $·sysirqctl(SB)
 DATA runtime·syscalls+(SYS_setprivlevel*4)(SB)/4, $·syssetprivlevel(SB)
 DATA runtime·syscalls+(SYS_write*4)(SB)/4, $·syswrite(SB)
@@ -29,27 +27,11 @@ DATA runtime·syscalls+(SYS_nanosleep*4)(SB)/4, $·sysnanosleep(SB)
 
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*4)
 
-// func nanotime1() int64
-TEXT ·nanotime1(SB),NOSPLIT|NOFRAME,$0-8
+// func nanotime() int64
+TEXT ·nanotime(SB),NOSPLIT|NOFRAME,$0-8
 	MOVW  $SYS_nanotime, R4
 	MOVW  $(0+4), R5
 	MOVW  $8, R6
-	SWI
-	RET
-
-// func walltime1() (sec int64, nsec int32)
-TEXT ·walltime1(SB),NOSPLIT|NOFRAME,$0-12
-	MOVW  $SYS_walltime, R4
-	MOVW  $(0+4), R5
-	MOVW  $12, R6
-	SWI
-	RET
-
-// func setwalltime(sec int64, nsec int32)
-TEXT ·setwalltime(SB),NOSPLIT|NOFRAME,$0-12
-	MOVW  $SYS_setwalltime, R4
-	MOVW  $(12+4), R5
-	MOVW  $0, R6
 	SWI
 	RET
 
@@ -69,8 +51,8 @@ TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-12
 	SWI
 	RET
 
-// func write1(fd uintptr, p unsafe.Pointer, n int32) int32
-TEXT ·write1(SB),NOSPLIT|NOFRAME,$0-16
+// func write(fd uintptr, p unsafe.Pointer, n int32) int32
+TEXT ·write(SB),NOSPLIT|NOFRAME,$0-16
 	MOVW  $SYS_write, R4
 	MOVW  $(12+4), R5
 	MOVW  $4, R6

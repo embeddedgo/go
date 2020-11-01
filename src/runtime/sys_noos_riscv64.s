@@ -11,8 +11,6 @@
 
 // syscalls allowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_nanotime*8)(SB)/8, $·sysnanotime(SB)
-DATA runtime·syscalls+(SYS_walltime*8)(SB)/8, $·syswalltime(SB)
-DATA runtime·syscalls+(SYS_setwalltime*8)(SB)/8, $·syssetwalltime(SB)
 DATA runtime·syscalls+(SYS_irqctl*8)(SB)/8, $·sysirqctl(SB)
 DATA runtime·syscalls+(SYS_setprivlevel*8)(SB)/8, $·syssetprivlevel(SB)
 DATA runtime·syscalls+(SYS_write*8)(SB)/8, $·syswrite(SB)
@@ -29,8 +27,8 @@ DATA runtime·syscalls+(SYS_nanosleep*8)(SB)/8, $·sysnanosleep(SB)
 
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*8)
 
-// func nanotime1() int64
-TEXT ·nanotime1(SB),NOSPLIT|NOFRAME,$0-8
+// func nanotime() int64
+TEXT ·nanotime(SB),NOSPLIT|NOFRAME,$0-8
 	MOV  $SYS_nanotime, A3
 	MOV  $(0+8), A4
 	MOV  $8, A5
@@ -44,19 +42,6 @@ TEXT ·cputicks(SB),NOSPLIT|NOFRAME,$0-8
 	MOV  $8, A5
 	ECALL
 	RET
-
-// func walltime1() (sec int64, nsec int32)
-TEXT ·walltime1(SB),NOSPLIT|NOFRAME,$0-16
-	MOV  $SYS_walltime, A3
-	MOV  $(0+8), A4
-	MOV  $16, A5
-	ECALL
-	RET
-
-// func setwalltime(sec int64, nsec int32)
-TEXT ·setwalltime(SB),NOSPLIT|NOFRAME,$0-12
-	EBREAK
-	JMP  -1(PC)
 
 // func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
 TEXT ·irqctl(SB),NOSPLIT|NOFRAME,$0-48
@@ -74,8 +59,8 @@ TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
 	ECALL
 	RET
 
-// func write1(fd uintptr, p unsafe.Pointer, n int32) int32
-TEXT ·write1(SB),NOSPLIT|NOFRAME,$0-32
+// func write(fd uintptr, p unsafe.Pointer, n int32) int32
+TEXT ·write(SB),NOSPLIT|NOFRAME,$0-32
 	MOV  $SYS_write, A3
 	MOV  $(24+8), A4
 	MOV  $8, A5

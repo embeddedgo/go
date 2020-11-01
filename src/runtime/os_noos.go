@@ -110,6 +110,52 @@ func isr() bool {
 	*/
 }
 
+var timestart struct {
+	sec  int64
+	nsec int32
+	lock rwmutex
+}
+
+// The noos has separate implementation of time_now for better performance (only
+// one syscall) and to ensure that the monotonic and the wall components both
+// point to the same instant in time (the RTC setting code can rely on this).
+
+//go:linkname time_now time.now
+func time_now() (sec int64, nsec int32, mono int64) {
+	timestart.lock.rlock()
+	sec = timestart.sec
+	nsec = timestart.nsec
+	timestart.lock.runlock()
+	mono = nanotime()
+	s := mono / 1e9
+	ns := int32(mono - s*1e9)
+	sec += s
+	nsec += ns
+	if nsec >= 1e9 {
+		sec++
+		nsec -= 1e9
+	}
+	return
+}
+
+//go:linkname time_move time.move
+func time_move(sec int64, nsec int32) (sec0 int64, nsec0 int32) {
+	timestart.lock.lock()
+	sec0 = timestart.sec + sec
+	nsec0 = timestart.nsec + nsec
+	if nsec0 < 0 {
+		nsec0 += 1e9
+		sec0--
+	} else if nsec0 >= 1e9 {
+		nsec0 -= 1e9
+		sec0++
+	}
+	timestart.sec = sec0
+	timestart.nsec = nsec0
+	timestart.lock.unlock()
+	return
+}
+
 func setsystim1()
 func setsyswriter1()
 func newosproc(mp *m)
@@ -117,7 +163,7 @@ func exit(code int32)
 func osyield()
 
 //go:noescape
-func write1(fd uintptr, p unsafe.Pointer, n int32) int32
+func write(fd uintptr, p unsafe.Pointer, n int32) int32
 
 //go:noescape
 func futexsleep(addr *uint32, val uint32, ns int64)
@@ -130,9 +176,15 @@ func exitThread(wait *uint32)
 
 // syscalls not used by runtime
 
-func setwalltime(sec int64, nsec int32)
 func setprivlevel(newlevel int) (oldlevel, errno int)
 func irqenabled(irq int) (enabled, errno int)
 func setirqenabled(irq, enabled int) (errno int)
 func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
 func nanosleep(ns int64)
+func nanotime() int64
+
+// faketime is the simulated time in nanoseconds since 1970 for the
+// playground.
+//
+// Zero means not to use faketime.
+var faketime int64

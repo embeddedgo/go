@@ -7,6 +7,7 @@
 // +build !freebsd
 // +build !aix
 // +build !solaris
+// +build !noos
 
 package runtime
 

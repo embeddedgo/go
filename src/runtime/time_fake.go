@@ -4,6 +4,7 @@
 
 // +build faketime
 // +build !windows
+// +build !noos
 
 // Faketime isn't currently supported on Windows. This would require:
 //

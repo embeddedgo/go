@@ -107,12 +107,6 @@ type tasker struct {
 	waitingf [fbnum]mcl // threads waiting on futex
 	tidgen   uintptr
 
-	timestart struct {
-		sec  int64
-		nsec int32
-		mx   cpumtx
-	}
-
 	nanotime func() int64
 	setalarm func(ns int64)
 	write    func(fd int, p []byte) int
@@ -501,45 +495,6 @@ func sysnanosleep(ns int64) {
 	wt.insertbyval(m)
 	wt.unlock()
 	curcpuSchedule()
-}
-
-//go:nowritebarrierrec
-//go:nosplit
-func syswalltime() (sec int64, nsec int32) {
-	t := curcpu().t
-	t.timestart.mx.lock()
-	sec = t.timestart.sec
-	nsec = t.timestart.nsec
-	t.timestart.mx.unlock()
-	now := t.nanotime()
-	s := now / 1e9
-	ns := int32(now - s*1e9)
-	sec += s
-	nsec += ns
-	if nsec >= 1e9 {
-		sec++
-		nsec -= 1e9
-	}
-	return
-}
-
-//go:nowritebarrierrec
-//go:nosplit
-func syssetwalltime(sec int64, nsec int32) {
-	t := curcpu().t
-	now := t.nanotime()
-	s := now / 1e9
-	ns := int32(now - s*1e9)
-	sec -= s
-	nsec -= ns
-	if nsec < 0 {
-		sec--
-		nsec += 1e9
-	}
-	t.timestart.mx.lock()
-	t.timestart.sec = sec
-	t.timestart.nsec = nsec
-	t.timestart.mx.unlock()
 }
 
 //go:nowritebarrierrec
