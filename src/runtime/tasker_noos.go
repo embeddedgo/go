@@ -295,7 +295,6 @@ func curcpuRunScheduler() {
 
 		// Nothing to execute. If this will be a work-stealing scheduler it will
 		// try to steal some work from other CPU here.
-		defaultWrite(0, dot)
 		curcpuSleep()
 	}
 }
