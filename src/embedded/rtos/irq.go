@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package rtos
-
 // Package rtos defines seven well known interrupt priority levels among which
 // five are ordered by increasing urgency as follows: IntPrioLowest, IntPrioLow,
 // IntPrioMid, IntPrioHigh, IntPrioHighest. There can be additional priority
@@ -22,6 +20,8 @@ package rtos
 // The IntPrioSysCall and IntPrioSysTimer are special priority levels. Do not
 // use them to set or calclulate an interrupt priority if their values are
 // outside of [IntPrioLowest, IntPrioHighest] range.
+package rtos
+
 const (
 	IntPrioHighest = intPrioHighest
 	IntPrioHigh    = intPrioHigh
@@ -63,4 +63,9 @@ func (irq IRQ) Disable(ctx IntCtx) error {
 // priority.
 func (irq IRQ) Status(ctx IntCtx) (enabled bool, prio int, err error) {
 	return irqStatus(irq, ctx)
+}
+
+// HandlerMode reports whether the function is called in interupt handler mode.
+func HandlerMode() bool {
+	return handlerMode()
 }

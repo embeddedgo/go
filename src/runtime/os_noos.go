@@ -95,7 +95,6 @@ func osinit() {
 	physPageSize = _PageSize
 }
 
-//go:linkname isr embedded/rtos.HandlerMode
 //go:nosplit
 func isr() bool {
 	gp := getg()

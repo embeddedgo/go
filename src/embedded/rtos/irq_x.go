@@ -6,6 +6,8 @@
 
 package rtos
 
+import _ "unsafe"
+
 const (
 	intPrioHighest  = 0
 	intPrioHigh     = 0
@@ -29,4 +31,8 @@ func irqDisable(irq IRQ, ctx IntCtx) error {
 
 func irqStatus(irq IRQ, ctx IntCtx) (enabled bool, prio int, err error) {
 	return false, 0, ErrNotSuppoted
+}
+
+func handlerMode() bool {
+	return false
 }

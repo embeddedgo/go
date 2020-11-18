@@ -29,5 +29,5 @@ func irqStatus(irq IRQ, ctx IntCtx) (enabled bool, prio int, err error) {
 //go:linkname runtime_irqctl runtime.irqctl
 func runtime_irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
 
-// HandlerMode reports whether the function is called in interupt handler mode.
-func HandlerMode() bool
+//go:linkname handlerMode runtime.isr
+func handlerMode() bool
