@@ -363,7 +363,7 @@ func (f *File) wrapErr(op string, err error) error {
 	if err == poll.ErrFileClosing {
 		err = ErrClosed
 	}
-	return &PathError{op, f.name, err}
+	return &PathError{Op: op, Path: f.name, Err: err}
 }
 
 // TempDir returns the default directory to use for temporary files.

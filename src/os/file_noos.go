@@ -5,22 +5,39 @@
 package os
 
 import (
+	_ "embedded/rtos"
+	"io"
+	"io/fs"
 	"syscall"
 	"time"
 )
 
+func tempDir() string {
+	return "/tmp"
+}
+
 type file struct {
+	f          fs.File
 	name       string
 	dirinfo    *dirInfo // nil unless directory being read
 	appendMode bool
 }
 
+func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
+	f, err := openFile(name, flag, perm)
+	if err != nil {
+		return nil, &PathError{Op: "open", Path: name, Err: err}
+	}
+	return &File{&file{f: f, name: name}}, nil
+}
+
+// NewFile is not supported by GOOS=noos.
 func NewFile(fd uintptr, name string) *File {
 	return nil
 }
 
 func (f *File) readdir(n int) (fi []FileInfo, err error) {
-	return nil, syscall.EINVAL
+	return nil, f.wrapErr("readdir", syscall.ENOTSUP)
 }
 
 func (f *File) checkValid(op string) error {
@@ -30,50 +47,124 @@ func (f *File) checkValid(op string) error {
 	return nil
 }
 
-func (f *File) read(b []byte) (n int, err error) {
-	return 0, f.wrapErr("read", syscall.ENOTSUP)
+func (f *File) read(p []byte) (n int, err error) {
+	return f.f.Read(p)
 }
 
 func (f *File) pread(b []byte, off int64) (n int, err error) {
-	return 0, f.wrapErr("pread", syscall.ENOTSUP)
+	if ff, ok := f.f.(interface {
+		ReadAt(b []byte, off int64) (n int, err error)
+	}); ok {
+		return ff.ReadAt(b, off)
+	}
+	return 0, syscall.ENOTSUP
 }
 
-func (f *File) write(b []byte) (n int, err error) {
-	return 0, f.wrapErr("write", syscall.ENOTSUP)
+func (f *File) write(p []byte) (n int, err error) {
+	if ff, ok := f.f.(io.Writer); ok {
+		return ff.Write(p)
+	}
+	return 0, syscall.ENOTSUP
 }
 
 func (f *File) pwrite(b []byte, off int64) (n int, err error) {
-	return 0, f.wrapErr("pwrite", syscall.ENOTSUP)
+	if ff, ok := f.f.(interface {
+		WriteAt(b []byte, off int64) (n int, err error)
+	}); ok {
+		return ff.WriteAt(b, off)
+	}
+	return 0, syscall.ENOTSUP
 }
 
 func (f *File) seek(offset int64, whence int) (ret int64, err error) {
-	return 0, f.wrapErr("seek", syscall.ENOTSUP)
+	if ff, ok := f.f.(interface {
+		Seek(offset int64, whence int) (ret int64, err error)
+	}); ok {
+		return ff.Seek(offset, whence)
+	}
+	return 0, syscall.ENOTSUP
 }
 
 // See docs in file.go:(*File).Chmod.
-func (f *File) chmod(mode FileMode) error {
-	return f.wrapErr("chmod", syscall.ENOTSUP)
+func (f *File) chmod(mode FileMode) (err error) {
+	err = syscall.ENOTSUP
+	if ff, ok := f.f.(interface {
+		Chmod(mode fs.FileMode) error
+	}); ok {
+		err = ff.Chmod(mode)
+		if err == nil {
+			return nil
+		}
+	}
+	return f.wrapErr("chmod", err)
 }
 
-func (f *File) setDeadline(t time.Time) error {
-	return f.wrapErr("setDeadline", syscall.ENOTSUP)
+func (f *File) setDeadline(t time.Time) (err error) {
+	err = syscall.ENOTSUP
+	if ff, ok := f.f.(interface {
+		SetDeadline(t time.Time) error
+	}); ok {
+		err = ff.SetDeadline(t)
+		if err == nil {
+			return nil
+		}
+	}
+	return f.wrapErr("setDeadline", err)
 }
 
-func (f *File) setReadDeadline(t time.Time) error {
-	return f.wrapErr("setDeadline", syscall.ENOTSUP)
+func (f *File) setReadDeadline(t time.Time) (err error) {
+	err = syscall.ENOTSUP
+	if ff, ok := f.f.(interface {
+		SetReadDeadline(t time.Time) error
+	}); ok {
+		err = ff.SetReadDeadline(t)
+		if err == nil {
+			return nil
+		}
+	}
+	return f.wrapErr("setReadDeadline", err)
 }
 
-func (f *File) setWriteDeadline(t time.Time) error {
-	return f.wrapErr("setDeadline", syscall.ENOTSUP)
+func (f *File) setWriteDeadline(t time.Time) (err error) {
+	err = syscall.ENOTSUP
+	if ff, ok := f.f.(interface {
+		SetWriteDeadline(t time.Time) error
+	}); ok {
+		err = ff.SetWriteDeadline(t)
+		if err == nil {
+			return nil
+		}
+	}
+	return f.wrapErr("setWriteDeadline", err)
 }
 
+// Close closes the File, rendering it unusable for I/O.
+// On files that support SetDeadline, any pending I/O operations will
+// be canceled and return immediately with an error.
+// Close will return an error if it has already been called.
 func (f *File) Close() error {
-	return f.wrapErr("close", syscall.ENOTSUP)
+	if f == nil {
+		return ErrInvalid
+	}
+	if err := f.f.Close(); err != nil {
+		return f.wrapErr("close", err)
+	}
+	return nil
 }
 
-func (f *File) Stat() (FileInfo, error) {
-	return nil, f.wrapErr("setDeadline", syscall.ENOTSUP)
-
+// Stat returns the FileInfo structure describing file.
+// If there is an error, it will be of type *PathError.
+func (f *File) Stat() (fi FileInfo, err error) {
+	err = syscall.ENOTSUP
+	if ff, ok := f.f.(interface {
+		Stat() (FileInfo, error)
+	}); ok {
+		fi, err = ff.Stat()
+		if err == nil {
+			return fi, nil
+		}
+	}
+	return nil, f.wrapErr("stat", err)
 }
 
 func epipecheck(file *File, e error) {}
@@ -85,27 +176,6 @@ func fixLongPath(path string) string {
 
 func syscallMode(i FileMode) uint32 {
 	return 0
-}
-
-func tempDir() string {
-	return "/tmp"
-}
-
-func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
-	return nil, &PathError{"open", name, syscall.ENOTSUP}
-}
-
-func rename(oldname, newname string) error {
-	return &PathError{"rename", oldname, syscall.ENOTSUP}
-}
-
-// See docs in file.go:Chmod.
-func chmod(name string, mode FileMode) error {
-	return &PathError{"chmod", name, syscall.ENOTSUP}
-}
-
-func Remove(name string) error {
-	return &PathError{"remove", name, syscall.ENOTSUP}
 }
 
 type rawConn struct{}
@@ -129,3 +199,13 @@ func newRawConn(file *File) (*rawConn, error) {
 func hostname() (name string, err error) {
 	return "", syscall.ENOTSUP
 }
+
+// provided by package embedded/rtos
+
+func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error)
+func chmod(name string, mode FileMode) error
+func rename(oldname, newname string) error
+
+// Remove removes the named file or (empty) directory.
+// If there is an error, it will be of type *PathError.
+func Remove(name string) error

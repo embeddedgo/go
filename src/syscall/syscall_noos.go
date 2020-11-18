@@ -29,6 +29,8 @@ const (
 	EISDIR       Errno = 9
 	ENOTDIR      Errno = 10
 	ENAMETOOLONG Errno = 11
+	EBUSY        Errno = 12
+	EMFILE       Errno = 13
 )
 
 var errors = [...]string{
@@ -43,10 +45,14 @@ var errors = [...]string{
 	EISDIR:       "is a directory",
 	ENOTDIR:      "not a directory",
 	ENAMETOOLONG: "file name too long",
+	EBUSY:        "device or resource busy",
+	EMFILE:       "too many open files",
 }
 
 func (e Errno) Is(target error) bool {
 	switch target {
+	case oserror.ErrInvalid:
+		return e == EINVAL
 	case oserror.ErrPermission:
 		return e == EACCES || e == EPERM
 	case oserror.ErrExist:
