@@ -28,27 +28,22 @@ func (f *testfile) Close() error {
 }
 
 type testfs struct {
-	name   string
-	closed bool
+	name string
 }
 
-func (fs *testfs) OpenWithClosed(name string, flag int, perm fs.FileMode, closed func()) (fs.File, error) {
+func (fs *testfs) OpenWithFinalizer(name string, flag int, perm fs.FileMode, closed func()) (fs.File, error) {
 	return &testfile{closed}, nil
 }
 
 func (fs *testfs) Type() string { return "testfs" }
 func (fs *testfs) Name() string { return fs.name }
-func (fs *testfs) Close() error {
-	if fs.closed {
-		return errors.New("closed before")
-	}
-	fs.closed = true
+func (fs *testfs) Sync() error {
 	return nil
 }
 
 type test struct {
 	prefix string
-	fs     *testfs
+	fs     FS
 }
 
 var (

@@ -10,7 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
-	_ "unsafe"
 )
 
 // An FS interface is the minimum implementation of a hierarchical file system
@@ -162,7 +161,6 @@ func findMountPoint(name string) (mp *MountPoint, unrooted string, err error) {
 	return
 }
 
-//go:linkname openFile os.openFile
 func openFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
 	mtab.lock.RLock()
 	defer mtab.lock.RUnlock()
@@ -177,7 +175,6 @@ func openFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
 	return mp.FS.OpenWithFinalizer(unrooted, flag, perm, mp.closed)
 }
 
-//go:linkname chmod os.chmod
 func chmod(name string, mode fs.FileMode) error {
 	mtab.lock.RLock()
 	defer mtab.lock.RUnlock()
@@ -208,7 +205,6 @@ func chmod(name string, mode fs.FileMode) error {
 	return syscall.ENOTSUP
 }
 
-//go:linkname rename os.rename
 func rename(oldname, newname string) error {
 	mtab.lock.RLock()
 	defer mtab.lock.RUnlock()
@@ -230,7 +226,6 @@ func rename(oldname, newname string) error {
 	return syscall.ENOTSUP
 }
 
-//go:linkname rename os.Remove
 func remove(name string) error {
 	mtab.lock.RLock()
 	defer mtab.lock.RUnlock()
