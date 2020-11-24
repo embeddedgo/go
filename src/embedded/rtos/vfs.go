@@ -32,20 +32,32 @@ type FS interface {
 
 	// Name returns the name (label) of a specific file system instance.
 	Name() string
-
-	// Sync synchronizes cached writes to persistent storage. It can be called
-	// at any time but it is specifically called by Unmount function after
-	// unmounting the file system from VFS.
-	Sync() error
 }
 
-// An UsageFS is a file system with a Usage method.
+// An UsageFS is a file system with an Usage method.
 type UsageFS interface {
 	FS
 
 	// Usage returns the filesystem usage statistics. All four values are
 	// subject to change while the file system is used.
 	Usage() (usedItems, maxItems int, usedBytes, maxBytes int64)
+}
+
+// A MkdirFS is a file system with a Mkdir method.
+type MkdirFS interface {
+	FS
+
+	Mkdir(name, perm fs.FileMode) error
+}
+
+// A SyncFS is a file system with a Sync method.
+type SyncFS interface {
+	FS
+
+	// Sync synchronizes cached writes to persistent storage. It can be called
+	// at any time but it is specifically called by Unmount function after
+	// unmounting the file system from VFS.
+	Sync() error
 }
 
 // A MountPoint represents a mounted file system.
@@ -125,8 +137,10 @@ func Unmount(prefix string, fsys FS) error {
 	if fsys == nil {
 		return nil
 	}
-	if err := fsys.Sync(); err != nil {
-		return &fs.PathError{Op: "unmount", Path: prefix, Err: err}
+	if syncfs, ok := fsys.(SyncFS); ok {
+		if err := syncfs.Sync(); err != nil {
+			return &fs.PathError{Op: "unmount", Path: prefix, Err: err}
+		}
 	}
 	return nil
 }
@@ -173,6 +187,10 @@ func openFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
 		return nil, err
 	}
 	return mp.FS.OpenWithFinalizer(unrooted, flag, perm, mp.closed)
+}
+
+func mkdir(name string, perm fs.FileMode) error {
+	return syscall.ENOTSUP
 }
 
 func chmod(name string, mode fs.FileMode) error {
