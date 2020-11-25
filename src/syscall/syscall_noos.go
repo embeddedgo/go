@@ -31,6 +31,7 @@ const (
 	ENAMETOOLONG Errno = 11
 	EBUSY        Errno = 12
 	EMFILE       Errno = 13
+	ENOSPC       Errno = 14
 )
 
 var errors = [...]string{
@@ -47,6 +48,7 @@ var errors = [...]string{
 	ENAMETOOLONG: "file name too long",
 	EBUSY:        "device or resource busy",
 	EMFILE:       "too many open files",
+	ENOSPC:       "no space left on device",
 }
 
 func (e Errno) Is(target error) bool {
