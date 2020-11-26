@@ -21,8 +21,7 @@ import (
 type FS interface {
 	// OpenWithFinalizer works like the os.OpenFile function but has an
 	// additional parameter. The returned fs.File implementation is obliged to
-	// call the closed function if the underlying file has been closed (the VFS
-	// uses this information to count open files).
+	// call the closed function if the underlying file has been closed.
 	OpenWithFinalizer(name string, flag int, perm fs.FileMode, closed func()) (fs.File, error)
 
 	// Type returns the file system type, e.g. fat32, ext4, nfs, ramfs. The type
@@ -39,7 +38,8 @@ type UsageFS interface {
 	FS
 
 	// Usage returns the filesystem usage statistics. All four values are
-	// subject to change while the file system is used.
+	// subject to change while the file system is used. Usage should return
+	// -1 for any unknown value.
 	Usage() (usedItems, maxItems int, usedBytes, maxBytes int64)
 }
 
