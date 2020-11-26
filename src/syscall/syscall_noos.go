@@ -18,24 +18,23 @@ var (
 type Errno uintptr
 
 const (
-	EAGAIN       Errno = 1
-	ENOTSUP      Errno = 2
-	EINVAL       Errno = 3
-	ENOENT       Errno = 4
-	EACCES       Errno = 5
-	EPERM        Errno = 6
-	EEXIST       Errno = 7
-	ENOTEMPTY    Errno = 8
-	EISDIR       Errno = 9
-	ENOTDIR      Errno = 10
-	ENAMETOOLONG Errno = 11
-	EBUSY        Errno = 12
-	EMFILE       Errno = 13
-	ENOSPC       Errno = 14
+	ENOTSUP Errno = iota
+	EINVAL
+	ENOENT
+	EACCES
+	EPERM
+	EEXIST
+	ENOTEMPTY
+	EISDIR
+	ENOTDIR
+	ENAMETOOLONG
+	EBUSY
+	EMFILE
+	ENOSPC
+	EBADF
 )
 
 var errors = [...]string{
-	EAGAIN:       "resource temporarily unavailable",
 	ENOTSUP:      "operation not supported",
 	EINVAL:       "invalid argument",
 	ENOENT:       "no such file or directory",
@@ -49,6 +48,7 @@ var errors = [...]string{
 	EBUSY:        "device or resource busy",
 	EMFILE:       "too many open files",
 	ENOSPC:       "no space left on device",
+	EBADF:        "bad file descriptor",
 }
 
 func (e Errno) Is(target error) bool {
