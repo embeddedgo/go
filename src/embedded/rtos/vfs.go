@@ -33,31 +33,35 @@ type FS interface {
 	Name() string
 }
 
-// An UsageFS is a file system with an Usage method.
-type UsageFS interface {
+// FullFeatureFS lists all file system methods recognized by VFS. The list of
+// methods may be extended in the future. Use it only for informative purposes
+// (e.g. to present the user an FF flag) and never expect/require the file
+// system to satisfy them all.
+type FullFeatureFS interface {
 	FS
+
+	Mkdir(name, perm fs.FileMode) error
+
+	Remove(name string) error
+
+	Rename(oldname, newname string) error
 
 	// Usage returns the filesystem usage statistics. All four values are
 	// subject to change while the file system is used. Usage should return
 	// -1 for any unknown value.
 	Usage() (usedItems, maxItems int, usedBytes, maxBytes int64)
-}
-
-// A MkdirFS is a file system with a Mkdir method.
-type MkdirFS interface {
-	FS
-
-	Mkdir(name, perm fs.FileMode) error
-}
-
-// A SyncFS is a file system with a Sync method.
-type SyncFS interface {
-	FS
 
 	// Sync synchronizes cached writes to persistent storage. It can be called
 	// at any time but it is specifically called by Unmount function after
 	// unmounting the file system from VFS.
 	Sync() error
+}
+
+// FullFeatureFile lists all file methods recognized by VFS.
+type FullFeatureFile interface {
+	fs.File
+
+	Write(p []byte) (int, error)
 }
 
 // A MountPoint represents a mounted file system.
