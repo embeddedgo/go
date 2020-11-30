@@ -165,9 +165,7 @@ func Getppid() int {
 	return 1
 }
 
-func Mkdir(path string, mode uint32) (err error) {
-	return ENOTSUP
-}
+func Mkdir(path string, mode uint32) (err error)
 
 func Chdir(path string) error {
 	return ENOTSUP

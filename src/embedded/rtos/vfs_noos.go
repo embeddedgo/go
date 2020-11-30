@@ -7,6 +7,8 @@ package rtos
 import _ "unsafe"
 
 //go:linkname openFile os.openFile
+
 //go:linkname chmod os.chmod
+//go:linkname mkdir syscall.Mkdir
 //go:linkname rename os.rename
-//go:linkname rename os.Remove
+//go:linkname remove os.Remove

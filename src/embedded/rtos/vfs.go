@@ -18,6 +18,19 @@ import (
 // Any FS implementation can also easily implement the fs.FS interface (and
 // vice versa) thanks to the use of the common fs.File interface to represent an
 // open file.
+//
+// The FS may implement the following optional methods recognized by VFS:
+//
+//	// Sync synchronizes cached writes to persistent storage. It can be called
+//	// at any time but it is specifically called by Unmount function after
+//	// unmounting the file system from VFS.
+//	Sync() error
+//
+//	Chmod(name string, mode fs.FileMode) error // see os.Chmod
+//	Mkdir(name, perm fs.FileMode) error        // see os.Mkdir
+//	Remove(name string) error                  // see os.Remove
+//	Rename(oldname, newname string) error      // see os.Rename
+//
 type FS interface {
 	// OpenWithFinalizer works like the os.OpenFile function but has an
 	// additional parameter. The returned fs.File implementation is obliged to
@@ -31,37 +44,11 @@ type FS interface {
 
 	// Name returns the name (label) of a specific file system instance.
 	Name() string
-}
-
-// FullFeatureFS lists all file system methods recognized by VFS. The list of
-// methods may be extended in the future. Use it only for informative purposes
-// (e.g. to present the user an FF flag) and never expect/require the file
-// system to satisfy them all.
-type FullFeatureFS interface {
-	FS
-
-	Mkdir(name, perm fs.FileMode) error
-
-	Remove(name string) error
-
-	Rename(oldname, newname string) error
 
 	// Usage returns the filesystem usage statistics. All four values are
 	// subject to change while the file system is used. Usage should return
 	// -1 for any unknown value.
 	Usage() (usedItems, maxItems int, usedBytes, maxBytes int64)
-
-	// Sync synchronizes cached writes to persistent storage. It can be called
-	// at any time but it is specifically called by Unmount function after
-	// unmounting the file system from VFS.
-	Sync() error
-}
-
-// FullFeatureFile lists all file methods recognized by VFS.
-type FullFeatureFile interface {
-	fs.File
-
-	Write(p []byte) (int, error)
 }
 
 // A MountPoint represents a mounted file system.
@@ -88,7 +75,7 @@ var mtab mountTable
 // slash-separated path and does not have to represent an existing directory
 // (in this respect it is similar to URL path). Mounted filesystem becomes
 // available to os package.
-func Mount(prefix string, fsys FS) error {
+func Mount(fsys FS, prefix string) error {
 	if prefix == "" || prefix[0] != '/' || fsys == nil {
 		return &fs.PathError{Op: "mount", Path: prefix, Err: syscall.EINVAL}
 	}
@@ -99,9 +86,9 @@ func Mount(prefix string, fsys FS) error {
 	return nil
 }
 
-// Unmount unmounts the last mounted filesystem that match prefix and/or fsys.
+// Unmount unmounts the last mounted filesystem that match fsys and prefix.
 // At least one parameter must be specified (not empty or nil).
-func Unmount(prefix string, fsys FS) error {
+func Unmount(fsys FS, prefix string) error {
 	if prefix == "" && fsys == nil {
 		return &fs.PathError{Op: "unmount", Path: prefix, Err: syscall.ENOENT}
 	}
@@ -141,7 +128,7 @@ func Unmount(prefix string, fsys FS) error {
 	if fsys == nil {
 		return nil
 	}
-	if syncfs, ok := fsys.(SyncFS); ok {
+	if syncfs, ok := fsys.(interface{ Sync() error }); ok {
 		if err := syncfs.Sync(); err != nil {
 			return &fs.PathError{Op: "unmount", Path: prefix, Err: err}
 		}
