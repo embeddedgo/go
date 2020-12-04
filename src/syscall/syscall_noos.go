@@ -32,6 +32,7 @@ const (
 	EMFILE
 	ENOSPC
 	EBADF
+	ECANCELED
 )
 
 var errors = [...]string{
@@ -49,6 +50,7 @@ var errors = [...]string{
 	EMFILE:       "too many open files",
 	ENOSPC:       "no space left on device",
 	EBADF:        "bad file descriptor",
+	ECANCELED:    "operation canceled",
 }
 
 func (e Errno) Is(target error) bool {
