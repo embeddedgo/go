@@ -37,7 +37,29 @@ func NewFile(fd uintptr, name string) *File {
 }
 
 func (f *File) readdir(n int) (fi []FileInfo, err error) {
-	return nil, f.wrapErr("readdir", syscall.ENOTSUP)
+	defer func() {
+		if err != nil {
+			err = f.wrapErr("readdir", err)
+		}
+	}()
+	ff, ok := f.f.(interface {
+		ReadDir(n int) ([]fs.DirEntry, error)
+	})
+	if !ok {
+		return nil, syscall.ENOTSUP
+	}
+	list, err := ff.ReadDir(n)
+	if err != nil {
+		return nil, err
+	}
+	fi = make([]FileInfo, len(list))
+	for i, de := range list {
+		fi[i], err = de.Info()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return fi, nil
 }
 
 func (f *File) checkValid(op string) error {
