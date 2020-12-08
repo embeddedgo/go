@@ -30,7 +30,7 @@ func Nanotime() int64 {
 	var downtick uint32
 	reloadcnt := systim.reloadcnt // non-atomic!
 	for {
-		downtick = uint32(st.CURRENT().Load())
+		downtick = uint32(st.CVR.LoadBits(systick.CURRENT))
 		reloadcnt1 := systim.reloadcnt // non-atomic!
 		if reloadcnt1 == reloadcnt {
 			break
@@ -38,7 +38,7 @@ func Nanotime() int64 {
 		reloadcnt = reloadcnt1
 	}
 	// the SysTick asserts an exception when the CURRENT changes from 1 to 0
-	periodtick := uint32(st.RELOAD().Load() + 1)
+	periodtick := uint32(st.RVR.LoadBits(systick.RELOAD) + 1)
 	tick := uint32(0)
 	if downtick != 0 {
 		tick = periodtick - downtick
@@ -60,12 +60,12 @@ func Setup(periodns, clkhz int64, external bool) {
 		return
 	}
 	// Set SysTick exception priority accortding to rtos package.
-	scb.SCB().PRI_SysTick().Store(255 - rtos.IntPrioSysTimer)
+	scb.SCB().SHPR3.StoreBits(scb.PRI_SysTick, 255-rtos.IntPrioSysTimer)
 	systim.periodns = periodns
 	systim.reloadcnt = 1 // ensure that nanotime never return zero
 	periodtick := uint32((periodns*clkhz + 5e8) / 1e9)
-	st.RELOAD().Store(systick.RVR(periodtick - 1))
-	st.CURRENT().Store(0)
+	st.RVR.StoreBits(systick.RELOAD, systick.RVR(periodtick-1))
+	st.CVR.StoreBits(systick.CURRENT, 0)
 
 	cfg := systick.ENABLE | systick.TICKINT
 	if !external {

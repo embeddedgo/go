@@ -13,11 +13,11 @@ type Periph struct {
 	ACTLR RACTLR
 }
 
+func SCID() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000E000))) }
+
 func (p *Periph) BaseAddr() uintptr {
 	return uintptr(unsafe.Pointer(p))
 }
-
-func SCID() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000E000))) }
 
 type MCR uint32
 
@@ -51,7 +51,7 @@ type RMICTR struct{ mmio.UM32 }
 func (rm RMICTR) Load() ICTR   { return ICTR(rm.UM32.Load()) }
 func (rm RMICTR) Store(b ICTR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) INTLINESNUM() RMICTR {
+func INTLINESNUM_(p *Periph) RMICTR {
 	return RMICTR{mmio.UM32{&p.ICTR.U32, uint32(INTLINESNUM)}}
 }
 
@@ -71,22 +71,22 @@ type RMACTLR struct{ mmio.UM32 }
 func (rm RMACTLR) Load() ACTLR   { return ACTLR(rm.UM32.Load()) }
 func (rm RMACTLR) Store(b ACTLR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) DISMCYCINT() RMACTLR {
+func DISMCYCINT_(p *Periph) RMACTLR {
 	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISMCYCINT)}}
 }
 
-func (p *Periph) DISDEFWBUF() RMACTLR {
+func DISDEFWBUF_(p *Periph) RMACTLR {
 	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISDEFWBUF)}}
 }
 
-func (p *Periph) DISFOLD() RMACTLR {
+func DISFOLD_(p *Periph) RMACTLR {
 	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISFOLD)}}
 }
 
-func (p *Periph) DISFPCA() RMACTLR {
+func DISFPCA_(p *Periph) RMACTLR {
 	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISFPCA)}}
 }
 
-func (p *Periph) DISOOFP() RMACTLR {
+func DISOOFP_(p *Periph) RMACTLR {
 	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISOOFP)}}
 }

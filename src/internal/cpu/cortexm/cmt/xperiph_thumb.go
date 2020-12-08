@@ -20,11 +20,11 @@ type Periph struct {
 	DCCISW   RDCCISW
 }
 
+func CMT() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000EF50))) }
+
 func (p *Periph) BaseAddr() uintptr {
 	return uintptr(unsafe.Pointer(p))
 }
-
-func CMT() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000EF50))) }
 
 type ICIALLU uint32
 

@@ -20,11 +20,11 @@ type ITM_Periph struct {
 	CID  [4]RCID
 }
 
+func ITM() *ITM_Periph { return (*ITM_Periph)(unsafe.Pointer(uintptr(0xE0000000))) }
+
 func (p *ITM_Periph) BaseAddr() uintptr {
 	return uintptr(unsafe.Pointer(p))
 }
-
-func ITM() *ITM_Periph { return (*ITM_Periph)(unsafe.Pointer(uintptr(0xE0000000))) }
 
 type STIM uint32
 
@@ -90,39 +90,39 @@ type RMTCR struct{ mmio.UM32 }
 func (rm RMTCR) Load() TCR   { return TCR(rm.UM32.Load()) }
 func (rm RMTCR) Store(b TCR) { rm.UM32.Store(uint32(b)) }
 
-func (p *ITM_Periph) ITMENA() RMTCR {
+func ITMENA_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(ITMENA)}}
 }
 
-func (p *ITM_Periph) TSENA() RMTCR {
+func TSENA_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TSENA)}}
 }
 
-func (p *ITM_Periph) SYNCENA() RMTCR {
+func SYNCENA_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(SYNCENA)}}
 }
 
-func (p *ITM_Periph) TXENA() RMTCR {
+func TXENA_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TXENA)}}
 }
 
-func (p *ITM_Periph) SWOENA() RMTCR {
+func SWOENA_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(SWOENA)}}
 }
 
-func (p *ITM_Periph) TSPrescale() RMTCR {
+func TSPrescale_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TSPrescale)}}
 }
 
-func (p *ITM_Periph) GTSFREQ() RMTCR {
+func GTSFREQ_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(GTSFREQ)}}
 }
 
-func (p *ITM_Periph) TraceBusID() RMTCR {
+func TraceBusID_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TraceBusID)}}
 }
 
-func (p *ITM_Periph) BUSY() RMTCR {
+func BUSY_(p *ITM_Periph) RMTCR {
 	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(BUSY)}}
 }
 

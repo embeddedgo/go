@@ -15,11 +15,11 @@ type Periph struct {
 	FPDSCR RFPDSCR
 }
 
+func FPU() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xe000ED88))) }
+
 func (p *Periph) BaseAddr() uintptr {
 	return uintptr(unsafe.Pointer(p))
 }
-
-func FPU() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xe000ED88))) }
 
 type CPACR uint32
 
@@ -37,11 +37,11 @@ type RMCPACR struct{ mmio.UM32 }
 func (rm RMCPACR) Load() CPACR   { return CPACR(rm.UM32.Load()) }
 func (rm RMCPACR) Store(b CPACR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) CP10() RMCPACR {
+func CP10_(p *Periph) RMCPACR {
 	return RMCPACR{mmio.UM32{&p.CPACR.U32, uint32(CP10)}}
 }
 
-func (p *Periph) CP11() RMCPACR {
+func CP11_(p *Periph) RMCPACR {
 	return RMCPACR{mmio.UM32{&p.CPACR.U32, uint32(CP11)}}
 }
 
@@ -61,39 +61,39 @@ type RMFPCCR struct{ mmio.UM32 }
 func (rm RMFPCCR) Load() FPCCR   { return FPCCR(rm.UM32.Load()) }
 func (rm RMFPCCR) Store(b FPCCR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) LSPACT() RMFPCCR {
+func LSPACT_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(LSPACT)}}
 }
 
-func (p *Periph) USER() RMFPCCR {
+func USER_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(USER)}}
 }
 
-func (p *Periph) THREAD() RMFPCCR {
+func THREAD_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(THREAD)}}
 }
 
-func (p *Periph) HFRDY() RMFPCCR {
+func HFRDY_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(HFRDY)}}
 }
 
-func (p *Periph) MMRDY() RMFPCCR {
+func MMRDY_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(MMRDY)}}
 }
 
-func (p *Periph) BFRDY() RMFPCCR {
+func BFRDY_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(BFRDY)}}
 }
 
-func (p *Periph) MONRDY() RMFPCCR {
+func MONRDY_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(MONRDY)}}
 }
 
-func (p *Periph) LSPEN() RMFPCCR {
+func LSPEN_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(LSPEN)}}
 }
 
-func (p *Periph) ASPEN() RMFPCCR {
+func ASPEN_(p *Periph) RMFPCCR {
 	return RMFPCCR{mmio.UM32{&p.FPCCR.U32, uint32(ASPEN)}}
 }
 
@@ -113,7 +113,7 @@ type RMFPCAR struct{ mmio.UM32 }
 func (rm RMFPCAR) Load() FPCAR   { return FPCAR(rm.UM32.Load()) }
 func (rm RMFPCAR) Store(b FPCAR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) ADDRESS() RMFPCAR {
+func ADDRESS_(p *Periph) RMFPCAR {
 	return RMFPCAR{mmio.UM32{&p.FPCAR.U32, uint32(ADDRESS)}}
 }
 
@@ -133,18 +133,18 @@ type RMFPDSCR struct{ mmio.UM32 }
 func (rm RMFPDSCR) Load() FPDSCR   { return FPDSCR(rm.UM32.Load()) }
 func (rm RMFPDSCR) Store(b FPDSCR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) RMode() RMFPDSCR {
+func RMode_(p *Periph) RMFPDSCR {
 	return RMFPDSCR{mmio.UM32{&p.FPDSCR.U32, uint32(RMode)}}
 }
 
-func (p *Periph) FZ() RMFPDSCR {
+func FZ_(p *Periph) RMFPDSCR {
 	return RMFPDSCR{mmio.UM32{&p.FPDSCR.U32, uint32(FZ)}}
 }
 
-func (p *Periph) DN() RMFPDSCR {
+func DN_(p *Periph) RMFPDSCR {
 	return RMFPDSCR{mmio.UM32{&p.FPDSCR.U32, uint32(DN)}}
 }
 
-func (p *Periph) AHP() RMFPDSCR {
+func AHP_(p *Periph) RMFPDSCR {
 	return RMFPDSCR{mmio.UM32{&p.FPDSCR.U32, uint32(AHP)}}
 }

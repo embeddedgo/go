@@ -25,11 +25,11 @@ type Periph struct {
 	STIR RSTIR
 }
 
+func NVIC() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000E100))) }
+
 func (p *Periph) BaseAddr() uintptr {
 	return uintptr(unsafe.Pointer(p))
 }
-
-func NVIC() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000E100))) }
 
 type ISER uint32
 

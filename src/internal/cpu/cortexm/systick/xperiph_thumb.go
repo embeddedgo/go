@@ -14,11 +14,11 @@ type Periph struct {
 	CALIB RCALIB
 }
 
+func SYSTICK() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000E010))) }
+
 func (p *Periph) BaseAddr() uintptr {
 	return uintptr(unsafe.Pointer(p))
 }
-
-func SYSTICK() *Periph { return (*Periph)(unsafe.Pointer(uintptr(0xE000E010))) }
 
 type CSR uint32
 
@@ -36,19 +36,19 @@ type RMCSR struct{ mmio.UM32 }
 func (rm RMCSR) Load() CSR   { return CSR(rm.UM32.Load()) }
 func (rm RMCSR) Store(b CSR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) ENABLE() RMCSR {
+func ENABLE_(p *Periph) RMCSR {
 	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(ENABLE)}}
 }
 
-func (p *Periph) TICKINT() RMCSR {
+func TICKINT_(p *Periph) RMCSR {
 	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(TICKINT)}}
 }
 
-func (p *Periph) CLKSOURCE() RMCSR {
+func CLKSOURCE_(p *Periph) RMCSR {
 	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(CLKSOURCE)}}
 }
 
-func (p *Periph) COUNTFLAG() RMCSR {
+func COUNTFLAG_(p *Periph) RMCSR {
 	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(COUNTFLAG)}}
 }
 
@@ -68,7 +68,7 @@ type RMRVR struct{ mmio.UM32 }
 func (rm RMRVR) Load() RVR   { return RVR(rm.UM32.Load()) }
 func (rm RMRVR) Store(b RVR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) RELOAD() RMRVR {
+func RELOAD_(p *Periph) RMRVR {
 	return RMRVR{mmio.UM32{&p.RVR.U32, uint32(RELOAD)}}
 }
 
@@ -88,7 +88,7 @@ type RMCVR struct{ mmio.UM32 }
 func (rm RMCVR) Load() CVR   { return CVR(rm.UM32.Load()) }
 func (rm RMCVR) Store(b CVR) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) CURRENT() RMCVR {
+func CURRENT_(p *Periph) RMCVR {
 	return RMCVR{mmio.UM32{&p.CVR.U32, uint32(CURRENT)}}
 }
 
@@ -108,14 +108,14 @@ type RMCALIB struct{ mmio.UM32 }
 func (rm RMCALIB) Load() CALIB   { return CALIB(rm.UM32.Load()) }
 func (rm RMCALIB) Store(b CALIB) { rm.UM32.Store(uint32(b)) }
 
-func (p *Periph) TENMS() RMCALIB {
+func TENMS_(p *Periph) RMCALIB {
 	return RMCALIB{mmio.UM32{&p.CALIB.U32, uint32(TENMS)}}
 }
 
-func (p *Periph) SKEW() RMCALIB {
+func SKEW_(p *Periph) RMCALIB {
 	return RMCALIB{mmio.UM32{&p.CALIB.U32, uint32(SKEW)}}
 }
 
-func (p *Periph) NOREF() RMCALIB {
+func NOREF_(p *Periph) RMCALIB {
 	return RMCALIB{mmio.UM32{&p.CALIB.U32, uint32(NOREF)}}
 }

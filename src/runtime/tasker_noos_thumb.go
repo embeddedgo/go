@@ -91,17 +91,17 @@ func taskerinit() {
 
 	// setup exception priority levels
 
-	sc := scb.SCB()
+	SCB := scb.SCB()
 
 	// enable fault handlers
-	sc.SHCSR.SetBits(scb.MEMFAULTENA | scb.BUSFAULTENA | scb.USGFAULTENA)
+	SCB.SHCSR.SetBits(scb.MEMFAULTENA | scb.BUSFAULTENA | scb.USGFAULTENA)
 
 	// division by zero will cause the UsageFault
-	sc.DIV_0_TRP().Set()
+	SCB.CCR.SetBits(scb.DIV_0_TRP)
 
 	// set PendSV and SVCall priorities according to description in rtos package
-	sc.PRI_SVCall().Store((4 << 5) << scb.PRI_SVCalln)
-	sc.PRI_PendSV().Store(255 << scb.PRI_PendSVn)
+	SCB.SHPR2.StoreBits(scb.PRI_SVCall, (4<<5)<<scb.PRI_SVCalln)
+	SCB.SHPR3.StoreBits(scb.PRI_PendSV, 255<<scb.PRI_PendSVn)
 
 	// All other exceptions/interrupts by default have the highest priority.
 
@@ -153,12 +153,11 @@ func taskerinit() {
 //go:nosplit
 func defaultWrite(fd int, p []byte) int {
 	ITM := itm.ITM()
-	itmena := ITM.ITMENA()
 	port := &ITM.STIM[fd]
 	portena := mmio.UM32{&ITM.TER[fd>>5].U32, 1 << (fd & 31)}
 	for i := 0; i < len(p); {
 		for port.LoadBit(0) == 0 {
-			if portena.Load() == 0 || itmena.Load() == 0 {
+			if portena.Load() == 0 || ITM.TCR.LoadBits(itm.ITMENA) == 0 {
 				return len(p) // do not block on disabled port/ITM
 			}
 		}
@@ -242,7 +241,7 @@ func setcpucontrol(ctrl uint32)
 
 //go:nosplit
 func irqNum() uint {
-	n := uint(scid.SCID().INTLINESNUM().Load()+1) * 32
+	n := uint(scid.SCID().ICTR.LoadBits(scid.INTLINESNUM)+1) * 32
 	if n > 496 {
 		n = 496
 	}
