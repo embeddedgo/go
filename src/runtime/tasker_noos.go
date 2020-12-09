@@ -293,8 +293,6 @@ func curcpuRunScheduler() {
 	}
 }
 
-var dot = []byte{'.'}
-
 //go:nowritebarrierrec
 //go:nosplit
 func rtos_notewakeup(n *notel) {
