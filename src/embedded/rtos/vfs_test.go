@@ -35,11 +35,9 @@ func (fs *testfs) OpenWithFinalizer(name string, flag int, perm fs.FileMode, clo
 	return &testfile{closed}, nil
 }
 
-func (fs *testfs) Type() string { return "testfs" }
-func (fs *testfs) Name() string { return fs.name }
-func (fs *testfs) Sync() error {
-	return nil
-}
+func (fs *testfs) Type() string                    { return "testfs" }
+func (fs *testfs) Name() string                    { return fs.name }
+func (fs *testfs) Usage() (int, int, int64, int64) { return -1, -1, -1, -1 }
 
 type test struct {
 	prefix string
@@ -81,25 +79,25 @@ func checkMounts(t *testing.T) {
 func TestMountOpen(t *testing.T) {
 	// mount
 	for _, test := range tests {
-		if err := Mount(test.prefix, test.fs); err != nil {
+		if err := Mount(test.fs, test.prefix); err != nil {
 			t.Fatal(err)
 		}
 	}
 	checkMounts(t)
-	if err := Unmount("/", nil); !errors.Is(err, fs.ErrNotExist) {
+	if err := Unmount(nil, "/"); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("expected fs.ErrNotExist, got:", err)
 	}
 
 	// unmount
-	if err := Unmount("//fs2/prefix2", nil); err != nil {
+	if err := Unmount(nil, "//fs2/prefix2"); err != nil {
 		t.Fatal(err)
 	}
 	tests[3].fs = nil
 	checkMounts(t)
-	if err := Unmount("/common/prefix/", fs1); err != nil {
+	if err := Unmount(nil, "/common/prefix/"); err != nil {
 		t.Fatal(err)
 	}
-	tests[4].fs = nil
+	tests[5].fs = nil
 	checkMounts(t)
 
 	// open
