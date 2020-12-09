@@ -103,33 +103,38 @@ func Unmount(fsys FS, prefix string) error {
 			break
 		}
 	}
+	var err error
 	if remove < 0 {
-		mtab.lock.Unlock()
-		return &fs.PathError{Op: "unmount", Path: prefix, Err: syscall.ENOENT}
+		err = syscall.ENOENT
+		goto skip
 	}
 	if atomic.LoadInt32(&mtab.mounts[remove].OpenCount) != 0 {
-		mtab.lock.Unlock()
-		return &fs.PathError{Op: "unmount", Path: prefix, Err: syscall.EBUSY}
+		err = syscall.EBUSY
+		goto skip
 	}
 	copy(mtab.mounts[remove:], mtab.mounts[remove+1:])
 	mtab.mounts = mtab.mounts[:len(mtab.mounts)-1]
+skip:
 	mtab.lock.Unlock()
+	if err != nil {
+		return &fs.PathError{Op: "unmount", Path: prefix, Err: err}
+	}
 
 	// close the fsys if it has no another mount point
 
 	mtab.lock.RLock()
-	defer mtab.lock.RUnlock()
 	for _, mp := range mtab.mounts {
 		if mp.FS == fsys {
 			fsys = nil // fsys is still mounted with another prefix
 			break
 		}
 	}
+	mtab.lock.RUnlock()
 	if fsys == nil {
 		return nil
 	}
-	if syncfs, ok := fsys.(interface{ Sync() error }); ok {
-		if err := syncfs.Sync(); err != nil {
+	if fsys, ok := fsys.(interface{ Sync() error }); ok {
+		if err = fsys.Sync(); err != nil {
 			return &fs.PathError{Op: "unmount", Path: prefix, Err: err}
 		}
 	}
@@ -139,11 +144,12 @@ func Unmount(fsys FS, prefix string) error {
 // Mounts returns the current list of mount points.
 func Mounts() []*MountPoint {
 	mtab.lock.RLock()
-	defer mtab.lock.RUnlock()
-	return append([]*MountPoint{}, mtab.mounts...)
+	list := append([]*MountPoint{}, mtab.mounts...)
+	mtab.lock.RUnlock()
+	return list
 }
 
-func findMountPoint(name string) (mp *MountPoint, unrooted string, err error) {
+func findMountPoint(name string) (mp *MountPoint, fsys FS, unrooted string, err error) {
 	name = path.Clean(name)
 	for i := len(mtab.mounts) - 1; i >= 0; i-- {
 		mp = mtab.mounts[i]
@@ -161,23 +167,25 @@ func findMountPoint(name string) (mp *MountPoint, unrooted string, err error) {
 		}
 	}
 	if unrooted == "" {
-		return nil, "", syscall.ENOENT
+		return nil, nil, "", syscall.ENOENT
 	}
-	return
+	return mp, mp.FS, unrooted, nil
 }
 
-func openFile(name string, flag int, perm fs.FileMode) (fs.File, error) {
+func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
 	mtab.lock.RLock()
-	defer mtab.lock.RUnlock()
-	mp, unrooted, err := findMountPoint(name)
+	mp, fsys, unrooted, err := findMountPoint(name)
+	if err == nil {
+		if atomic.AddInt32(&mp.OpenCount, 1) < 0 {
+			atomic.AddInt32(&mp.OpenCount, -1)
+			err = syscall.EMFILE
+		}
+	}
+	mtab.lock.RUnlock()
 	if err != nil {
-		return nil, err
+		return
 	}
-	if atomic.AddInt32(&mp.OpenCount, 1) < 0 {
-		atomic.AddInt32(&mp.OpenCount, -1)
-		return nil, err
-	}
-	return mp.FS.OpenWithFinalizer(unrooted, flag, perm, mp.closed)
+	return fsys.OpenWithFinalizer(unrooted, flag, perm, mp.closed)
 }
 
 func mkdir(name string, perm fs.FileMode) error {
@@ -186,63 +194,64 @@ func mkdir(name string, perm fs.FileMode) error {
 
 func chmod(name string, mode fs.FileMode) error {
 	mtab.lock.RLock()
-	defer mtab.lock.RUnlock()
-	mp, unrooted, err := findMountPoint(name)
+	_, fsys, unrooted, err := findMountPoint(name)
+	mtab.lock.RUnlock()
 	if err != nil {
 		return err
 	}
-	if fsys, ok := mp.FS.(interface {
+	if fsys, ok := fsys.(interface {
 		Chmod(name string, mode fs.FileMode) error
 	}); ok {
-		if err := fsys.Chmod(unrooted, mode); err != nil {
-			return err
-		}
+		return fsys.Chmod(unrooted, mode)
 	}
 	// try to use File.Chmod
-	f, err := mp.FS.OpenWithFinalizer(unrooted, syscall.O_RDONLY, 0, nil)
+	f, err := fsys.OpenWithFinalizer(unrooted, syscall.O_RDONLY, 0, nil)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	if ff, ok := f.(interface {
+	if f, ok := f.(interface {
 		Chmod(mode fs.FileMode) error
 	}); ok {
-		if err := ff.Chmod(mode); err != nil {
-			return err
-		}
+		err = f.Chmod(mode)
+	} else {
+		err = syscall.ENOTSUP
 	}
-	return syscall.ENOTSUP
+	cerr := f.Close()
+	if err != nil {
+		return err
+	}
+	return cerr
 }
 
 func rename(oldname, newname string) error {
 	mtab.lock.RLock()
-	defer mtab.lock.RUnlock()
-	mp, unrooted, err := findMountPoint(oldname)
-	if err != nil {
-		return err
+	_, oldfs, oldunrooted, olderr := findMountPoint(oldname)
+	_, newfs, newunrooted, newerr := findMountPoint(newname)
+	mtab.lock.RUnlock()
+	if olderr != nil {
+		return olderr
 	}
-	newmp, newunrooted, err := findMountPoint(newname)
-	if err != nil {
-		return err
+	if newerr != nil {
+		return newerr
 	}
-	if mp == newmp {
-		if fsys, ok := mp.FS.(interface {
+	if oldfs == newfs {
+		if fsys, ok := oldfs.(interface {
 			Rename(oldname, newname string) error
 		}); ok {
-			return fsys.Rename(unrooted, newunrooted)
+			return fsys.Rename(oldunrooted, newunrooted)
 		}
 	}
 	return syscall.ENOTSUP
 }
 
-func remove(name string) error {
+func remove(name string) (err error) {
 	mtab.lock.RLock()
-	defer mtab.lock.RUnlock()
-	mp, unrooted, err := findMountPoint(name)
+	_, fsys, unrooted, err := findMountPoint(name)
+	mtab.lock.RUnlock()
 	if err != nil {
 		return err
 	}
-	if fsys, ok := mp.FS.(interface {
+	if fsys, ok := fsys.(interface {
 		Remove(name string) error
 	}); ok {
 		return fsys.Remove(unrooted)
