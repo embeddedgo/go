@@ -65,7 +65,7 @@ func (mp *MountPoint) closed() {
 }
 
 type mountTable struct {
-	lock   sync.RWMutex
+	mu     sync.RWMutex
 	mounts []*MountPoint //  TODO: linked list?
 }
 
@@ -80,9 +80,9 @@ func Mount(fsys FS, prefix string) error {
 		return &fs.PathError{Op: "mount", Path: prefix, Err: syscall.EINVAL}
 	}
 	prefix = path.Clean(prefix)
-	mtab.lock.Lock()
+	mtab.mu.Lock()
 	mtab.mounts = append(mtab.mounts, &MountPoint{prefix, fsys, 0})
-	mtab.lock.Unlock()
+	mtab.mu.Unlock()
 	return nil
 }
 
@@ -93,7 +93,7 @@ func Unmount(fsys FS, prefix string) error {
 		return &fs.PathError{Op: "unmount", Path: prefix, Err: syscall.ENOENT}
 	}
 	prefix = path.Clean(prefix)
-	mtab.lock.Lock()
+	mtab.mu.Lock()
 	remove := -1
 	for i := len(mtab.mounts) - 1; i >= 0; i-- {
 		mp := mtab.mounts[i]
@@ -115,21 +115,21 @@ func Unmount(fsys FS, prefix string) error {
 	copy(mtab.mounts[remove:], mtab.mounts[remove+1:])
 	mtab.mounts = mtab.mounts[:len(mtab.mounts)-1]
 skip:
-	mtab.lock.Unlock()
+	mtab.mu.Unlock()
 	if err != nil {
 		return &fs.PathError{Op: "unmount", Path: prefix, Err: err}
 	}
 
 	// close the fsys if it has no another mount point
 
-	mtab.lock.RLock()
+	mtab.mu.RLock()
 	for _, mp := range mtab.mounts {
 		if mp.FS == fsys {
 			fsys = nil // fsys is still mounted with another prefix
 			break
 		}
 	}
-	mtab.lock.RUnlock()
+	mtab.mu.RUnlock()
 	if fsys == nil {
 		return nil
 	}
@@ -143,9 +143,9 @@ skip:
 
 // Mounts returns the current list of mount points.
 func Mounts() []*MountPoint {
-	mtab.lock.RLock()
+	mtab.mu.RLock()
 	list := append([]*MountPoint{}, mtab.mounts...)
-	mtab.lock.RUnlock()
+	mtab.mu.RUnlock()
 	return list
 }
 
@@ -173,7 +173,7 @@ func findMountPoint(name string) (mp *MountPoint, fsys FS, unrooted string, err 
 }
 
 func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
-	mtab.lock.RLock()
+	mtab.mu.RLock()
 	mp, fsys, unrooted, err := findMountPoint(name)
 	if err == nil {
 		if atomic.AddInt32(&mp.OpenCount, 1) < 0 {
@@ -181,7 +181,7 @@ func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
 			err = syscall.EMFILE
 		}
 	}
-	mtab.lock.RUnlock()
+	mtab.mu.RUnlock()
 	if err != nil {
 		return
 	}
@@ -193,9 +193,9 @@ func mkdir(name string, perm fs.FileMode) error {
 }
 
 func chmod(name string, mode fs.FileMode) error {
-	mtab.lock.RLock()
+	mtab.mu.RLock()
 	_, fsys, unrooted, err := findMountPoint(name)
-	mtab.lock.RUnlock()
+	mtab.mu.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -224,10 +224,10 @@ func chmod(name string, mode fs.FileMode) error {
 }
 
 func rename(oldname, newname string) error {
-	mtab.lock.RLock()
+	mtab.mu.RLock()
 	_, oldfs, oldunrooted, olderr := findMountPoint(oldname)
 	_, newfs, newunrooted, newerr := findMountPoint(newname)
-	mtab.lock.RUnlock()
+	mtab.mu.RUnlock()
 	if olderr != nil {
 		return olderr
 	}
@@ -245,9 +245,9 @@ func rename(oldname, newname string) error {
 }
 
 func remove(name string) (err error) {
-	mtab.lock.RLock()
+	mtab.mu.RLock()
 	_, fsys, unrooted, err := findMountPoint(name)
-	mtab.lock.RUnlock()
+	mtab.mu.RUnlock()
 	if err != nil {
 		return err
 	}
