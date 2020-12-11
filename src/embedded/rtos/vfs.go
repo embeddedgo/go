@@ -7,9 +7,11 @@ package rtos
 import (
 	"io/fs"
 	"path"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 // An FS interface is the minimum implementation of a hierarchical file system
@@ -149,43 +151,36 @@ func Mounts() []*MountPoint {
 	return list
 }
 
-func findMountPoint(name string) (mp *MountPoint, fsys FS, unrooted string, err error) {
+func findMountPoint(name string) (mp *MountPoint, fsys FS, unrooted string) {
 	name = path.Clean(name)
+	nlen := len(name)
+	vdir := name == "/"
 	for i := len(mtab.mounts) - 1; i >= 0; i-- {
 		mp = mtab.mounts[i]
 		plen := len(mp.Prefix)
-		if len(name) < plen || name[:plen] != mp.Prefix {
+		if nlen < plen {
+			if mp.Prefix[nlen] == '/' && mp.Prefix[:nlen] == name {
+				vdir = true
+			}
 			continue
 		}
-		if len(name) == plen {
+		if plen != nlen && name[plen] != '/' {
+			continue
+		}
+		if name[:plen] != mp.Prefix {
+			continue
+		}
+		if plen == nlen {
 			unrooted = "."
-			break
-		}
-		if name[plen] == '/' {
+		} else {
 			unrooted = name[plen+1:]
-			break
 		}
+		return mp, mp.FS, unrooted
 	}
-	if unrooted == "" {
-		return nil, nil, "", syscall.ENOENT
+	if vdir {
+		unrooted = name
 	}
-	return mp, mp.FS, unrooted, nil
-}
-
-func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
-	mtab.mu.RLock()
-	mp, fsys, unrooted, err := findMountPoint(name)
-	if err == nil {
-		if atomic.AddInt32(&mp.OpenCount, 1) < 0 {
-			atomic.AddInt32(&mp.OpenCount, -1)
-			err = syscall.EMFILE
-		}
-	}
-	mtab.mu.RUnlock()
-	if err != nil {
-		return
-	}
-	return fsys.OpenWithFinalizer(unrooted, flag, perm, mp.closed)
+	return nil, nil, unrooted
 }
 
 func mkdir(name string, perm fs.FileMode) error {
@@ -194,10 +189,10 @@ func mkdir(name string, perm fs.FileMode) error {
 
 func chmod(name string, mode fs.FileMode) error {
 	mtab.mu.RLock()
-	_, fsys, unrooted, err := findMountPoint(name)
+	_, fsys, unrooted := findMountPoint(name)
 	mtab.mu.RUnlock()
-	if err != nil {
-		return err
+	if fsys == nil {
+		return syscall.ENOENT
 	}
 	if fsys, ok := fsys.(interface {
 		Chmod(name string, mode fs.FileMode) error
@@ -225,14 +220,11 @@ func chmod(name string, mode fs.FileMode) error {
 
 func rename(oldname, newname string) error {
 	mtab.mu.RLock()
-	_, oldfs, oldunrooted, olderr := findMountPoint(oldname)
-	_, newfs, newunrooted, newerr := findMountPoint(newname)
+	_, oldfs, oldunrooted := findMountPoint(oldname)
+	_, newfs, newunrooted := findMountPoint(newname)
 	mtab.mu.RUnlock()
-	if olderr != nil {
-		return olderr
-	}
-	if newerr != nil {
-		return newerr
+	if oldfs == nil || newfs == nil {
+		return syscall.ENOENT
 	}
 	if oldfs == newfs {
 		if fsys, ok := oldfs.(interface {
@@ -246,10 +238,10 @@ func rename(oldname, newname string) error {
 
 func remove(name string) (err error) {
 	mtab.mu.RLock()
-	_, fsys, unrooted, err := findMountPoint(name)
+	_, fsys, unrooted := findMountPoint(name)
 	mtab.mu.RUnlock()
-	if err != nil {
-		return err
+	if fsys == nil {
+		return syscall.ENOENT
 	}
 	if fsys, ok := fsys.(interface {
 		Remove(name string) error
@@ -258,3 +250,62 @@ func remove(name string) (err error) {
 	}
 	return syscall.ENOTSUP
 }
+
+func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
+	mtab.mu.RLock()
+	mp, fsys, unrooted := findMountPoint(name)
+	if mp != nil {
+		if atomic.AddInt32(&mp.OpenCount, 1) < 0 {
+			atomic.AddInt32(&mp.OpenCount, -1)
+			err = syscall.EMFILE
+		}
+	}
+	mtab.mu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
+	if mp != nil {
+		return fsys.OpenWithFinalizer(unrooted, flag, perm, mp.closed)
+	}
+	if unrooted != "" {
+		// unrooted contains cleaned name
+		return &vdir{unrooted}, nil
+	}
+	return nil, syscall.ENOENT
+}
+
+type vdir struct {
+	name string
+}
+
+func (d *vdir) Read(p []byte) (int, error) { return 0, syscall.EISDIR }
+func (d *vdir) Stat() (fs.FileInfo, error) { return d, nil }
+func (d *vdir) Close() error               { return nil }
+
+func (d *vdir) ReadDir(n int) (dl []fs.DirEntry, err error) {
+	nlen := len(d.name)
+	mtab.mu.RLock()
+	for _, mp := range mtab.mounts {
+		prefix := mp.Prefix
+		plen := len(prefix)
+		if plen <= nlen || prefix[nlen] != '/' || d.name != prefix[:nlen] {
+			continue
+		}
+		i := strings.IndexByte(prefix[nlen+1:], '/') // prefix is clean so > 0
+		dl = append(dl, &vdir{prefix[:nlen+1+i]})
+	}
+	mtab.mu.RUnlock()
+	return
+}
+
+// To implement fs.FileInfo interface
+func (d *vdir) Name() string       { return d.name }
+func (d *vdir) Size() int64        { return 0 }
+func (d *vdir) IsDir() bool        { return true }
+func (d *vdir) Sys() interface{}   { return nil }
+func (d *vdir) ModTime() time.Time { return time.Time{} }
+func (d *vdir) Mode() fs.FileMode  { return fs.ModeDir & 0555 }
+
+// Additional methods to implement fs.DirEntry interface
+func (d *vdir) Type() fs.FileMode          { return fs.ModeDir & 0555 }
+func (d *vdir) Info() (fs.FileInfo, error) { return d, nil } // BUG: real FS
