@@ -52,6 +52,15 @@ func makepclnState(ctxt *Link) pclnState {
 }
 
 func (state *pclnState) ftabaddstring(ftab *loader.SymbolBuilder, s string) int32 {
+	if *stripFuncNames > 0 {
+		if *stripFuncNames == 1 {
+			if i := strings.LastIndexByte(s, '/'); i >= 0 {
+				s = s[i+1:]
+			}
+		} else {
+			s = ""
+		}
+	}
 	start := len(ftab.Data())
 	ftab.Grow(int64(start + len(s) + 1)) // make room for s plus trailing NUL
 	ftd := ftab.Data()

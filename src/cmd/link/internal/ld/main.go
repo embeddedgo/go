@@ -104,6 +104,7 @@ var (
 	benchmarkFileFlag = flag.String("benchmarkprofile", "", "emit phase profiles to `base`_phase.{cpu,mem}prof")
 
 	flagGo115Newobj = flag.Bool("go115newobj", true, "use new object file format")
+	stripFuncNames = flag.Int("stripfn", 0, "strip function names in pclntab, 1: remove package path, 2: blank names")
 )
 
 type MemBlock struct {
