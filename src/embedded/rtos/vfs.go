@@ -268,14 +268,18 @@ func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
 		return fsys.OpenWithFinalizer(unrooted, flag, perm, mp.closed)
 	}
 	if unrooted != "" {
-		// unrooted contains cleaned name
-		return &vdir{unrooted}, nil
+		if unrooted == "/" {
+			unrooted = ""
+		}
+		return &vdir{unrooted, &vfi_}, nil
 	}
 	return nil, syscall.ENOENT
 }
 
+// vdir represents virtual directory at the level of mount-point prefix
 type vdir struct {
 	name string
+	fs.FileInfo
 }
 
 func (d *vdir) Read(p []byte) (int, error) { return 0, syscall.EISDIR }
@@ -291,21 +295,44 @@ func (d *vdir) ReadDir(n int) (dl []fs.DirEntry, err error) {
 		if plen <= nlen || prefix[nlen] != '/' || d.name != prefix[:nlen] {
 			continue
 		}
-		i := strings.IndexByte(prefix[nlen+1:], '/') // prefix is clean so > 0
-		dl = append(dl, &vdir{prefix[:nlen+1+i]})
+		d := &vdir{name: prefix[nlen+1:]}
+		if i := strings.IndexByte(d.name, '/'); i >= 0 {
+			d.name = d.name[:i]
+			d.FileInfo = &vfi_
+		} else {
+			f, err := openFile(prefix, syscall.O_RDONLY, 0)
+			if err != nil {
+				return nil, err
+			}
+			d.FileInfo, err = f.Stat()
+			if err != nil {
+				return nil, err
+			}
+			f.Close()
+		}
+		dl = append(dl, d)
 	}
 	mtab.mu.RUnlock()
 	return
 }
 
-// To implement fs.FileInfo interface
-func (d *vdir) Name() string       { return d.name }
-func (d *vdir) Size() int64        { return 0 }
-func (d *vdir) IsDir() bool        { return true }
-func (d *vdir) Sys() interface{}   { return nil }
-func (d *vdir) ModTime() time.Time { return time.Time{} }
-func (d *vdir) Mode() fs.FileMode  { return fs.ModeDir & 0555 }
+// overwrite d.FileInfo Name method
+func (d *vdir) Name() string {
+	i := strings.LastIndexByte(d.name, '/')
+	return d.name[i+1:]
+}
 
 // Additional methods to implement fs.DirEntry interface
-func (d *vdir) Type() fs.FileMode          { return fs.ModeDir & 0555 }
-func (d *vdir) Info() (fs.FileInfo, error) { return d, nil } // BUG: real FS
+func (d *vdir) Type() fs.FileMode          { return d.Mode() }
+func (d *vdir) Info() (fs.FileInfo, error) { return d, nil }
+
+var vfi_ vfi
+
+type vfi struct{}
+
+func (_ *vfi) Name() string       { return "" }
+func (_ *vfi) Size() int64        { return 0 }
+func (_ *vfi) IsDir() bool        { return true }
+func (_ *vfi) Sys() interface{}   { return nil }
+func (_ *vfi) ModTime() time.Time { return time.Time{} }
+func (_ *vfi) Mode() fs.FileMode  { return fs.ModeDir | 0555 }
