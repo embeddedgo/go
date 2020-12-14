@@ -207,7 +207,7 @@ func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
 			continue
 		}
 
-		return nil, &PathError{"open", name, e}
+		return nil, &PathError{Op: "open", Path: name, Err: e}
 	}
 
 	// open(2) itself won't handle the sticky bit on *BSD and Solaris
@@ -236,7 +236,7 @@ func (file *file) close() error {
 		if e == poll.ErrFileClosing {
 			e = ErrClosed
 		}
-		err = &PathError{"close", file.name, e}
+		err = &PathError{Op: "close", Path: file.name, Err: e}
 	}
 
 	// no need for a finalizer anymore
@@ -265,7 +265,7 @@ func (f *File) seek(offset int64, whence int) (ret int64, err error) {
 // If there is an error, it will be of type *PathError.
 func Truncate(name string, size int64) error {
 	if e := syscall.Truncate(name, size); e != nil {
-		return &PathError{"truncate", name, e}
+		return &PathError{Op: "truncate", Path: name, Err: e}
 	}
 	return nil
 }
@@ -298,7 +298,7 @@ func Remove(name string) error {
 	if e1 != syscall.ENOTDIR {
 		e = e1
 	}
-	return &PathError{"remove", name, e}
+	return &PathError{Op: "remove", Path: name, Err: e}
 }
 
 func tempDir() string {
@@ -371,7 +371,7 @@ func Readlink(name string) (string, error) {
 			continue
 		}
 		if e != nil {
-			return "", &PathError{"readlink", name, e}
+			return "", &PathError{Op: "readlink", Path: name, Err: e}
 		}
 		if n < len {
 			return string(b[0:n]), nil

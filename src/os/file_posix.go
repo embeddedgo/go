@@ -77,7 +77,7 @@ func syscallMode(i FileMode) (o uint32) {
 // See docs in file.go:Chmod.
 func chmod(name string, mode FileMode) error {
 	if e := syscall.Chmod(fixLongPath(name), syscallMode(mode)); e != nil {
-		return &PathError{"chmod", name, e}
+		return &PathError{Op: "chmod", Path: name, Err: e}
 	}
 	return nil
 }
@@ -102,7 +102,7 @@ func (f *File) chmod(mode FileMode) error {
 // EPLAN9 error, wrapped in *PathError.
 func Chown(name string, uid, gid int) error {
 	if e := syscall.Chown(name, uid, gid); e != nil {
-		return &PathError{"chown", name, e}
+		return &PathError{Op: "chown", Path: name, Err: e}
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func Chown(name string, uid, gid int) error {
 // in *PathError.
 func Lchown(name string, uid, gid int) error {
 	if e := syscall.Lchown(name, uid, gid); e != nil {
-		return &PathError{"lchown", name, e}
+		return &PathError{Op: "lchown", Path: name, Err: e}
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ func Chtimes(name string, atime time.Time, mtime time.Time) error {
 	utimes[0] = syscall.NsecToTimespec(atime.UnixNano())
 	utimes[1] = syscall.NsecToTimespec(mtime.UnixNano())
 	if e := syscall.UtimesNano(fixLongPath(name), utimes[0:]); e != nil {
-		return &PathError{"chtimes", name, e}
+		return &PathError{Op: "chtimes", Path: name, Err: e}
 	}
 	return nil
 }
