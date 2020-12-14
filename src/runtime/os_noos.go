@@ -40,7 +40,7 @@ func msigrestore(sigmask sigset)     {}
 func initsig(preinit bool)           {}
 func setProcessCPUProfiler(hz int32) {}
 func mpreinit(mp *m)                 {}
-func msigsave(mp *m)                 {}
+func sigsave(p *sigset)              {}
 func goenvs()                        {}
 func minit()                         {}
 func preemptM(mp *m)                 {}
