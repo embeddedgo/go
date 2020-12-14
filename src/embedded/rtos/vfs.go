@@ -5,9 +5,9 @@
 package rtos
 
 import (
+	"internal/bytealg"
 	"io/fs"
 	"path"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -319,7 +319,7 @@ func (d *vdir) ReadDir(n int) (dl []fs.DirEntry, err error) {
 			continue
 		}
 		d := &vdir{name: prefix[nlen+1:]}
-		if i := strings.IndexByte(d.name, '/'); i >= 0 {
+		if i := bytealg.IndexByteString(d.name, '/'); i >= 0 {
 			d.name = d.name[:i]
 			d.FileInfo = &vfi_
 		} else {
@@ -342,10 +342,7 @@ func (d *vdir) ReadDir(n int) (dl []fs.DirEntry, err error) {
 // Additional methods to implement fs.DirEntry interface
 
 // overwrite d.FileInfo Name method
-func (d *vdir) Name() string {
-	i := strings.LastIndexByte(d.name, '/')
-	return d.name[i+1:]
-}
+func (d *vdir) Name() string               { return d.name }
 func (d *vdir) Type() fs.FileMode          { return d.Mode() }
 func (d *vdir) Info() (fs.FileInfo, error) { return d, nil }
 
