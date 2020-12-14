@@ -54,8 +54,11 @@ func makepclnState(ctxt *Link) pclnState {
 func (state *pclnState) ftabaddstring(ftab *loader.SymbolBuilder, s string) int32 {
 	if *stripFuncNames > 0 {
 		if *stripFuncNames == 1 {
-			if i := strings.LastIndexByte(s, '/'); i >= 0 {
-				s = s[i+1:]
+			for i := len(s) - 1; i >= 0; i-- {
+				if s[i] == '/' {
+					s = s[i+1:]
+					break
+				}
 			}
 		} else {
 			s = ""
