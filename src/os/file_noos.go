@@ -197,7 +197,7 @@ func fixLongPath(path string) string {
 }
 
 func syscallMode(i FileMode) uint32 {
-	return 0
+	return uint32(i.Perm())
 }
 
 type rawConn struct{}

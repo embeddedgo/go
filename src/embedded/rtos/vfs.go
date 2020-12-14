@@ -183,10 +183,6 @@ func findMountPoint(name string) (mp *MountPoint, fsys FS, unrooted string) {
 	return nil, nil, unrooted
 }
 
-func mkdir(name string, perm fs.FileMode) error {
-	return syscall.ENOTSUP
-}
-
 func chmod(name string, mode fs.FileMode) error {
 	mtab.mu.RLock()
 	_, fsys, unrooted := findMountPoint(name)
@@ -236,19 +232,46 @@ func rename(oldname, newname string) error {
 	return syscall.ENOTSUP
 }
 
+func mkdir(name string, perm fs.FileMode) (err error) {
+	mtab.mu.RLock()
+	_, fsys, unrooted := findMountPoint(name)
+	mtab.mu.RUnlock()
+	if fsys == nil {
+		err = syscall.ENOENT
+		goto error
+	}
+	if fsys, ok := fsys.(interface {
+		Mkdir(name string, perm fs.FileMode) error
+	}); ok {
+		if err = fsys.Mkdir(unrooted, perm); err != nil {
+			goto error
+		}
+		return nil
+	}
+	err = syscall.ENOTSUP
+error:
+	return &fs.PathError{Op: "mkdir", Path: name, Err: err}
+}
+
 func remove(name string) (err error) {
 	mtab.mu.RLock()
 	_, fsys, unrooted := findMountPoint(name)
 	mtab.mu.RUnlock()
 	if fsys == nil {
-		return syscall.ENOENT
+		err = syscall.ENOENT
+		goto error
 	}
 	if fsys, ok := fsys.(interface {
 		Remove(name string) error
 	}); ok {
-		return fsys.Remove(unrooted)
+		if err = fsys.Remove(unrooted); err != nil {
+			goto error
+		}
+		return nil
 	}
-	return syscall.ENOTSUP
+	err = syscall.ENOTSUP
+error:
+	return &fs.PathError{Op: "remove", Path: name, Err: err}
 }
 
 func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
@@ -276,7 +299,7 @@ func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error) {
 	return nil, syscall.ENOENT
 }
 
-// vdir represents virtual directory at the level of mount-point prefix
+// a vdir represents a fake directory at the level of a mount-point prefix
 type vdir struct {
 	name string
 	fs.FileInfo
@@ -316,13 +339,13 @@ func (d *vdir) ReadDir(n int) (dl []fs.DirEntry, err error) {
 	return
 }
 
+// Additional methods to implement fs.DirEntry interface
+
 // overwrite d.FileInfo Name method
 func (d *vdir) Name() string {
 	i := strings.LastIndexByte(d.name, '/')
 	return d.name[i+1:]
 }
-
-// Additional methods to implement fs.DirEntry interface
 func (d *vdir) Type() fs.FileMode          { return d.Mode() }
 func (d *vdir) Info() (fs.FileInfo, error) { return d, nil }
 
