@@ -5,7 +5,7 @@
 // Declarations for operating systems implementing time.now
 // indirectly, in terms of walltime and nanotime assembly.
 
-// +build !window
+// +build !windows
 // +build !noos
 
 package runtime
