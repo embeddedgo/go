@@ -114,3 +114,15 @@ pkg embedded/rtos, var ErrInsufPrivLevel *Error
 pkg embedded/rtos, var ErrNotSuppoted *Error
 pkg embedded/rtos, var ErrBadIntCtx *Error
 pkg embedded/rtos, var ErrUknown *Error
+pkg embedded/rtos, func Mount(FS, string) error
+pkg embedded/rtos, func Mounts() []*MountPoint
+pkg embedded/rtos, func Unmount(FS, string) error
+pkg embedded/rtos, type FS interface { Name, OpenWithFinalizer, Type, Usage }
+pkg embedded/rtos, type FS interface, Name() string
+pkg embedded/rtos, type FS interface, OpenWithFinalizer(string, int, fs.FileMode, func()) (fs.File, error)
+pkg embedded/rtos, type FS interface, Type() string
+pkg embedded/rtos, type FS interface, Usage() (int, int, int64, int64)
+pkg embedded/rtos, type MountPoint struct
+pkg embedded/rtos, type MountPoint struct, FS FS
+pkg embedded/rtos, type MountPoint struct, OpenCount int32
+pkg embedded/rtos, type MountPoint struct, Prefix string
