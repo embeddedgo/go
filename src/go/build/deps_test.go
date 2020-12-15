@@ -135,6 +135,9 @@ var depsRules = `
 	< context
 	< TIME;
 
+	time
+	< io/fs;
+
 	# MATH is RUNTIME plus the basic math packages.
 	RUNTIME
 	< math
@@ -156,7 +159,10 @@ var depsRules = `
 	# STR is basic string and buffer manipulation.
 	RUNTIME, io, unicode/utf8, unicode/utf16, unicode
 	< bytes, strings
-	< bufio, path;
+	< bufio;
+
+	RUNTIME, unicode/utf8
+    < path;
 
 	bufio, path, strconv
 	< STR;
@@ -164,9 +170,9 @@ var depsRules = `
 	# OS is basic OS access, including helpers (path/filepath, os/exec, etc).
 	# OS includes string routines, but those must be layered above package os.
 	# OS does not include reflection.
-	TIME, io, sort
+	TIME, io, sort, io/fs, path
 	< internal/testlog
-	< internal/poll
+	< internal/poll, embedded/rtos
 	< os
 	< os/signal;
 
@@ -505,9 +511,6 @@ var depsRules = `
 	< internal/trace;
 
 	# Embedded Go packages
-
-	sync, time, unsafe
-	< embedded/rtos;
 
 	embedded/rtos, internal/cpu/cortexm/scb, internal/cpu/cortexm/systick
 	< embedded/arch/cortexm/systim;
