@@ -6602,6 +6602,17 @@ func rewriteValueThumb_OpThumbMOVBUreg(v *Value) bool {
 		v.AddArg(x)
 		return true
 	}
+	// match: (MOVBUreg x:(MOVBUloadidx _ _ _))
+	// result: (MOVWreg x)
+	for {
+		x := v_0
+		if x.Op != OpThumbMOVBUloadidx {
+			break
+		}
+		v.reset(OpThumbMOVWreg)
+		v.AddArg(x)
+		return true
+	}
 	// match: (MOVBUreg (ANDconst [c] x))
 	// result: (ANDconst [c&0xff] x)
 	for {
@@ -6862,6 +6873,17 @@ func rewriteValueThumb_OpThumbMOVBreg(v *Value) bool {
 	for {
 		x := v_0
 		if x.Op != OpThumbMOVBload {
+			break
+		}
+		v.reset(OpThumbMOVWreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBreg x:(MOVBloadidx _ _ _))
+	// result: (MOVWreg x)
+	for {
+		x := v_0
+		if x.Op != OpThumbMOVBloadidx {
 			break
 		}
 		v.reset(OpThumbMOVWreg)
@@ -7712,6 +7734,28 @@ func rewriteValueThumb_OpThumbMOVHUreg(v *Value) bool {
 		v.AddArg(x)
 		return true
 	}
+	// match: (MOVHUreg x:(MOVBUloadidx _ _ _))
+	// result: (MOVWreg x)
+	for {
+		x := v_0
+		if x.Op != OpThumbMOVBUloadidx {
+			break
+		}
+		v.reset(OpThumbMOVWreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHUreg x:(MOVHUloadidx _ _ _))
+	// result: (MOVWreg x)
+	for {
+		x := v_0
+		if x.Op != OpThumbMOVHUloadidx {
+			break
+		}
+		v.reset(OpThumbMOVWreg)
+		v.AddArg(x)
+		return true
+	}
 	// match: (MOVHUreg (ANDconst [c] x))
 	// result: (ANDconst [c&0xffff] x)
 	for {
@@ -8005,6 +8049,39 @@ func rewriteValueThumb_OpThumbMOVHreg(v *Value) bool {
 	for {
 		x := v_0
 		if x.Op != OpThumbMOVHload {
+			break
+		}
+		v.reset(OpThumbMOVWreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg x:(MOVBloadidx _ _ _))
+	// result: (MOVWreg x)
+	for {
+		x := v_0
+		if x.Op != OpThumbMOVBloadidx {
+			break
+		}
+		v.reset(OpThumbMOVWreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg x:(MOVBUloadidx _ _ _))
+	// result: (MOVWreg x)
+	for {
+		x := v_0
+		if x.Op != OpThumbMOVBUloadidx {
+			break
+		}
+		v.reset(OpThumbMOVWreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg x:(MOVHloadidx _ _ _))
+	// result: (MOVWreg x)
+	for {
+		x := v_0
+		if x.Op != OpThumbMOVHloadidx {
 			break
 		}
 		v.reset(OpThumbMOVWreg)
