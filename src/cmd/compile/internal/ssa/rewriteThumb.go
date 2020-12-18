@@ -588,18 +588,24 @@ func rewriteValueThumb(v *Value) bool {
 		return rewriteValueThumb_OpThumbMOVBUload(v)
 	case OpThumbMOVBUloadidx:
 		return rewriteValueThumb_OpThumbMOVBUloadidx(v)
+	case OpThumbMOVBUloadshiftLL:
+		return rewriteValueThumb_OpThumbMOVBUloadshiftLL(v)
 	case OpThumbMOVBUreg:
 		return rewriteValueThumb_OpThumbMOVBUreg(v)
 	case OpThumbMOVBload:
 		return rewriteValueThumb_OpThumbMOVBload(v)
 	case OpThumbMOVBloadidx:
 		return rewriteValueThumb_OpThumbMOVBloadidx(v)
+	case OpThumbMOVBloadshiftLL:
+		return rewriteValueThumb_OpThumbMOVBloadshiftLL(v)
 	case OpThumbMOVBreg:
 		return rewriteValueThumb_OpThumbMOVBreg(v)
 	case OpThumbMOVBstore:
 		return rewriteValueThumb_OpThumbMOVBstore(v)
 	case OpThumbMOVBstoreidx:
 		return rewriteValueThumb_OpThumbMOVBstoreidx(v)
+	case OpThumbMOVBstoreshiftLL:
+		return rewriteValueThumb_OpThumbMOVBstoreshiftLL(v)
 	case OpThumbMOVDload:
 		return rewriteValueThumb_OpThumbMOVDload(v)
 	case OpThumbMOVDstore:
@@ -612,18 +618,24 @@ func rewriteValueThumb(v *Value) bool {
 		return rewriteValueThumb_OpThumbMOVHUload(v)
 	case OpThumbMOVHUloadidx:
 		return rewriteValueThumb_OpThumbMOVHUloadidx(v)
+	case OpThumbMOVHUloadshiftLL:
+		return rewriteValueThumb_OpThumbMOVHUloadshiftLL(v)
 	case OpThumbMOVHUreg:
 		return rewriteValueThumb_OpThumbMOVHUreg(v)
 	case OpThumbMOVHload:
 		return rewriteValueThumb_OpThumbMOVHload(v)
 	case OpThumbMOVHloadidx:
 		return rewriteValueThumb_OpThumbMOVHloadidx(v)
+	case OpThumbMOVHloadshiftLL:
+		return rewriteValueThumb_OpThumbMOVHloadshiftLL(v)
 	case OpThumbMOVHreg:
 		return rewriteValueThumb_OpThumbMOVHreg(v)
 	case OpThumbMOVHstore:
 		return rewriteValueThumb_OpThumbMOVHstore(v)
 	case OpThumbMOVHstoreidx:
 		return rewriteValueThumb_OpThumbMOVHstoreidx(v)
+	case OpThumbMOVHstoreshiftLL:
+		return rewriteValueThumb_OpThumbMOVHstoreshiftLL(v)
 	case OpThumbMOVWload:
 		return rewriteValueThumb_OpThumbMOVWload(v)
 	case OpThumbMOVWloadidx:
@@ -6589,6 +6601,47 @@ func rewriteValueThumb_OpThumbMOVBUloadidx(v *Value) bool {
 	}
 	return false
 }
+func rewriteValueThumb_OpThumbMOVBUloadshiftLL(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MOVBUloadshiftLL ptr idx [c] (MOVBstoreshiftLL ptr2 idx [d] x _))
+	// cond: c==d && isSamePtr(ptr, ptr2)
+	// result: (MOVBUreg x)
+	for {
+		c := v.AuxInt
+		ptr := v_0
+		idx := v_1
+		if v_2.Op != OpThumbMOVBstoreshiftLL {
+			break
+		}
+		d := v_2.AuxInt
+		x := v_2.Args[2]
+		ptr2 := v_2.Args[0]
+		if idx != v_2.Args[1] || !(c == d && isSamePtr(ptr, ptr2)) {
+			break
+		}
+		v.reset(OpThumbMOVBUreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBUloadshiftLL ptr (MOVWconst [c]) [d] mem)
+	// result: (MOVBUload [int64(uint32(c)<<uint64(d))] ptr mem)
+	for {
+		d := v.AuxInt
+		ptr := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		mem := v_2
+		v.reset(OpThumbMOVBUload)
+		v.AuxInt = int64(uint32(c) << uint64(d))
+		v.AddArg2(ptr, mem)
+		return true
+	}
+	return false
+}
 func rewriteValueThumb_OpThumbMOVBUreg(v *Value) bool {
 	v_0 := v.Args[0]
 	// match: (MOVBUreg x:(MOVBUload _ _))
@@ -6862,6 +6915,47 @@ func rewriteValueThumb_OpThumbMOVBloadidx(v *Value) bool {
 		v.reset(OpThumbMOVBloadshiftLL)
 		v.AuxInt = c
 		v.AddArg3(ptr, idx, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbMOVBloadshiftLL(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MOVBloadshiftLL ptr idx [c] (MOVBstoreshiftLL ptr2 idx [d] x _))
+	// cond: c==d && isSamePtr(ptr, ptr2)
+	// result: (MOVBreg x)
+	for {
+		c := v.AuxInt
+		ptr := v_0
+		idx := v_1
+		if v_2.Op != OpThumbMOVBstoreshiftLL {
+			break
+		}
+		d := v_2.AuxInt
+		x := v_2.Args[2]
+		ptr2 := v_2.Args[0]
+		if idx != v_2.Args[1] || !(c == d && isSamePtr(ptr, ptr2)) {
+			break
+		}
+		v.reset(OpThumbMOVBreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBloadshiftLL ptr (MOVWconst [c]) [d] mem)
+	// result: (MOVBload [int64(uint32(c)<<uint64(d))] ptr mem)
+	for {
+		d := v.AuxInt
+		ptr := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		mem := v_2
+		v.reset(OpThumbMOVBload)
+		v.AuxInt = int64(uint32(c) << uint64(d))
+		v.AddArg2(ptr, mem)
 		return true
 	}
 	return false
@@ -7183,6 +7277,29 @@ func rewriteValueThumb_OpThumbMOVBstoreidx(v *Value) bool {
 		v.reset(OpThumbMOVBstoreshiftLL)
 		v.AuxInt = c
 		v.AddArg4(ptr, idx, val, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbMOVBstoreshiftLL(v *Value) bool {
+	v_3 := v.Args[3]
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MOVBstoreshiftLL ptr (MOVWconst [c]) [d] val mem)
+	// result: (MOVBstore [int64(uint32(c)<<uint64(d))] ptr val mem)
+	for {
+		d := v.AuxInt
+		ptr := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		val := v_2
+		mem := v_3
+		v.reset(OpThumbMOVBstore)
+		v.AuxInt = int64(uint32(c) << uint64(d))
+		v.AddArg3(ptr, val, mem)
 		return true
 	}
 	return false
@@ -7710,6 +7827,47 @@ func rewriteValueThumb_OpThumbMOVHUloadidx(v *Value) bool {
 	}
 	return false
 }
+func rewriteValueThumb_OpThumbMOVHUloadshiftLL(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MOVHUloadshiftLL ptr idx [c] (MOVHstoreshiftLL ptr2 idx [d] x _))
+	// cond: c==d && isSamePtr(ptr, ptr2)
+	// result: (MOVHUreg x)
+	for {
+		c := v.AuxInt
+		ptr := v_0
+		idx := v_1
+		if v_2.Op != OpThumbMOVHstoreshiftLL {
+			break
+		}
+		d := v_2.AuxInt
+		x := v_2.Args[2]
+		ptr2 := v_2.Args[0]
+		if idx != v_2.Args[1] || !(c == d && isSamePtr(ptr, ptr2)) {
+			break
+		}
+		v.reset(OpThumbMOVHUreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHUloadshiftLL ptr (MOVWconst [c]) [d] mem)
+	// result: (MOVHUload [int64(uint32(c)<<uint64(d))] ptr mem)
+	for {
+		d := v.AuxInt
+		ptr := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		mem := v_2
+		v.reset(OpThumbMOVHUload)
+		v.AuxInt = int64(uint32(c) << uint64(d))
+		v.AddArg2(ptr, mem)
+		return true
+	}
+	return false
+}
 func rewriteValueThumb_OpThumbMOVHUreg(v *Value) bool {
 	v_0 := v.Args[0]
 	// match: (MOVHUreg x:(MOVBUload _ _))
@@ -8016,6 +8174,47 @@ func rewriteValueThumb_OpThumbMOVHloadidx(v *Value) bool {
 		v.reset(OpThumbMOVHloadshiftLL)
 		v.AuxInt = c
 		v.AddArg3(ptr, idx, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbMOVHloadshiftLL(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MOVHloadshiftLL ptr idx [c] (MOVHstoreshiftLL ptr2 idx [d] x _))
+	// cond: c==d && isSamePtr(ptr, ptr2)
+	// result: (MOVHreg x)
+	for {
+		c := v.AuxInt
+		ptr := v_0
+		idx := v_1
+		if v_2.Op != OpThumbMOVHstoreshiftLL {
+			break
+		}
+		d := v_2.AuxInt
+		x := v_2.Args[2]
+		ptr2 := v_2.Args[0]
+		if idx != v_2.Args[1] || !(c == d && isSamePtr(ptr, ptr2)) {
+			break
+		}
+		v.reset(OpThumbMOVHreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHloadshiftLL ptr (MOVWconst [c]) [d] mem)
+	// result: (MOVHload [int64(uint32(c)<<uint64(d))] ptr mem)
+	for {
+		d := v.AuxInt
+		ptr := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		mem := v_2
+		v.reset(OpThumbMOVHload)
+		v.AuxInt = int64(uint32(c) << uint64(d))
+		v.AddArg2(ptr, mem)
 		return true
 	}
 	return false
@@ -8369,6 +8568,29 @@ func rewriteValueThumb_OpThumbMOVHstoreidx(v *Value) bool {
 		v.reset(OpThumbMOVHstoreshiftLL)
 		v.AuxInt = c
 		v.AddArg4(ptr, idx, val, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbMOVHstoreshiftLL(v *Value) bool {
+	v_3 := v.Args[3]
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MOVHstoreshiftLL ptr (MOVWconst [c]) [d] val mem)
+	// result: (MOVHstore [int64(uint32(c)<<uint64(d))] ptr val mem)
+	for {
+		d := v.AuxInt
+		ptr := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		val := v_2
+		mem := v_3
+		v.reset(OpThumbMOVHstore)
+		v.AuxInt = int64(uint32(c) << uint64(d))
+		v.AddArg3(ptr, val, mem)
 		return true
 	}
 	return false

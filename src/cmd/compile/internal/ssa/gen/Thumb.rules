@@ -472,14 +472,17 @@
 (MOVFload [off] {sym} ptr (MOVFstore [off2] {sym2} ptr2 x _)) && sym == sym2 && off == off2 && isSamePtr(ptr, ptr2) -> x
 (MOVDload [off] {sym} ptr (MOVDstore [off2] {sym2} ptr2 x _)) && sym == sym2 && off == off2 && isSamePtr(ptr, ptr2) -> x
 
+// no MOVWloadshiftRL, MOVWloadshiftRA in Thumb2
 (MOVWloadidx ptr idx (MOVWstoreidx ptr2 idx x _)) && isSamePtr(ptr, ptr2) -> x
 (MOVWloadshiftLL ptr idx [c] (MOVWstoreshiftLL ptr2 idx [d] x _)) && c==d && isSamePtr(ptr, ptr2) -> x
-// no MOVWloadshiftRL, MOVWloadshiftRA in Thumb2
-
 (MOVBUloadidx ptr idx (MOVBstoreidx ptr2 idx x _)) && isSamePtr(ptr, ptr2) -> (MOVBUreg x)
+(MOVBUloadshiftLL ptr idx [c] (MOVBstoreshiftLL ptr2 idx [d] x _)) && c==d && isSamePtr(ptr, ptr2) -> (MOVBUreg x)
 (MOVBloadidx ptr idx (MOVBstoreidx ptr2 idx x _)) && isSamePtr(ptr, ptr2) -> (MOVBreg x)
+(MOVBloadshiftLL ptr idx [c] (MOVBstoreshiftLL ptr2 idx [d] x _)) && c==d && isSamePtr(ptr, ptr2) -> (MOVBreg x)
 (MOVHUloadidx ptr idx (MOVHstoreidx ptr2 idx x _)) && isSamePtr(ptr, ptr2) -> (MOVHUreg x)
+(MOVHUloadshiftLL ptr idx [c] (MOVHstoreshiftLL ptr2 idx [d] x _)) && c==d && isSamePtr(ptr, ptr2) -> (MOVHUreg x)
 (MOVHloadidx ptr idx (MOVHstoreidx ptr2 idx x _)) && isSamePtr(ptr, ptr2) -> (MOVHreg x)
+(MOVHloadshiftLL ptr idx [c] (MOVHstoreshiftLL ptr2 idx [d] x _)) && c==d && isSamePtr(ptr, ptr2) -> (MOVHreg x)
 
 // fold constant into arithmatic ops
 (ADD x (MOVWconst [c])) -> (ADDconst [c] x)
@@ -1054,8 +1057,15 @@
 (StoreOnce8idx (SLLconst idx [c]) ptr val mem) && c <= 3 -> (StoreOnce8shiftLL ptr idx [c] val mem)
 
 (MOVWloadshiftLL ptr (MOVWconst [c]) [d] mem) -> (MOVWload [int64(uint32(c)<<uint64(d))] ptr mem)
+(MOVHUloadshiftLL ptr (MOVWconst [c]) [d] mem) -> (MOVHUload [int64(uint32(c)<<uint64(d))] ptr mem)
+(MOVHloadshiftLL ptr (MOVWconst [c]) [d] mem) -> (MOVHload [int64(uint32(c)<<uint64(d))] ptr mem)
+(MOVBUloadshiftLL ptr (MOVWconst [c]) [d] mem) -> (MOVBUload [int64(uint32(c)<<uint64(d))] ptr mem)
+(MOVBloadshiftLL ptr (MOVWconst [c]) [d] mem) -> (MOVBload [int64(uint32(c)<<uint64(d))] ptr mem)
 
 (MOVWstoreshiftLL ptr (MOVWconst [c]) [d] val mem) -> (MOVWstore [int64(uint32(c)<<uint64(d))] ptr val mem)
+(MOVHstoreshiftLL ptr (MOVWconst [c]) [d] val mem) -> (MOVHstore [int64(uint32(c)<<uint64(d))] ptr val mem)
+(MOVBstoreshiftLL ptr (MOVWconst [c]) [d] val mem) -> (MOVBstore [int64(uint32(c)<<uint64(d))] ptr val mem)
+
 
 // generic simplifications
 (ADD x (RSBconst [0] y)) -> (SUB x y)
