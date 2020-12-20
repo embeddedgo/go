@@ -342,7 +342,7 @@ func doSigPreempt(gp *g, ctxt *sigctxt) {
 	}
 }
 
-const preemptMSupported = true
+const preemptMSupported = GOARCH != "thumb"
 
 // preemptM sends a preemption request to mp. This request may be
 // handled asynchronously and may be coalesced with other requests to
