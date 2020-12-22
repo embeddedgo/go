@@ -4419,6 +4419,56 @@ func rewriteValueThumb_OpThumbAND(v *Value) bool {
 }
 func rewriteValueThumb_OpThumbANDconst(v *Value) bool {
 	v_0 := v.Args[0]
+	// match: (ANDconst [c] y:(MOVBUreg _))
+	// cond: c&0xFF == 0xFF
+	// result: y
+	for {
+		c := auxIntToInt32(v.AuxInt)
+		y := v_0
+		if y.Op != OpThumbMOVBUreg || !(c&0xFF == 0xFF) {
+			break
+		}
+		v.copyOf(y)
+		return true
+	}
+	// match: (ANDconst [c] y:(MOVHUreg _))
+	// cond: c&0xFFFF == 0xFFFF
+	// result: y
+	for {
+		c := auxIntToInt32(v.AuxInt)
+		y := v_0
+		if y.Op != OpThumbMOVHUreg || !(c&0xFFFF == 0xFFFF) {
+			break
+		}
+		v.copyOf(y)
+		return true
+	}
+	// match: (ANDconst [c] (MOVBUreg x))
+	// result: (ANDconst [c&0xFF] x)
+	for {
+		c := auxIntToInt32(v.AuxInt)
+		if v_0.Op != OpThumbMOVBUreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbANDconst)
+		v.AuxInt = int32ToAuxInt(c & 0xFF)
+		v.AddArg(x)
+		return true
+	}
+	// match: (ANDconst [c] (MOVHUreg x))
+	// result: (ANDconst [c&0xFFFF] x)
+	for {
+		c := auxIntToInt32(v.AuxInt)
+		if v_0.Op != OpThumbMOVHUreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbANDconst)
+		v.AuxInt = int32ToAuxInt(c & 0xFFFF)
+		v.AddArg(x)
+		return true
+	}
 	// match: (ANDconst [0] _)
 	// result: (MOVWconst [0])
 	for {
@@ -6654,6 +6704,83 @@ func rewriteValueThumb_OpThumbMOVBUloadshiftLL(v *Value) bool {
 }
 func rewriteValueThumb_OpThumbMOVBUreg(v *Value) bool {
 	v_0 := v.Args[0]
+	b := v.Block
+	// match: (MOVBUreg (MOVBreg x))
+	// result: (MOVBUreg x)
+	for {
+		if v_0.Op != OpThumbMOVBreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVBUreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBUreg (MOVBUreg x))
+	// result: (MOVBUreg x)
+	for {
+		if v_0.Op != OpThumbMOVBUreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVBUreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBUreg <t> (SRLconst [c] (MOVBUreg x)))
+	// result: (SRLconst [c] (MOVBUreg <t> x))
+	for {
+		t := v.Type
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpThumbMOVBUreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpThumbSRLconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v0 := b.NewValue0(v.Pos, OpThumbMOVBUreg, t)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+	// match: (MOVBUreg (BFXU [c] x))
+	// cond: (c>>8 <= 8)
+	// result: (BFXU [c] x)
+	for {
+		if v_0.Op != OpThumbBFXU {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c>>8 <= 8) {
+			break
+		}
+		v.reset(OpThumbBFXU)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBUreg (SRLconst [c] x))
+	// cond: c>=24
+	// result: (SRLconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c >= 24) {
+			break
+		}
+		v.reset(OpThumbSRLconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
 	// match: (MOVBUreg x:(MOVBUload _ _))
 	// result: (MOVWreg x)
 	for {
@@ -6972,6 +7099,117 @@ func rewriteValueThumb_OpThumbMOVBloadshiftLL(v *Value) bool {
 }
 func rewriteValueThumb_OpThumbMOVBreg(v *Value) bool {
 	v_0 := v.Args[0]
+	b := v.Block
+	// match: (MOVBreg (MOVBUreg x))
+	// result: (MOVBreg x)
+	for {
+		if v_0.Op != OpThumbMOVBUreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVBreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBreg (MOVBreg x))
+	// result: (MOVBreg x)
+	for {
+		if v_0.Op != OpThumbMOVBreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVBreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBreg <t> (SRAconst [c] (MOVBreg x)))
+	// result: (SRAconst [c] (MOVBreg <t> x))
+	for {
+		t := v.Type
+		if v_0.Op != OpThumbSRAconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpThumbMOVBreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpThumbSRAconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v0 := b.NewValue0(v.Pos, OpThumbMOVBreg, t)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+	// match: (MOVBreg (BFX [c] x))
+	// cond: (c>>8 <= 8)
+	// result: (BFX [c] x)
+	for {
+		if v_0.Op != OpThumbBFX {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c>>8 <= 8) {
+			break
+		}
+		v.reset(OpThumbBFX)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBreg (SRLconst [c] x))
+	// cond: c>24
+	// result: (SRLconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c > 24) {
+			break
+		}
+		v.reset(OpThumbSRLconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBreg (SRLconst [c] x))
+	// cond: c==24
+	// result: (SRAconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c == 24) {
+			break
+		}
+		v.reset(OpThumbSRAconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVBreg (SRAconst [c] x))
+	// cond: c>=24
+	// result: (SRAconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRAconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c >= 24) {
+			break
+		}
+		v.reset(OpThumbSRAconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
 	// match: (MOVBreg x:(MOVBload _ _))
 	// result: (MOVWreg x)
 	for {
@@ -7880,6 +8118,131 @@ func rewriteValueThumb_OpThumbMOVHUloadshiftLL(v *Value) bool {
 }
 func rewriteValueThumb_OpThumbMOVHUreg(v *Value) bool {
 	v_0 := v.Args[0]
+	b := v.Block
+	// match: (MOVHUreg (MOVBUreg x))
+	// result: (MOVBUreg x)
+	for {
+		if v_0.Op != OpThumbMOVBUreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVBUreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHUreg (MOVHUreg x))
+	// result: (MOVHUreg x)
+	for {
+		if v_0.Op != OpThumbMOVHUreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVHUreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHUreg (MOVHreg x))
+	// result: (MOVHUreg x)
+	for {
+		if v_0.Op != OpThumbMOVHreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVHUreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHUreg <t> (SRLconst [c] (MOVBUreg x)))
+	// result: (SRLconst [c] (MOVBUreg <t> x))
+	for {
+		t := v.Type
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpThumbMOVBUreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpThumbSRLconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v0 := b.NewValue0(v.Pos, OpThumbMOVBUreg, t)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+	// match: (MOVHUreg <t> (SRLconst [c] (MOVHUreg x)))
+	// result: (SRLconst [c] (MOVHUreg <t> x))
+	for {
+		t := v.Type
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpThumbMOVHUreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpThumbSRLconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v0 := b.NewValue0(v.Pos, OpThumbMOVHUreg, t)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+	// match: (MOVHUreg (BFXU [c] x))
+	// cond: (c>>8 <= 8)
+	// result: (BFXU [c] x)
+	for {
+		if v_0.Op != OpThumbBFXU {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c>>8 <= 8) {
+			break
+		}
+		v.reset(OpThumbBFXU)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHUreg (BFXU [c] x))
+	// cond: (c>>8 <= 16)
+	// result: (BFXU [c] x)
+	for {
+		if v_0.Op != OpThumbBFXU {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c>>8 <= 16) {
+			break
+		}
+		v.reset(OpThumbBFXU)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHUreg (SRLconst [c] x))
+	// cond: c>=16
+	// result: (SRLconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c >= 16) {
+			break
+		}
+		v.reset(OpThumbSRLconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
 	// match: (MOVHUreg x:(MOVBUload _ _))
 	// result: (MOVWreg x)
 	for {
@@ -8231,6 +8594,165 @@ func rewriteValueThumb_OpThumbMOVHloadshiftLL(v *Value) bool {
 }
 func rewriteValueThumb_OpThumbMOVHreg(v *Value) bool {
 	v_0 := v.Args[0]
+	b := v.Block
+	// match: (MOVHreg (MOVBreg x))
+	// result: (MOVBreg x)
+	for {
+		if v_0.Op != OpThumbMOVBreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVBreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg (MOVHreg x))
+	// result: (MOVHreg x)
+	for {
+		if v_0.Op != OpThumbMOVHreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVHreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg (MOVHUreg x))
+	// result: (MOVHreg x)
+	for {
+		if v_0.Op != OpThumbMOVHUreg {
+			break
+		}
+		x := v_0.Args[0]
+		v.reset(OpThumbMOVHreg)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg <t> (SRAconst [c] (MOVBreg x)))
+	// result: (SRAconst [c] (MOVBreg <t> x))
+	for {
+		t := v.Type
+		if v_0.Op != OpThumbSRAconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpThumbMOVBreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpThumbSRAconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v0 := b.NewValue0(v.Pos, OpThumbMOVBreg, t)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+	// match: (MOVHreg <t> (SRAconst [c] (MOVHreg x)))
+	// result: (SRAconst [c] (MOVHreg <t> x))
+	for {
+		t := v.Type
+		if v_0.Op != OpThumbSRAconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		v_0_0 := v_0.Args[0]
+		if v_0_0.Op != OpThumbMOVHreg {
+			break
+		}
+		x := v_0_0.Args[0]
+		v.reset(OpThumbSRAconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v0 := b.NewValue0(v.Pos, OpThumbMOVHreg, t)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+	// match: (MOVHreg (BFX [c] x))
+	// cond: (c>>8 <= 8)
+	// result: (BFX [c] x)
+	for {
+		if v_0.Op != OpThumbBFX {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c>>8 <= 8) {
+			break
+		}
+		v.reset(OpThumbBFX)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg (BFX [c] x))
+	// cond: (c>>8 <= 16)
+	// result: (BFX [c] x)
+	for {
+		if v_0.Op != OpThumbBFX {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c>>8 <= 16) {
+			break
+		}
+		v.reset(OpThumbBFX)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg (SRLconst [c] x))
+	// cond: c>16
+	// result: (SRLconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c > 16) {
+			break
+		}
+		v.reset(OpThumbSRLconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg (SRAconst [c] x))
+	// cond: c>=16
+	// result: (SRAconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRAconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c >= 16) {
+			break
+		}
+		v.reset(OpThumbSRAconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
+	// match: (MOVHreg (SRLconst [c] x))
+	// cond: c==16
+	// result: (SRAconst [c] x)
+	for {
+		if v_0.Op != OpThumbSRLconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		x := v_0.Args[0]
+		if !(c == 16) {
+			break
+		}
+		v.reset(OpThumbSRAconst)
+		v.AuxInt = int32ToAuxInt(c)
+		v.AddArg(x)
+		return true
+	}
 	// match: (MOVHreg x:(MOVBload _ _))
 	// result: (MOVWreg x)
 	for {
