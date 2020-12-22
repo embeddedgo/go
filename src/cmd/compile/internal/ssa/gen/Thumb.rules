@@ -500,6 +500,7 @@
 
 (AND x (MOVWconst [c])) -> (ANDconst [c] x)
 (OR  x (MOVWconst [c])) -> (ORconst [c] x)
+(ORN x (MOVWconst [c])) -> (ORNconst [c] x)
 (XOR x (MOVWconst [c])) -> (XORconst [c] x)
 (BIC x (MOVWconst [c])) -> (BICconst [c] x)
 
@@ -738,6 +739,8 @@
 (ANDconst [c] x) && int32(c)==-1 -> x
 (ORconst [0] x) -> x
 (ORconst [c] _) && int32(c)==-1 -> (MOVWconst [-1])
+(ORNconst [0] _) -> (MOVWconst [-1])
+(ORNconst [c] x) && int32(c)==-1 -> x
 (XORconst [0] x) -> x
 (BICconst [0] x) -> x
 (BICconst [c] _) && int32(c)==-1 -> (MOVWconst [0])
@@ -771,6 +774,8 @@
 (ANDconst [c] (ANDconst [d] x)) -> (ANDconst [c&d] x)
 (ORconst [c] (MOVWconst [d])) -> (MOVWconst [c|d])
 (ORconst [c] (ORconst [d] x)) -> (ORconst [c|d] x)
+(ORNconst [c] (MOVWconst [d])) -> (MOVWconst [^c|d])
+(ORNconst [c] (ORNconst [d] x)) -> (ORconst [^c|^d] x)
 (XORconst [c] (MOVWconst [d])) -> (MOVWconst [c^d])
 (XORconst [c] (XORconst [d] x)) -> (XORconst [c^d] x)
 (BICconst [c] (MOVWconst [d])) -> (MOVWconst [d&^c])
@@ -822,6 +827,9 @@
 (OR x (SLLconst [c] y)) -> (ORshiftLL x y [c])
 (OR x (SRLconst [c] y)) -> (ORshiftRL x y [c])
 (OR x (SRAconst [c] y)) -> (ORshiftRA x y [c])
+(ORN x (SLLconst [c] y)) -> (ORNshiftLL x y [c])
+(ORN x (SRLconst [c] y)) -> (ORNshiftRL x y [c])
+(ORN x (SRAconst [c] y)) -> (ORNshiftRA x y [c])
 (XOR x (SLLconst [c] y)) -> (XORshiftLL x y [c])
 (XOR x (SRLconst [c] y)) -> (XORshiftRL x y [c])
 (XOR x (SRAconst [c] y)) -> (XORshiftRA x y [c])
@@ -925,6 +933,9 @@
 (ORshiftLL x (MOVWconst [c]) [d]) -> (ORconst x [int64(int32(uint32(c)<<uint64(d)))])
 (ORshiftRL x (MOVWconst [c]) [d]) -> (ORconst x [int64(int32(uint32(c)>>uint64(d)))])
 (ORshiftRA x (MOVWconst [c]) [d]) -> (ORconst x [int64(int32(c)>>uint64(d))])
+(ORNshiftLL x (MOVWconst [c]) [d]) -> (ORNconst x [int64(int32(uint32(c)<<uint64(d)))])
+(ORNshiftRL x (MOVWconst [c]) [d]) -> (ORNconst x [int64(int32(uint32(c)>>uint64(d)))])
+(ORNshiftRA x (MOVWconst [c]) [d]) -> (ORNconst x [int64(int32(c)>>uint64(d))])
 (XORshiftLL x (MOVWconst [c]) [d]) -> (XORconst x [int64(int32(uint32(c)<<uint64(d)))])
 (XORshiftRL x (MOVWconst [c]) [d]) -> (XORconst x [int64(int32(uint32(c)>>uint64(d)))])
 (XORshiftRA x (MOVWconst [c]) [d]) -> (XORconst x [int64(int32(c)>>uint64(d))])
@@ -1074,6 +1085,7 @@
 (RSB x x) -> (MOVWconst [0])
 (AND x x) -> x
 (OR x x) -> x
+(ORN x x) -> (MOVWconst [-1])
 (XOR x x) -> (MOVWconst [0])
 (BIC x x) -> (MOVWconst [0])
 
@@ -1099,6 +1111,7 @@
 (SUBD a (NMULD x y)) && a.Uses == 1 -> (MULAD a x y)
 
 (AND x (MVN y)) -> (BIC x y)
+(OR  x (MVN y)) -> (ORN x y)
 
 // simplification with *shift ops
 (SUBshiftLL x (SLLconst x [c]) [d]) && c==d -> (MOVWconst [0])

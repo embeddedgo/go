@@ -2461,6 +2461,8 @@ const (
 	OpThumbANDconst
 	OpThumbOR
 	OpThumbORconst
+	OpThumbORN
+	OpThumbORNconst
 	OpThumbXOR
 	OpThumbXORconst
 	OpThumbBIC
@@ -2499,6 +2501,9 @@ const (
 	OpThumbORshiftLL
 	OpThumbORshiftRL
 	OpThumbORshiftRA
+	OpThumbORNshiftLL
+	OpThumbORNshiftRL
+	OpThumbORNshiftRA
 	OpThumbXORshiftLL
 	OpThumbXORshiftRL
 	OpThumbXORshiftRA
@@ -32966,6 +32971,37 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
+		name:         "ORN",
+		argLen:       2,
+		commutative:  true,
+		clobberFlags: true,
+		asm:          thumb.AORN,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{1, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:         "ORNconst",
+		auxType:      auxInt32,
+		argLen:       1,
+		clobberFlags: true,
+		asm:          thumb.AORN,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
 		name:         "XOR",
 		argLen:       2,
 		commutative:  true,
@@ -33507,6 +33543,51 @@ var opcodeTable = [...]opInfo{
 		auxType: auxInt32,
 		argLen:  2,
 		asm:     thumb.AORR,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{1, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "ORNshiftLL",
+		auxType: auxInt32,
+		argLen:  2,
+		asm:     thumb.AORN,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{1, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "ORNshiftRL",
+		auxType: auxInt32,
+		argLen:  2,
+		asm:     thumb.AORN,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+				{1, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14
+			},
+			outputs: []outputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "ORNshiftRA",
+		auxType: auxInt32,
+		argLen:  2,
+		asm:     thumb.AORN,
 		reg: regInfo{
 			inputs: []inputInfo{
 				{0, 24447}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 g R11 R12 R14

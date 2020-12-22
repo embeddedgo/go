@@ -680,6 +680,16 @@ func rewriteValueThumb(v *Value) bool {
 		return rewriteValueThumb_OpThumbNotEqual(v)
 	case OpThumbOR:
 		return rewriteValueThumb_OpThumbOR(v)
+	case OpThumbORN:
+		return rewriteValueThumb_OpThumbORN(v)
+	case OpThumbORNconst:
+		return rewriteValueThumb_OpThumbORNconst(v)
+	case OpThumbORNshiftLL:
+		return rewriteValueThumb_OpThumbORNshiftLL(v)
+	case OpThumbORNshiftRA:
+		return rewriteValueThumb_OpThumbORNshiftRA(v)
+	case OpThumbORNshiftRL:
+		return rewriteValueThumb_OpThumbORNshiftRL(v)
 	case OpThumbORconst:
 		return rewriteValueThumb_OpThumbORconst(v)
 	case OpThumbORshiftLL:
@@ -10454,6 +10464,213 @@ func rewriteValueThumb_OpThumbOR(v *Value) bool {
 			break
 		}
 		v.copyOf(x)
+		return true
+	}
+	// match: (OR x (MVN y))
+	// result: (ORN x y)
+	for {
+		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
+			x := v_0
+			if v_1.Op != OpThumbMVN {
+				continue
+			}
+			y := v_1.Args[0]
+			v.reset(OpThumbORN)
+			v.AddArg2(x, y)
+			return true
+		}
+		break
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbORN(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (ORN x (MOVWconst [c]))
+	// result: (ORNconst [c] x)
+	for {
+		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
+			x := v_0
+			if v_1.Op != OpThumbMOVWconst {
+				continue
+			}
+			c := v_1.AuxInt
+			v.reset(OpThumbORNconst)
+			v.AuxInt = c
+			v.AddArg(x)
+			return true
+		}
+		break
+	}
+	// match: (ORN x (SLLconst [c] y))
+	// result: (ORNshiftLL x y [c])
+	for {
+		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
+			x := v_0
+			if v_1.Op != OpThumbSLLconst {
+				continue
+			}
+			c := v_1.AuxInt
+			y := v_1.Args[0]
+			v.reset(OpThumbORNshiftLL)
+			v.AuxInt = c
+			v.AddArg2(x, y)
+			return true
+		}
+		break
+	}
+	// match: (ORN x (SRLconst [c] y))
+	// result: (ORNshiftRL x y [c])
+	for {
+		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
+			x := v_0
+			if v_1.Op != OpThumbSRLconst {
+				continue
+			}
+			c := v_1.AuxInt
+			y := v_1.Args[0]
+			v.reset(OpThumbORNshiftRL)
+			v.AuxInt = c
+			v.AddArg2(x, y)
+			return true
+		}
+		break
+	}
+	// match: (ORN x (SRAconst [c] y))
+	// result: (ORNshiftRA x y [c])
+	for {
+		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
+			x := v_0
+			if v_1.Op != OpThumbSRAconst {
+				continue
+			}
+			c := v_1.AuxInt
+			y := v_1.Args[0]
+			v.reset(OpThumbORNshiftRA)
+			v.AuxInt = c
+			v.AddArg2(x, y)
+			return true
+		}
+		break
+	}
+	// match: (ORN x x)
+	// result: (MOVWconst [-1])
+	for {
+		x := v_0
+		if x != v_1 {
+			break
+		}
+		v.reset(OpThumbMOVWconst)
+		v.AuxInt = -1
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbORNconst(v *Value) bool {
+	v_0 := v.Args[0]
+	// match: (ORNconst [0] _)
+	// result: (MOVWconst [-1])
+	for {
+		if v.AuxInt != 0 {
+			break
+		}
+		v.reset(OpThumbMOVWconst)
+		v.AuxInt = -1
+		return true
+	}
+	// match: (ORNconst [c] x)
+	// cond: int32(c)==-1
+	// result: x
+	for {
+		c := v.AuxInt
+		x := v_0
+		if !(int32(c) == -1) {
+			break
+		}
+		v.copyOf(x)
+		return true
+	}
+	// match: (ORNconst [c] (MOVWconst [d]))
+	// result: (MOVWconst [^c|d])
+	for {
+		c := v.AuxInt
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		d := v_0.AuxInt
+		v.reset(OpThumbMOVWconst)
+		v.AuxInt = ^c | d
+		return true
+	}
+	// match: (ORNconst [c] (ORNconst [d] x))
+	// result: (ORconst [^c|^d] x)
+	for {
+		c := v.AuxInt
+		if v_0.Op != OpThumbORNconst {
+			break
+		}
+		d := v_0.AuxInt
+		x := v_0.Args[0]
+		v.reset(OpThumbORconst)
+		v.AuxInt = ^c | ^d
+		v.AddArg(x)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbORNshiftLL(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (ORNshiftLL x (MOVWconst [c]) [d])
+	// result: (ORNconst x [int64(int32(uint32(c)<<uint64(d)))])
+	for {
+		d := v.AuxInt
+		x := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		v.reset(OpThumbORNconst)
+		v.AuxInt = int64(int32(uint32(c) << uint64(d)))
+		v.AddArg(x)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbORNshiftRA(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (ORNshiftRA x (MOVWconst [c]) [d])
+	// result: (ORNconst x [int64(int32(c)>>uint64(d))])
+	for {
+		d := v.AuxInt
+		x := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		v.reset(OpThumbORNconst)
+		v.AuxInt = int64(int32(c) >> uint64(d))
+		v.AddArg(x)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbORNshiftRL(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (ORNshiftRL x (MOVWconst [c]) [d])
+	// result: (ORNconst x [int64(int32(uint32(c)>>uint64(d)))])
+	for {
+		d := v.AuxInt
+		x := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := v_1.AuxInt
+		v.reset(OpThumbORNconst)
+		v.AuxInt = int64(int32(uint32(c) >> uint64(d)))
+		v.AddArg(x)
 		return true
 	}
 	return false

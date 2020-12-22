@@ -197,6 +197,8 @@ func init() {
 		{name: "ANDconst", argLength: 1, reg: gp11, asm: "AND", aux: "Int32", clobberFlags: true}, // arg0 & auxInt
 		{name: "OR", argLength: 2, reg: gp21, asm: "ORR", commutative: true, clobberFlags: true},  // arg0 | arg1
 		{name: "ORconst", argLength: 1, reg: gp11, asm: "ORR", aux: "Int32", clobberFlags: true},  // arg0 | auxInt
+		{name: "ORN", argLength: 2, reg: gp21, asm: "ORN", commutative: true, clobberFlags: true},  // arg0 | ^arg1
+		{name: "ORNconst", argLength: 1, reg: gp11, asm: "ORN", aux: "Int32", clobberFlags: true},  // arg0 | ^auxInt
 		{name: "XOR", argLength: 2, reg: gp21, asm: "EOR", commutative: true, clobberFlags: true}, // arg0 ^ arg1
 		{name: "XORconst", argLength: 1, reg: gp11, asm: "EOR", aux: "Int32", clobberFlags: true}, // arg0 ^ auxInt
 		{name: "BIC", argLength: 2, reg: gp21, asm: "BIC", clobberFlags: true},                    // arg0 &^ arg1
@@ -244,6 +246,9 @@ func init() {
 		{name: "ORshiftLL", argLength: 2, reg: gp21, asm: "ORR", aux: "Int32"},  // arg0 | arg1<<auxInt
 		{name: "ORshiftRL", argLength: 2, reg: gp21, asm: "ORR", aux: "Int32"},  // arg0 | arg1>>auxInt, unsigned shift
 		{name: "ORshiftRA", argLength: 2, reg: gp21, asm: "ORR", aux: "Int32"},  // arg0 | arg1>>auxInt, signed shift
+		{name: "ORNshiftLL", argLength: 2, reg: gp21, asm: "ORN", aux: "Int32"},  // arg0 | ^(arg1<<auxInt)
+		{name: "ORNshiftRL", argLength: 2, reg: gp21, asm: "ORN", aux: "Int32"},  // arg0 | ^(arg1>>auxInt), unsigned shift
+		{name: "ORNshiftRA", argLength: 2, reg: gp21, asm: "ORN", aux: "Int32"},  // arg0 | ^(arg1>>auxInt), signed shift
 		{name: "XORshiftLL", argLength: 2, reg: gp21, asm: "EOR", aux: "Int32"}, // arg0 ^ arg1<<auxInt
 		{name: "XORshiftRL", argLength: 2, reg: gp21, asm: "EOR", aux: "Int32"}, // arg0 ^ arg1>>auxInt, unsigned shift
 		{name: "XORshiftRA", argLength: 2, reg: gp21, asm: "EOR", aux: "Int32"}, // arg0 ^ arg1>>auxInt, signed shift

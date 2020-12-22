@@ -182,6 +182,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbRSB,
 		ssa.OpThumbAND,
 		ssa.OpThumbOR,
+		ssa.OpThumbORN,
 		ssa.OpThumbXOR,
 		ssa.OpThumbBIC,
 		ssa.OpThumbMUL,
@@ -297,6 +298,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbSBCconst,
 		ssa.OpThumbRSBconst,
 		ssa.OpThumbORconst,
+		ssa.OpThumbORNconst,
 		ssa.OpThumbXORconst,
 		ssa.OpThumbSLLconst,
 		ssa.OpThumbSRLconst,
@@ -326,6 +328,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbRSBshiftLL,
 		ssa.OpThumbANDshiftLL,
 		ssa.OpThumbORshiftLL,
+		ssa.OpThumbORNshiftLL,
 		ssa.OpThumbXORshiftLL,
 		ssa.OpThumbBICshiftLL:
 		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LL, v.AuxInt)
@@ -341,6 +344,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbRSBshiftRL,
 		ssa.OpThumbANDshiftRL,
 		ssa.OpThumbORshiftRL,
+		ssa.OpThumbORNshiftRL,
 		ssa.OpThumbXORshiftRL,
 		ssa.OpThumbBICshiftRL:
 		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LR, v.AuxInt)
@@ -356,6 +360,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbRSBshiftRA,
 		ssa.OpThumbANDshiftRA,
 		ssa.OpThumbORshiftRA,
+		ssa.OpThumbORNshiftRA,
 		ssa.OpThumbXORshiftRA,
 		ssa.OpThumbBICshiftRA:
 		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_AR, v.AuxInt)
