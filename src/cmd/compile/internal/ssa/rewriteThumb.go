@@ -6705,6 +6705,21 @@ func rewriteValueThumb_OpThumbMOVBUloadshiftLL(v *Value) bool {
 func rewriteValueThumb_OpThumbMOVBUreg(v *Value) bool {
 	v_0 := v.Args[0]
 	b := v.Block
+	// match: (MOVBUreg y:(ANDconst [c] _))
+	// cond: uint64(c) <= 0xFF
+	// result: y
+	for {
+		y := v_0
+		if y.Op != OpThumbANDconst {
+			break
+		}
+		c := auxIntToInt32(y.AuxInt)
+		if !(uint64(c) <= 0xFF) {
+			break
+		}
+		v.copyOf(y)
+		return true
+	}
 	// match: (MOVBUreg (MOVBreg x))
 	// result: (MOVBUreg x)
 	for {
@@ -8119,6 +8134,21 @@ func rewriteValueThumb_OpThumbMOVHUloadshiftLL(v *Value) bool {
 func rewriteValueThumb_OpThumbMOVHUreg(v *Value) bool {
 	v_0 := v.Args[0]
 	b := v.Block
+	// match: (MOVHUreg y:(ANDconst [c] _))
+	// cond: uint64(c) <= 0xFFFF
+	// result: y
+	for {
+		y := v_0
+		if y.Op != OpThumbANDconst {
+			break
+		}
+		c := auxIntToInt32(y.AuxInt)
+		if !(uint64(c) <= 0xFFFF) {
+			break
+		}
+		v.copyOf(y)
+		return true
+	}
 	// match: (MOVHUreg (MOVBUreg x))
 	// result: (MOVBUreg x)
 	for {
