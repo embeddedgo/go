@@ -60,7 +60,7 @@ func shiftidx(x8 int8, u8 uint8, x16 int16, u16 uint16, x32 int32, u32 uint32) {
 
 	// ppc64:-"MOVHZ\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVHZ\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVHZ\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVHU\tR\\d+,\\sR\\d+"
 	val16[1] = uint16(sval16[u16>>2])
 
 }
