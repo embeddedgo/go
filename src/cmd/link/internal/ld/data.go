@@ -47,6 +47,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 )
 
 // isRuntimeDepPkg reports whether pkg is the runtime package or its dependency
@@ -1409,11 +1410,18 @@ func (ctxt *Link) dodata2(symGroupType []sym.SymKind) {
 	if ctxt.HeadType == objabi.Hnoos {
 		// leave some read-only variables in Flash (hack to save RAM)
 		for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
-			if strings.HasPrefix(ldr.SymName(s), "unicode..stmp_") {
-				state.setSymType(s, sym.SRODATA)
+			if t := state.symType(s); t != sym.SDATA && t != sym.SNOPTRDATA {
 				continue
 			}
-			switch ldr.SymName(s) {
+			name := ldr.SymName(s)
+			if len(name) > 8 && strings.HasPrefix(name, "unicode.") {
+				uname := name[8:]
+				if unicode.IsUpper(rune(uname[0])) || strings.HasPrefix(uname, ".stmp_") || strings.HasPrefix(uname, "fold") {
+					state.setSymType(s, sym.SRODATA)
+					continue
+				}
+			}
+			switch name {
 			case "embedded/rtos.errorsByNumber",
 				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
 				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
@@ -1434,7 +1442,7 @@ func (ctxt *Link) dodata2(symGroupType []sym.SymKind) {
 				"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
 				"runtime.emptymspan", "runtime.levelBits", "runtime.levelShift",
 				"runtime.levelLogPages", "runtime.consec8tab",
-				"runtime/internal/sys.len8tab","runtime/internal/sys.ntz8tab",
+				"runtime/internal/sys.len8tab", "runtime/internal/sys.ntz8tab",
 				"runtime/internal/sys.deBruijn64tab",
 				"runtime/internal/sys.deBruijnIdx64ctz",
 				"runtime/internal/sys.deBruijnIdx32ctz",
@@ -1446,7 +1454,7 @@ func (ctxt *Link) dodata2(symGroupType []sym.SymKind) {
 				"strconv.float32info",
 				"syscall.errors",
 				"time.std0x", "time.longDayNames", "time.shortDayNames",
-				"time.shortMonthNames","time.longMonthNames","time.",
+				"time.shortMonthNames", "time.longMonthNames", "time.",
 				"time.daysBefore", "time.utcLoc",
 				"unicode.properties", "unicode.asciiFold", "unicode.caseOrbit",
 				"unicode/utf8.first", "unicode/utf8.acceptRanges":
