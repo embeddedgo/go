@@ -75,9 +75,9 @@
 
 	1111 0011 1110 1111  1000 dddd mmmm mmmm   MOVW      SYSm, Rd
 	1111 0011 1000 nnnn  1000 mm00 mmmm mmmm   MOVW      Rn, SYSm
-	
+
 	1110 1110 1111 0001  tttt 1010 0001 0000   MOVW      FPSCR, Rt
-	1110 1110 1110 0001  tttt 1010 0001 0000   MOVW      Rt, FPSCR	
+	1110 1110 1110 0001  tttt 1010 0001 0000   MOVW      Rt, FPSCR
 
 	1111 1011 0000 nnnn  1111 dddd 0000 mmmm  .MUL       Rm, Rn, Rd
 	1111 1011 1001 nnnn  1111 dddd 1111 mmmm   DIV       Rm, Rn, Rd
@@ -176,8 +176,48 @@
 	1111 1000 0010 nnnn  tttt 1p±w uuuu uuuu   MOVH.p.w  Rt, ±u8(Rn)
 	1111 1000 0000 nnnn  tttt 1p±w uuuu uuuu   MOVB.p.w  Rt, ±u8(Rn)
 
+	1110 1110 0d11 nnnn  dddd 1010 n0m0 mmmm  .ADDF      Fm, Fn, Fd
+	1110 1110 0d11 nnnn  dddd 1011 n0m0 mmmm   ADDD      Fm, Fn, Fd
+	1110 1110 0d11 nnnn  dddd 1010 n1m0 mmmm   SUBF      Fm, Fn, Fd
+	1110 1110 0d11 nnnn  dddd 1011 n1m0 mmmm   SUBD      Fm, Fn, Fd
+	1110 1110 0d10 nnnn  dddd 1010 n0m0 mmmm   MULF      Fm, Fn, Fd
+	1110 1110 0d10 nnnn  dddd 1011 n0m0 mmmm   MULD      Fm, Fn, Fd
+	1110 1110 1d00 nnnn  dddd 1010 n0m0 mmmm   DIVF      Fm, Fn, Fd
+	1110 1110 1d00 nnnn  dddd 1011 n0m0 mmmm   DIVD      Fm, Fn, Fd
+	1110 1110 0d00 nnnn  dddd 1010 n0m0 mmmm   MULAF     Fm, Fn, Fd
+	1110 1110 0d00 nnnn  dddd 1011 n0m0 mmmm   MULAD     Fm, Fn, Fd
+	1110 1110 0d00 nnnn  dddd 1010 n1m0 mmmm   MULSF     Fm, Fn, Fd
+	1110 1110 0d00 nnnn  dddd 1011 n1m0 mmmm   MULSD     Fm, Fn, Fd
+	1110 1110 0d10 nnnn  dddd 1010 n1m0 mmmm   NMULF     Fm, Fn, Fd
+	1110 1110 0d10 nnnn  dddd 1011 n1m0 mmmm   NMULD     Fm, Fn, Fd
+
 	1110 1110 1d11 0001  dddd 1010 11m0 mmmm  .SQRTF     Fm, Fd
 	1110 1110 1d11 0001  dddd 1011 11m0 mmmm   SQRTD     Fm, Fd
+	1110 1110 1d11 0001  dddd 1010 01m0 mmmm   NEGF      Fm, Fd
+	1110 1110 1d11 0001  dddd 1011 01m0 mmmm   NEGD      Fm, Fd
+	1110 1110 1d11 0000  dddd 1010 01m0 mmmm   MOVF      Fm, Fd
+	1110 1110 1d11 0000  dddd 1011 01m0 mmmm   MOVD      Fm, Fd
+	1110 1110 1d11 0000  dddd 1010 11m0 mmmm   ABSF      Fm, Fd
+	1110 1110 1d11 0000  dddd 1011 11m0 mmmm   ABSD      Fm, Fd
+	1110 1110 1d11 0111  dddd 1010 11m0 mmmm   MOVFD     Fm, Fd
+	1110 1110 1d11 0111  dddd 1011 11m0 mmmm   MOVDF     Fm, Fd
+
+	1110 1110 00h1 nnnn  tttt 1011 n001 0000  .MOVW      Fn, Rt
+	1110 1110 00h0 dddd  tttt 1011 d001 0000  .MOVW      Rt, Fd
+
+	1111 1110 1d11 1101  dddd 1010 11m0 mmmm  .MOVFW     Fm, Fd
+	1111 1110 1d11 1100  dddd 1010 11m0 mmmm   MOVFW.U   Fm, Fd
+	1111 1110 1d11 1101  dddd 1011 11m0 mmmm   MOVDW     Fm, Fd
+	1111 1110 1d11 1100  dddd 1011 11m0 mmmm   MOVDW.U   Fm, Fd
+	1111 1110 1d11 1000  dddd 1010 11m0 mmmm   MOVWF     Fm, Fd
+	1111 1110 1d11 1000  dddd 1010 01m0 mmmm   MOVWF.U   Fm, Fd
+	1111 1110 1d11 1000  dddd 1011 11m0 mmmm   MOVWD     Fm, Fd
+	1111 1110 1d11 1000  dddd 1011 01m0 mmmm   MOVWD.U   Fm, Fd
+
+	1110 1110 1d11 0100  dddd 1010 e1m0 mmmm  .CMPF      Fm, Fd
+	1110 1110 1d11 0100  dddd 1011 e1m0 mmmm   CMPD      Fm, Fd
+	1110 1110 1d11 0101  dddd 1010 e100 0000  .CMPF      Fd
+	1110 1110 1d11 0101  dddd 1010 e100 0000   CMPD      Fd
 
 	1110 1101 ±d01 nnnn  dddd 1010 uuuu uuuu  .MOVF      ±u8<<2(Rn), Fd
 	1110 1101 ±d01 nnnn  dddd 1011 uuuu uuuu   MOVD      ±u8<<2(Rn), Fd
@@ -260,17 +300,5 @@
 	1111 0011 1010 1111  1000 0000 0000 0100   SEV
 
 	1111 0111 1111 uuuu  1010 uuuu uuuu uuuu   UNDEF     u16
-
-	1110 1110 0d11 nnnn  dddd 1010 n0m0 mmmm   ADDF      Fm, Fn, Fd
-	1110 1110 0d11 nnnn  dddd 1011 n0m0 mmmm   ADDD      Fm, Fn, Fd
-
-	1110 1110 0d10 nnnn  dddd 1010 n0m0 mmmm   MULF      Fm, Fn, Fd
-	1110 1110 0d10 nnnn  dddd 1011 n0m0 mmmm   MULD      Fm, Fn, Fd
-
-	1110 1110 1d10 nnnn  dddd 1010 n0m0 mmmm   FMULAF    Fm, Fn, Fd
-	1110 1110 1d10 nnnn  dddd 1011 n0m0 mmmm   FMULAD    Fm, Fn, Fd
-
-	1110 1110 1d10 nnnn  dddd 1010 n1m0 mmmm   FMULSF    Fm, Fn, Fd
-	1110 1110 1d10 nnnn  dddd 1011 n1m0 mmmm   FMULSD    Fm, Fn, Fd
 
 	... and more

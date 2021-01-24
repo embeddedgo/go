@@ -330,7 +330,10 @@ func _MOVM_IAw(enc uint32) Args {
 
 // 1110 1110 111x 0001  tttt 1010 0001 0000
 func _MOVW__FPSCR__Rt(enc uint32) Args {
-	Rt := Reg(enc >> 12 & 15)
+	Rt := Reg(enc>>12) & 15
+	if Rt == 15 {
+		Rt = APSR
+	}
 	if enc>>20&1 != 0 {
 		return Args{Rt, FPSCR}
 	}
@@ -466,30 +469,51 @@ func _STREXB__Rn__Rt(enc uint32) Args {
 
 // 1110 1101 ±d0x nnnn  dddd 101x uuuu uuuu
 func _MOVF__s8_2_Rn__Fd(enc uint32) Args {
-	var Vd Reg
-	if (enc>>8)&1 != 0 {
-		Vd = Reg(int(D0) + int((enc>>18)&16|(enc>>12)&15))
-	} else {
-		Vd = Reg(int(S0) + int((enc>>11)&30|(enc>>22)&1))
-	}
-	offset := int(enc) & 0xFF
+	offset := int(enc) & 0xFF << 2
 	if (enc>>23)&1 == 0 {
 		offset = -offset
 	}
-	return Args{Vd, Mem{Mode: AddrOffset, Base: Reg(enc >> 16 & 15), Offset: int16(offset)}}
+	return Args{
+		_Fd(enc),
+		Mem{Mode: AddrOffset, Base: Reg(enc >> 16 & 15), Offset: int16(offset)},
+	}
 }
 
-// 1110 1110 1d11 0001  dddd 101x 11m0 mmmm
+// 1110 1110 1d11 0101  dddd 101x e100 0000
+func _CMPF__0__Fd(enc uint32) Args {
+	return Args{_Fd(enc), Imm(0)}
+}
+
+// 1110 1110 1d11 0100  dddd 101x e1m0 mmmm
+func _CMPF__Fm__Fd(enc uint32) Args {
+	return Args{_Fd(enc), _Fm(enc)}
+}
+
+// 1110 1110 1d11 0xxx  dddd 101x x1m0 mmmm
 func _SQRTF__Fm__Fd(enc uint32) Args {
-	var Vm, Vd Reg
-	if (enc>>8)&1 != 0 {
-		Vm = Reg(int(D0) + int((enc>>1)&16|enc&15))
-		Vd = Reg(int(D0) + int((enc>>18)&16|(enc>>12)&15))
-	} else {
-		Vm = Reg(int(S0) + int((enc<<1)&30|(enc>>5)&1))
-		Vd = Reg(int(S0) + int((enc>>11)&30|(enc>>22)&1))
+	return Args{_Fd(enc), _Fm(enc)}
+}
+
+// 1110 1110 00h0 dddd  tttt 1011 d001 0000
+// 1110 1110 00h1 nnnn  tttt 1011 n001 0000
+func _MOVW__Fm__Rd(enc uint32) Args {
+	F := S0 + Reg(enc>>16&15)
+	R := Reg(enc >> 12 & 15)
+	if enc>>20&1 == 0 {
+		return Args{F, R}
 	}
-	return Args{Vd, Vm}
+	return Args{R, F}
+}
+
+// 1110 1110 1d11 ffff  dddd 101x 0000 ffff
+func _MOVF__f8__Fd(enc uint32) Args {
+	imm8 := Imm(enc>>12&0xF0 | enc&0xF)
+	return Args{_Fd(enc), imm8}
+}
+
+// 1110 1110 xdxx nnnn  dddd 101x nxm0 mmmm
+func _ADDF__Fm__Fn__Fd(enc uint32) Args {
+	return Args{_Fd(enc), _Fn(enc), _Fm(enc)}
 }
 
 func decodeMIC(enc uint32) ImmAlt {
@@ -510,4 +534,25 @@ func decodeShiftI(enc uint32) RegShift {
 		shift = RotateRightExt
 	}
 	return RegShift{Rm, shift, count}
+}
+
+func _Fm(enc uint32) Reg {
+	if (enc>>8)&1 != 0 {
+		return Reg(int(D0) + int((enc>>1)&0x10|enc&0x0F))
+	}
+	return Reg(int(S0) + int((enc<<1)&0x1E|(enc>>5)&0x01))
+}
+
+func _Fn(enc uint32) Reg {
+	if (enc>>8)&1 != 0 {
+		return Reg(int(D0) + int((enc>>3)&0x10|enc>>16&0x0F))
+	}
+	return Reg(int(S0) + int((enc>>15)&0x1E|(enc>>7)&0x01))
+}
+
+func _Fd(enc uint32) Reg {
+	if (enc>>8)&1 != 0 {
+		return Reg(int(D0) + int((enc>>18)&0x10|(enc>>12)&0x0F))
+	}
+	return Reg(int(S0) + int((enc>>11)&0x1E|(enc>>22)&0x01))
 }

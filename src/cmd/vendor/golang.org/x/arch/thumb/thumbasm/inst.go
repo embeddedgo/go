@@ -11,6 +11,13 @@ import (
 
 type Op uint16
 
+func (op Op) String() string {
+	if op >= Op(len(opstr)) || opstr[op] == "" {
+		return fmt.Sprintf("Op(%d)", int(op))
+	}
+	return opstr[op]
+}
+
 // An Inst is a single instruction.
 type Inst struct {
 	Op   Op     // Opcode mnemonic

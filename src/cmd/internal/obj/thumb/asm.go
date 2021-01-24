@@ -167,6 +167,11 @@ func (c *Ctx) offset(a *obj.Addr) int64 {
 func (c *Ctx) chipzero(e float64) int {
 	switch objabi.GOARM {
 	case 0x7F, 0x7D: // ARMv7-M with floating point extension
+		break
+	default:
+		return -1
+	}
+	if math.Float64bits(e) == 0 {
 		return 0
 	}
 	return -1
@@ -855,6 +860,19 @@ func span(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 						// here we are correcting this assumption
 						m -= 2
 						//fmt.Println(-2, loreg)
+					}
+					if p.As == AMOVF || p.As == AMOVD {
+						name := p.From.Name
+						if o.flag&LTO != 0 {
+							name = p.To.Name
+						}
+						if name == obj.NAME_STATIC || name == obj.NAME_EXTERN {
+							// optab assumes the offset(regBase) requires
+							// 16-bit ADD regBase,REGTMP instruction but
+							// in this case the offset is absolute addres so
+							// there is no ADD instruction
+							m -= 2
+						}
 					}
 				}
 			}

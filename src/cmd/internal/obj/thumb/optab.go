@@ -280,12 +280,51 @@ var optab = [...]Optab{
 	{as: AMOVB},
 	{as: AMOVBU},
 
+	{AADDF, C_FREG, C_FREG, C_FREG, 0x14, 0, 0, 0, _ADDF__Fm__Fn__Fd}, // ADDF Fm, Fn, Fd
+	{AADDF, C_FREG, C_NONE, C_FREG, 0x14, 0, 0, 0, _ADDF__Fm__Fn__Fd}, // ADDF Fm, Fdn
+	{as: AADDD},
+	{as: ASUBF},
+	{as: ASUBD},
+	{as: AMULF},
+	{as: AMULD},
+	{as: ADIVF},
+	{as: ADIVD},
+	{as: AMULAF},
+	{as: AMULAD},
+	{as: AMULSF},
+	{as: AMULSD},
+	{as: ANMULF},
+	{as: ANMULD},
+
 	{ASQRTF, C_FREG, C_NONE, C_FREG, 0x14, 0, 0, 0, _SQRTF__Fm__Fd}, // SQRTF Fm, Fd
 	{as: ASQRTD},
+	{as: ANEGF},
+	{as: ANEGD},
+	{as: AMOVF},
+	{as: AMOVD},
+	{as: AABSF},
+	{as: AABSD},
+	{as: AMOVFD},
+	{as: AMOVDF},
 
-	{AMOVF, C_FOREG, C_NONE, C_FREG, 0x14, 0, 0, 0, _MOVF__s8_2_Rn__Fd}, // MOVF ±u8<<2(Rn), Fd
-	{AMOVF, C_FREG, C_NONE, C_FOREG, 0x14, 0, 0, 0, _MOVF__s8_2_Rn__Fd}, // MOVF Fd, ±u8<<2(Rn)
-	{AMOVF, C_SFCON, C_NONE, C_FREG, 0x14, 0, 0, 0, _MOVF__f8__Fd},      // MOVF f8, Fd
+	{AMOVW, C_FREG, C_NONE, C_REG, 0x14, 0, 0, 0, _MOVW__Fm__Rd}, // MOVW Fm, Rd},
+	{AMOVW, C_REG, C_NONE, C_FREG, 0x14, 0, 0, 0, _MOVW__Fm__Rd}, // MOVW Rt, Fd},
+
+	{AMOVFW, C_FREG, C_NONE, C_REG, 0x28, 0, 0, C_UBIT, _MOVFW__Fm__Rd}, // MOVFW Fm, Rd
+	{as: AMOVDW},
+	{AMOVWF, C_REG, C_NONE, C_FREG, 0x28, 0, 0, C_UBIT, _MOVFW__Fm__Rd}, // MOVWF Rm, Fd
+	{as: AMOVWD},
+
+	{ACMPF, C_FREG, C_FREG, C_NONE, 0x28, 0, 0, 0, _CMPF__Fm__Fd}, // CMPF Fm, Fd
+	{ACMPF, C_FREG, C_NONE, C_NONE, 0x28, 0, 0, 0, _CMPF__Fm__Fd}, // CMPF Fd
+	{as: ACMPD},
+
+	{AMOVF, C_FOREG, C_NONE, C_FREG, 0x14, 0, 0, 0, _MOVF__s8_2_Rn__Fd},    // MOVF ±u8<<2(Rn), Fd
+	{AMOVF, C_FREG, C_NONE, C_FOREG, 0x14, 0, 0, 0, _MOVF__s8_2_Rn__Fd},    // MOVF Fd, ±u8<<2(Rn)
+	{AMOVF, C_LOREG, C_NONE, C_FREG, 0x3A, LFROM, 0, 0, _MOVF__lit_Rn__Rt}, // MOVF lit(Rn), Rt
+	{AMOVF, C_FREG, C_NONE, C_LOREG, 0x3A, LTO, 0, 0, _MOVF__lit_Rn__Rt},   // MOVF Rt, lit(Rn)
+	{AMOVF, C_SFCON, C_NONE, C_FREG, 0x14, 0, 0, 0, _MOVF__f8__Fd},         // MOVF f8, Fd
+	{AMOVF, C_ZFCON, C_NONE, C_FREG, 0x28, 0, 0, 0, _MOVF__0__Fd},          // MOVF 0, Fd
 	{as: AMOVD},
 
 	{AIT, C_IT, C_NONE, C_NONE, 0x12, 0, 0, 0, _ITmask__firstcond}, // ITmask firstcond
@@ -1435,17 +1474,17 @@ func _HWORD__u16(c *Ctx, p *obj.Prog, out []uint16) int {
 // 1110 1101 ±d0x nnnn  dddd 101x uuuu uuuu
 func _MOVF__s8_2_Rn__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
 	o1 := 0xED00
-	reg, mem := p.From, p.To
+	reg, mem := &p.From, &p.To
 	if mem.Type == obj.TYPE_REG {
 		reg, mem = mem, reg
 		o1 |= 0x0010
 	}
 	o2 := 0x0A00 | int(reg.Reg)&15<<12
 	if p.As == AMOVD {
-		o2 |= 1 << 8
+		o2 |= 0x100
 	}
 	o1 |= int(mem.Reg & 15)
-	offset := int(mem.Offset)
+	offset := int(c.offset(mem)) >> 2
 	if offset >= 0 {
 		o1 |= 0x0080
 	} else {
@@ -1457,26 +1496,239 @@ func _MOVF__s8_2_Rn__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
 	return 4
 }
 
-// 1110 1110 1d11 0001  dddd 101x 11m0 mmmm
-func _SQRTF__Fm__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
-	Fm := int(p.From.Reg)
-	Fd := int(p.To.Reg)
-	o2 := 0x0AC0 | Fd&15<<12 | Fm&15
-	if p.As == ASQRTD {
-		o2 |= 1 << 8
+func _MOVF__lit_Rn__Rt(c *Ctx, p *obj.Prog, out []uint16) int {
+	q := *p
+	if q.To.Type == obj.TYPE_MEM {
+		q.From, q.To.Type = q.To, q.From.Type
 	}
-	out[0] = 0xEEB1
+	q.As = AMOVW
+	tr := q.To.Reg
+	q.To.Reg = REGTMP
+	n := _MOVW__lit__Rd(c, &q, out)
+	if q.From.Name != obj.NAME_STATIC && q.From.Name != obj.NAME_EXTERN {
+		q.As = AADD
+		q.From.Reg = tr
+		n += _ADD__Rm__Rdn(c, &q, out[n/2:])
+	}
+	q = *p
+	mem := &q.From
+	if q.To.Type == obj.TYPE_MEM {
+		mem = &q.To
+	}
+	mem.Name = obj.NAME_NONE
+	mem.Reg = REGTMP
+	mem.Offset = 0
+	return n + _MOVF__s8_2_Rn__Fd(c, &q, out[n/2:])
+}
+
+// 1110 1110 xdxx nnnn  dddd 101x nxm0 mmmm
+func _ADDF__Fm__Fn__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
+	Fm := int(p.From.Reg) & 15
+	Fd := int(p.To.Reg) & 15
+	Fn := Fd
+	if p.Reg != 0 {
+		Fn = int(p.Reg) & 15
+	}
+	o1 := 0xEE00 | Fn
+	o2 := 0x0A00 | Fd<<12 | Fm
+	switch p.As {
+	case AADDF:
+		o1 |= 0x030
+	case AADDD:
+		o1 |= 0x030
+		o2 |= 0x100
+	case ASUBF:
+		o1 |= 0x030
+		o2 |= 0x040
+	case ASUBD:
+		o1 |= 0x030
+		o2 |= 0x140
+	case AMULF:
+		o1 |= 0x020
+	case AMULD:
+		o1 |= 0x020
+		o2 |= 0x100
+	case ADIVF:
+		o1 |= 0x080
+	case ADIVD:
+		o1 |= 0x080
+		o2 |= 0x100
+	case AMULAF:
+		// nothing
+	case AMULAD:
+		o2 |= 0x100
+	case AMULSF:
+		o2 |= 0x040
+	case AMULSD:
+		o2 |= 0x140
+	case ANMULF:
+		o1 |= 0x020
+		o2 |= 0x040
+	default: // ANMULD
+		o1 |= 0x020
+		o2 |= 0x140
+	}
+	out[0] = uint16(o1)
 	out[1] = uint16(o2)
 	return 4
 }
 
-// ********
+// 1110 1110 1d11 0xxx  dddd 101x x1m0 mmmm
+func _SQRTF__Fm__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
+	Fm := int(p.From.Reg) & 15
+	Fd := int(p.To.Reg) & 15
+	o1 := 0xEEB0
+	o2 := 0x0A40 | Fd<<12 | Fm
+	switch p.As {
+	case ASQRTF:
+		o1 |= 0x001
+		o2 |= 0x080
+	case ASQRTD:
+		o1 |= 0x001
+		o2 |= 0x180
+	case ANEGF:
+		o1 |= 0x001
+	case ANEGD:
+		o1 |= 0x001
+		o2 |= 0x100
+	case AMOVF:
+		// nothing
+	case AMOVD:
+		o2 |= 0x100
+	case AABSF:
+		o2 |= 0x080
+	case AABSD:
+		o2 |= 0x180
+	case AMOVFD:
+		o1 |= 0x007
+		o2 |= 0x080
+	default: // AMOVDF
+		o1 |= 0x007
+		o2 |= 0x180
+	}
+	out[0] = uint16(o1)
+	out[1] = uint16(o2)
+	return 4
+}
+
+// 1110 1110 00h1 nnnn  tttt 1011 n001 0000
+// 1110 1110 00h0 dddd  tttt 1011 d001 0000
+func _MOVW__Fm__Rd(c *Ctx, p *obj.Prog, out []uint16) int {
+	from := int(p.From.Reg) & 15
+	to := int(p.To.Reg) & 15
+	o1 := 0xEE00
+	o2 := 0x0B10
+	if Aclass(p.From.Class-1) == C_FREG {
+		o1 |= 0x10 | from
+		o2 |= to << 12
+	} else {
+		o1 |= to
+		o2 |= from << 12
+	}
+	out[0] = uint16(o1)
+	out[1] = uint16(o2)
+	return 4
+}
+
+// 1111 1110 1d11 1xxx  dddd 101x x1m0 mmmm
+func _MOVFW__Fm__Rd(c *Ctx, p *obj.Prog, out []uint16) int {
+	q := *p
+	Xm := int(p.From.Reg) & 15
+	Xd := int(p.To.Reg) & 15
+	Ftmp := int(FREGTMP) & 15
+	switch p.As {
+	case AMOVFW, AMOVDW:
+		o1 := 0xEEBC // from ARMv7-A RM (the ARMv7-M RM says 0xFEBC)
+		if p.Scond&C_UBIT == 0 {
+			o1 |= 1
+		}
+		o2 := 0x0AC0 | Ftmp<<12 | Xm
+		if p.As == AMOVDW {
+			o2 |= 0x100
+		}
+		out[0] = uint16(o1)
+		out[1] = uint16(o2)
+		q.From.Reg = FREGTMP
+		_MOVW__Fm__Rd(c, &q, out[2:4])
+	default: // AMOVWF, AMOVWD
+		q.To.Reg = FREGTMP
+		_MOVW__Fm__Rd(c, &q, out[0:2])
+		o1 := 0xEEB8 // from ARMv7-A RM (the ARMv7-M RM says 0xFEB8)
+		o2 := 0x0A40 | Xd<<12 | Ftmp
+		if p.As == AMOVWD {
+			o2 |= 0x100
+		}
+		if p.Scond&C_UBIT == 0 {
+			o2 |= 0x80
+		}
+		out[2] = uint16(o1)
+		out[3] = uint16(o2)
+	}
+	return 8
+}
+
+// 1110 1110 1d11 0100  dddd 101x e1m0 mmmm
+// 1110 1110 1d11 0101  dddd 101x e100 0000
+func _CMPF__Fm__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
+	o1 := 0xEEB4
+	o2 := 0x0AC0 // e=1
+	if p.As == ACMPD {
+		o2 |= 0x100
+	}
+	if p.Reg != 0 {
+		o2 |= int(p.Reg&15)<<12 | int(p.From.Reg&15)
+	} else {
+		o1 |= 1
+		o2 |= int(p.From.Reg&15) << 12
+	}
+	out[0] = uint16(o1)
+	out[1] = uint16(o2)
+	// move flags from FPSCR to APSR (VMRS R15)
+	out[2] = 0xEEF1
+	out[3] = 0xFA10
+	return 8
+}
 
 // 1110 1110 1d11 ffff  dddd 101x 0000 ffff
 func _MOVF__f8__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
-	log.Fatal("not implemented ", p)
+	v := c.chipfloat(p.From.Val.(float64))
+	o1 := 0xEEB0 | v>>4&0xF
+	o2 := 0x0A00 | int(p.To.Reg)&15<<12 | v&0xF
+	if p.As == AMOVD {
+		o2 |= 0x100
+	}
+	out[0] = uint16(o1)
+	out[1] = uint16(o2)
 	return 4
 }
+
+// 1110 1110 1d11 ffff  dddd 101x 0000 ffff
+// 1110 1110 0d11 nnnn  dddd 101x n1m0 mmmm
+func _MOVF__0__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
+	Rd := int(p.To.Reg) & 15
+
+	// MOVF $1.0, Fd
+	o1 := 0xEEB7
+	o2 := 0x0A00 | Rd<<12
+	if p.As == AMOVD {
+		o2 |= 0x100
+	}
+	out[0] = uint16(o1)
+	out[1] = uint16(o2)
+
+	// SUBF Fd, Fd, Fd
+	o1 = 0xEE30 | Rd
+	o2 = 0x0A40 | Rd<<12 | Rd
+	if p.As == AMOVD {
+		o2 |= 1 << 8
+	}
+	out[2] = uint16(o1)
+	out[3] = uint16(o2)
+
+	return 8
+}
+
+// ********
 
 func oldrstr32(p *obj.Prog) (o1, o2 int, mem *obj.Addr) {
 	var r *obj.Addr

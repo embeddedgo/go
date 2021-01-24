@@ -35,6 +35,9 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 
 
 #define PALLOC_MIN 20*1024
+#define FPU_CTRL_BASE 0xE000ED88
+#define FPU_CPACR 0x000
+#define FPU_FPCCR 0x1AC
 
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
@@ -53,6 +56,18 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOVW  R1, g_m(R0)   // cpu0.gh.m = m0
 
 	MOVW  R0, g  // we use R0 above instead of g for shorter encoding
+
+	// enable FPU if GOARM is xF or xD
+	MOVB  runtime·goarm(SB), R0
+	AND   $0xD, R0
+	CMP   $0xD, R0
+	BNE   skipFPU
+	MOVW  $FPU_CTRL_BASE, R0  // address of CPACR
+	MOVW  $3<<20, R1
+	MOVW  R1, FPU_CPACR(R0)  // full access to CP10
+	SLL   $10, R1
+	MOVW  R1, FPU_FPCCR(R0)  // set LSPEN and ASPEN
+skipFPU:
 
 	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
 	BL  runtime·check(SB)
