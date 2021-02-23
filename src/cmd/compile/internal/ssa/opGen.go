@@ -32973,7 +32973,6 @@ var opcodeTable = [...]opInfo{
 	{
 		name:         "ORN",
 		argLen:       2,
-		commutative:  true,
 		clobberFlags: true,
 		asm:          thumb.AORN,
 		reg: regInfo{

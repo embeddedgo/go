@@ -11041,69 +11041,57 @@ func rewriteValueThumb_OpThumbORN(v *Value) bool {
 	// match: (ORN x (MOVWconst [c]))
 	// result: (ORNconst [c] x)
 	for {
-		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
-			x := v_0
-			if v_1.Op != OpThumbMOVWconst {
-				continue
-			}
-			c := v_1.AuxInt
-			v.reset(OpThumbORNconst)
-			v.AuxInt = c
-			v.AddArg(x)
-			return true
+		x := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
 		}
-		break
+		c := v_1.AuxInt
+		v.reset(OpThumbORNconst)
+		v.AuxInt = c
+		v.AddArg(x)
+		return true
 	}
 	// match: (ORN x (SLLconst [c] y))
 	// result: (ORNshiftLL x y [c])
 	for {
-		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
-			x := v_0
-			if v_1.Op != OpThumbSLLconst {
-				continue
-			}
-			c := v_1.AuxInt
-			y := v_1.Args[0]
-			v.reset(OpThumbORNshiftLL)
-			v.AuxInt = c
-			v.AddArg2(x, y)
-			return true
+		x := v_0
+		if v_1.Op != OpThumbSLLconst {
+			break
 		}
-		break
+		c := v_1.AuxInt
+		y := v_1.Args[0]
+		v.reset(OpThumbORNshiftLL)
+		v.AuxInt = c
+		v.AddArg2(x, y)
+		return true
 	}
 	// match: (ORN x (SRLconst [c] y))
 	// result: (ORNshiftRL x y [c])
 	for {
-		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
-			x := v_0
-			if v_1.Op != OpThumbSRLconst {
-				continue
-			}
-			c := v_1.AuxInt
-			y := v_1.Args[0]
-			v.reset(OpThumbORNshiftRL)
-			v.AuxInt = c
-			v.AddArg2(x, y)
-			return true
+		x := v_0
+		if v_1.Op != OpThumbSRLconst {
+			break
 		}
-		break
+		c := v_1.AuxInt
+		y := v_1.Args[0]
+		v.reset(OpThumbORNshiftRL)
+		v.AuxInt = c
+		v.AddArg2(x, y)
+		return true
 	}
 	// match: (ORN x (SRAconst [c] y))
 	// result: (ORNshiftRA x y [c])
 	for {
-		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
-			x := v_0
-			if v_1.Op != OpThumbSRAconst {
-				continue
-			}
-			c := v_1.AuxInt
-			y := v_1.Args[0]
-			v.reset(OpThumbORNshiftRA)
-			v.AuxInt = c
-			v.AddArg2(x, y)
-			return true
+		x := v_0
+		if v_1.Op != OpThumbSRAconst {
+			break
 		}
-		break
+		c := v_1.AuxInt
+		y := v_1.Args[0]
+		v.reset(OpThumbORNshiftRA)
+		v.AuxInt = c
+		v.AddArg2(x, y)
+		return true
 	}
 	// match: (ORN x x)
 	// result: (MOVWconst [-1])
