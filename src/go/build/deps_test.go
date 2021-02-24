@@ -186,7 +186,7 @@ var depsRules = `
 	reflect !< OS;
 
 	OS
-	< golang.org/x/sys/cpu, internal/goroot;
+	< golang.org/x/sys/cpu;
 
 	# FMT is OS (which includes string routines) plus reflect and fmt.
 	# It does not include package log, which should be avoided in core packages.
@@ -201,6 +201,12 @@ var depsRules = `
 	< FMT;
 
 	log !< FMT;
+
+	OS, FMT
+	< internal/execabs;
+
+	OS, internal/execabs
+	< internal/goroot;
 
 	# Misc packages needing only FMT.
 	FMT
