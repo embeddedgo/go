@@ -231,8 +231,8 @@ TEXT runtime·pendsvHandler(SB),NOSPLIT|NOFRAME,$0-0
 	BL    ·identcurcpu(SB)  // current CPU context to R0
 
 	// if cpuctx.schedule then context saved by syscall
-	MOVB  (cpuctx_schedule)(R0), R3
-	CBNZ  R3, contextSaved
+	MOVBU  (cpuctx_schedule)(R0), R3
+	CBNZ   R3, contextSaved
 
 	// save not stacked registers (R4-R11), SP, CONTROL[nPRIV], EXC_RETURN
 	MOVW     (cpuctx_exe)(R0), R3
