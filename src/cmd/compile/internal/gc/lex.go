@@ -49,8 +49,11 @@ const (
 	Yeswritebarrierrec // cancels Nowritebarrierrec in this function and callees
 	Interrupthandler   // generate interrupt handler prologue / epilogue
 
-	// Runtime-only type pragmas
+	// Runtime and cgo type pragmas
 	NotInHeap // values of this type must not be heap allocated
+
+	// Go command pragmas
+	GoBuildPragma
 )
 
 const (
@@ -73,6 +76,8 @@ const (
 
 func pragmaFlag(verb string) PragmaFlag {
 	switch verb {
+	case "go:build":
+		return GoBuildPragma
 	case "go:nointerface":
 		if objabi.Fieldtrack_enabled != 0 {
 			return Nointerface

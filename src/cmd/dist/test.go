@@ -217,6 +217,9 @@ func (t *tester) run() {
 		fmt.Println("\nFAILED")
 		xexit(1)
 	} else if incomplete[goos+"/"+goarch] {
+		// The test succeeded, but consider it as failed so we don't
+		// forget to remove the port from the incomplete map once the
+		// port is complete.
 		fmt.Println("\nFAILED (incomplete port)")
 		xexit(1)
 	} else if t.partial {
@@ -241,13 +244,15 @@ func (t *tester) shouldRunTest(name string) bool {
 	return false
 }
 
-// short returns a -short flag to pass to 'go test'.
-// It returns "-short", unless the environment variable
+// short returns a -short flag value to use with 'go test'
+// or a test binary for tests intended to run in short mode.
+// It returns "true", unless the environment variable
 // GO_TEST_SHORT is set to a non-empty, false-ish string.
 //
 // This environment variable is meant to be an internal
-// detail between the Go build system and cmd/dist
-// and is not intended for use by users.
+// detail between the Go build system and cmd/dist for
+// the purpose of longtest builders, and is not intended
+// for use by users. See golang.org/issue/12508.
 func short() string {
 	if v := os.Getenv("GO_TEST_SHORT"); v != "" {
 		short, err := strconv.ParseBool(v)
@@ -255,10 +260,10 @@ func short() string {
 			fatalf("invalid GO_TEST_SHORT %q: %v", v, err)
 		}
 		if !short {
-			return "-short=false"
+			return "false"
 		}
 	}
-	return "-short"
+	return "true"
 }
 
 // goTest returns the beginning of the go test command line.
@@ -266,7 +271,7 @@ func short() string {
 // defaults as later arguments in the command line.
 func (t *tester) goTest() []string {
 	return []string{
-		"go", "test", short(), "-count=1", t.tags(), t.runFlag(""),
+		"go", "test", "-short=" + short(), "-count=1", t.tags(), t.runFlag(""),
 	}
 }
 
@@ -335,7 +340,7 @@ func (t *tester) registerStdTest(pkg string) {
 			}
 			args := []string{
 				"test",
-				short(),
+				"-short=" + short(),
 				t.tags(),
 				t.timeout(timeoutSec),
 				"-gcflags=all=" + gogcflags,
@@ -373,7 +378,7 @@ func (t *tester) registerRaceBenchTest(pkg string) {
 			ranGoBench = true
 			args := []string{
 				"test",
-				short(),
+				"-short=" + short(),
 				"-race",
 				t.timeout(1200), // longer timeout for race with benchmarks
 				"-run=^$",       // nothing. only benchmarks.
@@ -461,13 +466,14 @@ func (t *tester) registerTests() {
 		})
 	}
 
-	// Test the ios build tag on darwin/amd64 for the iOS simulator.
-	if goos == "darwin" && !t.iOS() {
+	// Test ios/amd64 for the iOS simulator.
+	if goos == "darwin" && goarch == "amd64" && t.cgoEnabled {
 		t.tests = append(t.tests, distTest{
 			name:    "amd64ios",
-			heading: "ios tag on darwin/amd64",
+			heading: "GOOS=ios on darwin/amd64",
 			fn: func(dt *distTest) error {
-				t.addCmd(dt, "src", t.goTest(), t.timeout(300), "-tags=ios", "-run=SystemRoots", "crypto/x509")
+				cmd := t.addCmd(dt, "src", t.goTest(), t.timeout(300), "-run=SystemRoots", "crypto/x509")
+				cmd.Env = append(os.Environ(), "GOOS=ios", "CGO_ENABLED=1")
 				return nil
 			},
 		})
@@ -721,14 +727,6 @@ func (t *tester) registerTests() {
 		}
 	}
 
-	// Doc tests only run on builders.
-	// They find problems approximately never.
-	if goos != "js" && goos != "android" && !t.iOS() && os.Getenv("GO_BUILDER_NAME") != "" {
-		t.registerTest("doc_progs", "../doc/progs", "go", "run", "run.go")
-		t.registerTest("wiki", "../doc/articles/wiki", t.goTest(), ".")
-		t.registerTest("codewalk", "../doc/codewalk", t.goTest(), "codewalk_test.go")
-	}
-
 	if goos != "android" && !t.iOS() {
 		// There are no tests in this directory, only benchmarks.
 		// Check that the test binary builds but don't bother running it.
@@ -901,7 +899,7 @@ func (t *tester) addCmd(dt *distTest, dir string, cmdline ...interface{}) *exec.
 }
 
 func (t *tester) iOS() bool {
-	return goos == "darwin" && goarch == "arm64"
+	return goos == "ios"
 }
 
 func (t *tester) out(v string) {
@@ -919,7 +917,7 @@ func (t *tester) extLink() bool {
 		"darwin-amd64", "darwin-arm64",
 		"dragonfly-amd64",
 		"freebsd-386", "freebsd-amd64", "freebsd-arm",
-		"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-mips64", "linux-mips64le", "linux-mips", "linux-mipsle", "linux-s390x",
+		"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-mips64", "linux-mips64le", "linux-mips", "linux-mipsle", "linux-riscv64", "linux-s390x",
 		"netbsd-386", "netbsd-amd64",
 		"openbsd-386", "openbsd-amd64",
 		"windows-386", "windows-amd64":
@@ -941,13 +939,13 @@ func (t *tester) internalLink() bool {
 	if goos == "android" {
 		return false
 	}
-	if t.iOS() {
+	if goos == "ios" {
 		return false
 	}
 	// Internally linking cgo is incomplete on some architectures.
 	// https://golang.org/issue/10373
 	// https://golang.org/issue/14449
-	if goarch == "mips64" || goarch == "mips64le" || goarch == "mips" || goarch == "mipsle" {
+	if goarch == "mips64" || goarch == "mips64le" || goarch == "mips" || goarch == "mipsle" || goarch == "riscv64" {
 		return false
 	}
 	if goos == "aix" {
@@ -959,10 +957,10 @@ func (t *tester) internalLink() bool {
 
 func (t *tester) internalLinkPIE() bool {
 	switch goos + "-" + goarch {
-	case "linux-amd64", "linux-arm64",
-		"android-arm64":
-		return true
-	case "windows-amd64", "windows-386", "windows-arm":
+	case "darwin-amd64", "darwin-arm64",
+		"linux-amd64", "linux-arm64",
+		"android-arm64",
+		"windows-amd64", "windows-386", "windows-arm":
 		return true
 	}
 	return false
@@ -977,7 +975,7 @@ func (t *tester) supportedBuildmode(mode string) bool {
 		}
 		switch pair {
 		case "aix-ppc64",
-			"darwin-amd64", "darwin-arm64",
+			"darwin-amd64", "darwin-arm64", "ios-arm64",
 			"linux-amd64", "linux-386", "linux-ppc64le", "linux-s390x",
 			"freebsd-amd64",
 			"windows-amd64", "windows-386":
@@ -987,7 +985,7 @@ func (t *tester) supportedBuildmode(mode string) bool {
 	case "c-shared":
 		switch pair {
 		case "linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-s390x",
-			"darwin-amd64",
+			"darwin-amd64", "darwin-arm64",
 			"freebsd-amd64",
 			"android-arm", "android-arm64", "android-386",
 			"windows-amd64", "windows-386":
@@ -1006,7 +1004,7 @@ func (t *tester) supportedBuildmode(mode string) bool {
 		switch pair {
 		case "linux-386", "linux-amd64", "linux-arm", "linux-s390x", "linux-ppc64le":
 			return true
-		case "darwin-amd64":
+		case "darwin-amd64", "darwin-arm64":
 			return true
 		case "freebsd-amd64":
 			return true
@@ -1015,10 +1013,10 @@ func (t *tester) supportedBuildmode(mode string) bool {
 	case "pie":
 		switch pair {
 		case "aix/ppc64",
-			"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-s390x",
+			"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-riscv64", "linux-s390x",
 			"android-amd64", "android-arm", "android-arm64", "android-386":
 			return true
-		case "darwin-amd64":
+		case "darwin-amd64", "darwin-arm64":
 			return true
 		case "windows-amd64", "windows-386", "windows-arm":
 			return true
@@ -1069,22 +1067,26 @@ func (t *tester) runHostTest(dir, pkg string) error {
 	if err := cmd.Run(); err != nil {
 		return err
 	}
-	return t.dirCmd(dir, f.Name(), "-test.short").Run()
+	return t.dirCmd(dir, f.Name(), "-test.short="+short()).Run()
 }
 
 func (t *tester) cgoTest(dt *distTest) error {
 	cmd := t.addCmd(dt, "misc/cgo/test", t.goTest())
 	cmd.Env = append(os.Environ(), "GOFLAGS=-ldflags=-linkmode=auto")
 
-	if t.internalLink() {
+	// Skip internal linking cases on arm64 to support GCC-9.4 and above,
+	// only for linux, conservatively.
+	// See issue #39466.
+	skipInternalLink := goarch == "arm64" && goos == "linux"
+
+	if t.internalLink() && !skipInternalLink {
 		cmd := t.addCmd(dt, "misc/cgo/test", t.goTest(), "-tags=internal")
 		cmd.Env = append(os.Environ(), "GOFLAGS=-ldflags=-linkmode=internal")
 	}
 
 	pair := gohostos + "-" + goarch
 	switch pair {
-	case "darwin-amd64",
-		"openbsd-386", "openbsd-amd64",
+	case "darwin-amd64", "darwin-arm64",
 		"windows-386", "windows-amd64":
 		// test linkmode=external, but __thread not supported, so skip testtls.
 		if !t.extLink() {
@@ -1095,17 +1097,26 @@ func (t *tester) cgoTest(dt *distTest) error {
 
 		cmd = t.addCmd(dt, "misc/cgo/test", t.goTest(), "-ldflags", "-linkmode=external -s")
 
+		if t.supportedBuildmode("pie") {
+			t.addCmd(dt, "misc/cgo/test", t.goTest(), "-buildmode=pie")
+			if t.internalLink() && t.internalLinkPIE() {
+				t.addCmd(dt, "misc/cgo/test", t.goTest(), "-buildmode=pie", "-ldflags=-linkmode=internal", "-tags=internal,internal_pie")
+			}
+		}
+
 	case "aix-ppc64",
 		"android-arm", "android-arm64",
 		"dragonfly-amd64",
 		"freebsd-386", "freebsd-amd64", "freebsd-arm",
-		"linux-386", "linux-amd64", "linux-arm", "linux-ppc64le", "linux-s390x",
-		"netbsd-386", "netbsd-amd64", "linux-arm64":
+		"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-riscv64", "linux-s390x",
+		"netbsd-386", "netbsd-amd64",
+		"openbsd-386", "openbsd-amd64", "openbsd-arm", "openbsd-arm64", "openbsd-mips64":
 
 		cmd := t.addCmd(dt, "misc/cgo/test", t.goTest())
 		cmd.Env = append(os.Environ(), "GOFLAGS=-ldflags=-linkmode=external")
-		// A -g argument in CGO_CFLAGS should not affect how the test runs.
-		cmd.Env = append(cmd.Env, "CGO_CFLAGS=-g0")
+		// cgo should be able to cope with both -g arguments and colored
+		// diagnostics.
+		cmd.Env = append(cmd.Env, "CGO_CFLAGS=-g0 -fdiagnostics-color")
 
 		t.addCmd(dt, "misc/cgo/testtls", t.goTest(), "-ldflags", "-linkmode=auto")
 		t.addCmd(dt, "misc/cgo/testtls", t.goTest(), "-ldflags", "-linkmode=external")
@@ -1144,8 +1155,8 @@ func (t *tester) cgoTest(dt *distTest) error {
 
 			if t.supportedBuildmode("pie") {
 				t.addCmd(dt, "misc/cgo/test", t.goTest(), "-buildmode=pie")
-				if t.internalLink() && t.internalLinkPIE() {
-					t.addCmd(dt, "misc/cgo/test", t.goTest(), "-buildmode=pie", "-ldflags=-linkmode=internal")
+				if t.internalLink() && t.internalLinkPIE() && !skipInternalLink {
+					t.addCmd(dt, "misc/cgo/test", t.goTest(), "-buildmode=pie", "-ldflags=-linkmode=internal", "-tags=internal,internal_pie")
 				}
 				t.addCmd(dt, "misc/cgo/testtls", t.goTest(), "-buildmode=pie")
 				t.addCmd(dt, "misc/cgo/nocgo", t.goTest(), "-buildmode=pie")
@@ -1425,7 +1436,6 @@ func (t *tester) testDirTest(dt *distTest, shard, shards int) error {
 
 // cgoPackages is the standard packages that use cgo.
 var cgoPackages = []string{
-	"crypto/x509",
 	"net",
 	"os/user",
 }
@@ -1491,6 +1501,7 @@ func (t *tester) makeGOROOTUnwritable() (undo func()) {
 	}
 	gocacheSubdir, _ := filepath.Rel(dir, gocache)
 
+	// Note: Can't use WalkDir here, because this has to compile with Go 1.4.
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if suffix := strings.TrimPrefix(path, dir+string(filepath.Separator)); suffix != "" {
 			if suffix == gocacheSubdir {
@@ -1570,7 +1581,7 @@ func (t *tester) prebuiltGoPackageTestBinary() string {
 func (t *tester) runPrecompiledStdTest(timeout time.Duration) error {
 	bin := t.prebuiltGoPackageTestBinary()
 	fmt.Fprintf(os.Stderr, "# %s: using pre-built %s...\n", stdMatches[0], bin)
-	cmd := exec.Command(bin, "-test.short", "-test.timeout="+timeout.String())
+	cmd := exec.Command(bin, "-test.short="+short(), "-test.timeout="+timeout.String())
 	cmd.Dir = filepath.Dir(bin)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -1600,7 +1611,9 @@ func raceDetectorSupported(goos, goarch string) bool {
 	switch goos {
 	case "linux":
 		return goarch == "amd64" || goarch == "ppc64le" || goarch == "arm64"
-	case "darwin", "freebsd", "netbsd", "windows":
+	case "darwin":
+		return goarch == "amd64" || goarch == "arm64"
+	case "freebsd", "netbsd", "windows":
 		return goarch == "amd64"
 	default:
 		return false

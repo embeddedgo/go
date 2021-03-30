@@ -48,15 +48,9 @@ func Init() (*sys.Arch, ld.Arch) {
 		Archreloc:        archreloc,
 		Archrelocvariant: archrelocvariant,
 		Trampoline:       trampoline,
-		Asmb:             asmb,
-		Asmb2:            asmb2,
 		Elfreloc1:        elfreloc1,
-		Gentext2:         gentext2,
-
-		//Adddynrel:      adddynrel,
-		//Elfsetupplt:    elfsetupplt,
-		//Machoreloc1:    machoreloc1,
-		//PEreloc1:       pereloc1,
+		ElfrelocSize:     8,
+		Gentext:          gentext,
 	}
 	return arch, theArch
 }

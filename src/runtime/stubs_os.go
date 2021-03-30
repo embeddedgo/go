@@ -14,6 +14,6 @@ func sysReserveMaxArena() (addr, size uintptr) {
 	return 0, 0
 }
 
-func sysPersistentAlloc(size, align uintptr, sysStat *uint64) *notInHeap {
+func sysPersistentAlloc(size, align uintptr, sysStat *sysMemStat) *notInHeap {
 	return nil
 }

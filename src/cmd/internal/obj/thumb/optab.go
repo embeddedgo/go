@@ -524,7 +524,7 @@ func _AND__Rm__Rdn(c *Ctx, p *obj.Prog, out []uint16) int {
 
 // 1110 0iii iiii iiii
 func _B__i11_1(c *Ctx, p *obj.Prog, out []uint16) int {
-	v := int(p.Pcond.Pc-p.Pc-pcoff) >> 1
+	v := int(p.To.Target().Pc-p.Pc-pcoff) >> 1
 	out[0] = uint16(0xE000 | v&0x7FF)
 	return 2
 }
@@ -545,7 +545,7 @@ func _B__Rm(c *Ctx, p *obj.Prog, out []uint16) int {
 
 // 1101 cccc iiii iiii
 func _Bcond__i8_1(c *Ctx, p *obj.Prog, out []uint16) int {
-	v := int(p.Pcond.Pc-p.Pc-pcoff) >> 1
+	v := int(p.To.Target().Pc-p.Pc-pcoff) >> 1
 	out[0] = uint16(0xD000 | obcond(p.As)<<8 | v&0xFF)
 	return 2
 }
@@ -557,7 +557,7 @@ func _CBZ__Rn__u6_1(c *Ctx, p *obj.Prog, out []uint16) int {
 		o1 |= 0x0800
 	}
 	Rn := int(p.From.Reg & 7)
-	v := int(p.Pcond.Pc-p.Pc-4) >> 1
+	v := int(p.To.Target().Pc-p.Pc-4) >> 1
 	out[0] = uint16(o1 | v&0x20<<4 | v&0x1F<<3 | Rn)
 	return 2
 }
@@ -1876,8 +1876,8 @@ func obcond(as obj.As) int {
 func (c *Ctx) boffsetrel(p *obj.Prog, o1, o2 int) int {
 	v := -pcoff
 	if p.To.Sym == nil {
-		if p.Pcond != nil {
-			v += int(p.Pcond.Pc - p.Pc)
+		if p.To.Target() != nil {
+			v += int(p.To.Target().Pc - p.Pc)
 		}
 		return v >> 1
 	}

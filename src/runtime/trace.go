@@ -15,6 +15,7 @@
 package runtime
 
 import (
+	"runtime/internal/atomic"
 	"runtime/internal/sys"
 	"unsafe"
 )
@@ -1065,7 +1066,7 @@ func traceGoStart() {
 	_g_ := getg().m.curg
 	_p_ := _g_.m.p
 	_g_.traceseq++
-	if _g_ == _p_.ptr().gcBgMarkWorker.ptr() {
+	if _p_.ptr().gcMarkWorkerMode != gcMarkWorkerNotWorker {
 		traceEvent(traceEvGoStartLabel, -1, uint64(_g_.goid), _g_.traceseq, trace.markWorkerLabels[_p_.ptr().gcMarkWorkerMode])
 	} else if _g_.tracelastp == _p_ {
 		traceEvent(traceEvGoStartLocal, -1, uint64(_g_.goid))
@@ -1148,11 +1149,11 @@ func traceHeapAlloc() {
 }
 
 func traceNextGC() {
-	if memstats.next_gc == ^uint64(0) {
+	if nextGC := atomic.Load64(&memstats.next_gc); nextGC == ^uint64(0) {
 		// Heap-based triggering is disabled.
 		traceEvent(traceEvNextGC, -1, 0)
 	} else {
-		traceEvent(traceEvNextGC, -1, memstats.next_gc)
+		traceEvent(traceEvNextGC, -1, nextGC)
 	}
 }
 

@@ -35,7 +35,7 @@ func sigdisable(uint32)              {}
 func sigenable(uint32)               {}
 func sigignore(uint32)               {}
 func signame(sig uint32) string      { return "" }
-func sigblock()                      {}
+func sigblock(exiting bool)          {}
 func msigrestore(sigmask sigset)     {}
 func initsig(preinit bool)           {}
 func setProcessCPUProfiler(hz int32) {}
@@ -43,6 +43,7 @@ func mpreinit(mp *m)                 {}
 func sigsave(p *sigset)              {}
 func goenvs()                        {}
 func minit()                         {}
+func mdestroy(mp *m)                 {}
 func preemptM(mp *m)                 {}
 
 //go:nosplit

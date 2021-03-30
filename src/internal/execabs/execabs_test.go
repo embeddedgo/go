@@ -20,9 +20,9 @@ func TestFixCmd(t *testing.T) {
 	cmd := &exec.Cmd{Path: "hello"}
 	fixCmd("hello", cmd)
 	if cmd.Path != "" {
-		t.Errorf("fixCmd didn't clear cmd.Path")
+		t.Error("fixCmd didn't clear cmd.Path")
 	}
-	expectedErr := fmt.Sprintf("hello resolves to executable in current directory (.%chello)", filepath.Separator)
+	expectedErr := fmt.Sprintf("hello resolves to executable relative to current directory (.%chello)", filepath.Separator)
 	if err := cmd.Run(); err == nil {
 		t.Fatal("Command.Run didn't fail")
 	} else if err.Error() != expectedErr {
@@ -37,16 +37,12 @@ func TestCommand(t *testing.T) {
 		func(s string) *Cmd { return Command(s) },
 		func(s string) *Cmd { return CommandContext(context.Background(), s) },
 	} {
-		tmpDir, err := ioutil.TempDir("", "execabs-test")
-		if err != nil {
-			t.Fatalf("ioutil.TempDir failed: %s", err)
-		}
-		defer os.RemoveAll(tmpDir)
+		tmpDir := t.TempDir()
 		executable := "execabs-test"
 		if runtime.GOOS == "windows" {
 			executable += ".exe"
 		}
-		if err = ioutil.WriteFile(filepath.Join(tmpDir, executable), []byte{1, 2, 3}, 0111); err != nil {
+		if err := ioutil.WriteFile(filepath.Join(tmpDir, executable), []byte{1, 2, 3}, 0111); err != nil {
 			t.Fatalf("ioutil.WriteFile failed: %s", err)
 		}
 		cwd, err := os.Getwd()
@@ -64,7 +60,7 @@ func TestCommand(t *testing.T) {
 			defer os.Setenv("PATH", origPath)
 			os.Setenv("PATH", fmt.Sprintf(".:%s", origPath))
 		}
-		expectedErr := fmt.Sprintf("execabs-test resolves to executable in current directory (.%c%s)", filepath.Separator, executable)
+		expectedErr := fmt.Sprintf("execabs-test resolves to executable relative to current directory (.%c%s)", filepath.Separator, executable)
 		if err = cmd("execabs-test").Run(); err == nil {
 			t.Fatalf("Command.Run didn't fail when exec.LookPath returned a relative path")
 		} else if err.Error() != expectedErr {
@@ -76,16 +72,12 @@ func TestCommand(t *testing.T) {
 func TestLookPath(t *testing.T) {
 	testenv.MustHaveExec(t)
 
-	tmpDir, err := ioutil.TempDir("", "execabs-test")
-	if err != nil {
-		t.Fatalf("ioutil.TempDir failed: %s", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	executable := "execabs-test"
 	if runtime.GOOS == "windows" {
 		executable += ".exe"
 	}
-	if err = ioutil.WriteFile(filepath.Join(tmpDir, executable), []byte{1, 2, 3}, 0111); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(tmpDir, executable), []byte{1, 2, 3}, 0111); err != nil {
 		t.Fatalf("ioutil.WriteFile failed: %s", err)
 	}
 	cwd, err := os.Getwd()
@@ -103,7 +95,7 @@ func TestLookPath(t *testing.T) {
 		defer os.Setenv("PATH", origPath)
 		os.Setenv("PATH", fmt.Sprintf(".:%s", origPath))
 	}
-	expectedErr := fmt.Sprintf("execabs-test resolves to executable in current directory (.%c%s)", filepath.Separator, executable)
+	expectedErr := fmt.Sprintf("execabs-test resolves to executable relative to current directory (.%c%s)", filepath.Separator, executable)
 	if _, err := LookPath("execabs-test"); err == nil {
 		t.Fatalf("LookPath didn't fail when finding a non-relative path")
 	} else if err.Error() != expectedErr {

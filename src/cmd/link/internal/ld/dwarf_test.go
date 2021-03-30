@@ -238,6 +238,10 @@ func TestSizes(t *testing.T) {
 	if runtime.GOOS == "plan9" {
 		t.Skip("skipping on plan9; no DWARF symbol table in executables")
 	}
+
+	// External linking may bring in C symbols with unknown size. Skip.
+	testenv.MustInternalLink(t)
+
 	t.Parallel()
 
 	// DWARF sizes should never be -1.
@@ -919,6 +923,7 @@ func TestAbstractOriginSanityIssue26237(t *testing.T) {
 
 func TestRuntimeTypeAttrInternal(t *testing.T) {
 	testenv.MustHaveGoBuild(t)
+	testenv.MustInternalLink(t)
 
 	if runtime.GOOS == "plan9" {
 		t.Skip("skipping on plan9; no DWARF symbol table in executables")
@@ -1018,6 +1023,9 @@ func main() {
 		t.Fatalf("*main.X DIE had no runtime type attr. DIE: %v", dies[0])
 	}
 
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		return // everything is PIE on ARM64, addresses are relocated
+	}
 	if rtAttr.(uint64)+types.Addr != addr {
 		t.Errorf("DWARF type offset was %#x+%#x, but test program said %#x", rtAttr.(uint64), types.Addr, addr)
 	}
@@ -1203,6 +1211,15 @@ func main() {
 		}
 	}
 
+	// When external linking, we put all symbols in the symbol table (so the
+	// external linker can find them). Skip the symbol table check.
+	// TODO: maybe there is some way to tell the external linker not to put
+	// those symbols in the executable's symbol table? Prefix the symbol name
+	// with "." or "L" to pretend it is a label?
+	if !testenv.CanInternalLink() {
+		return
+	}
+
 	syms, err := f.Symbols()
 	if err != nil {
 		t.Fatalf("error reading symbols: %v", err)
@@ -1376,6 +1393,8 @@ func TestIssue38192(t *testing.T) {
 		t.Skip("skipping on plan9; no DWARF symbol table in executables")
 	}
 
+	t.Parallel()
+
 	// Build a test program that contains a translation unit whose
 	// text (from am assembly source) contains only a single instruction.
 	tmpdir, err := ioutil.TempDir("", "TestIssue38192")
@@ -1486,6 +1505,8 @@ func TestIssue39757(t *testing.T) {
 	if runtime.GOOS == "plan9" {
 		t.Skip("skipping on plan9; no DWARF symbol table in executables")
 	}
+
+	t.Parallel()
 
 	// In this bug the DWARF line table contents for the last couple of
 	// instructions in a function were incorrect (bad file/line). This

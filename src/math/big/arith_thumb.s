@@ -30,7 +30,7 @@ E1:
 	MOVW.CC  $0, R0
 	MOVW.CS  $1, R0
 	MOVW     R0, c+36(FP)
-	RET      
+	RET
 
 
 // func subVV(z, x, y []Word) (c Word)
@@ -55,7 +55,7 @@ E2:
 	MOVW.CS  $0, R0
 	MOVW.CC  $1, R0
 	MOVW     R0, c+36(FP)
-	RET      
+	RET
 
 
 // func addVW(z, x []Word, y Word) (c Word)
@@ -68,7 +68,7 @@ TEXT ·addVW(SB),NOSPLIT,$0
 	TEQ   R1, R4
 	BNE   L3a
 	MOVW  R3, c+28(FP)
-	RET   
+	RET
 L3a:
 	MOVW.P  4(R2), R5
 	ADD.S   R3, R5
@@ -85,7 +85,7 @@ E3:
 	MOVW.CC  $0, R0
 	MOVW.CS  $1, R0
 	MOVW     R0, c+28(FP)
-	RET      
+	RET
 
 
 // func subVW(z, x []Word, y Word) (c Word)
@@ -98,7 +98,7 @@ TEXT ·subVW(SB),NOSPLIT,$0
 	TEQ   R1, R4
 	BNE   L4a
 	MOVW  R3, c+28(FP)
-	RET   
+	RET
 L4a:
 	MOVW.P  4(R2), R5
 	SUB.S   R3, R5
@@ -115,7 +115,7 @@ E4:
 	MOVW.CS  $0, R0
 	MOVW.CC  $1, R0
 	MOVW     R0, c+28(FP)
-	RET      
+	RET
 
 
 // func shlVU(z, x []Word, s uint) (c Word)
@@ -152,7 +152,7 @@ E7:
 	BNE  L7
 
 	MOVW  R7, -4(R5)
-	RET   
+	RET
 
 Y7: // copy loop, because shift 0 == shift 32
 	MOVW.W  -4(R2), R6
@@ -163,7 +163,7 @@ Y7: // copy loop, because shift 0 == shift 32
 X7:
 	MOVW  $0, R1
 	MOVW  R1, c+28(FP)
-	RET   
+	RET
 
 
 // func shrVU(z, x []Word, s uint) (c Word)
@@ -201,7 +201,7 @@ E6:
 	BNE  L6
 
 	MOVW  R7, 0(R1)
-	RET   
+	RET
 
 Y6: // copy loop, because shift 0 == shift 32
 	MOVW.P  4(R2), R6
@@ -212,7 +212,7 @@ Y6: // copy loop, because shift 0 == shift 32
 X6:
 	MOVW  $0, R1
 	MOVW  R1, c+28(FP)
-	RET   
+	RET
 
 
 // func mulAddVWW(z, x []Word, y, r Word) (c Word)
@@ -239,7 +239,7 @@ E8:
 	BNE  L8
 
 	MOVW  R4, c+32(FP)
-	RET   
+	RET
 
 
 // func addMulVVW(z, x []Word, y Word) (c Word)
@@ -269,19 +269,8 @@ E9:
 	BNE  L9
 
 	MOVW  R4, c+28(FP)
-	RET   
+	RET
 
-
-// func divWVW(z* Word, xn Word, x []Word, y Word) (r Word)
-TEXT ·divWVW(SB),NOSPLIT,$0
-	// ARM has no multiword division, so use portable code.
-	B   ·divWVW_g(SB)
-
-
-// func divWW(x1, x0, y Word) (q, r Word)
-TEXT ·divWW(SB),NOSPLIT,$0
-	// ARM has no multiword division, so use portable code.
-	B   ·divWW_g(SB)
 
 
 // func mulWW(x, y Word) (z1, z0 Word)
@@ -291,4 +280,4 @@ TEXT ·mulWW(SB),NOSPLIT,$0
 	MULLU  R1, R2, (R4, R3)
 	MOVW   R4, z1+8(FP)
 	MOVW   R3, z0+12(FP)
-	RET    
+	RET

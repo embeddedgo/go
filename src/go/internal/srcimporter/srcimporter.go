@@ -15,7 +15,6 @@ import (
 	"go/types"
 	exec "internal/execabs"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,7 +199,7 @@ func (p *Importer) parseFiles(dir string, filenames []string) ([]*ast.File, erro
 }
 
 func (p *Importer) cgo(bp *build.Package) (*ast.File, error) {
-	tmpdir, err := ioutil.TempDir("", "srcimporter")
+	tmpdir, err := os.MkdirTemp("", "srcimporter")
 	if err != nil {
 		return nil, err
 	}

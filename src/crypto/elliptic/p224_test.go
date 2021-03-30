@@ -83,14 +83,14 @@ func generateLimb(rand *rand.Rand) uint32 {
 
 func (p224FieldElement) Generate(rand *rand.Rand, size int) reflect.Value {
 	return reflect.ValueOf(p224FieldElement{
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
-		weirdLimbs[rand.Intn(len(weirdLimbs))],
+		generateLimb(rand),
+		generateLimb(rand),
+		generateLimb(rand),
+		generateLimb(rand),
+		generateLimb(rand),
+		generateLimb(rand),
+		generateLimb(rand),
+		generateLimb(rand),
 	})
 }
 

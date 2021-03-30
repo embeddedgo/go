@@ -91,10 +91,6 @@ func decodetypeIfaceMethodCount(arch *sys.Arch, p []byte) int64 {
 	return int64(decodeInuxi(arch, p[commonsize(arch)+2*arch.PtrSize:], arch.PtrSize))
 }
 
-// methodsig is a fully qualified typed method signature, like
-// "Visit(type.go/ast.Node) (type.go/ast.Visitor)".
-type methodsig string
-
 // Matches runtime/typekind.go and reflect.Kind.
 const (
 	kindArray     = 17
@@ -108,14 +104,14 @@ const (
 	kindMask      = (1 << 5) - 1
 )
 
-func decodeReloc(ldr *loader.Loader, symIdx loader.Sym, relocs *loader.Relocs, off int32) loader.Reloc2 {
+func decodeReloc(ldr *loader.Loader, symIdx loader.Sym, relocs *loader.Relocs, off int32) loader.Reloc {
 	for j := 0; j < relocs.Count(); j++ {
-		rel := relocs.At2(j)
+		rel := relocs.At(j)
 		if rel.Off() == off {
 			return rel
 		}
 	}
-	return loader.Reloc2{}
+	return loader.Reloc{}
 }
 
 func decodeRelocSym(ldr *loader.Loader, symIdx loader.Sym, relocs *loader.Relocs, off int32) loader.Sym {
@@ -283,7 +279,7 @@ func findShlibSection(ctxt *Link, path string, addr uint64) *elf.Section {
 	for _, shlib := range ctxt.Shlibs {
 		if shlib.Path == path {
 			for _, sect := range shlib.File.Sections[1:] { // skip the NULL section
-				if sect.Addr <= addr && addr <= sect.Addr+sect.Size {
+				if sect.Addr <= addr && addr < sect.Addr+sect.Size {
 					return sect
 				}
 			}

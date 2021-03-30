@@ -37,13 +37,13 @@ const (
 )
 
 func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
-	if cursym.Func.Text == nil || cursym.Func.Text.Link == nil {
+	if cursym.Func().Text == nil || cursym.Func().Text.Link == nil {
 		return
 	}
 
 	c := Ctx{ctxt: ctxt, cursym: cursym, newprog: newprog}
 
-	p := c.cursym.Func.Text
+	p := c.cursym.Func().Text
 	autoffset := int(p.To.Offset)
 	if autoffset == -4 {
 		// Historical way to mark NOFRAME.
@@ -59,25 +59,25 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 		}
 	}
 
-	cursym.Func.Locals = int32(autoffset)
-	cursym.Func.Args = p.To.Val.(int32)
-	cursym.Func.Text.Mark = AUTOIT
-	if !cursym.Func.Text.From.Sym.ISR() {
-		cursym.Func.Text.Mark |= LEAF
+	cursym.Func().Locals = int32(autoffset)
+	cursym.Func().Args = p.To.Val.(int32)
+	cursym.Func().Text.Mark = AUTOIT
+	if !cursym.Func().Text.From.Sym.ISR() {
+		cursym.Func().Text.Mark |= LEAF
 	}
 
-	for p := cursym.Func.Text; p != nil; p = p.Link {
+	for p := cursym.Func().Text; p != nil; p = p.Link {
 		switch {
 		case AITTTT <= p.As && p.As <= AITEEE:
-			cursym.Func.Text.Mark &^= AUTOIT
+			cursym.Func().Text.Mark &^= AUTOIT
 		case p.As == ABL:
-			cursym.Func.Text.Mark &^= LEAF
+			cursym.Func().Text.Mark &^= LEAF
 		}
 	}
 
 	var autosize int
-	for p := cursym.Func.Text; p != nil; p = p.Link {
-		if cursym.Func.Text.Mark&AUTOIT != 0 && p.To.Type == obj.TYPE_BRANCH &&
+	for p := cursym.Func().Text; p != nil; p = p.Link {
+		if cursym.Func().Text.Mark&AUTOIT != 0 && p.To.Type == obj.TYPE_BRANCH &&
 			ABEQ <= p.As && p.As <= ABLE {
 			// convert `Bcond label` to `B.cond label`
 			cond := byte(C_SCOND_LE)
@@ -128,19 +128,19 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				autosize += rasize
 			}
 
-			if autosize == 0 && cursym.Func.Text.Mark&LEAF == 0 {
+			if autosize == 0 && cursym.Func().Text.Mark&LEAF == 0 {
 				// A very few functions that do not return to their caller
 				// are not identified as leaves but still have no frame.
 				if ctxt.Debugvlog {
 					ctxt.Logf("save suppressed in: %s\n", cursym.Name)
 				}
-				cursym.Func.Text.Mark |= LEAF
+				cursym.Func().Text.Mark |= LEAF
 			}
 
 			c.autosize = autosize
 			p.To.Offset = int64(autosize - rasize) // FP offsets need an updated p.To.Offset.
 
-			if cursym.Func.Text.From.Sym.ISR() {
+			if cursym.Func().Text.From.Sym.ISR() {
 				// Emit the interrupt handler prologue:
 				//
 				//  PUSH  [R4-R11]
@@ -206,17 +206,17 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.As = ACPSIE
 				p = obj.Appendp(p, newprog)
 				p.As = obj.ANOP
-				bne.Pcond = p
+				bne.To.SetTarget(p)
 			}
 
-			if cursym.Func.Text.Mark&LEAF != 0 {
+			if cursym.Func().Text.Mark&LEAF != 0 {
 				cursym.Set(obj.AttrLeaf, true)
-				if cursym.Func.Text.From.Sym.NoFrame() {
+				if cursym.Func().Text.From.Sym.NoFrame() {
 					break
 				}
 			}
 
-			if !cursym.Func.Text.From.Sym.NoSplit() {
+			if !cursym.Func().Text.From.Sym.NoSplit() {
 				p = c.stacksplit(p, int32(autosize)) // emit split check
 			}
 
@@ -263,7 +263,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.Spadj = int32(autosize)
 			}
 
-			if cursym.Func.Text.From.Sym.ISR() {
+			if cursym.Func().Text.From.Sym.ISR() {
 				p = obj.Appendp(p, newprog)
 				p.As = ABL
 				p.To.Type = obj.TYPE_BRANCH
@@ -276,7 +276,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.To.Reg = REGG
 			}
 
-			if cursym.Func.Text.From.Sym.Wrapper() {
+			if cursym.Func().Text.From.Sym.Wrapper() {
 				// if(g->panic != nil && g->panic->argp == FP) g->panic->argp = bottom-of-frame
 				//
 				//	MOVW g_panic(g), R1
@@ -335,7 +335,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				mov.To.Reg = REG_R2
 
 				// B.NE branch target is MOVW above
-				bne.Pcond = mov
+				bne.To.SetTarget(mov)
 
 				// ADD $(autosize+4), R13, R3
 				p = obj.Appendp(mov, newprog)
@@ -357,7 +357,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p = obj.Appendp(p, newprog)
 				p.As = ABNE
 				p.To.Type = obj.TYPE_BRANCH
-				p.Pcond = end
+				p.To.SetTarget(end)
 
 				// ADD $4, R13, R4
 				p = obj.Appendp(p, newprog)
@@ -381,7 +381,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p = obj.Appendp(p, newprog)
 				p.As = AB
 				p.To.Type = obj.TYPE_BRANCH
-				p.Pcond = end
+				p.To.SetTarget(end)
 
 				// reset for subsequent passes
 				p = end
@@ -389,7 +389,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 
 		case obj.ARET:
 			nocache(p)
-			if cursym.Func.Text.Mark&LEAF != 0 && autosize == 0 {
+			if cursym.Func().Text.Mark&LEAF != 0 && autosize == 0 {
 				p.As = AB
 				p.From = obj.Addr{}
 				if p.To.Sym != nil { // retjmp
@@ -437,7 +437,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.To.Reg = REGLINK
 			}
 
-			if cursym.Func.Text.From.Sym.ISR() {
+			if cursym.Func().Text.From.Sym.ISR() {
 				if p.As == AMOVW {
 					// MOVW.P autosize(SP),PC -> MOVW.P autosize(SP),LR
 					p.To.Reg = REGLINK
@@ -490,8 +490,8 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.From.Reg = REGSP
 				p.To.Type = obj.TYPE_REGLIST
 				p.To.Offset = 0xFF0
-				bne.Pcond = p
-				beq.Pcond = p
+				bne.To.SetTarget(p)
+				beq.To.SetTarget(p)
 				p = obj.Appendp(p, newprog)
 				p.As = AB
 				p.To.Type = obj.TYPE_MEM
@@ -698,7 +698,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	end := c.ctxt.EndUnsafePoint(bls, c.newprog, -1)
 
 	var last *obj.Prog
-	for last = c.cursym.Func.Text; last.Link != nil; last = last.Link {
+	for last = c.cursym.Func().Text; last.Link != nil; last = last.Link {
 	}
 
 	// Now we are at the end of the function, but logically
@@ -719,7 +719,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	movw.To.Type = obj.TYPE_REG
 	movw.To.Reg = REG_R3
 
-	bls.Pcond = movw
+	bls.To.SetTarget(movw)
 
 	// BL runtime.morestack
 	call := obj.Appendp(movw, c.newprog)
@@ -729,7 +729,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	switch {
 	case c.cursym.CFunc():
 		morestack = "runtime.morestackc"
-	case !c.cursym.Func.Text.From.Sym.NeedCtxt():
+	case !c.cursym.Func().Text.From.Sym.NeedCtxt():
 		morestack = "runtime.morestack_noctxt"
 	}
 	call.To.Sym = c.ctxt.Lookup(morestack)
@@ -740,7 +740,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	b := obj.Appendp(pcdata, c.newprog)
 	b.As = obj.AJMP
 	b.To.Type = obj.TYPE_BRANCH
-	b.Pcond = c.cursym.Func.Text.Link
+	b.To.SetTarget(c.cursym.Func().Text.Link)
 	b.Spadj = +framesize
 
 	return end

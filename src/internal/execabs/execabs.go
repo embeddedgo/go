@@ -1,4 +1,4 @@
-// Copyright 2020 The Go Authors. All rights reserved.
+// Copyright 2021 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -28,7 +28,7 @@ type (
 )
 
 func relError(file, path string) error {
-	return fmt.Errorf("%s resolves to executable in current directory (.%c%s)", file, filepath.Separator, path)
+	return fmt.Errorf("%s resolves to executable relative to current directory (.%c%s)", file, filepath.Separator, path)
 }
 
 func LookPath(file string) (string, error) {

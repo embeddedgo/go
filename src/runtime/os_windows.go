@@ -21,6 +21,7 @@ const (
 //go:cgo_import_dynamic runtime._CreateIoCompletionPort CreateIoCompletionPort%4 "kernel32.dll"
 //go:cgo_import_dynamic runtime._CreateThread CreateThread%6 "kernel32.dll"
 //go:cgo_import_dynamic runtime._CreateWaitableTimerA CreateWaitableTimerA%3 "kernel32.dll"
+//go:cgo_import_dynamic runtime._CreateWaitableTimerExW CreateWaitableTimerExW%4 "kernel32.dll"
 //go:cgo_import_dynamic runtime._DuplicateHandle DuplicateHandle%7 "kernel32.dll"
 //go:cgo_import_dynamic runtime._ExitProcess ExitProcess%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._FreeEnvironmentStringsW FreeEnvironmentStringsW%1 "kernel32.dll"
@@ -36,10 +37,7 @@ const (
 //go:cgo_import_dynamic runtime._SetThreadContext SetThreadContext%2 "kernel32.dll"
 //go:cgo_import_dynamic runtime._LoadLibraryW LoadLibraryW%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._LoadLibraryA LoadLibraryA%1 "kernel32.dll"
-//go:cgo_import_dynamic runtime._OpenProcess OpenProcess%3 "kernel32.dll"
 //go:cgo_import_dynamic runtime._PostQueuedCompletionStatus PostQueuedCompletionStatus%4 "kernel32.dll"
-//go:cgo_import_dynamic runtime._ProcessIdToSessionId ProcessIdToSessionId%2 "kernel32.dll"
-//go:cgo_import_dynamic runtime._QueryFullProcessImageNameA QueryFullProcessImageNameA%4 "kernel32.dll"
 //go:cgo_import_dynamic runtime._ResumeThread ResumeThread%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SetConsoleCtrlHandler SetConsoleCtrlHandler%2 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SetErrorMode SetErrorMode%1 "kernel32.dll"
@@ -48,6 +46,7 @@ const (
 //go:cgo_import_dynamic runtime._SetThreadPriority SetThreadPriority%2 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SetUnhandledExceptionFilter SetUnhandledExceptionFilter%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SetWaitableTimer SetWaitableTimer%6 "kernel32.dll"
+//go:cgo_import_dynamic runtime._Sleep Sleep%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SuspendThread SuspendThread%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._SwitchToThread SwitchToThread%0 "kernel32.dll"
 //go:cgo_import_dynamic runtime._TlsAlloc TlsAlloc%0 "kernel32.dll"
@@ -71,6 +70,7 @@ var (
 	_CreateIoCompletionPort,
 	_CreateThread,
 	_CreateWaitableTimerA,
+	_CreateWaitableTimerExW,
 	_DuplicateHandle,
 	_ExitProcess,
 	_FreeEnvironmentStringsW,
@@ -87,10 +87,7 @@ var (
 	_SetThreadContext,
 	_LoadLibraryW,
 	_LoadLibraryA,
-	_OpenProcess,
 	_PostQueuedCompletionStatus,
-	_ProcessIdToSessionId,
-	_QueryFullProcessImageNameA,
 	_QueryPerformanceCounter,
 	_QueryPerformanceFrequency,
 	_ResumeThread,
@@ -101,6 +98,7 @@ var (
 	_SetThreadPriority,
 	_SetUnhandledExceptionFilter,
 	_SetWaitableTimer,
+	_Sleep,
 	_SuspendThread,
 	_SwitchToThread,
 	_TlsAlloc,
@@ -134,8 +132,7 @@ var (
 	// Load ntdll.dll manually during startup, otherwise Mingw
 	// links wrong printf function to cgo executable (see issue
 	// 12030 for details).
-	_NtWaitForSingleObject     stdFunction
-	_NtQueryInformationProcess stdFunction
+	_NtWaitForSingleObject stdFunction
 
 	// These are from non-kernel32.dll, so we prefer to LoadLibraryEx them.
 	_timeBeginPeriod,
@@ -157,6 +154,8 @@ type mOS struct {
 
 	waitsema   uintptr // semaphore for parking on locks
 	resumesema uintptr // semaphore to indicate suspend/resume
+
+	highResTimer uintptr // high resolution timer handle used in usleep
 
 	// preemptExtLock synchronizes preemptM with entry/exit from
 	// external C code.
@@ -262,7 +261,6 @@ func loadOptionalSyscalls() {
 		throw("ntdll.dll not found")
 	}
 	_NtWaitForSingleObject = windowsFindfunc(n32, []byte("NtWaitForSingleObject\000"))
-	_NtQueryInformationProcess = windowsFindfunc(n32, []byte("NtQueryInformationProcess\000"))
 
 	if GOARCH == "arm" {
 		_QueryPerformanceCounter = windowsFindfunc(k32, []byte("QueryPerformanceCounter\000"))
@@ -410,15 +408,61 @@ const osRelaxMinNS = 60 * 1e6
 // osRelax is called by the scheduler when transitioning to and from
 // all Ps being idle.
 //
-// On Windows, it adjusts the system-wide timer resolution. Go needs a
+// Some versions of Windows have high resolution timer. For those
+// versions osRelax is noop.
+// For Windows versions without high resolution timer, osRelax
+// adjusts the system-wide timer resolution. Go needs a
 // high resolution timer while running and there's little extra cost
 // if we're already using the CPU, but if all Ps are idle there's no
 // need to consume extra power to drive the high-res timer.
 func osRelax(relax bool) uint32 {
+	if haveHighResTimer {
+		// If the high resolution timer is available, the runtime uses the timer
+		// to sleep for short durations. This means there's no need to adjust
+		// the global clock frequency.
+		return 0
+	}
+
 	if relax {
 		return uint32(stdcall1(_timeEndPeriod, 1))
 	} else {
 		return uint32(stdcall1(_timeBeginPeriod, 1))
+	}
+}
+
+// haveHighResTimer indicates that the CreateWaitableTimerEx
+// CREATE_WAITABLE_TIMER_HIGH_RESOLUTION flag is available.
+var haveHighResTimer = false
+
+// createHighResTimer calls CreateWaitableTimerEx with
+// CREATE_WAITABLE_TIMER_HIGH_RESOLUTION flag to create high
+// resolution timer. createHighResTimer returns new timer
+// handle or 0, if CreateWaitableTimerEx failed.
+func createHighResTimer() uintptr {
+	const (
+		// As per @jstarks, see
+		// https://github.com/golang/go/issues/8687#issuecomment-656259353
+		_CREATE_WAITABLE_TIMER_HIGH_RESOLUTION = 0x00000002
+
+		_SYNCHRONIZE        = 0x00100000
+		_TIMER_QUERY_STATE  = 0x0001
+		_TIMER_MODIFY_STATE = 0x0002
+	)
+	return stdcall4(_CreateWaitableTimerExW, 0, 0,
+		_CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+		_SYNCHRONIZE|_TIMER_QUERY_STATE|_TIMER_MODIFY_STATE)
+}
+
+func initHighResTimer() {
+	if GOARCH == "arm" {
+		// TODO: Not yet implemented.
+		return
+	}
+	h := createHighResTimer()
+	if h != 0 {
+		haveHighResTimer = true
+		usleep2Addr = unsafe.Pointer(funcPC(usleep2HighRes))
+		stdcall1(_CloseHandle, h)
 	}
 }
 
@@ -437,6 +481,7 @@ func osinit() {
 
 	stdcall2(_SetConsoleCtrlHandler, funcPC(ctrlhandler), 1)
 
+	initHighResTimer()
 	timeBeginPeriodRetValue = osRelax(false)
 
 	ncpu = getproccount()
@@ -843,18 +888,30 @@ func clearSignalHandlers() {
 }
 
 //go:nosplit
-func sigblock() {
+func sigblock(exiting bool) {
 }
 
 // Called to initialize a new m (including the bootstrap m).
 // Called on the new thread, cannot allocate memory.
 func minit() {
 	var thandle uintptr
-	stdcall7(_DuplicateHandle, currentProcess, currentThread, currentProcess, uintptr(unsafe.Pointer(&thandle)), 0, 0, _DUPLICATE_SAME_ACCESS)
+	if stdcall7(_DuplicateHandle, currentProcess, currentThread, currentProcess, uintptr(unsafe.Pointer(&thandle)), 0, 0, _DUPLICATE_SAME_ACCESS) == 0 {
+		print("runtime.minit: duplicatehandle failed; errno=", getlasterror(), "\n")
+		throw("runtime.minit: duplicatehandle failed")
+	}
 
 	mp := getg().m
 	lock(&mp.threadLock)
 	mp.thread = thandle
+
+	// Configure usleep timer, if possible.
+	if mp.highResTimer == 0 && haveHighResTimer {
+		mp.highResTimer = createHighResTimer()
+		if mp.highResTimer == 0 {
+			print("runtime: CreateWaitableTimerEx failed; errno=", getlasterror(), "\n")
+			throw("CreateWaitableTimerEx when creating timer failed")
+		}
+	}
 	unlock(&mp.threadLock)
 
 	// Query the true stack base from the OS. Currently we're
@@ -890,9 +947,29 @@ func minit() {
 func unminit() {
 	mp := getg().m
 	lock(&mp.threadLock)
-	stdcall1(_CloseHandle, mp.thread)
-	mp.thread = 0
+	if mp.thread != 0 {
+		stdcall1(_CloseHandle, mp.thread)
+		mp.thread = 0
+	}
 	unlock(&mp.threadLock)
+}
+
+// Called from exitm, but not from drop, to undo the effect of thread-owned
+// resources in minit, semacreate, or elsewhere. Do not take locks after calling this.
+//go:nosplit
+func mdestroy(mp *m) {
+	if mp.highResTimer != 0 {
+		stdcall1(_CloseHandle, mp.highResTimer)
+		mp.highResTimer = 0
+	}
+	if mp.waitsema != 0 {
+		stdcall1(_CloseHandle, mp.waitsema)
+		mp.waitsema = 0
+	}
+	if mp.resumesema != 0 {
+		stdcall1(_CloseHandle, mp.resumesema)
+		mp.resumesema = 0
+	}
 }
 
 // Calling stdcall on os stack.
@@ -984,9 +1061,12 @@ func stdcall7(fn stdFunction, a0, a1, a2, a3, a4, a5, a6 uintptr) uintptr {
 	return stdcall(fn)
 }
 
-// in sys_windows_386.s and sys_windows_amd64.s
+// In sys_windows_386.s and sys_windows_amd64.s.
 func onosstack(fn unsafe.Pointer, arg uint32)
+
+// These are not callable functions. They should only be called via onosstack.
 func usleep2(usec uint32)
+func usleep2HighRes(usec uint32)
 func switchtothread()
 
 var usleep2Addr unsafe.Pointer
@@ -1003,63 +1083,6 @@ func usleep(us uint32) {
 	onosstack(usleep2Addr, 10*us)
 }
 
-// isWindowsService returns whether the process is currently executing as a
-// Windows service. The below technique looks a bit hairy, but it's actually
-// exactly what the .NET framework does for the similarly named function:
-// https://github.com/dotnet/extensions/blob/f4066026ca06984b07e90e61a6390ac38152ba93/src/Hosting/WindowsServices/src/WindowsServiceHelpers.cs#L26-L31
-// Specifically, it looks up whether the parent process has session ID zero
-// and is called "services".
-func isWindowsService() bool {
-	const (
-		_CURRENT_PROCESS                   = ^uintptr(0)
-		_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-	)
-	// pbi is a PROCESS_BASIC_INFORMATION struct, where we just care about
-	// the 6th pointer inside of it, which contains the pid of the process
-	// parent:
-	// https://github.com/wine-mirror/wine/blob/42cb7d2ad1caba08de235e6319b9967296b5d554/include/winternl.h#L1294
-	var pbi [6]uintptr
-	var pbiLen uint32
-	err := stdcall5(_NtQueryInformationProcess, _CURRENT_PROCESS, 0, uintptr(unsafe.Pointer(&pbi[0])), uintptr(unsafe.Sizeof(pbi)), uintptr(unsafe.Pointer(&pbiLen)))
-	if err != 0 {
-		return false
-	}
-	var psid uint32
-	err = stdcall2(_ProcessIdToSessionId, pbi[5], uintptr(unsafe.Pointer(&psid)))
-	if err == 0 || psid != 0 {
-		return false
-	}
-	pproc := stdcall3(_OpenProcess, _PROCESS_QUERY_LIMITED_INFORMATION, 0, pbi[5])
-	if pproc == 0 {
-		return false
-	}
-	defer stdcall1(_CloseHandle, pproc)
-	// exeName gets the path to the executable image of the parent process
-	var exeName [261]byte
-	exeNameLen := uint32(len(exeName) - 1)
-	err = stdcall4(_QueryFullProcessImageNameA, pproc, 0, uintptr(unsafe.Pointer(&exeName[0])), uintptr(unsafe.Pointer(&exeNameLen)))
-	if err == 0 || exeNameLen == 0 {
-		return false
-	}
-	servicesLower := "services.exe"
-	servicesUpper := "SERVICES.EXE"
-	i := int(exeNameLen) - 1
-	j := len(servicesLower) - 1
-	if i < j {
-		return false
-	}
-	for {
-		if j == -1 {
-			return i == -1 || exeName[i] == '\\'
-		}
-		if exeName[i] != servicesLower[j] && exeName[i] != servicesUpper[j] {
-			return false
-		}
-		i--
-		j--
-	}
-}
-
 func ctrlhandler1(_type uint32) uint32 {
 	var s uint32
 
@@ -1073,12 +1096,12 @@ func ctrlhandler1(_type uint32) uint32 {
 	}
 
 	if sigsend(s) {
+		if s == _SIGTERM {
+			// Windows terminates the process after this handler returns.
+			// Block indefinitely to give signal handlers a chance to clean up.
+			stdcall1(_Sleep, uintptr(_INFINITE))
+		}
 		return 1
-	}
-	if !islibrary && !isarchive && !isWindowsService() {
-		// Only exit the program if we don't have a DLL or service.
-		// See https://golang.org/issues/35965 and https://golang.org/issues/40167
-		exit(2) // SIGINT, SIGTERM, etc
 	}
 	return 0
 }
@@ -1135,8 +1158,12 @@ func profileloop1(param uintptr) uint32 {
 			}
 			// Acquire our own handle to the thread.
 			var thread uintptr
-			stdcall7(_DuplicateHandle, currentProcess, mp.thread, currentProcess, uintptr(unsafe.Pointer(&thread)), 0, 0, _DUPLICATE_SAME_ACCESS)
+			if stdcall7(_DuplicateHandle, currentProcess, mp.thread, currentProcess, uintptr(unsafe.Pointer(&thread)), 0, 0, _DUPLICATE_SAME_ACCESS) == 0 {
+				print("runtime.profileloop1: duplicatehandle failed; errno=", getlasterror(), "\n")
+				throw("runtime.profileloop1: duplicatehandle failed")
+			}
 			unlock(&mp.threadLock)
+
 			// mp may exit between the DuplicateHandle
 			// above and the SuspendThread. The handle
 			// will remain valid, but SuspendThread may
@@ -1215,7 +1242,10 @@ func preemptM(mp *m) {
 		return
 	}
 	var thread uintptr
-	stdcall7(_DuplicateHandle, currentProcess, mp.thread, currentProcess, uintptr(unsafe.Pointer(&thread)), 0, 0, _DUPLICATE_SAME_ACCESS)
+	if stdcall7(_DuplicateHandle, currentProcess, mp.thread, currentProcess, uintptr(unsafe.Pointer(&thread)), 0, 0, _DUPLICATE_SAME_ACCESS) == 0 {
+		print("runtime.preemptM: duplicatehandle failed; errno=", getlasterror(), "\n")
+		throw("runtime.preemptM: duplicatehandle failed")
+	}
 	unlock(&mp.threadLock)
 
 	// Prepare thread context buffer. This must be aligned to 16 bytes.

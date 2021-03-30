@@ -80,19 +80,19 @@ func sysReserve(v unsafe.Pointer, size uintptr) unsafe.Pointer {
 }
 
 //go:nosplit
-func sysAlloc(size uintptr, sysStat *uint64) unsafe.Pointer {
+func sysAlloc(size uintptr, sysStat *sysMemStat) unsafe.Pointer {
 	size += (_PageSize - 1)
 	size &^= (_PageSize - 1)
 	p := sysReserve1(size)
 	if p != nil {
-		mSysStatInc(sysStat, size)
+		sysStat.add(int64(size))
 	}
 	return p
 }
 
 // align must be power of two
 //go:nosplit
-func sysPersistentAlloc(size, align uintptr, sysStat *uint64) (p *notInHeap) {
+func sysPersistentAlloc(size, align uintptr, sysStat *sysMemStat) (p *notInHeap) {
 	if size&(_PageSize-1) == 0 {
 		p = (*notInHeap)(sysReserve1(size))
 	} else {
@@ -109,18 +109,18 @@ func sysPersistentAlloc(size, align uintptr, sysStat *uint64) (p *notInHeap) {
 	if p == nil {
 		throw("runtime: cannot allocate memory")
 	}
-	mSysStatInc(sysStat, size)
+	sysStat.add(int64(size))
 	return
 }
 
 //go:nosplit
-func sysMap(v unsafe.Pointer, n uintptr, sysStat *uint64) {
-	mSysStatInc(sysStat, n)
+func sysMap(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
+	sysStat.add(int64(n))
 }
 
 //go:nosplit
-func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
-	mSysStatDec(sysStat, n)
+func sysFree(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
+	sysStat.add(-int64(n))
 }
 
 func sysUnused(v unsafe.Pointer, n uintptr)   {}

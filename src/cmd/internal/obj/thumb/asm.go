@@ -542,7 +542,7 @@ func (c *Ctx) oplook(p *obj.Prog) (ret *Optab) {
 
 	//fmt.Printf("\t%-12v %-12v %-12v %04b\n", a1, a2, a3, p.Scond>>4)
 
-	autoit := c.cursym.Func.Text.Mark&AUTOIT != 0
+	autoit := c.cursym.Func().Text.Mark&AUTOIT != 0
 	cond := p.Scond & 0xF
 again:
 	if autoit {
@@ -706,7 +706,7 @@ again:
 }
 
 func (c *Ctx) brlook(p *obj.Prog) *Optab {
-	v := (p.Pcond.Pc - p.Pc - 4) >> 1
+	v := (p.To.Target().Pc - p.Pc - 4) >> 1
 	var a3 Aclass
 	switch {
 	case 0 <= v && v < 1<<6:
@@ -752,7 +752,7 @@ func debug(p *obj.Prog) {
 }
 
 func (c *Ctx) litoffset(p *obj.Prog, reglo bool, pcdiff int) (offset int, short bool) {
-	v := int(p.Pcond.Pc - p.Pc&^3 - 4)
+	v := int(p.Pool.Pc - p.Pc&^3 - 4)
 	if v > 0 {
 		v += pcdiff // forward literal
 	}
@@ -768,7 +768,7 @@ func span(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 		ctxt.Diag("-spectre=ret not supported on thumb")
 		ctxt.Retpoline = false // don't keep printing
 	}
-	p := cursym.Func.Text
+	p := cursym.Func().Text
 	if p == nil || p.Link == nil {
 		return // external functions or ELF section symbol
 	}
@@ -824,7 +824,7 @@ func span(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 	// TODO: jump across functions needs reloc and always uses 32-bit instruction
 
 	for {
-		p = c.cursym.Func.Text
+		p = c.cursym.Func().Text
 		pc = 0
 		changed := false
 		for p.Link != nil {
@@ -839,7 +839,7 @@ func span(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 			}
 			var o *Optab
 			var m int
-			if p.To.Type == obj.TYPE_BRANCH && p.Pcond != nil && p.To.Sym == nil {
+			if p.To.Type == obj.TYPE_BRANCH && p.To.Target() != nil && p.To.Sym == nil {
 				o = c.brlook(p)
 				m = int(o.size) & 0xF
 			} else {
@@ -890,12 +890,12 @@ func span(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 	c.cursym.Grow(c.cursym.Size)
 	bp := c.cursym.P
 	var out [8]uint16
-	p = c.cursym.Func.Text
+	p = c.cursym.Func().Text
 	pc = int(p.Pc)
 	for p.Link != nil {
 		p = p.Link
 		var o *Optab
-		if p.To.Type == obj.TYPE_BRANCH && p.Pcond != nil {
+		if p.To.Type == obj.TYPE_BRANCH && p.To.Target() != nil {
 			o = c.brlook(p)
 		} else {
 			o = c.oplook(p)
@@ -958,7 +958,7 @@ func (c *Ctx) addpool(p *obj.Prog, a *obj.Addr, pc int) {
 	}
 	for q := c.blitrl; q != nil; q = q.Link {
 		if q.Rel == nil && q.To == t.To {
-			p.Pcond = q
+			p.Pool = q
 			return
 		}
 	}
@@ -970,7 +970,7 @@ func (c *Ctx) addpool(p *obj.Prog, a *obj.Addr, pc int) {
 	}
 	c.elitrl = t
 	c.pool.size += 4
-	p.Pcond = t // store the link to the pool entry in Pcond
+	p.Pool = t // store the link to the pool entry in Pool
 }
 
 func (c *Ctx) flushpool(p *obj.Prog, pc int, skip bool) (*obj.Prog, int) {
@@ -978,7 +978,7 @@ func (c *Ctx) flushpool(p *obj.Prog, pc int, skip bool) (*obj.Prog, int) {
 		q := c.newprog()
 		q.As = AB
 		q.To.Type = obj.TYPE_BRANCH
-		q.Pcond = p.Link
+		q.To.SetTarget(p.Link)
 		q.Pos = p.Pos
 		q.Link = c.blitrl
 		c.blitrl = q
