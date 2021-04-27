@@ -550,8 +550,11 @@ func (state *pclntab) generateFunctab(ctxt *Link, funcs []loader.Sym, inlSyms ma
 			// We need to write the offset.
 			setAddr = func(s *loader.SymbolBuilder, arch *sys.Arch, off int64, tgt loader.Sym, add int64) int64 {
 				if v := ldr.SymValue(tgt); v != 0 {
-					if arch.Family == sys.Thumb {
-						add += 1
+					if arch.Family == sys.Thumb && (ldr.SymType(tgt) == sym.STEXT || ldr.SymType(tgt) == sym.SABIALIAS) {
+						if add&1 != 0 {
+							panic("generateFunctab: thumb bit already set")
+						}
+						add |= 1
 					}
 					s.SetUint(arch, off, uint64(v+add))
 				}

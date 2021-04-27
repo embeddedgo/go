@@ -47,8 +47,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"unicode"
 	"sync/atomic"
+	"unicode"
 )
 
 // isRuntimeDepPkg reports whether pkg is the runtime package or its dependency
@@ -356,12 +356,11 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 
 			o = ldr.SymValue(rs) + r.Add()
 
-			if !dwarf && target.IsThumb() {
-				fmt.Println("*** sym:", ldr.SymName(r.Sym()), ldr.SymType(r.Sym()), "o:", o)
-			}
-
-			if !dwarf && target.IsThumb() && ldr.SymType(r.Sym()) == sym.STEXT {
-				o += 1 // thumb function call address
+			if !dwarf && target.IsThumb() && (ldr.SymType(r.Sym()) == sym.STEXT || ldr.SymType(r.Sym()) == sym.SABIALIAS) {
+				if o&1 != 0 {
+					panic("relocsym: thumb bit already set")
+				}
+				o |= 1
 			}
 
 			// On amd64, 4-byte offsets will be sign-extended, so it is impossible to
