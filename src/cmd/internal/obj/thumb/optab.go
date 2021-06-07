@@ -892,7 +892,7 @@ func _Bcond__ji20_1(c *Ctx, p *obj.Prog, out []uint16) int {
 	o1 := 0xF000 | obcond(p.As)<<6
 	o2 := 0x8000
 	v := c.boffsetrel(p, o1, o2)
-	out[0] = uint16(o1 | v>>6&0x400 | v>>11&0x3F)
+	out[0] = uint16(o1 | v>>9&0x400 | v>>11&0x3F)
 	out[1] = uint16(o2 | v>>4&0x2000 | v>>7&0x800 | v&0x7FF)
 	return 4
 }
