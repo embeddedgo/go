@@ -33,6 +33,7 @@ const (
 	ENOSPC
 	EBADF
 	ECANCELED
+	EINTR // for os package only, never returned
 )
 
 var errors = [...]string{
@@ -51,12 +52,11 @@ var errors = [...]string{
 	ENOSPC:       "no space left on device",
 	EBADF:        "bad file descriptor",
 	ECANCELED:    "operation canceled",
+	EINTR:        "interrupt",
 }
 
 func (e Errno) Is(target error) bool {
 	switch target {
-	case oserror.ErrInvalid:
-		return e == EINVAL
 	case oserror.ErrPermission:
 		return e == EACCES || e == EPERM
 	case oserror.ErrExist:

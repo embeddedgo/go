@@ -112,6 +112,7 @@ func asmb2(ctxt *Link) {
 		objabi.Hfreebsd,
 		objabi.Hlinux,
 		objabi.Hnetbsd,
+		objabi.Hnoos,
 		objabi.Hopenbsd,
 		objabi.Hsolaris:
 		asmbElf(ctxt)

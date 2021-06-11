@@ -36,7 +36,7 @@ func NewFile(fd uintptr, name string) *File {
 	return nil
 }
 
-func (f *File) readdir(n int) (fi []FileInfo, err error) {
+func (f *File) readdir(n int, mode readdirMode) (names []string, dirents []DirEntry, fi []FileInfo, err error) {
 	{
 		ff, ok := f.f.(interface {
 			ReadDir(n int) ([]fs.DirEntry, error)
@@ -45,21 +45,32 @@ func (f *File) readdir(n int) (fi []FileInfo, err error) {
 			err = syscall.ENOTSUP
 			goto error
 		}
-		list, err := ff.ReadDir(n)
+		dirents, err := ff.ReadDir(n)
 		if err != nil {
 			goto error
 		}
-		fi = make([]FileInfo, len(list))
-		for i, de := range list {
-			fi[i], err = de.Info()
-			if err != nil {
-				goto error
+		switch mode {
+		case readdirName:
+			names = make([]string, len(dirents))
+			for i, de := range dirents {
+				names[i] = de.Name()
 			}
+			return names, nil, nil, err
+		case readdirDirEntry:
+			return nil, dirents, nil, err
+		default:
+			fi = make([]FileInfo, len(dirents))
+			for i, de := range dirents {
+				fi[i], err = de.Info()
+				if err != nil {
+					goto error
+				}
+			}
+			return nil, nil, fi, err
 		}
-		return fi, nil
 	}
 error:
-	return nil, f.wrapErr("readdir", err)
+	return nil, nil, nil, f.wrapErr("readdir", err)
 }
 
 func (f *File) checkValid(op string) error {
@@ -220,6 +231,10 @@ func newRawConn(file *File) (*rawConn, error) {
 
 func hostname() (name string, err error) {
 	return "", syscall.ENOTSUP
+}
+
+func ignoringEINTR(fn func() error) error {
+	return fn()
 }
 
 // provided by package embedded/rtos
