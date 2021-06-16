@@ -75,7 +75,7 @@
 #define lr   1
 #define x2   2
 #define gp   3
-#define G    4
+#define tp   4
 #define t0   5
 #define t1   6
 #define t2   7
@@ -98,7 +98,7 @@
 #define s8  24
 #define s9  25
 #define s10 26
-#define s11 27
+#define G   27
 #define t3  28
 #define t4  29
 #define t5  30
@@ -116,30 +116,30 @@
 \ // LR saved separately
 \ // SP saved separately
 MOV  GP, (0*8+offset)(base) \
-\ // g saved separately
-MOV  T0, (1*8+offset)(base) \
-MOV  T1, (2*8+offset)(base) \
-MOV  T2, (3*8+offset)(base) \
-MOV  S0, (4*8+offset)(base) \
-MOV  S1, (5*8+offset)(base) \
+MOV  TP, (1*8+offset)(base) \
+MOV  T0, (2*8+offset)(base) \
+MOV  T1, (3*8+offset)(base) \
+MOV  T2, (4*8+offset)(base) \
+MOV  S0, (5*8+offset)(base) \
+MOV  S1, (6*8+offset)(base) \
 \ // A0 saved separately
-MOV  A1, (6*8+offset)(base) \
-MOV  A2, (7*8+offset)(base) \
-MOV  A3, (8*8+offset)(base) \
-MOV  A4, (9*8+offset)(base) \
-MOV  A5, (10*8+offset)(base) \
-MOV  A6, (11*8+offset)(base) \
-MOV  A7, (12*8+offset)(base) \
-MOV  S2, (13*8+offset)(base) \
-MOV  S3, (14*8+offset)(base) \
-MOV  S4, (15*8+offset)(base) \
-MOV  S5, (16*8+offset)(base) \
-MOV  S6, (17*8+offset)(base) \
-MOV  S7, (18*8+offset)(base) \
-MOV  S8, (19*8+offset)(base) \
-MOV  S9, (20*8+offset)(base) \
-MOV  S10, (21*8+offset)(base) \
-MOV  S11, (22*8+offset)(base) \
+MOV  A1, (7*8+offset)(base) \
+MOV  A2, (8*8+offset)(base) \
+MOV  A3, (9*8+offset)(base) \
+MOV  A4, (10*8+offset)(base) \
+MOV  A5, (11*8+offset)(base) \
+MOV  A6, (12*8+offset)(base) \
+MOV  A7, (13*8+offset)(base) \
+MOV  S2, (14*8+offset)(base) \
+MOV  S3, (15*8+offset)(base) \
+MOV  S4, (16*8+offset)(base) \
+MOV  S5, (17*8+offset)(base) \
+MOV  S6, (18*8+offset)(base) \
+MOV  S7, (19*8+offset)(base) \
+MOV  S8, (20*8+offset)(base) \
+MOV  S9, (21*8+offset)(base) \
+MOV  S10, (22*8+offset)(base) \
+\ // g saved separately
 MOV  T3, (23*8+offset)(base) \
 MOV  T4, (24*8+offset)(base) \
 MOV  T5, (25*8+offset)(base) \
@@ -149,30 +149,30 @@ MOV  TMP, (26*8+offset)(base)
 \ // LR loaded separately
 \ // SP loaded separately
 MOV  (0*8+offset)(base), GP \
-\ // g loaded separately
-MOV  (1*8+offset)(base), T0 \
-MOV  (2*8+offset)(base), T1 \
-MOV  (3*8+offset)(base), T2 \
-MOV  (4*8+offset)(base), S0 \
-MOV  (5*8+offset)(base), S1 \
+MOV  (1*8+offset)(base), TP \
+MOV  (2*8+offset)(base), T0 \
+MOV  (3*8+offset)(base), T1 \
+MOV  (4*8+offset)(base), T2 \
+MOV  (5*8+offset)(base), S0 \
+MOV  (6*8+offset)(base), S1 \
 \ // A0 loaded separately
-MOV  (6*8+offset)(base), A1 \
-MOV  (7*8+offset)(base), A2 \
-MOV  (8*8+offset)(base), A3 \
-MOV  (9*8+offset)(base), A4 \
-MOV  (10*8+offset)(base), A5 \
-MOV  (11*8+offset)(base), A6 \
-MOV  (12*8+offset)(base), A7 \
-MOV  (13*8+offset)(base), S2 \
-MOV  (14*8+offset)(base), S3 \
-MOV  (15*8+offset)(base), S4 \
-MOV  (16*8+offset)(base), S5 \
-MOV  (17*8+offset)(base), S6 \
-MOV  (18*8+offset)(base), S7 \
-MOV  (19*8+offset)(base), S8 \
-MOV  (20*8+offset)(base), S9 \
-MOV  (21*8+offset)(base), S10 \
-MOV  (22*8+offset)(base), S11 \
+MOV  (7*8+offset)(base), A1 \
+MOV  (8*8+offset)(base), A2 \
+MOV  (9*8+offset)(base), A3 \
+MOV  (10*8+offset)(base), A4 \
+MOV  (11*8+offset)(base), A5 \
+MOV  (12*8+offset)(base), A6 \
+MOV  (13*8+offset)(base), A7 \
+MOV  (14*8+offset)(base), S2 \
+MOV  (15*8+offset)(base), S3 \
+MOV  (16*8+offset)(base), S4 \
+MOV  (17*8+offset)(base), S5 \
+MOV  (18*8+offset)(base), S6 \
+MOV  (19*8+offset)(base), S7 \
+MOV  (20*8+offset)(base), S8 \
+MOV  (21*8+offset)(base), S9 \
+MOV  (22*8+offset)(base), S10 \
+\ // g loaded separately
 MOV  (23*8+offset)(base), T3 \
 MOV  (24*8+offset)(base), T4 \
 MOV  (25*8+offset)(base), T5 \

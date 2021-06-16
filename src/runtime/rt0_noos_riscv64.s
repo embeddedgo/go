@@ -16,7 +16,7 @@
 //
 // The gdb and objdump use C ABI names for registers (Tn, An, Sn, ...). In most
 // cases there is imposible to make them print Xn names so we use C ABI names
-// in RISC-V assembly except  LR (RA), X2 (stack pointer), g (X4) and TMP (T6).
+// in RISC-V assembly except LR (X1), X2 (stack pointer), g (X27) and TMP (X31).
 
 
 #define handlerStackSize 4*1024 // size of stack usesd by trap handlers
@@ -96,10 +96,8 @@ TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	JMP   cleared
 
 clear:
-	// clear mtime register
+	// clear the mtime register
 	MOV  $mtime, A0
-	SLL  $3, S0, A1
-	ADD  A1, A0
 	MOV  ZERO, (A0)
 
 	// clear the BSS and the whole unallocated memory
