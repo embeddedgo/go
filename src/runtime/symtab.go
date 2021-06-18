@@ -102,7 +102,9 @@ func (ci *Frames) Next() (frame Frame, more bool) {
 		name := funcname(funcInfo)
 		if inldata := funcdata(funcInfo, _FUNCDATA_InlTree); inldata != nil {
 			inltree := (*[1 << 20]inlinedCall)(inldata)
-			ix := pcdatavalue(funcInfo, _PCDATA_InlTreeIndex, pc, nil)
+			// Non-strict as cgoTraceback may have added bogus PCs
+			// with a valid funcInfo but invalid PCDATA.
+			ix := pcdatavalue1(funcInfo, _PCDATA_InlTreeIndex, pc, nil, false)
 			if ix >= 0 {
 				// Note: entry is not modified. It always refers to a real frame, not an inlined one.
 				f = nil
@@ -183,7 +185,9 @@ func runtime_expandFinalInlineFrame(stk []uintptr) []uintptr {
 	var cache pcvalueCache
 	inltree := (*[1 << 20]inlinedCall)(inldata)
 	for {
-		ix := pcdatavalue(f, _PCDATA_InlTreeIndex, tracepc, &cache)
+		// Non-strict as cgoTraceback may have added bogus PCs
+		// with a valid funcInfo but invalid PCDATA.
+		ix := pcdatavalue1(f, _PCDATA_InlTreeIndex, tracepc, &cache, false)
 		if ix < 0 {
 			break
 		}

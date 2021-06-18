@@ -642,6 +642,16 @@ func archrelocaddr(ldr *loader.Loader, target *ld.Target, syms *ld.ArchSyms, r l
 	return int64(o2)<<32 | int64(o1)
 }
 
+// Determine if the code was compiled so that the TOC register R2 is initialized and maintained
+func r2Valid(ctxt *ld.Link) bool {
+	switch ctxt.BuildMode {
+	case ld.BuildModeCArchive, ld.BuildModeCShared, ld.BuildModePIE, ld.BuildModeShared, ld.BuildModePlugin:
+		return true
+	}
+	// -linkshared option
+	return ctxt.IsSharedGoLink()
+}
+
 // resolve direct jump relocation r in s, and add trampoline if necessary
 func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 
@@ -649,20 +659,26 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 	// For internal linking, trampolines are always created for long calls.
 	// For external linking, the linker can insert a call stub to handle a long call, but depends on having the TOC address in
 	// r2.  For those build modes with external linking where the TOC address is not maintained in r2, trampolines must be created.
-	if ctxt.IsExternal() && (ctxt.DynlinkingGo() || ctxt.BuildMode == ld.BuildModeCArchive || ctxt.BuildMode == ld.BuildModeCShared || ctxt.BuildMode == ld.BuildModePIE) {
+	if ctxt.IsExternal() && r2Valid(ctxt) {
 		// No trampolines needed since r2 contains the TOC
 		return
 	}
 
 	relocs := ldr.Relocs(s)
 	r := relocs.At(ri)
-	t := ldr.SymValue(rs) + r.Add() - (ldr.SymValue(s) + int64(r.Off()))
+	var t int64
+	// ldr.SymValue(rs) == 0 indicates a cross-package jump to a function that is not yet
+	// laid out. Conservatively use a trampoline. This should be rare, as we lay out packages
+	// in dependency order.
+	if ldr.SymValue(rs) != 0 {
+		t = ldr.SymValue(rs) + r.Add() - (ldr.SymValue(s) + int64(r.Off()))
+	}
 	switch r.Type() {
 	case objabi.R_CALLPOWER:
 
 		// If branch offset is too far then create a trampoline.
 
-		if (ctxt.IsExternal() && ldr.SymSect(s) != ldr.SymSect(rs)) || (ctxt.IsInternal() && int64(int32(t<<6)>>6) != t) || (*ld.FlagDebugTramp > 1 && ldr.SymPkg(s) != ldr.SymPkg(rs)) {
+		if (ctxt.IsExternal() && ldr.SymSect(s) != ldr.SymSect(rs)) || (ctxt.IsInternal() && int64(int32(t<<6)>>6) != t) || ldr.SymValue(rs) == 0 || (*ld.FlagDebugTramp > 1 && ldr.SymPkg(s) != ldr.SymPkg(rs)) {
 			var tramp loader.Sym
 			for i := 0; ; i++ {
 
@@ -697,7 +713,7 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 				}
 			}
 			if ldr.SymType(tramp) == 0 {
-				if ctxt.DynlinkingGo() || ctxt.BuildMode == ld.BuildModeCArchive || ctxt.BuildMode == ld.BuildModeCShared || ctxt.BuildMode == ld.BuildModePIE {
+				if r2Valid(ctxt) {
 					// Should have returned for above cases
 					ctxt.Errorf(s, "unexpected trampoline for shared or dynamic linking")
 				} else {
@@ -749,7 +765,7 @@ func gentramp(ctxt *ld.Link, ldr *loader.Loader, tramp *loader.SymbolBuilder, ta
 
 		// With external linking, the target address must be
 		// relocated using LO and HA
-		if ctxt.IsExternal() {
+		if ctxt.IsExternal() || ldr.SymValue(target) == 0 {
 			r, _ := tramp.AddRel(objabi.R_ADDRPOWER)
 			r.SetOff(0)
 			r.SetSiz(8) // generates 2 relocations: HA + LO
