@@ -182,7 +182,7 @@ func (s *ssafn) AllocFrame(f *ssa.Func) {
 		} else {
 			lastHasPtr = false
 		}
-		if thearch.LinkArch.InFamily(sys.MIPS, sys.MIPS64, sys.ARM, sys.ARM64, sys.PPC64, sys.S390X) {
+		if thearch.LinkArch.InFamily(sys.MIPS, sys.MIPS64, sys.ARM, sys.ARM64, sys.PPC64, sys.S390X, sys.Thumb) {
 			s.stksize = Rnd(s.stksize, int64(Widthptr))
 		}
 		n.Xoffset = -s.stksize

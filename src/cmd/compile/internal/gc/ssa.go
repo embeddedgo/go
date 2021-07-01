@@ -3815,7 +3815,7 @@ func init() {
 			s.startBlock(bEnd)
 			return s.variable(n, types.Types[TFLOAT64])
 		},
-		sys.ARM)
+		sys.ARM, sys.Thumb)
 
 	makeRoundAMD64 := func(op ssa.Op) func(s *state, n *Node, args []*ssa.Value) *ssa.Value {
 		return func(s *state, n *Node, args []*ssa.Value) *ssa.Value {

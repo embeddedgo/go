@@ -1642,7 +1642,7 @@ func rtconvfn(src, dst *types.Type) (param, result types.EType) {
 	}
 
 	switch thearch.LinkArch.Family {
-	case sys.ARM, sys.MIPS:
+	case sys.ARM, sys.MIPS, sys.Thumb:
 		if src.IsFloat() {
 			switch dst.Etype {
 			case TINT64, TUINT64:
