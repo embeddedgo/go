@@ -1451,7 +1451,7 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 				"math/big._RoundingMode_index",
 				"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
 				"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
-				"runtime.zeroVal", "runtime.staticuint64s", "runtime.oneptrmask",
+				"runtime.staticuint64s", "runtime.oneptrmask",
 				"runtime.fastlog2Table", "runtime.class_to_size",
 				"runtime.class_to_allocnpages", "runtime.class_to_divmagic",
 				"runtime.size_to_class8", "runtime.size_to_class128",
