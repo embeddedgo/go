@@ -1174,7 +1174,7 @@ func expandFile(fname string) string {
 	fname = expandGoroot(fname)
 	if *stripFuncNames > 0 {
 		if *stripFuncNames == 1 {
-			if i := strings.LastIndexByte(fname, '/'); i >= 0 {
+			if i := strings.LastIndex(fname, "/"); i >= 0 {
 				fname = fname[i+1:]
 			}
 		} else {
