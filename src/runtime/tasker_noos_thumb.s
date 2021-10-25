@@ -80,8 +80,13 @@ TEXT runtime·faultHandler(SB),NOSPLIT|NOFRAME,$0-0
 	// 2. Thumb bit in PSR
 	// 3. IPSR in PSR
 
-	// To print stack frame in gdb use:
-	//   x/8xw $r1
+	// To print stack frame in GDB use x/8xw $r1
+
+	// MemManage with MMSR = 0x82 and MMAR = 0 means probably the nil pointer
+	// dereference (TODO: print stack trace). Useful GDB commands:
+	//
+	//	l **($r1+24)
+	//	b **($r1+24)
 
 	BKPT
 	B   -1(PC)
