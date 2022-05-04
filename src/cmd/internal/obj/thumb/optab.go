@@ -321,8 +321,8 @@ var optab = [...]Optab{
 
 	{AMOVF, C_FOREG, C_NONE, C_FREG, 0x14, 0, 0, 0, _MOVF__s8_2_Rn__Fd},    // MOVF ±u8<<2(Rn), Fd
 	{AMOVF, C_FREG, C_NONE, C_FOREG, 0x14, 0, 0, 0, _MOVF__s8_2_Rn__Fd},    // MOVF Fd, ±u8<<2(Rn)
-	{AMOVF, C_LOREG, C_NONE, C_FREG, 0x3A, LFROM, 0, 0, _MOVF__lit_Rn__Rt}, // MOVF lit(Rn), Rt
-	{AMOVF, C_FREG, C_NONE, C_LOREG, 0x3A, LTO, 0, 0, _MOVF__lit_Rn__Rt},   // MOVF Rt, lit(Rn)
+	{AMOVF, C_LOREG, C_NONE, C_FREG, 0x3A, LFROM, 0, 0, _MOVF__lit_Rn__Ft}, // MOVF lit(Rn), Ft
+	{AMOVF, C_FREG, C_NONE, C_LOREG, 0x3A, LTO, 0, 0, _MOVF__lit_Rn__Ft},   // MOVF Ft, lit(Rn)
 	{AMOVF, C_SFCON, C_NONE, C_FREG, 0x14, 0, 0, 0, _MOVF__f8__Fd},         // MOVF f8, Fd
 	{AMOVF, C_ZFCON, C_NONE, C_FREG, 0x28, 0, 0, 0, _MOVF__0__Fd},          // MOVF 0, Fd
 	{as: AMOVD},
@@ -1496,18 +1496,16 @@ func _MOVF__s8_2_Rn__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
 	return 4
 }
 
-func _MOVF__lit_Rn__Rt(c *Ctx, p *obj.Prog, out []uint16) int {
+func _MOVF__lit_Rn__Ft(c *Ctx, p *obj.Prog, out []uint16) int {
 	q := *p
 	if q.To.Type == obj.TYPE_MEM {
 		q.From, q.To.Type = q.To, q.From.Type
 	}
 	q.As = AMOVW
-	tr := q.To.Reg
 	q.To.Reg = REGTMP
 	n := _MOVW__lit__Rd(c, &q, out)
 	if q.From.Name != obj.NAME_STATIC && q.From.Name != obj.NAME_EXTERN {
 		q.As = AADD
-		q.From.Reg = tr
 		n += _ADD__Rm__Rdn(c, &q, out[n/2:])
 	}
 	q = *p

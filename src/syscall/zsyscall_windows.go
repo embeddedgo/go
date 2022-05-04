@@ -43,6 +43,7 @@ var (
 	modkernel32 = NewLazyDLL(sysdll.Add("kernel32.dll"))
 	modmswsock  = NewLazyDLL(sysdll.Add("mswsock.dll"))
 	modnetapi32 = NewLazyDLL(sysdll.Add("netapi32.dll"))
+	modntdll    = NewLazyDLL(sysdll.Add("ntdll.dll"))
 	modsecur32  = NewLazyDLL(sysdll.Add("secur32.dll"))
 	modshell32  = NewLazyDLL(sysdll.Add("shell32.dll"))
 	moduserenv  = NewLazyDLL(sysdll.Add("userenv.dll"))
@@ -93,6 +94,7 @@ var (
 	procCreateSymbolicLinkW                = modkernel32.NewProc("CreateSymbolicLinkW")
 	procCreateToolhelp32Snapshot           = modkernel32.NewProc("CreateToolhelp32Snapshot")
 	procDeleteFileW                        = modkernel32.NewProc("DeleteFileW")
+	procDeleteProcThreadAttributeList      = modkernel32.NewProc("DeleteProcThreadAttributeList")
 	procDeviceIoControl                    = modkernel32.NewProc("DeviceIoControl")
 	procDuplicateHandle                    = modkernel32.NewProc("DuplicateHandle")
 	procExitProcess                        = modkernel32.NewProc("ExitProcess")
@@ -131,6 +133,7 @@ var (
 	procGetTempPathW                       = modkernel32.NewProc("GetTempPathW")
 	procGetTimeZoneInformation             = modkernel32.NewProc("GetTimeZoneInformation")
 	procGetVersion                         = modkernel32.NewProc("GetVersion")
+	procInitializeProcThreadAttributeList  = modkernel32.NewProc("InitializeProcThreadAttributeList")
 	procLoadLibraryW                       = modkernel32.NewProc("LoadLibraryW")
 	procLocalFree                          = modkernel32.NewProc("LocalFree")
 	procMapViewOfFile                      = modkernel32.NewProc("MapViewOfFile")
@@ -153,6 +156,7 @@ var (
 	procSetHandleInformation               = modkernel32.NewProc("SetHandleInformation")
 	procTerminateProcess                   = modkernel32.NewProc("TerminateProcess")
 	procUnmapViewOfFile                    = modkernel32.NewProc("UnmapViewOfFile")
+	procUpdateProcThreadAttribute          = modkernel32.NewProc("UpdateProcThreadAttribute")
 	procVirtualLock                        = modkernel32.NewProc("VirtualLock")
 	procVirtualUnlock                      = modkernel32.NewProc("VirtualUnlock")
 	procWaitForSingleObject                = modkernel32.NewProc("WaitForSingleObject")
@@ -164,6 +168,7 @@ var (
 	procNetApiBufferFree                   = modnetapi32.NewProc("NetApiBufferFree")
 	procNetGetJoinInformation              = modnetapi32.NewProc("NetGetJoinInformation")
 	procNetUserGetInfo                     = modnetapi32.NewProc("NetUserGetInfo")
+	procRtlGetNtVersionNumbers             = modntdll.NewProc("RtlGetNtVersionNumbers")
 	procGetUserNameExW                     = modsecur32.NewProc("GetUserNameExW")
 	procTranslateNameW                     = modsecur32.NewProc("TranslateNameW")
 	procCommandLineToArgvW                 = modshell32.NewProc("CommandLineToArgvW")
@@ -300,7 +305,7 @@ func RegCloseKey(key Handle) (regerrno error) {
 	return
 }
 
-func RegEnumKeyEx(key Handle, index uint32, name *uint16, nameLen *uint32, reserved *uint32, class *uint16, classLen *uint32, lastWriteTime *Filetime) (regerrno error) {
+func regEnumKeyEx(key Handle, index uint32, name *uint16, nameLen *uint32, reserved *uint32, class *uint16, classLen *uint32, lastWriteTime *Filetime) (regerrno error) {
 	r0, _, _ := Syscall9(procRegEnumKeyExW.Addr(), 8, uintptr(key), uintptr(index), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(nameLen)), uintptr(unsafe.Pointer(reserved)), uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(classLen)), uintptr(unsafe.Pointer(lastWriteTime)), 0)
 	if r0 != 0 {
 		regerrno = Errno(r0)
@@ -566,6 +571,11 @@ func DeleteFile(path *uint16) (err error) {
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
+	return
+}
+
+func deleteProcThreadAttributeList(attrlist *_PROC_THREAD_ATTRIBUTE_LIST) {
+	Syscall(procDeleteProcThreadAttributeList.Addr(), 1, uintptr(unsafe.Pointer(attrlist)), 0, 0)
 	return
 }
 
@@ -897,6 +907,14 @@ func GetVersion() (ver uint32, err error) {
 	return
 }
 
+func initializeProcThreadAttributeList(attrlist *_PROC_THREAD_ATTRIBUTE_LIST, attrcount uint32, flags uint32, size *uintptr) (err error) {
+	r1, _, e1 := Syscall6(procInitializeProcThreadAttributeList.Addr(), 4, uintptr(unsafe.Pointer(attrlist)), uintptr(attrcount), uintptr(flags), uintptr(unsafe.Pointer(size)), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func LoadLibrary(libname string) (handle Handle, err error) {
 	var _p0 *uint16
 	_p0, err = UTF16PtrFromString(libname)
@@ -1099,6 +1117,14 @@ func UnmapViewOfFile(addr uintptr) (err error) {
 	return
 }
 
+func updateProcThreadAttribute(attrlist *_PROC_THREAD_ATTRIBUTE_LIST, flags uint32, attr uintptr, value unsafe.Pointer, size uintptr, prevvalue unsafe.Pointer, returnedsize *uintptr) (err error) {
+	r1, _, e1 := Syscall9(procUpdateProcThreadAttribute.Addr(), 7, uintptr(unsafe.Pointer(attrlist)), uintptr(flags), uintptr(attr), uintptr(value), uintptr(size), uintptr(prevvalue), uintptr(unsafe.Pointer(returnedsize)), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func VirtualLock(addr uintptr, length uintptr) (err error) {
 	r1, _, e1 := Syscall(procVirtualLock.Addr(), 2, uintptr(addr), uintptr(length), 0)
 	if r1 == 0 {
@@ -1186,6 +1212,11 @@ func NetUserGetInfo(serverName *uint16, userName *uint16, level uint32, buf **by
 	if r0 != 0 {
 		neterr = Errno(r0)
 	}
+	return
+}
+
+func rtlGetNtVersionNumbers(majorVersion *uint32, minorVersion *uint32, buildNumber *uint32) {
+	Syscall(procRtlGetNtVersionNumbers.Addr(), 3, uintptr(unsafe.Pointer(majorVersion)), uintptr(unsafe.Pointer(minorVersion)), uintptr(unsafe.Pointer(buildNumber)))
 	return
 }
 

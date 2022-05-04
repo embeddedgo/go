@@ -35,7 +35,7 @@ import (
 	"math"
 
 	"cmd/internal/obj"
-	"cmd/internal/objabi"
+	"internal/buildcfg"
 )
 
 type Ctx struct {
@@ -165,7 +165,7 @@ func (c *Ctx) offset(a *obj.Addr) int64 {
 }
 
 func (c *Ctx) chipzero(e float64) int {
-	switch objabi.GOARM {
+	switch buildcfg.GOARM {
 	case 0x7F, 0x7D: // ARMv7-M with floating point extension
 		break
 	default:
@@ -178,7 +178,7 @@ func (c *Ctx) chipzero(e float64) int {
 }
 
 func (c *Ctx) chipfloat(e float64) int {
-	switch objabi.GOARM {
+	switch buildcfg.GOARM {
 	case 0x7F, 0x7D: // ARMv7-M with floating point extension
 		break
 	default:
@@ -1129,7 +1129,6 @@ func match(op, code Aclass) bool {
 var oprange [ALAST & obj.AMask][]Optab
 
 var (
-	deferreturn *obj.LSym
 	symdiv      *obj.LSym
 	symdivu     *obj.LSym
 	symmod      *obj.LSym
@@ -1142,8 +1141,6 @@ func buildop(ctxt *obj.Link) {
 		// cmd/asm tests, each of which re-initializes the arch.
 		return
 	}
-
-	deferreturn = ctxt.LookupABI("runtime.deferreturn", obj.ABIInternal)
 
 	symdiv = ctxt.Lookup("runtime._div")
 	symdivu = ctxt.Lookup("runtime._divu")

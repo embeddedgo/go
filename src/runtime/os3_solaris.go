@@ -5,7 +5,8 @@
 package runtime
 
 import (
-	"runtime/internal/sys"
+	"internal/abi"
+	"internal/goarch"
 	"unsafe"
 )
 
@@ -172,7 +173,7 @@ func newosproc(mp *m) {
 	// Disable signals during create, so that the new thread starts
 	// with signals disabled. It will enable them in minit.
 	sigprocmask(_SIG_SETMASK, &sigset_all, &oset)
-	ret = pthread_create(&tid, &attr, funcPC(tstart_sysvicall), unsafe.Pointer(mp))
+	ret = pthread_create(&tid, &attr, abi.FuncPCABI0(tstart_sysvicall), unsafe.Pointer(mp))
 	sigprocmask(_SIG_SETMASK, &oset, nil)
 	if ret != 0 {
 		print("runtime: failed to create new OS thread (have ", mcount(), " already; errno=", ret, ")\n")
@@ -215,7 +216,7 @@ func miniterrno()
 // Called to initialize a new m (including the bootstrap m).
 // Called on the new thread, cannot allocate memory.
 func minit() {
-	asmcgocall(unsafe.Pointer(funcPC(miniterrno)), unsafe.Pointer(&libc____errno))
+	asmcgocall(unsafe.Pointer(abi.FuncPCABI0(miniterrno)), unsafe.Pointer(&libc____errno))
 
 	minitSignals()
 
@@ -241,8 +242,8 @@ func setsig(i uint32, fn uintptr) {
 
 	sa.sa_flags = _SA_SIGINFO | _SA_ONSTACK | _SA_RESTART
 	sa.sa_mask = sigset_all
-	if fn == funcPC(sighandler) {
-		fn = funcPC(sigtramp)
+	if fn == abi.FuncPCABIInternal(sighandler) { // abi.FuncPCABIInternal(sighandler) matches the callers in signal_unix.go
+		fn = abi.FuncPCABI0(sigtramp)
 	}
 	*((*uintptr)(unsafe.Pointer(&sa._funcptr))) = fn
 	sigaction(i, &sa, nil)
@@ -288,6 +289,19 @@ func sigdelset(mask *sigset, i int) {
 func (c *sigctxt) fixsigcode(sig uint32) {
 }
 
+func setProcessCPUProfiler(hz int32) {
+	setProcessCPUProfilerTimer(hz)
+}
+
+func setThreadCPUProfiler(hz int32) {
+	setThreadCPUProfilerHz(hz)
+}
+
+//go:nosplit
+func validSIGPROF(mp *m, c *sigctxt) bool {
+	return true
+}
+
 //go:nosplit
 func semacreate(mp *m) {
 	if mp.waitsema != 0 {
@@ -315,20 +329,20 @@ func semacreate(mp *m) {
 
 //go:nosplit
 func semasleep(ns int64) int32 {
-	_m_ := getg().m
+	mp := getg().m
 	if ns >= 0 {
-		_m_.ts.tv_sec = ns / 1000000000
-		_m_.ts.tv_nsec = ns % 1000000000
+		mp.ts.tv_sec = ns / 1000000000
+		mp.ts.tv_nsec = ns % 1000000000
 
-		_m_.libcall.fn = uintptr(unsafe.Pointer(&libc_sem_reltimedwait_np))
-		_m_.libcall.n = 2
-		_m_.scratch = mscratch{}
-		_m_.scratch.v[0] = _m_.waitsema
-		_m_.scratch.v[1] = uintptr(unsafe.Pointer(&_m_.ts))
-		_m_.libcall.args = uintptr(unsafe.Pointer(&_m_.scratch))
-		asmcgocall(unsafe.Pointer(&asmsysvicall6x), unsafe.Pointer(&_m_.libcall))
-		if *_m_.perrno != 0 {
-			if *_m_.perrno == _ETIMEDOUT || *_m_.perrno == _EAGAIN || *_m_.perrno == _EINTR {
+		mp.libcall.fn = uintptr(unsafe.Pointer(&libc_sem_reltimedwait_np))
+		mp.libcall.n = 2
+		mp.scratch = mscratch{}
+		mp.scratch.v[0] = mp.waitsema
+		mp.scratch.v[1] = uintptr(unsafe.Pointer(&mp.ts))
+		mp.libcall.args = uintptr(unsafe.Pointer(&mp.scratch))
+		asmcgocall(unsafe.Pointer(&asmsysvicall6x), unsafe.Pointer(&mp.libcall))
+		if *mp.perrno != 0 {
+			if *mp.perrno == _ETIMEDOUT || *mp.perrno == _EAGAIN || *mp.perrno == _EINTR {
 				return -1
 			}
 			throw("sem_reltimedwait_np")
@@ -336,16 +350,16 @@ func semasleep(ns int64) int32 {
 		return 0
 	}
 	for {
-		_m_.libcall.fn = uintptr(unsafe.Pointer(&libc_sem_wait))
-		_m_.libcall.n = 1
-		_m_.scratch = mscratch{}
-		_m_.scratch.v[0] = _m_.waitsema
-		_m_.libcall.args = uintptr(unsafe.Pointer(&_m_.scratch))
-		asmcgocall(unsafe.Pointer(&asmsysvicall6x), unsafe.Pointer(&_m_.libcall))
-		if _m_.libcall.r1 == 0 {
+		mp.libcall.fn = uintptr(unsafe.Pointer(&libc_sem_wait))
+		mp.libcall.n = 1
+		mp.scratch = mscratch{}
+		mp.scratch.v[0] = mp.waitsema
+		mp.libcall.args = uintptr(unsafe.Pointer(&mp.scratch))
+		asmcgocall(unsafe.Pointer(&asmsysvicall6x), unsafe.Pointer(&mp.libcall))
+		if mp.libcall.r1 == 0 {
 			break
 		}
-		if *_m_.perrno == _EINTR {
+		if *mp.perrno == _EINTR {
 			continue
 		}
 		throw("sem_wait")
@@ -390,6 +404,7 @@ func mmap(addr unsafe.Pointer, n uintptr, prot, flags, fd int32, off uint32) (un
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func doMmap(addr, n, prot, flags, fd, off uintptr) (uintptr, uintptr) {
 	var libcall libcall
 	libcall.fn = uintptr(unsafe.Pointer(&libc_mmap))
@@ -522,11 +537,16 @@ func sysconf(name int32) int64 {
 func usleep1(usec uint32)
 
 //go:nosplit
+func usleep_no_g(µs uint32) {
+	usleep1(µs)
+}
+
+//go:nosplit
 func usleep(µs uint32) {
 	usleep1(µs)
 }
 
-func walltime1() (sec int64, nsec int32) {
+func walltime() (sec int64, nsec int32) {
 	var ts mts
 	sysvicall2(&libc_clock_gettime, _CLOCK_REALTIME, uintptr(unsafe.Pointer(&ts)))
 	return ts.tv_sec, int32(ts.tv_nsec)
@@ -569,16 +589,13 @@ func setNonblock(fd int32) {
 func osyield1()
 
 //go:nosplit
-func osyield() {
-	_g_ := getg()
-
-	// Check the validity of m because we might be called in cgo callback
-	// path early enough where there isn't a m available yet.
-	if _g_ != nil && _g_.m != nil {
-		sysvicall0(&libc_sched_yield)
-		return
-	}
+func osyield_no_g() {
 	osyield1()
+}
+
+//go:nosplit
+func osyield() {
+	sysvicall0(&libc_sched_yield)
 }
 
 //go:linkname executablePath os.executablePath
@@ -596,7 +613,7 @@ func sysargs(argc int32, argv **byte) {
 	n++
 
 	// now argv+n is auxv
-	auxv := (*[1 << 28]uintptr)(add(unsafe.Pointer(argv), uintptr(n)*sys.PtrSize))
+	auxv := (*[1 << 28]uintptr)(add(unsafe.Pointer(argv), uintptr(n)*goarch.PtrSize))
 	sysauxv(auxv[:])
 }
 
@@ -616,4 +633,13 @@ func sysauxv(auxv []uintptr) {
 			executablePath = gostringnocopy((*byte)(unsafe.Pointer(val)))
 		}
 	}
+}
+
+// sigPerThreadSyscall is only used on linux, so we assign a bogus signal
+// number.
+const sigPerThreadSyscall = 1 << 31
+
+//go:nosplit
+func runPerThreadSyscall() {
+	throw("runPerThreadSyscall only valid on linux")
 }

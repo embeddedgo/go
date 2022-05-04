@@ -5,8 +5,10 @@
 package atomic_test
 
 import (
+	"internal/goarch"
 	"fmt"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	. "sync/atomic"
 	"testing"
@@ -31,7 +33,7 @@ const (
 )
 
 // Do the 64-bit functions panic? If so, don't bother testing.
-var test64err = func() (err interface{}) {
+var test64err = func() (err any) {
 	defer func() {
 		err = recover()
 	}()
@@ -1196,6 +1198,11 @@ func TestHammerStoreLoad(t *testing.T) {
 	}
 	const procs = 8
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(procs))
+	// Disable the GC because hammerStoreLoadPointer invokes
+	// write barriers on values that aren't real pointers.
+	defer debug.SetGCPercent(debug.SetGCPercent(-1))
+	// Ensure any in-progress GC is finished.
+	runtime.GC()
 	for _, tt := range tests {
 		c := make(chan int)
 		var val uint64
@@ -1417,6 +1424,10 @@ func TestUnaligned64(t *testing.T) {
 	// instead of failing silently.
 	if !arch32 {
 		t.Skip("test only runs on 32-bit systems")
+	}
+	if goarch.GOARCH == "thumb" {
+		// TODO: remove this when https://github.com/golang/go/issues/51776 will be fixed
+		t.Skip("panic disabled on thumb")
 	}
 
 	x := make([]uint32, 4)

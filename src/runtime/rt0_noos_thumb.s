@@ -39,7 +39,7 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 #define FPU_CPACR 0x000
 #define FPU_FPCCR 0x1AC
 
-TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
+TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 
 	// setup main stack in cpu0.gh
 	MOVW  $runtime·cpu0(SB), R0      // gh is the first field of the cpuctx struct
@@ -54,7 +54,8 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOVW  $runtime·m0(SB), R1
 	MOVW  R0, m_g0(R1)  // m0.g0 = cpu0.gh
 	MOVW  R1, g_m(R0)   // cpu0.gh.m = m0
-	MOVW  R0, g         // set g to gh
+
+	MOVW  R0, g  // we use R0 above instead of g for shorter encoding
 
 	// enable FPU if GOARM is xF or xD
 	MOVB  runtime·goarm(SB), R0
@@ -62,10 +63,10 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	CMP   $0xD, R0
 	BNE   skipFPU
 	MOVW  $FPU_CTRL_BASE, R0  // address of CPACR
-	MOVW  $0xF<<20, R1
-	MOVW  R1, FPU_CPACR(R0)  // full access to CP10 and CP11 instruction set
+	MOVW  $3<<20, R1
+	MOVW  R1, FPU_CPACR(R0)  // full access to CP10
 	SLL   $10, R1
-	MOVW  R1, FPU_FPCCR(R0)  // set LSPEN and ASPEN (lazy auto save FP context)
+	MOVW  R1, FPU_FPCCR(R0)  // set LSPEN and ASPEN
 skipFPU:
 
 	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
@@ -151,12 +152,13 @@ skipFPU:
 	ISB
 
 	// create a new goroutine to start program
-	MOVW       $0, R0
-	MOVW       $0, R1
-	MOVW       $runtime·mainPC(SB), R2
-	MOVM.DB.W  [R0-R2], (R13)
-	BL         runtime·newproc(SB)
-	ADD        $12, R13
+	SUB	$8, R13
+	MOVW	$runtime·mainPC(SB), R0
+	MOVW	R0, 4(R13)	// arg 1: fn
+	MOVW	$0, R0
+	MOVW	R0, 0(R13)	// dummy LR
+	BL	runtime·newproc(SB)
+	ADD	$8, R13	// pop args and LR
 
 	// start this M
 	BL  runtime·mstart(SB)

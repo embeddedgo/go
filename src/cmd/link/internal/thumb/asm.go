@@ -168,17 +168,22 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 	r := relocs.At(ri)
 	switch r.Type() {
 	case objabi.R_CALLARM:
-		var maxoffset int64
-		switch uint32(r.Add()>>32) & 0x9000F800 {
-		case 0x9000F000: // B/BL imm24
-			maxoffset = 1 << 24
-		case 0x8000F000: // Bcond imm20
-			maxoffset = 1 << 20
-		default:
-			ldr.Errorf(s, "bad branch opcode")
+		var t, maxoffset int64
+		// ldr.SymValue(rs) == 0 indicates a cross-package jump to a function that is not yet
+		// laid out. Conservatively use a trampoline. This should be rare, as we lay out packages
+		// in dependency order.
+		if ldr.SymValue(rs) != 0 {
+			switch uint32(r.Add()>>32) & 0x9000F800 {
+			case 0x9000F000: // B/BL imm24 (signed offset = imm24 * 2)
+				maxoffset = 1 << 24
+			case 0x8000F000: // Bcond imm20 (signed offset = imm20 * 2)
+				maxoffset = 1 << 20
+			default:
+				ldr.Errorf(s, "bad branch opcode")
+			}
+			t = (ldr.SymValue(rs) + int64(int32(r.Add())) - (ldr.SymValue(s) + int64(r.Off())))
 		}
-		t := (ldr.SymValue(rs) + int64(int32(r.Add())) - (ldr.SymValue(s) + int64(r.Off())))
-		if -maxoffset <= t && t < maxoffset {
+		if -maxoffset <= t && t < maxoffset && *ld.FlagDebugTramp == 0 {
 			return
 		}
 		// Direct call too far, need to insert trampoline.
@@ -244,7 +249,6 @@ func gentramp(arch *sys.Arch, linkmode ld.LinkMode, ldr *loader.Loader, tramp *l
 
 func archreloc(target *ld.Target, ldr *loader.Loader, syms *ld.ArchSyms, r loader.Reloc, s loader.Sym, val int64) (o int64, nExtReloc int, ok bool) {
 	rs := r.Sym()
-	rs = ldr.ResolveABIAlias(rs)
 	if target.IsExternal() {
 		log.Fatalf("BUGL: external linking not supported")
 		return val, 0, false
@@ -290,7 +294,7 @@ func archreloc(target *ld.Target, ldr *loader.Loader, syms *ld.ArchSyms, r loade
 	return val, 0, false
 }
 
-func archrelocvariant(*ld.Target, *loader.Loader, loader.Reloc, sym.RelocVariant, loader.Sym, int64) int64 {
+func archrelocvariant(*ld.Target, *loader.Loader, loader.Reloc, sym.RelocVariant, loader.Sym, int64, []byte) int64  {
 	log.Fatalf("unexpected relocation variant")
 	return -1
 }

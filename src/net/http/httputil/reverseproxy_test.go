@@ -16,6 +16,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/http/internal/ascii"
 	"net/url"
 	"os"
 	"reflect"
@@ -1194,6 +1195,26 @@ func TestSelectFlushInterval(t *testing.T) {
 			want: -1,
 		},
 		{
+			name: "server-sent events with media-type parameters overrides non-zero",
+			res: &http.Response{
+				Header: http.Header{
+					"Content-Type": {"text/event-stream;charset=utf-8"},
+				},
+			},
+			p:    &ReverseProxy{FlushInterval: 123},
+			want: -1,
+		},
+		{
+			name: "server-sent events with media-type parameters overrides zero",
+			res: &http.Response{
+				Header: http.Header{
+					"Content-Type": {"text/event-stream;charset=utf-8"},
+				},
+			},
+			p:    &ReverseProxy{FlushInterval: 0},
+			want: -1,
+		},
+		{
 			name: "Content-Length: -1, overrides non-zero",
 			res: &http.Response{
 				ContentLength: -1,
@@ -1281,7 +1302,7 @@ func TestReverseProxyWebSocket(t *testing.T) {
 		t.Errorf("Header(XHeader) = %q; want %q", got, want)
 	}
 
-	if upgradeType(res.Header) != "websocket" {
+	if !ascii.EqualFold(upgradeType(res.Header), "websocket") {
 		t.Fatalf("not websocket upgrade; got %#v", res.Header)
 	}
 	rwc, ok := res.Body.(io.ReadWriteCloser)
@@ -1306,7 +1327,7 @@ func TestReverseProxyWebSocket(t *testing.T) {
 	}
 }
 
-func TestReverseProxyWebSocketCancelation(t *testing.T) {
+func TestReverseProxyWebSocketCancellation(t *testing.T) {
 	n := 5
 	triggerCancelCh := make(chan bool, n)
 	nthResponse := func(i int) string {
@@ -1398,7 +1419,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 		t.Errorf("X-Header mismatch\n\tgot:  %q\n\twant: %q", g, w)
 	}
 
-	if g, w := upgradeType(res.Header), "websocket"; g != w {
+	if g, w := upgradeType(res.Header), "websocket"; !ascii.EqualFold(g, w) {
 		t.Fatalf("Upgrade header mismatch\n\tgot:  %q\n\twant: %q", g, w)
 	}
 

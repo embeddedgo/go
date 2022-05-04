@@ -34,9 +34,11 @@ import (
 	"bufio"
 	"cmd/internal/goobj"
 	"cmd/internal/objabi"
+	"cmd/internal/quoted"
 	"cmd/internal/sys"
 	"cmd/link/internal/benchmark"
 	"flag"
+	"internal/buildcfg"
 	"log"
 	"os"
 	"runtime"
@@ -55,6 +57,8 @@ var (
 
 func init() {
 	flag.Var(&rpath, "r", "set the ELF dynamic linker search `path` to dir1:dir2:...")
+	flag.Var(&flagExtld, "extld", "use `linker` when linking in external mode")
+	flag.Var(&flagExtldflags, "extldflags", "pass `flags` to external linker")
 }
 
 // Flags used by the linker. The exported flags are used by the architecture-specific packages.
@@ -68,14 +72,15 @@ var (
 	flagDumpDep       = flag.Bool("dumpdep", false, "dump symbol dependency graph")
 	flagRace          = flag.Bool("race", false, "enable race detector")
 	flagMsan          = flag.Bool("msan", false, "enable MSan interface")
+	flagAsan          = flag.Bool("asan", false, "enable ASan interface")
 	flagAslr          = flag.Bool("aslr", true, "enable ASLR for buildmode=c-shared on windows")
 
 	flagFieldTrack = flag.String("k", "", "set field tracking `symbol`")
 	flagLibGCC     = flag.String("libgcc", "", "compiler support lib for internal linking; use \"none\" to disable")
 	flagTmpdir     = flag.String("tmpdir", "", "use `directory` for temporary files")
 
-	flagExtld      = flag.String("extld", "", "use `linker` when linking in external mode")
-	flagExtldflags = flag.String("extldflags", "", "pass `flags` to external linker")
+	flagExtld      quoted.Flag
+	flagExtldflags quoted.Flag
 	flagExtar      = flag.String("extar", "", "archive program for buildmode=c-archive")
 
 	flagA             = flag.Bool("a", false, "no-op (deprecated)")
@@ -90,16 +95,14 @@ var (
 	flag8             bool // use 64-bit addresses in symbol table
 	flagInterpreter   = flag.String("I", "", "use `linker` as ELF dynamic linker")
 	FlagDebugTramp    = flag.Int("debugtramp", 0, "debug trampolines")
-	FlagDebugTextSize = flag.Int("debugppc64textsize", 0, "debug PPC64 text section max")
+	FlagDebugTextSize = flag.Int("debugtextsize", 0, "debug text section max size")
 	FlagStrictDups    = flag.Int("strictdups", 0, "sanity check duplicate symbol contents during object file reading (1=warn 2=err).")
 	FlagRound         = flag.Int("R", -1, "set address rounding `quantum`")
 	FlagTextAddr      = flag.Int64("T", -1, "set text segment `address`")
 	FlagEntrySymbol   = flag.String("E", "", "set `entry` symbol name")
-
-	cpuprofile     = flag.String("cpuprofile", "", "write cpu profile to `file`")
-	memprofile     = flag.String("memprofile", "", "write memory profile to `file`")
-	memprofilerate = flag.Int64("memprofilerate", 0, "set runtime.MemProfileRate to `rate`")
-
+	cpuprofile        = flag.String("cpuprofile", "", "write cpu profile to `file`")
+	memprofile        = flag.String("memprofile", "", "write memory profile to `file`")
+	memprofilerate    = flag.Int64("memprofilerate", 0, "set runtime.MemProfileRate to `rate`")
 	benchmarkFlag     = flag.String("benchmark", "", "set to 'mem' or 'cpu' to enable phase benchmarking")
 	benchmarkFileFlag = flag.String("benchmarkprofile", "", "emit phase profiles to `base`_phase.{cpu,mem}prof")
 
@@ -156,11 +159,17 @@ func Main(arch *sys.Arch, theArch Arch) {
 	}
 
 	final := gorootFinal()
-	addstrdata1(ctxt, "runtime/internal/sys.DefaultGoroot="+final)
-	addstrdata1(ctxt, "cmd/internal/objabi.defaultGOROOT="+final)
+	addstrdata1(ctxt, "runtime.defaultGOROOT="+final)
+	addstrdata1(ctxt, "internal/buildcfg.defaultGOROOT="+final)
+
+	buildVersion := buildcfg.Version
+	if goexperiment := buildcfg.GOEXPERIMENT(); goexperiment != "" {
+		buildVersion += " X:" + goexperiment
+	}
+	addstrdata1(ctxt, "runtime.buildVersion="+buildVersion)
 
 	// TODO(matloob): define these above and then check flag values here
-	if ctxt.Arch.Family == sys.AMD64 && objabi.GOOS == "plan9" {
+	if ctxt.Arch.Family == sys.AMD64 && buildcfg.GOOS == "plan9" {
 		flag.BoolVar(&flag8, "8", false, "use 64-bit addresses in symbol table")
 	}
 	flagHeadType := flag.String("H", "", "set header `type`")
@@ -176,13 +185,13 @@ func Main(arch *sys.Arch, theArch Arch) {
 	objabi.Flagfn1("importcfg", "read import configuration from `file`", ctxt.readImportCfg)
 
 	var flagMemory string
-	if objabi.GOOS == "noos" {
+	if buildcfg.GOOS == "noos" {
 		flag.StringVar(&flagMemory, "M", "", "set memory layout: BASE1:SIZE1[,BASE2:SIZE2]")
 	}
 
 	objabi.Flagparse(usage)
 
-	if objabi.GOOS == "noos" {
+	if buildcfg.GOOS == "noos" {
 		descr := strings.Split(flagMemory, ",")
 		if len(descr) == 0 {
 			Exitf("memory layout (-M) not specified")
@@ -215,7 +224,7 @@ func Main(arch *sys.Arch, theArch Arch) {
 		}
 	}
 	if ctxt.HeadType == objabi.Hunknown {
-		ctxt.HeadType.Set(objabi.GOOS)
+		ctxt.HeadType.Set(buildcfg.GOOS)
 	}
 
 	if !*flagAslr && ctxt.BuildMode != BuildModeCShared {
@@ -223,7 +232,15 @@ func Main(arch *sys.Arch, theArch Arch) {
 		usage()
 	}
 
+	if *FlagD && ctxt.UsesLibc() {
+		Exitf("dynamic linking required on %s; -d flag cannot be used", buildcfg.GOOS)
+	}
+
 	checkStrictDups = *FlagStrictDups
+
+	if !buildcfg.Experiment.RegabiWrappers {
+		abiInternalVer = 0
+	}
 
 	startProfile()
 	if ctxt.BuildMode == BuildModeUnset {
@@ -311,7 +328,7 @@ func Main(arch *sys.Arch, theArch Arch) {
 
 	bench.Start("dostrdata")
 	ctxt.dostrdata()
-	if objabi.Fieldtrack_enabled != 0 {
+	if buildcfg.Experiment.FieldTrack {
 		bench.Start("fieldtrack")
 		fieldtrack(ctxt.Arch, ctxt.loader)
 	}
@@ -350,7 +367,6 @@ func Main(arch *sys.Arch, theArch Arch) {
 	bench.Start("textbuildid")
 	ctxt.textbuildid()
 	bench.Start("addexport")
-	setupdynexp(ctxt)
 	ctxt.setArchSyms()
 	ctxt.addexport()
 	bench.Start("Gentext")
@@ -390,7 +406,7 @@ func Main(arch *sys.Arch, theArch Arch) {
 		// Don't mmap if we're building for Wasm. Wasm file
 		// layout is very different so filesize is meaningless.
 		if err := ctxt.Out.Mmap(filesize); err != nil {
-			panic(err)
+			Exitf("mapping output file failed: %v", err)
 		}
 	}
 	// asmb will redirect symbols to the output file mmap, and relocations

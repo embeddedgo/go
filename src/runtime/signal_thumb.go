@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build linux
+//go:build linux
 
 package runtime
 
-import "unsafe"
+import (
+	"internal/abi"
+	"unsafe"
+)
 
 func dumpregs(c *sigctxt) {
 	print("trap    ", hex(c.trap()), "\n")
@@ -34,7 +37,13 @@ func dumpregs(c *sigctxt) {
 
 //go:nosplit
 //go:nowritebarrierrec
-func (c *sigctxt) sigpc() uintptr { return uintptr(c.pc() | 1) }
+func (c *sigctxt) sigpc() uintptr {
+	pc := c.pc()
+	if pc != 0 {
+		pc |= 1
+	}
+	return uintptr(pc)
+}
 
 func (c *sigctxt) sigsp() uintptr { return uintptr(c.sp()) }
 func (c *sigctxt) siglr() uintptr { return uintptr(c.lr()) }
@@ -60,10 +69,8 @@ func (c *sigctxt) preparePanic(sig uint32, gp *g) {
 
 	// In case we are panicking from external C code
 	c.set_r10(uint32(uintptr(unsafe.Pointer(gp))))
-	c.set_pc(uint32(funcPC(sigpanic) &^ 1))
+	c.set_pc(uint32(abi.FuncPCABIInternal(sigpanic) &^ 1))
 }
-
-const pushCallSupported = false
 
 func (c *sigctxt) pushCall(targetPC, resumePC uintptr) {
 	// Push the LR to stack, as we'll clobber it in order to
@@ -75,6 +82,6 @@ func (c *sigctxt) pushCall(targetPC, resumePC uintptr) {
 	*(*uint32)(unsafe.Pointer(uintptr(sp))) = c.lr()
 	// Set up PC and LR to pretend the function being signaled
 	// calls targetPC at the faulting PC.
-	c.set_lr(uint32(resumePC) | 1)
+	c.set_lr(uint32(resumePC))
 	c.set_pc(uint32(targetPC) &^ 1)
 }

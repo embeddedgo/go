@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build dragonfly freebsd netbsd openbsd,!amd64,!arm64
+//go:build dragonfly || netbsd || (openbsd && mips64)
 
 package syscall
 
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -89,8 +90,6 @@ func forkAndExecInChild(argv0 *byte, argv, envv []*byte, chroot, dir *byte, attr
 
 	// Fork succeeded, now in child.
 
-	runtime_AfterForkInChild()
-
 	// Enable tracing if requested.
 	if sys.Ptrace {
 		_, _, err1 = RawSyscall(SYS_PTRACE, uintptr(PTRACE_TRACEME), 0, 0)
@@ -136,6 +135,10 @@ func forkAndExecInChild(argv0 *byte, argv, envv []*byte, chroot, dir *byte, attr
 		}
 	}
 
+	// Restore the signal mask. We do this after TIOCSPGRP to avoid
+	// having the kernel send a SIGTTOU signal to the process group.
+	runtime_AfterForkInChild()
+
 	// Chroot
 	if chroot != nil {
 		_, _, err1 = RawSyscall(SYS_CHROOT, uintptr(unsafe.Pointer(chroot)), 0, 0)
@@ -178,11 +181,19 @@ func forkAndExecInChild(argv0 *byte, argv, envv []*byte, chroot, dir *byte, attr
 	// Pass 1: look for fd[i] < i and move those up above len(fd)
 	// so that pass 2 won't stomp on an fd it needs later.
 	if pipe < nextfd {
-		_, _, err1 = RawSyscall(SYS_DUP2, uintptr(pipe), uintptr(nextfd), 0)
-		if err1 != 0 {
-			goto childerror
+		switch runtime.GOOS {
+		case "netbsd":
+			_, _, err1 = RawSyscall(_SYS_DUP3, uintptr(pipe), uintptr(nextfd), O_CLOEXEC)
+			if err1 != 0 {
+				goto childerror
+			}
+		default:
+			_, _, err1 = RawSyscall(SYS_DUP2, uintptr(pipe), uintptr(nextfd), 0)
+			if err1 != 0 {
+				goto childerror
+			}
+			RawSyscall(SYS_FCNTL, uintptr(nextfd), F_SETFD, FD_CLOEXEC)
 		}
-		RawSyscall(SYS_FCNTL, uintptr(nextfd), F_SETFD, FD_CLOEXEC)
 		pipe = nextfd
 		nextfd++
 	}
@@ -191,11 +202,19 @@ func forkAndExecInChild(argv0 *byte, argv, envv []*byte, chroot, dir *byte, attr
 			if nextfd == pipe { // don't stomp on pipe
 				nextfd++
 			}
-			_, _, err1 = RawSyscall(SYS_DUP2, uintptr(fd[i]), uintptr(nextfd), 0)
-			if err1 != 0 {
-				goto childerror
+			switch runtime.GOOS {
+			case "netbsd":
+				_, _, err1 = RawSyscall(_SYS_DUP3, uintptr(fd[i]), uintptr(nextfd), O_CLOEXEC)
+				if err1 != 0 {
+					goto childerror
+				}
+			default:
+				_, _, err1 = RawSyscall(SYS_DUP2, uintptr(fd[i]), uintptr(nextfd), 0)
+				if err1 != 0 {
+					goto childerror
+				}
+				RawSyscall(SYS_FCNTL, uintptr(nextfd), F_SETFD, FD_CLOEXEC)
 			}
-			RawSyscall(SYS_FCNTL, uintptr(nextfd), F_SETFD, FD_CLOEXEC)
 			fd[i] = nextfd
 			nextfd++
 		}

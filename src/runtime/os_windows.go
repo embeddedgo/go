@@ -5,8 +5,9 @@
 package runtime
 
 import (
+	"internal/abi"
+	"internal/goarch"
 	"runtime/internal/atomic"
-	"runtime/internal/sys"
 	"unsafe"
 )
 
@@ -18,6 +19,7 @@ const (
 //go:cgo_import_dynamic runtime._AddVectoredExceptionHandler AddVectoredExceptionHandler%2 "kernel32.dll"
 //go:cgo_import_dynamic runtime._CloseHandle CloseHandle%1 "kernel32.dll"
 //go:cgo_import_dynamic runtime._CreateEventA CreateEventA%4 "kernel32.dll"
+//go:cgo_import_dynamic runtime._CreateFileA CreateFileA%7 "kernel32.dll"
 //go:cgo_import_dynamic runtime._CreateIoCompletionPort CreateIoCompletionPort%4 "kernel32.dll"
 //go:cgo_import_dynamic runtime._CreateThread CreateThread%6 "kernel32.dll"
 //go:cgo_import_dynamic runtime._CreateWaitableTimerA CreateWaitableTimerA%3 "kernel32.dll"
@@ -67,6 +69,7 @@ var (
 	_AddVectoredExceptionHandler,
 	_CloseHandle,
 	_CreateEventA,
+	_CreateFileA,
 	_CreateIoCompletionPort,
 	_CreateThread,
 	_CreateWaitableTimerA,
@@ -132,7 +135,9 @@ var (
 	// Load ntdll.dll manually during startup, otherwise Mingw
 	// links wrong printf function to cgo executable (see issue
 	// 12030 for details).
-	_NtWaitForSingleObject stdFunction
+	_NtWaitForSingleObject  stdFunction
+	_RtlGetCurrentPeb       stdFunction
+	_RtlGetNtVersionNumbers stdFunction
 
 	// These are from non-kernel32.dll, so we prefer to LoadLibraryEx them.
 	_timeBeginPeriod,
@@ -145,8 +150,8 @@ var (
 // to start new os thread.
 func tstart_stdcall(newm *m)
 
-// Called by OS using stdcall ABI.
-func ctrlhandler()
+// Init-time helper
+func wintls()
 
 type mOS struct {
 	threadLock mutex   // protects "thread" and prevents closing
@@ -216,25 +221,28 @@ func windowsFindfunc(lib uintptr, name []byte) stdFunction {
 	return stdFunction(unsafe.Pointer(f))
 }
 
-var sysDirectory [521]byte
+const _MAX_PATH = 260 // https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation
+var sysDirectory [_MAX_PATH + 1]byte
 var sysDirectoryLen uintptr
 
 func windowsLoadSystemLib(name []byte) uintptr {
+	if sysDirectoryLen == 0 {
+		l := stdcall2(_GetSystemDirectoryA, uintptr(unsafe.Pointer(&sysDirectory[0])), uintptr(len(sysDirectory)-1))
+		if l == 0 || l > uintptr(len(sysDirectory)-1) {
+			throw("Unable to determine system directory")
+		}
+		sysDirectory[l] = '\\'
+		sysDirectoryLen = l + 1
+	}
 	if useLoadLibraryEx {
 		return stdcall3(_LoadLibraryExA, uintptr(unsafe.Pointer(&name[0])), 0, _LOAD_LIBRARY_SEARCH_SYSTEM32)
 	} else {
-		if sysDirectoryLen == 0 {
-			l := stdcall2(_GetSystemDirectoryA, uintptr(unsafe.Pointer(&sysDirectory[0])), uintptr(len(sysDirectory)-1))
-			if l == 0 || l > uintptr(len(sysDirectory)-1) {
-				throw("Unable to determine system directory")
-			}
-			sysDirectory[l] = '\\'
-			sysDirectoryLen = l + 1
-		}
 		absName := append(sysDirectory[:sysDirectoryLen], name...)
 		return stdcall1(_LoadLibraryA, uintptr(unsafe.Pointer(&absName[0])))
 	}
 }
+
+const haveCputicksAsm = GOARCH == "386" || GOARCH == "amd64"
 
 func loadOptionalSyscalls() {
 	var kernel32dll = []byte("kernel32.dll\000")
@@ -261,8 +269,10 @@ func loadOptionalSyscalls() {
 		throw("ntdll.dll not found")
 	}
 	_NtWaitForSingleObject = windowsFindfunc(n32, []byte("NtWaitForSingleObject\000"))
+	_RtlGetCurrentPeb = windowsFindfunc(n32, []byte("RtlGetCurrentPeb\000"))
+	_RtlGetNtVersionNumbers = windowsFindfunc(n32, []byte("RtlGetNtVersionNumbers\000"))
 
-	if GOARCH == "arm" {
+	if !haveCputicksAsm {
 		_QueryPerformanceCounter = windowsFindfunc(k32, []byte("QueryPerformanceCounter\000"))
 		if _QueryPerformanceCounter == nil {
 			throw("could not find QPC syscalls")
@@ -313,7 +323,7 @@ func monitorSuspendResume() {
 	if powerRegisterSuspendResumeNotification == nil {
 		return // Running on Windows 7, where we don't need it anyway.
 	}
-	var fn interface{} = func(context uintptr, changeType uint32, setting uintptr) uintptr {
+	var fn any = func(context uintptr, changeType uint32, setting uintptr) uintptr {
 		for mp := (*m)(atomic.Loadp(unsafe.Pointer(&allm))); mp != nil; mp = mp.alllink {
 			if mp.resumesema != 0 {
 				stdcall1(_SetEvent, mp.resumesema)
@@ -377,9 +387,7 @@ const (
 )
 
 // in sys_windows_386.s and sys_windows_amd64.s:
-func externalthreadhandler()
 func getlasterror() uint32
-func setlasterror(err uint32)
 
 // When loading DLLs, we prefer to use LoadLibraryEx with
 // LOAD_LIBRARY_SEARCH_* flags, if available. LoadLibraryEx is not
@@ -453,23 +461,90 @@ func createHighResTimer() uintptr {
 		_SYNCHRONIZE|_TIMER_QUERY_STATE|_TIMER_MODIFY_STATE)
 }
 
+const highResTimerSupported = GOARCH == "386" || GOARCH == "amd64"
+
 func initHighResTimer() {
-	if GOARCH == "arm" {
+	if !highResTimerSupported {
 		// TODO: Not yet implemented.
 		return
 	}
 	h := createHighResTimer()
 	if h != 0 {
 		haveHighResTimer = true
-		usleep2Addr = unsafe.Pointer(funcPC(usleep2HighRes))
 		stdcall1(_CloseHandle, h)
 	}
 }
 
+//go:linkname canUseLongPaths os.canUseLongPaths
+var canUseLongPaths bool
+
+// We want this to be large enough to hold the contents of sysDirectory, *plus*
+// a slash and another component that itself is greater than MAX_PATH.
+var longFileName [(_MAX_PATH+1)*2 + 1]byte
+
+// initLongPathSupport initializes the canUseLongPaths variable, which is
+// linked into os.canUseLongPaths for determining whether or not long paths
+// need to be fixed up. In the best case, this function is running on newer
+// Windows 10 builds, which have a bit field member of the PEB called
+// "IsLongPathAwareProcess." When this is set, we don't need to go through the
+// error-prone fixup function in order to access long paths. So this init
+// function first checks the Windows build number, sets the flag, and then
+// tests to see if it's actually working. If everything checks out, then
+// canUseLongPaths is set to true, and later when called, os.fixLongPath
+// returns early without doing work.
+func initLongPathSupport() {
+	const (
+		IsLongPathAwareProcess = 0x80
+		PebBitFieldOffset      = 3
+		OPEN_EXISTING          = 3
+		ERROR_PATH_NOT_FOUND   = 3
+	)
+
+	// Check that we're ≥ 10.0.15063.
+	var maj, min, build uint32
+	stdcall3(_RtlGetNtVersionNumbers, uintptr(unsafe.Pointer(&maj)), uintptr(unsafe.Pointer(&min)), uintptr(unsafe.Pointer(&build)))
+	if maj < 10 || (maj == 10 && min == 0 && build&0xffff < 15063) {
+		return
+	}
+
+	// Set the IsLongPathAwareProcess flag of the PEB's bit field.
+	bitField := (*byte)(unsafe.Pointer(stdcall0(_RtlGetCurrentPeb) + PebBitFieldOffset))
+	originalBitField := *bitField
+	*bitField |= IsLongPathAwareProcess
+
+	// Check that this actually has an effect, by constructing a large file
+	// path and seeing whether we get ERROR_PATH_NOT_FOUND, rather than
+	// some other error, which would indicate the path is too long, and
+	// hence long path support is not successful. This whole section is NOT
+	// strictly necessary, but is a nice validity check for the near to
+	// medium term, when this functionality is still relatively new in
+	// Windows.
+	getRandomData(longFileName[len(longFileName)-33 : len(longFileName)-1])
+	start := copy(longFileName[:], sysDirectory[:sysDirectoryLen])
+	const dig = "0123456789abcdef"
+	for i := 0; i < 32; i++ {
+		longFileName[start+i*2] = dig[longFileName[len(longFileName)-33+i]>>4]
+		longFileName[start+i*2+1] = dig[longFileName[len(longFileName)-33+i]&0xf]
+	}
+	start += 64
+	for i := start; i < len(longFileName)-1; i++ {
+		longFileName[i] = 'A'
+	}
+	stdcall7(_CreateFileA, uintptr(unsafe.Pointer(&longFileName[0])), 0, 0, 0, OPEN_EXISTING, 0, 0)
+	// The ERROR_PATH_NOT_FOUND error value is distinct from
+	// ERROR_FILE_NOT_FOUND or ERROR_INVALID_NAME, the latter of which we
+	// expect here due to the final component being too long.
+	if getlasterror() == ERROR_PATH_NOT_FOUND {
+		*bitField = originalBitField
+		println("runtime: warning: IsLongPathAwareProcess failed to enable long paths; proceeding in fixup mode")
+		return
+	}
+
+	canUseLongPaths = true
+}
+
 func osinit() {
-	asmstdcallAddr = unsafe.Pointer(funcPC(asmstdcall))
-	usleep2Addr = unsafe.Pointer(funcPC(usleep2))
-	switchtothreadAddr = unsafe.Pointer(funcPC(switchtothread))
+	asmstdcallAddr = unsafe.Pointer(abi.FuncPCABI0(asmstdcall))
 
 	setBadSignalMsg()
 
@@ -479,10 +554,10 @@ func osinit() {
 
 	initExceptionHandler()
 
-	stdcall2(_SetConsoleCtrlHandler, funcPC(ctrlhandler), 1)
-
 	initHighResTimer()
 	timeBeginPeriodRetValue = osRelax(false)
+
+	initLongPathSupport()
 
 	ncpu = getproccount()
 
@@ -605,8 +680,12 @@ func goenvs() {
 
 	stdcall1(_FreeEnvironmentStringsW, uintptr(strings))
 
-	// We call this all the way here, late in init, so that malloc works
-	// for the callback function this generates.
+	// We call these all the way here, late in init, so that malloc works
+	// for the callback functions these generate.
+	var fn any = ctrlHandler
+	ctrlHandlerPC := compileCallback(*efaceOf(&fn), true)
+	stdcall2(_SetConsoleCtrlHandler, ctrlHandlerPC, 1)
+
 	monitorSuspendResume()
 }
 
@@ -726,9 +805,6 @@ func writeConsoleUTF16(handle uintptr, b []uint16) {
 	return
 }
 
-// walltime1 isn't implemented on Windows, but will never be called.
-func walltime1() (sec int64, nsec int32)
-
 //go:nosplit
 func semasleep(ns int64) int32 {
 	const (
@@ -831,7 +907,7 @@ func semacreate(mp *m) {
 func newosproc(mp *m) {
 	// We pass 0 for the stack size to use the default for this binary.
 	thandle := stdcall6(_CreateThread, 0, 0,
-		funcPC(tstart_stdcall), uintptr(unsafe.Pointer(mp)),
+		abi.FuncPCABI0(tstart_stdcall), uintptr(unsafe.Pointer(mp)),
 		0, 0)
 
 	if thandle == 0 {
@@ -1006,6 +1082,7 @@ func stdcall0(fn stdFunction) uintptr {
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func stdcall1(fn stdFunction, a0 uintptr) uintptr {
 	mp := getg().m
 	mp.libcall.n = 1
@@ -1014,6 +1091,7 @@ func stdcall1(fn stdFunction, a0 uintptr) uintptr {
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func stdcall2(fn stdFunction, a0, a1 uintptr) uintptr {
 	mp := getg().m
 	mp.libcall.n = 2
@@ -1022,6 +1100,7 @@ func stdcall2(fn stdFunction, a0, a1 uintptr) uintptr {
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func stdcall3(fn stdFunction, a0, a1, a2 uintptr) uintptr {
 	mp := getg().m
 	mp.libcall.n = 3
@@ -1030,6 +1109,7 @@ func stdcall3(fn stdFunction, a0, a1, a2 uintptr) uintptr {
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func stdcall4(fn stdFunction, a0, a1, a2, a3 uintptr) uintptr {
 	mp := getg().m
 	mp.libcall.n = 4
@@ -1038,6 +1118,7 @@ func stdcall4(fn stdFunction, a0, a1, a2, a3 uintptr) uintptr {
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func stdcall5(fn stdFunction, a0, a1, a2, a3, a4 uintptr) uintptr {
 	mp := getg().m
 	mp.libcall.n = 5
@@ -1046,6 +1127,7 @@ func stdcall5(fn stdFunction, a0, a1, a2, a3, a4 uintptr) uintptr {
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func stdcall6(fn stdFunction, a0, a1, a2, a3, a4, a5 uintptr) uintptr {
 	mp := getg().m
 	mp.libcall.n = 6
@@ -1054,6 +1136,7 @@ func stdcall6(fn stdFunction, a0, a1, a2, a3, a4, a5 uintptr) uintptr {
 }
 
 //go:nosplit
+//go:cgo_unsafe_args
 func stdcall7(fn stdFunction, a0, a1, a2, a3, a4, a5, a6 uintptr) uintptr {
 	mp := getg().m
 	mp.libcall.n = 7
@@ -1061,29 +1144,42 @@ func stdcall7(fn stdFunction, a0, a1, a2, a3, a4, a5, a6 uintptr) uintptr {
 	return stdcall(fn)
 }
 
-// In sys_windows_386.s and sys_windows_amd64.s.
-func onosstack(fn unsafe.Pointer, arg uint32)
-
-// These are not callable functions. They should only be called via onosstack.
-func usleep2(usec uint32)
-func usleep2HighRes(usec uint32)
+// These must run on the system stack only.
+func usleep2(dt int32)
+func usleep2HighRes(dt int32)
 func switchtothread()
 
-var usleep2Addr unsafe.Pointer
-var switchtothreadAddr unsafe.Pointer
+//go:nosplit
+func osyield_no_g() {
+	switchtothread()
+}
 
 //go:nosplit
 func osyield() {
-	onosstack(switchtothreadAddr, 0)
+	systemstack(switchtothread)
+}
+
+//go:nosplit
+func usleep_no_g(us uint32) {
+	dt := -10 * int32(us) // relative sleep (negative), 100ns units
+	usleep2(dt)
 }
 
 //go:nosplit
 func usleep(us uint32) {
-	// Have 1us units; want 100ns units.
-	onosstack(usleep2Addr, 10*us)
+	systemstack(func() {
+		dt := -10 * int32(us) // relative sleep (negative), 100ns units
+		// If the high-res timer is available and its handle has been allocated for this m, use it.
+		// Otherwise fall back to the low-res one, which doesn't need a handle.
+		if haveHighResTimer && getg().m.highResTimer != 0 {
+			usleep2HighRes(dt)
+		} else {
+			usleep2(dt)
+		}
+	})
 }
 
-func ctrlhandler1(_type uint32) uint32 {
+func ctrlHandler(_type uint32) uintptr {
 	var s uint32
 
 	switch _type {
@@ -1098,16 +1194,15 @@ func ctrlhandler1(_type uint32) uint32 {
 	if sigsend(s) {
 		if s == _SIGTERM {
 			// Windows terminates the process after this handler returns.
-			// Block indefinitely to give signal handlers a chance to clean up.
-			stdcall1(_Sleep, uintptr(_INFINITE))
+			// Block indefinitely to give signal handlers a chance to clean up,
+			// but make sure to be properly parked first, so the rest of the
+			// program can continue executing.
+			block()
 		}
 		return 1
 	}
 	return 0
 }
-
-// in sys_windows_386.s and sys_windows_amd64.s
-func profileloop()
 
 // called from zcallback_windows_*.s to sys_windows_*.s
 func callbackasm1()
@@ -1123,31 +1218,36 @@ func profilem(mp *m, thread uintptr) {
 	c.contextflags = _CONTEXT_CONTROL
 	stdcall2(_GetThreadContext, thread, uintptr(unsafe.Pointer(c)))
 
-	gp := gFromTLS(mp)
+	gp := gFromSP(mp, c.sp())
 
 	sigprof(c.ip(), c.sp(), c.lr(), gp, mp)
 }
 
-func gFromTLS(mp *m) *g {
-	switch GOARCH {
-	case "arm":
-		tls := &mp.tls[0]
-		return **((***g)(unsafe.Pointer(tls)))
-	case "386", "amd64":
-		tls := &mp.tls[0]
-		return *((**g)(unsafe.Pointer(tls)))
+func gFromSP(mp *m, sp uintptr) *g {
+	if gp := mp.g0; gp != nil && gp.stack.lo < sp && sp < gp.stack.hi {
+		return gp
 	}
-	throw("unsupported architecture")
+	if gp := mp.gsignal; gp != nil && gp.stack.lo < sp && sp < gp.stack.hi {
+		return gp
+	}
+	if gp := mp.curg; gp != nil && gp.stack.lo < sp && sp < gp.stack.hi {
+		return gp
+	}
 	return nil
 }
 
-func profileloop1(param uintptr) uint32 {
+func profileLoop() {
 	stdcall2(_SetThreadPriority, currentThread, _THREAD_PRIORITY_HIGHEST)
 
 	for {
 		stdcall2(_WaitForSingleObject, profiletimer, _INFINITE)
 		first := (*m)(atomic.Loadp(unsafe.Pointer(&allm)))
 		for mp := first; mp != nil; mp = mp.alllink {
+			if mp == getg().m {
+				// Don't profile ourselves.
+				continue
+			}
+
 			lock(&mp.threadLock)
 			// Do not profile threads blocked on Notes,
 			// this includes idle worker threads,
@@ -1159,8 +1259,8 @@ func profileloop1(param uintptr) uint32 {
 			// Acquire our own handle to the thread.
 			var thread uintptr
 			if stdcall7(_DuplicateHandle, currentProcess, mp.thread, currentProcess, uintptr(unsafe.Pointer(&thread)), 0, 0, _DUPLICATE_SAME_ACCESS) == 0 {
-				print("runtime.profileloop1: duplicatehandle failed; errno=", getlasterror(), "\n")
-				throw("runtime.profileloop1: duplicatehandle failed")
+				print("runtime: duplicatehandle failed; errno=", getlasterror(), "\n")
+				throw("duplicatehandle failed")
 			}
 			unlock(&mp.threadLock)
 
@@ -1188,9 +1288,7 @@ func setProcessCPUProfiler(hz int32) {
 	if profiletimer == 0 {
 		timer := stdcall3(_CreateWaitableTimerA, 0, 0, 0)
 		atomic.Storeuintptr(&profiletimer, timer)
-		thread := stdcall6(_CreateThread, 0, 0, funcPC(profileloop), 0, 0, 0)
-		stdcall2(_SetThreadPriority, thread, _THREAD_PRIORITY_HIGHEST)
-		stdcall1(_CloseHandle, thread)
+		newm(profileLoop, nil, -1)
 	}
 }
 
@@ -1208,18 +1306,13 @@ func setThreadCPUProfiler(hz int32) {
 	atomic.Store((*uint32)(unsafe.Pointer(&getg().m.profilehz)), uint32(hz))
 }
 
-const preemptMSupported = GOARCH != "arm"
+const preemptMSupported = true
 
 // suspendLock protects simultaneous SuspendThread operations from
 // suspending each other.
 var suspendLock mutex
 
 func preemptM(mp *m) {
-	if GOARCH == "arm" {
-		// TODO: Implement call injection
-		return
-	}
-
 	if mp == getg().m {
 		throw("self-preempt")
 	}
@@ -1286,23 +1379,46 @@ func preemptM(mp *m) {
 	unlock(&suspendLock)
 
 	// Does it want a preemption and is it safe to preempt?
-	gp := gFromTLS(mp)
-	if wantAsyncPreempt(gp) {
+	gp := gFromSP(mp, c.sp())
+	if gp != nil && wantAsyncPreempt(gp) {
 		if ok, newpc := isAsyncSafePoint(gp, c.ip(), c.sp(), c.lr()); ok {
 			// Inject call to asyncPreempt
-			targetPC := funcPC(asyncPreempt)
+			targetPC := abi.FuncPCABI0(asyncPreempt)
 			switch GOARCH {
 			default:
 				throw("unsupported architecture")
 			case "386", "amd64":
 				// Make it look like the thread called targetPC.
 				sp := c.sp()
-				sp -= sys.PtrSize
+				sp -= goarch.PtrSize
 				*(*uintptr)(unsafe.Pointer(sp)) = newpc
 				c.set_sp(sp)
 				c.set_ip(targetPC)
-			}
 
+			case "arm":
+				// Push LR. The injected call is responsible
+				// for restoring LR. gentraceback is aware of
+				// this extra slot. See sigctxt.pushCall in
+				// signal_arm.go, which is similar except we
+				// subtract 1 from IP here.
+				sp := c.sp()
+				sp -= goarch.PtrSize
+				c.set_sp(sp)
+				*(*uint32)(unsafe.Pointer(sp)) = uint32(c.lr())
+				c.set_lr(newpc - 1)
+				c.set_ip(targetPC)
+
+			case "arm64":
+				// Push LR. The injected call is responsible
+				// for restoring LR. gentraceback is aware of
+				// this extra slot. See sigctxt.pushCall in
+				// signal_arm64.go.
+				sp := c.sp() - 16 // SP needs 16-byte alignment
+				c.set_sp(sp)
+				*(*uint64)(unsafe.Pointer(sp)) = uint64(c.lr())
+				c.set_lr(newpc)
+				c.set_ip(targetPC)
+			}
 			stdcall2(_SetThreadContext, thread, uintptr(unsafe.Pointer(c)))
 		}
 	}

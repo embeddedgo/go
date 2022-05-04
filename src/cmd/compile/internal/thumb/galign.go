@@ -5,22 +5,21 @@
 package thumb
 
 import (
-	"cmd/compile/internal/gc"
 	"cmd/compile/internal/ssa"
+	"cmd/compile/internal/ssagen"
 	"cmd/internal/obj/thumb"
-	"cmd/internal/objabi"
+	"internal/buildcfg"
 )
 
-func Init(arch *gc.Arch) {
+func Init(arch *ssagen.ArchInfo) {
 	arch.LinkArch = &thumb.Link
 	arch.REGSP = thumb.REGSP
 	arch.MAXWIDTH = (1 << 32) - 1
-	arch.SoftFloat = objabi.GOARM&0xF != 0xD // TODO: handle GOARM==0x7F (32-bit FPU)
+	arch.SoftFloat = buildcfg.GOARM&0xF != 0xD // TODO: handle GOARM==0x7F (32-bit FPU)
 	arch.ZeroRange = zerorange
 	arch.Ginsnop = ginsnop      // used as inline mark
-	arch.Ginsnopdefer = ginsnop // for stack trace to show right line number for deffered calls
 
-	arch.SSAMarkMoves = func(s *gc.SSAGenState, b *ssa.Block) {}
+	arch.SSAMarkMoves = func(s *ssagen.State, b *ssa.Block) {}
 	arch.SSAGenValue = ssaGenValue
 	arch.SSAGenBlock = ssaGenBlock
 }

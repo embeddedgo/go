@@ -6,16 +6,18 @@ package thumb
 
 import (
 	"fmt"
+	"internal/buildcfg"
 	"math"
 	"math/bits"
 
-	"cmd/compile/internal/gc"
+	"cmd/compile/internal/base"
+	"cmd/compile/internal/ir"
 	"cmd/compile/internal/logopt"
 	"cmd/compile/internal/ssa"
+	"cmd/compile/internal/ssagen"
 	"cmd/compile/internal/types"
 	"cmd/internal/obj"
 	"cmd/internal/obj/thumb"
-	"cmd/internal/objabi"
 )
 
 // loadByType returns the load instruction of the given type.
@@ -86,15 +88,18 @@ func (v shift) String() string {
 }
 
 // makeshift encodes a register shifted by a constant
-func makeshift(reg int16, typ int64, s int64) shift {
+func makeshift(v *ssa.Value, reg int16, typ int64, s int64) shift {
+	if s < 0 || s >= 32 {
+		v.Fatalf("shift out of range: %d", s)
+	}
 	return shift(int64(reg&0xf) | typ | (s&31)<<7)
 }
 
 // genshift generates a Prog for r = r0 op (r1 shifted by n)
-func genshift(s *gc.SSAGenState, as obj.As, r0, r1, r int16, typ int64, n int64) *obj.Prog {
+func genshift(s *ssagen.State, v *ssa.Value, as obj.As, r0, r1, r int16, typ int64, n int64) *obj.Prog {
 	p := s.Prog(as)
 	p.From.Type = obj.TYPE_SHIFT
-	p.From.Offset = int64(makeshift(r1, typ, n))
+	p.From.Offset = int64(makeshift(v, r1, typ, n))
 	p.Reg = r0
 	if r != 0 {
 		p.To.Type = obj.TYPE_REG
@@ -125,7 +130,7 @@ func getBFC(v uint32) (uint32, uint32) {
 	return 0xffffffff, 0
 }
 
-func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
+func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 	switch v.Op {
 	case ssa.OpCopy, ssa.OpThumbMOVWreg:
 		if v.Type.IsMemory() {
@@ -153,9 +158,6 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = y
 	case ssa.OpThumbMOVWnop:
-		if v.Reg() != v.Args[0].Reg() {
-			v.Fatalf("input[0] and output not in same register %s", v.LongString())
-		}
 		// nothing to do
 	case ssa.OpLoadReg:
 		if v.Type.IsFlags() {
@@ -163,7 +165,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 			return
 		}
 		p := s.Prog(loadByType(v.Type))
-		gc.AddrAuto(&p.From, v.Args[0])
+		ssagen.AddrAuto(&p.From, v.Args[0])
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
 	case ssa.OpStoreReg:
@@ -174,7 +176,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p := s.Prog(storeByType(v.Type))
 		p.From.Type = obj.TYPE_REG
 		p.From.Reg = v.Args[0].Reg()
-		gc.AddrAuto(&p.To, v)
+		ssagen.AddrAuto(&p.To, v)
 	case ssa.OpThumbADD,
 		ssa.OpThumbADC,
 		ssa.OpThumbSUB,
@@ -264,14 +266,14 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p := s.Prog(v.Op.Asm())
 		p.From.Type = obj.TYPE_CONST
 		p.From.Offset = v.AuxInt >> 8
-		p.SetFrom3(obj.Addr{Type: obj.TYPE_CONST, Offset: v.AuxInt & 0xff})
+		p.SetFrom3Const(v.AuxInt & 0xff)
 		p.Reg = v.Args[0].Reg()
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
 	case ssa.OpThumbANDconst, ssa.OpThumbBICconst:
 		// try to optimize ANDconst and BICconst to BFC, which saves bytes and ticks
 		// BFC is only available on ARMv7, and its result and source are in the same register
-		if objabi.GOARM >= 7 && v.Reg() == v.Args[0].Reg() {
+		if v.Reg() == v.Args[0].Reg() {
 			var val uint32
 			if v.Op == ssa.OpThumbANDconst {
 				val = ^uint32(v.AuxInt)
@@ -284,7 +286,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 				p := s.Prog(thumb.ABFC)
 				p.From.Type = obj.TYPE_CONST
 				p.From.Offset = int64(width)
-				p.SetFrom3(obj.Addr{Type: obj.TYPE_CONST, Offset: int64(lsb)})
+				p.SetFrom3Const(int64(lsb))
 				p.To.Type = obj.TYPE_REG
 				p.To.Reg = v.Reg()
 				break
@@ -320,7 +322,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg0()
 	case ssa.OpThumbSRRconst:
-		genshift(s, thumb.AMOVW, 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_RR, v.AuxInt)
+		genshift(s, v, thumb.AMOVW, 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_RR, v.AuxInt)
 	case ssa.OpThumbADDshiftLL,
 		ssa.OpThumbADCshiftLL,
 		ssa.OpThumbSUBshiftLL,
@@ -331,11 +333,11 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbORNshiftLL,
 		ssa.OpThumbXORshiftLL,
 		ssa.OpThumbBICshiftLL:
-		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LL, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LL, v.AuxInt)
 	case ssa.OpThumbADDSshiftLL,
 		ssa.OpThumbSUBSshiftLL,
 		ssa.OpThumbRSBSshiftLL:
-		p := genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg0(), thumb.SHIFT_LL, v.AuxInt)
+		p := genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg0(), thumb.SHIFT_LL, v.AuxInt)
 		p.Scond = thumb.C_SBIT
 	case ssa.OpThumbADDshiftRL,
 		ssa.OpThumbADCshiftRL,
@@ -347,11 +349,11 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbORNshiftRL,
 		ssa.OpThumbXORshiftRL,
 		ssa.OpThumbBICshiftRL:
-		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LR, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LR, v.AuxInt)
 	case ssa.OpThumbADDSshiftRL,
 		ssa.OpThumbSUBSshiftRL,
 		ssa.OpThumbRSBSshiftRL:
-		p := genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg0(), thumb.SHIFT_LR, v.AuxInt)
+		p := genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg0(), thumb.SHIFT_LR, v.AuxInt)
 		p.Scond = thumb.C_SBIT
 	case ssa.OpThumbADDshiftRA,
 		ssa.OpThumbADCshiftRA,
@@ -363,20 +365,20 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbORNshiftRA,
 		ssa.OpThumbXORshiftRA,
 		ssa.OpThumbBICshiftRA:
-		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_AR, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_AR, v.AuxInt)
 	case ssa.OpThumbADDSshiftRA,
 		ssa.OpThumbSUBSshiftRA,
 		ssa.OpThumbRSBSshiftRA:
-		p := genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg0(), thumb.SHIFT_AR, v.AuxInt)
+		p := genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg0(), thumb.SHIFT_AR, v.AuxInt)
 		p.Scond = thumb.C_SBIT
 	case ssa.OpThumbXORshiftRR:
-		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_RR, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), v.Reg(), thumb.SHIFT_RR, v.AuxInt)
 	case ssa.OpThumbMVNshiftLL:
-		genshift(s, v.Op.Asm(), 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_LL, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_LL, v.AuxInt)
 	case ssa.OpThumbMVNshiftRL:
-		genshift(s, v.Op.Asm(), 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_LR, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_LR, v.AuxInt)
 	case ssa.OpThumbMVNshiftRA:
-		genshift(s, v.Op.Asm(), 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_AR, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), 0, v.Args[0].Reg(), v.Reg(), thumb.SHIFT_AR, v.AuxInt)
 	case ssa.OpThumbHMUL,
 		ssa.OpThumbHMULU:
 		// 32-bit high multiplication
@@ -444,11 +446,11 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.From.Type = obj.TYPE_REG
 		p.From.Reg = v.Args[0].Reg()
 	case ssa.OpThumbCMPshiftLL, ssa.OpThumbCMNshiftLL, ssa.OpThumbTSTshiftLL, ssa.OpThumbTEQshiftLL:
-		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), 0, thumb.SHIFT_LL, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), 0, thumb.SHIFT_LL, v.AuxInt)
 	case ssa.OpThumbCMPshiftRL, ssa.OpThumbCMNshiftRL, ssa.OpThumbTSTshiftRL, ssa.OpThumbTEQshiftRL:
-		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), 0, thumb.SHIFT_LR, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), 0, thumb.SHIFT_LR, v.AuxInt)
 	case ssa.OpThumbCMPshiftRA, ssa.OpThumbCMNshiftRA, ssa.OpThumbTSTshiftRA, ssa.OpThumbTEQshiftRA:
-		genshift(s, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), 0, thumb.SHIFT_AR, v.AuxInt)
+		genshift(s, v, v.Op.Asm(), v.Args[0].Reg(), v.Args[1].Reg(), 0, thumb.SHIFT_AR, v.AuxInt)
 	case ssa.OpThumbMOVWaddr:
 		p := s.Prog(thumb.AMOVW)
 		p.From.Type = obj.TYPE_ADDR
@@ -467,10 +469,10 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 			v.Fatalf("aux is of unknown type %T", v.Aux)
 		case *obj.LSym:
 			wantreg = "SB"
-			gc.AddAux(&p.From, v)
-		case *gc.Node:
+			ssagen.AddAux(&p.From, v)
+		case *ir.Name:
 			wantreg = "SP"
-			gc.AddAux(&p.From, v)
+			ssagen.AddAux(&p.From, v)
 		case nil:
 			// No sym, just MOVW $off(SP), R
 			wantreg = "SP"
@@ -492,13 +494,9 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p := s.Prog(v.Op.Asm())
 		p.From.Type = obj.TYPE_MEM
 		p.From.Reg = v.Args[0].Reg()
-		gc.AddAux(&p.From, v)
+		ssagen.AddAux(&p.From, v)
 		p.To.Type = obj.TYPE_REG
-		if _, ok := v.Block.Func.RegAlloc[v.ID].(ssa.LocPair); ok {
-			p.To.Reg = v.Reg0()
-		} else {
-			p.To.Reg = v.Reg()
-		}
+		p.To.Reg = v.Reg()
 	case ssa.OpThumbMOVWstore,
 		ssa.OpThumbMOVHstore,
 		ssa.OpThumbMOVBstore,
@@ -512,7 +510,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.From.Reg = v.Args[1].Reg()
 		p.To.Type = obj.TYPE_MEM
 		p.To.Reg = v.Args[0].Reg()
-		gc.AddAux(&p.To, v)
+		ssagen.AddAux(&p.To, v)
 	case ssa.OpThumbMOVWloadidx,
 		ssa.OpThumbMOVHUloadidx,
 		ssa.OpThumbMOVHloadidx,
@@ -531,13 +529,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbLoadOnce32shiftLL,
 		ssa.OpThumbLoadOnce16shiftLL,
 		ssa.OpThumbLoadOnce8shiftLL:
-		var toreg int16
-		if _, ok := v.Block.Func.RegAlloc[v.ID].(ssa.LocPair); ok {
-			toreg = v.Reg0()
-		} else {
-			toreg = v.Reg()
-		}
-		p := genshift(s, v.Op.Asm(), 0, v.Args[1].Reg(), toreg, thumb.SHIFT_LL, v.AuxInt)
+		p := genshift(s, v, v.Op.Asm(), 0, v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LL, v.AuxInt)
 		p.From.Reg = v.Args[0].Reg()
 	case ssa.OpThumbMOVWstoreidx,
 		ssa.OpThumbMOVHstoreidx,
@@ -558,7 +550,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.From.Reg = v.Args[2].Reg()
 		p.To.Type = obj.TYPE_SHIFT
 		p.To.Reg = v.Args[0].Reg()
-		p.To.Offset = int64(makeshift(v.Args[1].Reg(), thumb.SHIFT_LL, v.AuxInt))
+		p.To.Offset = int64(makeshift(v, v.Args[1].Reg(), thumb.SHIFT_LL, v.AuxInt))
 	case ssa.OpThumbMOVBreg,
 		ssa.OpThumbMOVBUreg,
 		ssa.OpThumbMOVHreg,
@@ -593,6 +585,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		ssa.OpThumbREV,
 		ssa.OpThumbREV16,
 		ssa.OpThumbRBIT,
+		ssa.OpThumbSQRTF,
 		ssa.OpThumbSQRTD,
 		ssa.OpThumbNEGF,
 		ssa.OpThumbNEGD,
@@ -634,6 +627,8 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Reg = v.Reg()
 	case ssa.OpThumbCALLstatic, ssa.OpThumbCALLclosure, ssa.OpThumbCALLinter:
 		s.Call(v)
+	case ssa.OpThumbCALLtail:
+		s.TailCall(v)
 	case ssa.OpThumbLoweredWB:
 		p := s.Prog(obj.ACALL)
 		p.To.Type = obj.TYPE_MEM
@@ -643,42 +638,42 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p := s.Prog(obj.ACALL)
 		p.To.Type = obj.TYPE_MEM
 		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = gc.BoundsCheckFunc[v.AuxInt]
+		p.To.Sym = ssagen.BoundsCheckFunc[v.AuxInt]
 		s.UseArgs(8) // space used in callee args area by assembly stubs
 	case ssa.OpThumbLoweredPanicExtendA, ssa.OpThumbLoweredPanicExtendB, ssa.OpThumbLoweredPanicExtendC:
 		p := s.Prog(obj.ACALL)
 		p.To.Type = obj.TYPE_MEM
 		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = gc.ExtendCheckFunc[v.AuxInt]
+		p.To.Sym = ssagen.ExtendCheckFunc[v.AuxInt]
 		s.UseArgs(12) // space used in callee args area by assembly stubs
 	case ssa.OpThumbDUFFZERO:
 		p := s.Prog(obj.ADUFFZERO)
 		p.To.Type = obj.TYPE_MEM
 		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = gc.Duffzero
+		p.To.Sym = ir.Syms.Duffzero
 		p.To.Offset = v.AuxInt
 	case ssa.OpThumbDUFFCOPY:
 		p := s.Prog(obj.ADUFFCOPY)
 		p.To.Type = obj.TYPE_MEM
 		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = gc.Duffcopy
+		p.To.Sym = ir.Syms.Duffcopy
 		p.To.Offset = v.AuxInt
 	case ssa.OpThumbLoweredNilCheck:
-		if objabi.GOOS == "noos" {
+		if buildcfg.GOOS == "noos" {
 			// BUG: avoid nil check because of MMIO
 		} else {
 			// Issue a load which will fault if arg is nil.
 			p := s.Prog(thumb.AMOVBU)
 			p.From.Type = obj.TYPE_MEM
 			p.From.Reg = v.Args[0].Reg()
-			gc.AddAux(&p.From, v)
+			ssagen.AddAux(&p.From, v)
 			p.To.Type = obj.TYPE_REG
 			p.To.Reg = thumb.REGTMP
 			if logopt.Enabled() {
 				logopt.LogOpt(v.Pos, "nilcheck", "genssa", v.Block.Func.Name)
 			}
-			if gc.Debug_checknil != 0 && v.Pos.Line() > 1 { // v.Pos.Line()==1 in generated wrappers
-				gc.Warnl(v.Pos, "generated nil check")
+			if base.Debug.Nil != 0 && v.Pos.Line() > 1 { // v.Pos.Line()==1 in generated wrappers
+				base.WarnfAt(v.Pos, "generated nil check")
 			}
 		}
 	case ssa.OpThumbLoweredZero:
@@ -714,7 +709,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p2.Reg = thumb.REG_R1
 		p3 := s.Prog(thumb.ABLE)
 		p3.To.Type = obj.TYPE_BRANCH
-		gc.Patch(p3, p)
+		p3.To.SetTarget(p)
 	case ssa.OpThumbLoweredMove:
 		// MOVW.P	4(R1), Rtmp
 		// MOVW.P	Rtmp, 4(R2)
@@ -755,7 +750,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p3.Reg = thumb.REG_R1
 		p4 := s.Prog(thumb.ABLE)
 		p4.To.Type = obj.TYPE_BRANCH
-		gc.Patch(p4, p)
+		p4.To.SetTarget(p)
 	case ssa.OpThumbEqual,
 		ssa.OpThumbNotEqual,
 		ssa.OpThumbLessThan,
@@ -783,12 +778,12 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		p.To.Reg = v.Reg()
 	case ssa.OpThumbLoweredGetClosurePtr:
 		// Closure pointer is R11 (thumb.REGCTXT).
-		gc.CheckLoweredGetClosurePtr(v)
+		ssagen.CheckLoweredGetClosurePtr(v)
 	case ssa.OpThumbLoweredGetCallerSP:
 		// caller's SP is FixedFrameSize below the address of the first arg
 		p := s.Prog(thumb.AMOVW)
 		p.From.Type = obj.TYPE_ADDR
-		p.From.Offset = -gc.Ctxt.FixedFrameSize()
+		p.From.Offset = -base.Ctxt.FixedFrameSize()
 		p.From.Name = obj.NAME_PARAM
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
@@ -800,7 +795,7 @@ func ssaGenValue(s *gc.SSAGenState, v *ssa.Value) {
 		v.Fatalf("FlagConstant op should never make it to codegen %v", v.LongString())
 	case ssa.OpThumbInvertFlags:
 		v.Fatalf("InvertFlags should never make it to codegen %v", v.LongString())
-	case ssa.OpClobber:
+	case ssa.OpClobber, ssa.OpClobberReg:
 		// TODO: implement for clobberdead experiment. Nop is ok for now.
 	case ssa.OpThumbDSB:
 		s.Prog(thumb.ADSB)
@@ -844,24 +839,24 @@ var blockJump = map[ssa.BlockKind]struct {
 }
 
 // To model a 'LEnoov' ('<=' without overflow checking) branching
-var leJumps = [2][2]gc.IndexJump{
+var leJumps = [2][2]ssagen.IndexJump{
 	{{Jump: thumb.ABEQ, Index: 0}, {Jump: thumb.ABPL, Index: 1}}, // next == b.Succs[0]
 	{{Jump: thumb.ABMI, Index: 0}, {Jump: thumb.ABEQ, Index: 0}}, // next == b.Succs[1]
 }
 
 // To model a 'GTnoov' ('>' without overflow checking) branching
-var gtJumps = [2][2]gc.IndexJump{
+var gtJumps = [2][2]ssagen.IndexJump{
 	{{Jump: thumb.ABMI, Index: 1}, {Jump: thumb.ABEQ, Index: 1}}, // next == b.Succs[0]
 	{{Jump: thumb.ABEQ, Index: 1}, {Jump: thumb.ABPL, Index: 0}}, // next == b.Succs[1]
 }
 
-func ssaGenBlock(s *gc.SSAGenState, b, next *ssa.Block) {
+func ssaGenBlock(s *ssagen.State, b, next *ssa.Block) {
 	switch b.Kind {
 	case ssa.BlockPlain:
 		if b.Succs[0].Block() != next {
 			p := s.Prog(obj.AJMP)
 			p.To.Type = obj.TYPE_BRANCH
-			s.Branches = append(s.Branches, gc.Branch{P: p, B: b.Succs[0].Block()})
+			s.Branches = append(s.Branches, ssagen.Branch{P: p, B: b.Succs[0].Block()})
 		}
 
 	case ssa.BlockDefer:
@@ -874,23 +869,17 @@ func ssaGenBlock(s *gc.SSAGenState, b, next *ssa.Block) {
 		p.Reg = thumb.REG_R0
 		p = s.Prog(thumb.ABNE)
 		p.To.Type = obj.TYPE_BRANCH
-		s.Branches = append(s.Branches, gc.Branch{P: p, B: b.Succs[1].Block()})
+		s.Branches = append(s.Branches, ssagen.Branch{P: p, B: b.Succs[1].Block()})
 		if b.Succs[0].Block() != next {
 			p := s.Prog(obj.AJMP)
 			p.To.Type = obj.TYPE_BRANCH
-			s.Branches = append(s.Branches, gc.Branch{P: p, B: b.Succs[0].Block()})
+			s.Branches = append(s.Branches, ssagen.Branch{P: p, B: b.Succs[0].Block()})
 		}
 
-	case ssa.BlockExit:
+	case ssa.BlockExit, ssa.BlockRetJmp:
 
 	case ssa.BlockRet:
 		s.Prog(obj.ARET)
-
-	case ssa.BlockRetJmp:
-		p := s.Prog(obj.ARET)
-		p.To.Type = obj.TYPE_MEM
-		p.To.Name = obj.NAME_EXTERN
-		p.To.Sym = b.Aux.(*obj.LSym)
 
 	case ssa.BlockThumbEQ, ssa.BlockThumbNE,
 		ssa.BlockThumbLT, ssa.BlockThumbGE,

@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net"
 	"net/http"
+	"net/http/internal/ascii"
 	"net/textproto"
 	"net/url"
 	"strings"
@@ -251,6 +253,10 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	outreq.Close = false
 
 	reqUpType := upgradeType(outreq.Header)
+	if !ascii.IsPrint(reqUpType) {
+		p.getErrorHandler()(rw, req, fmt.Errorf("client tried to switch to invalid protocol %q", reqUpType))
+		return
+	}
 	removeConnectionHeaders(outreq.Header)
 
 	// Remove hop-by-hop headers to the backend. Especially
@@ -407,7 +413,7 @@ func (p *ReverseProxy) flushInterval(res *http.Response) time.Duration {
 
 	// For Server-Sent Events responses, flush immediately.
 	// The MIME type is defined in https://www.w3.org/TR/eventsource/#text-event-stream
-	if resCT == "text/event-stream" {
+	if baseCT, _, _ := mime.ParseMediaType(resCT); baseCT == "text/event-stream" {
 		return -1 // negative means immediately
 	}
 
@@ -478,7 +484,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader, buf []byte) (int
 	}
 }
 
-func (p *ReverseProxy) logf(format string, args ...interface{}) {
+func (p *ReverseProxy) logf(format string, args ...any) {
 	if p.ErrorLog != nil {
 		p.ErrorLog.Printf(format, args...)
 	} else {
@@ -543,13 +549,16 @@ func upgradeType(h http.Header) string {
 	if !httpguts.HeaderValuesContainsToken(h["Connection"], "Upgrade") {
 		return ""
 	}
-	return strings.ToLower(h.Get("Upgrade"))
+	return h.Get("Upgrade")
 }
 
 func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.Request, res *http.Response) {
 	reqUpType := upgradeType(req.Header)
 	resUpType := upgradeType(res.Header)
-	if reqUpType != resUpType {
+	if !ascii.IsPrint(resUpType) { // We know reqUpType is ASCII, it's checked by the caller.
+		p.getErrorHandler()(rw, req, fmt.Errorf("backend tried to switch to invalid protocol %q", resUpType))
+	}
+	if !ascii.EqualFold(reqUpType, resUpType) {
 		p.getErrorHandler()(rw, req, fmt.Errorf("backend tried to switch protocol %q when %q was requested", resUpType, reqUpType))
 		return
 	}
@@ -567,7 +576,7 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 
 	backConnCloseCh := make(chan bool)
 	go func() {
-		// Ensure that the cancelation of a request closes the backend.
+		// Ensure that the cancellation of a request closes the backend.
 		// See issue https://golang.org/issue/35559.
 		select {
 		case <-req.Context().Done():

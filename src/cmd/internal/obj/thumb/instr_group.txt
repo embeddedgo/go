@@ -285,6 +285,9 @@
 
 -- not implemented
 
+	FMULAD - if added update compile/internal/ssagen/ssa.go addF("math", "FMA",
+	         and remove comment from ssa/gen/Thumb.rules
+
 	1110 100p ±1w0 nnnn  aaaa bbbb uuuu uuuu   MOVW.p.w  (Rta, Rtb), ±u8<<2(Rn)
 	1110 100p ±1w1 nnnn  aaaa bbbb uuuu uuuu   MOVW.p.w  ±u8<<2(Rn), (Rta, Rtb)
 

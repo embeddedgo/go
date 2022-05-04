@@ -57,8 +57,8 @@ func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
 // concurrently with any other reservation. TODO: Consider replace this by
 // direct initialization of mheap_.arena.
 //go:nosplit
-func sysReserveMaxArena() (addr, size uintptr) {
-	return sysMem.arenaStart, sysMem.arenaSize
+func sysReserveMaxArena() (addr, size uintptr, mapMemory bool) {
+	return sysMem.arenaStart, sysMem.arenaSize, true
 }
 
 //go:nosplit

@@ -4,7 +4,7 @@
 // Created by cgo -godefs - DO NOT EDIT
 // cgo -godefs -- _const.go
 
-// +build thumb,linux
+//go:build thumb && linux
 
 package syscall
 

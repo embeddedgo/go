@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !noos
+//go:build !noos
 
 #include "go_asm.h"
 #include "go_tls.h"
@@ -17,7 +17,7 @@ TEXT runtime·save_g(SB),NOSPLIT|NOFRAME,$0-0
 	BEQ	X0, X31, nocgo
 
 	MOV	runtime·tls_g(SB), X31
-	ADD	X4, X31		// add offset to thread pointer (X4)
+	ADD	TP, X31		// add offset to thread pointer (X4)
 	MOV	g, (X31)
 
 nocgo:
@@ -25,7 +25,7 @@ nocgo:
 
 TEXT runtime·load_g(SB),NOSPLIT|NOFRAME,$0-0
 	MOV	runtime·tls_g(SB), X31
-	ADD	X4, X31		// add offset to thread pointer (X4)
+	ADD	TP, X31		// add offset to thread pointer (X4)
 	MOV	(X31), g
 	RET
 

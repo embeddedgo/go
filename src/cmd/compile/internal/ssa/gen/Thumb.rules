@@ -46,6 +46,7 @@
 (Com(32|16|8) ...) => (MVN ...)
 
 (Sqrt ...) => (SQRTD ...)
+(Sqrt32 ...) => (SQRTF ...)
 (Abs ...) => (ABSD ...)
 
 (Ctz32NonZero ...) => (Ctz32 ...)
@@ -136,7 +137,7 @@
 (Const(8|16|32) [val]) => (MOVWconst [int32(val)])
 (Const(32|64)F [val]) => (MOV(F|D)const [float64(val)])
 (ConstNil) => (MOVWconst [0])
-(ConstBool [b]) => (MOVWconst [b2i32(b)])
+(ConstBool [t]) => (MOVWconst [b2i32(t)])
 
 // truncations
 // Because we ignore high parts of registers, truncates are just copies.
@@ -173,7 +174,7 @@
 
 (CvtBoolToUint8 ...) => (Copy ...)
 
-// fused-multiply-add
+// fused-multiply-add (FMULAD not implemented yet in obj/thumb)
 (FMA x y z) => (FMULAD z x y)
 
 // comparisons
@@ -240,7 +241,7 @@
 (MMIOMB ...) => (DSB ...) // use DSB instead of DMB because of memory mapped CPU controll registers and to ensure memory update before the sleep (before WFI, WFE)
 
 // publication barrier
-(PublicationBarrier ...) => (DMB_ST ...)
+(PubBarrier ...) => (DMB_ST ...)
 
 // zero instructions
 (Zero [0] _ mem) => mem
@@ -326,6 +327,7 @@
 (StaticCall ...) => (CALLstatic ...)
 (ClosureCall ...) => (CALLclosure ...)
 (InterCall ...) => (CALLinter ...)
+(TailCall ...) => (CALLtail ...)
 
 // checks
 (NilCheck ...) => (LoweredNilCheck ...)
@@ -553,9 +555,9 @@
 (XOR x (MOVWconst [c])) => (XORconst [c] x)
 (BIC x (MOVWconst [c])) => (BICconst [c] x)
 
-(SLL x (MOVWconst [c])) => (SLLconst x [c&31]) // Note: I don't think we ever generate bad constant shifts (i.e. c>=32)
-(SRL x (MOVWconst [c])) => (SRLconst x [c&31])
-(SRA x (MOVWconst [c])) => (SRAconst x [c&31])
+(SLL x (MOVWconst [c])) && 0 <= c && c < 32 => (SLLconst x [c])
+(SRL x (MOVWconst [c])) && 0 <= c && c < 32 => (SRLconst x [c])
+(SRA x (MOVWconst [c])) && 0 <= c && c < 32 => (SRAconst x [c])
 
 (CMP x (MOVWconst [c])) => (CMPconst [c] x)
 (CMP (MOVWconst [c]) x) => (InvertFlags (CMPconst [c] x))
@@ -563,8 +565,10 @@
 (TST x (MOVWconst [c])) => (TSTconst [c] x)
 (TEQ x (MOVWconst [c])) => (TEQconst [c] x)
 
+(SRR x (MOVWconst [c])) => (SRRconst x [c&31])
+
 // Canonicalize the order of arguments to comparisons - helps with CSE.
-(CMP x y) && x.ID > y.ID => (InvertFlags (CMP y x))
+(CMP x y) && canonLessThan(x,y) => (InvertFlags (CMP y x))
 
 // don't extend after proper load
 // MOVWreg instruction is not emitted if src and dst registers are same, but it ensures the type.
@@ -610,6 +614,10 @@
 // if a register move has only 1 use, just use the same register without emitting instruction
 // MOVWnop doesn't emit instruction, only for ensuring the type.
 (MOVWreg x) && x.Uses == 1 => (MOVWnop x)
+
+// TODO: we should be able to get rid of MOVWnop all together.
+// But for now, this is enough to get rid of lots of them.
+(MOVWnop (MOVWconst [c])) => (MOVWconst [c])
 
 // mul by constant
 (MUL x (MOVWconst [c])) && int32(c) == -1 => (RSBconst [0] x)
@@ -1016,7 +1024,6 @@
 ( ORshiftRL [c] (SLLconst x [32-c]) x) => (SRRconst [   c] x)
 (XORshiftRL [c] (SLLconst x [32-c]) x) => (SRRconst [   c] x)
 
-(RotateLeft32 x (MOVWconst [c])) => (SRRconst [-c&31] x)
 (RotateLeft16 <t> x (MOVWconst [c])) => (Or16 (Lsh16x32 <t> x (MOVWconst [c&15])) (Rsh16Ux32 <t> x (MOVWconst [-c&15])))
 (RotateLeft8 <t> x (MOVWconst [c])) => (Or8 (Lsh8x32 <t> x (MOVWconst [c&7])) (Rsh8Ux32 <t> x (MOVWconst [-c&7])))
 (RotateLeft32 x y) => (SRR x (RSBconst [0] <y.Type> y))
@@ -1162,24 +1169,24 @@
 (OR  x (MVN y)) => (ORN x y)
 
 // simplification with *shift ops
-(SUBshiftLL x (SLLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(SUBshiftRL x (SRLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(SUBshiftRA x (SRAconst x [c]) [d]) && c==d => (MOVWconst [0])
-(RSBshiftLL x (SLLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(RSBshiftRL x (SRLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(RSBshiftRA x (SRAconst x [c]) [d]) && c==d => (MOVWconst [0])
-(ANDshiftLL x y:(SLLconst x [c]) [d]) && c==d => y
-(ANDshiftRL x y:(SRLconst x [c]) [d]) && c==d => y
-(ANDshiftRA x y:(SRAconst x [c]) [d]) && c==d => y
-(ORshiftLL x y:(SLLconst x [c]) [d]) && c==d => y
-(ORshiftRL x y:(SRLconst x [c]) [d]) && c==d => y
-(ORshiftRA x y:(SRAconst x [c]) [d]) && c==d => y
-(XORshiftLL x (SLLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(XORshiftRL x (SRLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(XORshiftRA x (SRAconst x [c]) [d]) && c==d => (MOVWconst [0])
-(BICshiftLL x (SLLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(BICshiftRL x (SRLconst x [c]) [d]) && c==d => (MOVWconst [0])
-(BICshiftRA x (SRAconst x [c]) [d]) && c==d => (MOVWconst [0])
+(SUBshiftLL (SLLconst x [c]) x [c]) => (MOVWconst [0])
+(SUBshiftRL (SRLconst x [c]) x [c]) => (MOVWconst [0])
+(SUBshiftRA (SRAconst x [c]) x [c]) => (MOVWconst [0])
+(RSBshiftLL (SLLconst x [c]) x [c]) => (MOVWconst [0])
+(RSBshiftRL (SRLconst x [c]) x [c]) => (MOVWconst [0])
+(RSBshiftRA (SRAconst x [c]) x [c]) => (MOVWconst [0])
+(ANDshiftLL y:(SLLconst x [c]) x [c]) => y
+(ANDshiftRL y:(SRLconst x [c]) x [c]) => y
+(ANDshiftRA y:(SRAconst x [c]) x [c]) => y
+(ORshiftLL y:(SLLconst x [c]) x [c]) => y
+(ORshiftRL y:(SRLconst x [c]) x [c]) => y
+(ORshiftRA y:(SRAconst x [c]) x [c]) => y
+(XORshiftLL (SLLconst x [c]) x [c]) => (MOVWconst [0])
+(XORshiftRL (SRLconst x [c]) x [c]) => (MOVWconst [0])
+(XORshiftRA (SRAconst x [c]) x [c]) => (MOVWconst [0])
+(BICshiftLL (SLLconst x [c]) x [c]) => (MOVWconst [0])
+(BICshiftRL (SRLconst x [c]) x [c]) => (MOVWconst [0])
+(BICshiftRA (SRAconst x [c]) x [c]) => (MOVWconst [0])
 (AND x (MVNshiftLL y [c])) => (BICshiftLL x y [c])
 (AND x (MVNshiftRL y [c])) => (BICshiftRL x y [c])
 (AND x (MVNshiftRA y [c])) => (BICshiftRA x y [c])
@@ -1193,8 +1200,8 @@
 (SRLconst (SLLconst x [c]) [d]) && uint64(d)>=uint64(c) && uint64(d)<=31 => (BFXU [(d-c)|(32-d)<<8] x)
 
 // comparison simplification
-((LT|LE|EQ|NE|GE|GT) (CMP x (RSBconst [0] y))) => ((LT|LE|EQ|NE|GE|GT) (CMN x y)) // sense of carry bit not preserved
-((LT|LE|EQ|NE|GE|GT) (CMN x (RSBconst [0] y))) => ((LT|LE|EQ|NE|GE|GT) (CMP x y)) // sense of carry bit not preserved
+((EQ|NE) (CMP x (RSBconst [0] y))) => ((EQ|NE) (CMN x y)) // sense of carry bit not preserved; see also #50854
+((EQ|NE) (CMN x (RSBconst [0] y))) => ((EQ|NE) (CMP x y)) // sense of carry bit not preserved; see also #50864
 (EQ (CMPconst [0] l:(SUB x y)) yes no) && l.Uses==1 => (EQ (CMP x y) yes no)
 (EQ (CMPconst [0] l:(MULS x y a)) yes no) && l.Uses==1 => (EQ (CMP a (MUL <x.Type> x y)) yes no)
 (EQ (CMPconst [0] l:(SUBconst [c] x)) yes no) && l.Uses==1 => (EQ (CMPconst [c] x) yes no)

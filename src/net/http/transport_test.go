@@ -30,7 +30,7 @@ import (
 	"net/http/httptest"
 	"net/http/httptrace"
 	"net/http/httputil"
-	"net/http/internal"
+	"net/http/internal/testcert"
 	"net/textproto"
 	"net/url"
 	"os"
@@ -626,12 +626,15 @@ func TestTransportMaxConnsPerHost(t *testing.T) {
 			t.Fatalf("ExportHttp2ConfigureTransport: %v", err)
 		}
 
-		connCh := make(chan net.Conn, 1)
+		mu := sync.Mutex{}
+		var conns []net.Conn
 		var dialCnt, gotConnCnt, tlsHandshakeCnt int32
 		tr.Dial = func(network, addr string) (net.Conn, error) {
 			atomic.AddInt32(&dialCnt, 1)
 			c, err := net.Dial(network, addr)
-			connCh <- c
+			mu.Lock()
+			defer mu.Unlock()
+			conns = append(conns, c)
 			return c, err
 		}
 
@@ -685,7 +688,12 @@ func TestTransportMaxConnsPerHost(t *testing.T) {
 			t.FailNow()
 		}
 
-		(<-connCh).Close()
+		mu.Lock()
+		for _, c := range conns {
+			c.Close()
+		}
+		conns = nil
+		mu.Unlock()
 		tr.CloseIdleConnections()
 
 		doReq()
@@ -768,7 +776,7 @@ func TestTransportServerClosingUnexpectedly(t *testing.T) {
 	c := ts.Client()
 
 	fetch := func(n, retries int) string {
-		condFatalf := func(format string, arg ...interface{}) {
+		condFatalf := func(format string, arg ...any) {
 			if retries <= 0 {
 				t.Fatalf(format, arg...)
 			}
@@ -3506,7 +3514,7 @@ func TestRetryRequestsOnError(t *testing.T) {
 				mu     sync.Mutex
 				logbuf bytes.Buffer
 			)
-			logf := func(format string, args ...interface{}) {
+			logf := func(format string, args ...any) {
 				mu.Lock()
 				defer mu.Unlock()
 				fmt.Fprintf(&logbuf, format, args...)
@@ -3734,7 +3742,7 @@ func TestTransportDialTLSContext(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		return c, c.Handshake()
+		return c, c.HandshakeContext(ctx)
 	}
 
 	req, err := NewRequest("GET", ts.URL, nil)
@@ -4291,7 +4299,7 @@ func TestTransportReuseConnEmptyResponseBody(t *testing.T) {
 
 // Issue 13839
 func TestNoCrashReturningTransportAltConn(t *testing.T) {
-	cert, err := tls.X509KeyPair(internal.LocalhostCert, internal.LocalhostKey)
+	cert, err := tls.X509KeyPair(testcert.LocalhostCert, testcert.LocalhostKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4483,7 +4491,7 @@ func testTransportEventTrace(t *testing.T, h2 bool, noHooks bool) {
 
 	var mu sync.Mutex // guards buf
 	var buf bytes.Buffer
-	logf := func(format string, args ...interface{}) {
+	logf := func(format string, args ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		fmt.Fprintf(&buf, format, args...)
@@ -4642,7 +4650,7 @@ func testTransportEventTrace(t *testing.T, h2 bool, noHooks bool) {
 func TestTransportEventTraceTLSVerify(t *testing.T) {
 	var mu sync.Mutex
 	var buf bytes.Buffer
-	logf := func(format string, args ...interface{}) {
+	logf := func(format string, args ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		fmt.Fprintf(&buf, format, args...)
@@ -4728,7 +4736,7 @@ func TestTransportEventTraceRealDNS(t *testing.T) {
 
 	var mu sync.Mutex // guards buf
 	var buf bytes.Buffer
-	logf := func(format string, args ...interface{}) {
+	logf := func(format string, args ...any) {
 		mu.Lock()
 		defer mu.Unlock()
 		fmt.Fprintf(&buf, format, args...)
@@ -6502,5 +6510,34 @@ func TestCancelRequestWhenSharingConnection(t *testing.T) {
 	close(idlec)
 
 	close(r2c)
+	wg.Wait()
+}
+
+func TestHandlerAbortRacesBodyRead(t *testing.T) {
+	setParallel(t)
+	defer afterTest(t)
+
+	ts := httptest.NewServer(HandlerFunc(func(rw ResponseWriter, req *Request) {
+		go io.Copy(io.Discard, req.Body)
+		panic(ErrAbortHandler)
+	}))
+	defer ts.Close()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				const reqLen = 6 * 1024 * 1024
+				req, _ := NewRequest("POST", ts.URL, &io.LimitedReader{R: neverEnding('x'), N: reqLen})
+				req.ContentLength = reqLen
+				resp, _ := ts.Client().Transport.RoundTrip(req)
+				if resp != nil {
+					resp.Body.Close()
+				}
+			}
+		}()
+	}
 	wg.Wait()
 }

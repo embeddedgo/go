@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !noos
+//go:build !noos
 
 package runtime
 
@@ -44,7 +44,7 @@ var cgoHasExtraM bool
 // 2) they keep the argument alive until the call site; the call is emitted after
 // the end of the (presumed) use of the argument by C.
 // cgoUse should not actually be called (see cgoAlwaysFalse).
-func cgoUse(interface{}) { throw("cgoUse should not be called") }
+func cgoUse(any) { throw("cgoUse should not be called") }
 
 // cgoAlwaysFalse is a boolean value that is always false.
 // The cgo-generated code says if cgoAlwaysFalse { cgoUse(p) }.

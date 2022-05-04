@@ -2,16 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build linux
-// +build ppc64 ppc64le
+//go:build linux && (ppc64 || ppc64le)
 
 package syscall
-
-// archHonorsR2 captures the fact that r2 is honored by the
-// runtime.GOARCH.  Syscall conventions are generally r1, r2, err :=
-// syscall(trap, ...).  Not all architectures define r2 in their
-// ABI. See "man syscall".
-const archHonorsR2 = false
 
 const _SYS_setgroups = SYS_SETGROUPS
 
@@ -79,30 +72,6 @@ func setTimespec(sec, nsec int64) Timespec {
 
 func setTimeval(sec, usec int64) Timeval {
 	return Timeval{Sec: sec, Usec: usec}
-}
-
-func Pipe(p []int) (err error) {
-	if len(p) != 2 {
-		return EINVAL
-	}
-	var pp [2]_C_int
-	err = pipe2(&pp, 0)
-	p[0] = int(pp[0])
-	p[1] = int(pp[1])
-	return
-}
-
-//sysnb pipe2(p *[2]_C_int, flags int) (err error)
-
-func Pipe2(p []int, flags int) (err error) {
-	if len(p) != 2 {
-		return EINVAL
-	}
-	var pp [2]_C_int
-	err = pipe2(&pp, flags)
-	p[0] = int(pp[0])
-	p[1] = int(pp[1])
-	return
 }
 
 func (r *PtraceRegs) PC() uint64 { return r.Nip }

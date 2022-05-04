@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build aix darwin dragonfly freebsd linux netbsd openbsd solaris
+//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
 
 package net
 
@@ -600,14 +600,14 @@ func TestGoLookupIPOrderFallbackToFile(t *testing.T) {
 		name := fmt.Sprintf("order %v", order)
 
 		// First ensure that we get an error when contacting a non-existent host.
-		_, _, err := r.goLookupIPCNAMEOrder(context.Background(), "notarealhost", order)
+		_, _, err := r.goLookupIPCNAMEOrder(context.Background(), "ip", "notarealhost", order)
 		if err == nil {
 			t.Errorf("%s: expected error while looking up name not in hosts file", name)
 			continue
 		}
 
 		// Now check that we get an address when the name appears in the hosts file.
-		addrs, _, err := r.goLookupIPCNAMEOrder(context.Background(), "thor", order) // entry is in "testdata/hosts"
+		addrs, _, err := r.goLookupIPCNAMEOrder(context.Background(), "ip", "thor", order) // entry is in "testdata/hosts"
 		if err != nil {
 			t.Errorf("%s: expected to successfully lookup host entry", name)
 			continue
@@ -881,7 +881,7 @@ func (f *fakeDNSPacketConn) Close() error {
 func TestIgnoreDNSForgeries(t *testing.T) {
 	c, s := Pipe()
 	go func() {
-		b := make([]byte, 512)
+		b := make([]byte, maxDNSPacketSize)
 		n, err := s.Read(b)
 		if err != nil {
 			t.Error(err)
@@ -2078,6 +2078,7 @@ func TestCVE202133195(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, tc.f)
 	}
+
 }
 
 func TestNullMX(t *testing.T) {
@@ -2112,6 +2113,47 @@ func TestNullMX(t *testing.T) {
 		t.Fatalf("LookupMX: %v", err)
 	}
 	if want := []*MX{&MX{Host: "."}}; !reflect.DeepEqual(rrset, want) {
+		records := []string{}
+		for _, rr := range rrset {
+			records = append(records, fmt.Sprintf("%v", rr))
+		}
+		t.Errorf("records = [%v]; want [%v]", strings.Join(records, " "), want[0])
+	}
+}
+
+func TestRootNS(t *testing.T) {
+	// See https://golang.org/issue/45715.
+	fake := fakeDNSServer{
+		rh: func(n, _ string, q dnsmessage.Message, _ time.Time) (dnsmessage.Message, error) {
+			r := dnsmessage.Message{
+				Header: dnsmessage.Header{
+					ID:       q.Header.ID,
+					Response: true,
+					RCode:    dnsmessage.RCodeSuccess,
+				},
+				Questions: q.Questions,
+				Answers: []dnsmessage.Resource{
+					{
+						Header: dnsmessage.ResourceHeader{
+							Name:  q.Questions[0].Name,
+							Type:  dnsmessage.TypeNS,
+							Class: dnsmessage.ClassINET,
+						},
+						Body: &dnsmessage.NSResource{
+							NS: dnsmessage.MustNewName("i.root-servers.net."),
+						},
+					},
+				},
+			}
+			return r, nil
+		},
+	}
+	r := Resolver{PreferGo: true, Dial: fake.DialContext}
+	rrset, err := r.LookupNS(context.Background(), ".")
+	if err != nil {
+		t.Fatalf("LookupNS: %v", err)
+	}
+	if want := []*NS{&NS{Host: "i.root-servers.net."}}; !reflect.DeepEqual(rrset, want) {
 		records := []string{}
 		for _, rr := range rrset {
 			records = append(records, fmt.Sprintf("%v", rr))

@@ -12,7 +12,7 @@
 
 // using NOFRAME means do not save LR on stack.
 // argc is in R0, argv is in R1.
-TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
+TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  $0xcafebabe, R12
 
 	// copy arguments forward on an even stack
@@ -56,12 +56,13 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	BL    runtime·schedinit(SB)
 
 	// create a new goroutine to start program
-	MOVW       $0, R0
-	MOVW       $8, R1
-	MOVW       $runtime·mainPC(SB), R2
-	MOVM.DB.W  [R0-R2], (R13)
-	BL         runtime·newproc(SB)
-	MOVW       $12(R13), R13
+	SUB	$8, R13
+	MOVW	$runtime·mainPC(SB), R0
+	MOVW	R0, 4(R13)	// arg 1: fn
+	MOVW	$0, R0
+	MOVW	R0, 0(R13)	// dummy LR
+	BL	runtime·newproc(SB)
+	ADD	$8, R13	// pop args and LR
 
 	// start this M
 	BL  runtime·mstart(SB)
@@ -97,26 +98,13 @@ TEXT runtime·asminit(SB),NOSPLIT,$0-0
 	// WORD	$0xeee1ba10	// vmsr fpscr, REGTMP
 	RET
 
-//
-//  go-routine
-//
+TEXT runtime·mstart(SB),NOSPLIT|TOPFRAME,$0
+	BL	runtime·mstart0(SB)
+	RET // not reached
 
-// void gosave(Gobuf*)
-// save state in Gobuf; setjmp
-TEXT runtime·gosave(SB),NOSPLIT|NOFRAME,$0-4
-	MOVW  buf+0(FP), R0
-	MOVW  R13, gobuf_sp(R0)
-	MOVW  LR, gobuf_pc(R0)
-	MOVW  g, gobuf_g(R0)
-	MOVW  $0, REGTMP
-	MOVW  REGTMP, gobuf_lr(R0)
-	MOVW  REGTMP, gobuf_ret(R0)
-	// Assert ctxt is zero. See func save.
-	MOVW  gobuf_ctxt(R0), R0
-	CMP   R0, REGTMP
-	B.EQ   2(PC)
-	CALL  runtime·badctxt(SB)
-	RET
+/*
+ *  go-routine
+ */
 
 TEXT ·asmcgocall(SB),NOSPLIT,$0-12
 	BKPT
@@ -124,21 +112,14 @@ TEXT ·asmcgocall(SB),NOSPLIT,$0-12
 
 // void gogo(Gobuf*)
 // restore state from Gobuf; longjmp
-TEXT runtime·gogo(SB),NOSPLIT,$8-4
+TEXT runtime·gogo(SB),NOSPLIT|NOFRAME,$0-4
 	MOVW  buf+0(FP), R1
 	MOVW  gobuf_g(R1), R0
-	BL    setg<>(SB)
+	MOVW  0(R0), R2	// make sure g != nil
+	B	  gogo<>(SB)
 
-	// NOTE: We updated g above, and we are about to update SP.
-	// Until LR and PC are also updated, the g/SP/LR/PC quadruple
-	// are out of sync and must not be used as the basis of a traceback.
-	// Sigprof skips the traceback when SP is not within g's bounds,
-	// and when the PC is inside this function, runtime.gogo.
-	// Since we are about to update SP, until we complete runtime.gogo
-	// we must not leave this function. In particular, no calls
-	// after this point: it must be straight-line code until the
-	// final B instruction.
-	// See large comment in sigprof for more details.
+TEXT gogo<>(SB),NOSPLIT|NOFRAME,$0
+	BL	  setg<>(SB)
 	MOVW  gobuf_sp(R1), R13  // restore SP==R13
 	MOVW  gobuf_lr(R1), LR
 	MOVW  gobuf_ret(R1), R0
@@ -162,7 +143,6 @@ TEXT runtime·mcall(SB),NOSPLIT|NOFRAME,$0-4
 	MOVW  LR, (g_sched+gobuf_pc)(g)
 	MOVW  $0, REGTMP
 	MOVW  REGTMP, (g_sched+gobuf_lr)(g)
-	MOVW  g, (g_sched+gobuf_g)(g)
 
 	// Switch to m->g0 & its stack, call fn.
 	MOVW  g, R1
@@ -218,24 +198,14 @@ TEXT runtime·systemstack(SB),NOSPLIT,$0-4
 switch:
 	// save our state in g->sched. Pretend to
 	// be systemstack_switch if the G stack is scanned.
-	MOVW  $runtime·systemstack_switch(SB), R3
-	ADD   $4, R3, R3  // get past push {lr}
-	MOVW  R3, (g_sched+gobuf_pc)(g)
-	MOVW  R13, (g_sched+gobuf_sp)(g)
-	MOVW  LR, (g_sched+gobuf_lr)(g)
-	MOVW  g, (g_sched+gobuf_g)(g)
+	BL	gosave_systemstack_switch<>(SB)
 
 	// switch to g0
 	MOVW  R0, R5
 	MOVW  R2, R0
 	BL    setg<>(SB)
 	MOVW  R5, R0
-	MOVW  (g_sched+gobuf_sp)(R2), R3
-	// make it look like mstart called systemstack on g0, to stop traceback
-	SUB   $4, R3, R3
-	MOVW  $runtime·mstart(SB), R4
-	MOVW  R4, 0(R3)
-	MOVW  R3, R13
+	MOVW	(g_sched+gobuf_sp)(R2), R13
 
 	// call target function
 	MOVW  R0, REGCTXT
@@ -317,7 +287,7 @@ TEXT runtime·morestack_noctxt(SB),NOSPLIT|NOFRAME,$0-0
 	B     runtime·morestack(SB)
 
 // reflectcall: call a function with the given argument list
-// func call(argtype *_type, f *FuncVal, arg *byte, argsize, retoffset uint32).
+// func call(stackArgsType *_type, f *FuncVal, stackArgs *byte, stackArgsSize, stackRetOffset, frameSize uint32, regArgs *abi.RegArgs).
 // we don't have variable-sized frames, so we use a small number
 // of constant-sized-frame functions to encode a few bits of size in the pc.
 // Caution: ugly multiline assembly macros in your future!
@@ -328,8 +298,8 @@ TEXT runtime·morestack_noctxt(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  $NAME(SB), R1; \
 	B     (R1)
 
-TEXT ·reflectcall(SB),NOSPLIT|NOFRAME,$0-20
-	MOVW                              argsize+12(FP), R0
+TEXT ·reflectcall(SB),NOSPLIT|NOFRAME,$0-28
+	MOVW	                          frameSize+20(FP), R0
 	DISPATCH(runtime·call16,          16)
 	DISPATCH(runtime·call32,          32)
 	DISPATCH(runtime·call64,          64)
@@ -361,11 +331,11 @@ TEXT ·reflectcall(SB),NOSPLIT|NOFRAME,$0-20
 	B                                 (R1)
 
 #define CALLFN(NAME,MAXSIZE) \
-TEXT NAME(SB), WRAPPER, $MAXSIZE-20; \
+TEXT NAME(SB), WRAPPER, $MAXSIZE-28; \
 	NO_LOCAL_POINTERS;  \
 /*                  copy arguments to stack */ \
-	MOVW     argptr+8(FP), R0; \
-	MOVW     argsize+12(FP), R2; \
+	MOVW     stackArgs+8(FP), R0; \
+	MOVW     stackArgsSize+12(FP), R2; \
 	ADD      $4, R13, R1; \
 	CMP      $0, R2; \
 	B.EQ     5(PC); \
@@ -379,10 +349,10 @@ TEXT NAME(SB), WRAPPER, $MAXSIZE-20; \
 	PCDATA  $PCDATA_StackMapIndex, $0; \
 	BL      (R0); \
 /*                  copy return values back */ \
-	MOVW  argtype+0(FP), R4; \
-	MOVW  argptr+8(FP), R0; \
-	MOVW  argsize+12(FP), R2; \
-	MOVW  retoffset+16(FP), R3; \
+	MOVW  stackArgsType+0(FP), R4; \
+	MOVW  stackArgs+8(FP), R0; \
+	MOVW  stackArgsSize+12(FP), R2; \
+	MOVW  stackArgsRetOffset+16(FP), R3; \
 	ADD   $4, R13, R1; \
 	ADD   R3, R1; \
 	ADD   R3, R0; \
@@ -394,11 +364,13 @@ TEXT NAME(SB), WRAPPER, $MAXSIZE-20; \
 // separate function so it can allocate stack space for the arguments
 // to reflectcallmove. It does not follow the Go ABI; it expects its
 // arguments in registers.
-TEXT callRet<>(SB), NOSPLIT, $16-0
+TEXT callRet<>(SB), NOSPLIT, $20-0
 	MOVW  R4, 4(R13)
 	MOVW  R0, 8(R13)
 	MOVW  R1, 12(R13)
 	MOVW  R2, 16(R13)
+	MOVW  $0, R7
+	MOVW  R7, 20(R13)
 	BL    runtime·reflectcallmove(SB)
 	RET
 
@@ -430,38 +402,29 @@ TEXT callRet<>(SB), NOSPLIT, $16-0
 	CALLFN(·call536870912,   536870912)
 	CALLFN(·call1073741824,  1073741824)
 
-// void jmpdefer(fn, sp);
-// called from deferreturn.
-// 1. grab stored LR for caller
-// 2. sub 4 bytes to get back to BL deferreturn
-// 3. B to fn
-// TODO(rsc): Push things on stack and then use pop
-// to load all registers simultaneously, so that a profiling
-// interrupt can never see mismatched SP/LR/PC.
-// (And double-check that pop is atomic in that way.)
-TEXT runtime·jmpdefer(SB),NOSPLIT,$0-8
-	MOVW  0(R13), LR
-	MOVW  $-4(LR), LR  // BL deferreturn
-	MOVW  fv+0(FP), REGCTXT
-	MOVW  argp+4(FP), R13
-	MOVW  $-4(R13), R13  // SP is 4 below argp, due to saved LR
-	MOVW  0(REGCTXT), R1
-	B     (R1)
-
-// Save state of caller into g->sched. Smashes REGTMP.
-TEXT gosave<>(SB),NOSPLIT|NOFRAME,$0
-	MOVW  LR, (g_sched+gobuf_pc)(g)
+// Save state of caller into g->sched,
+// but using fake PC from systemstack_switch.
+// Must only be called from functions with no locals ($0)
+// or else unwinding from systemstack_switch is incorrect.
+// Smashes REGTMP.
+TEXT gosave_systemstack_switch<>(SB),NOSPLIT|NOFRAME,$0
+	MOVW  $runtime·systemstack_switch(SB), REGTMP
+	ADD   $4, REGTMP // get past push {lr}
+	MOVW  REGTMP, (g_sched+gobuf_pc)(g)
 	MOVW  R13, (g_sched+gobuf_sp)(g)
 	MOVW  $0, REGTMP
 	MOVW  REGTMP, (g_sched+gobuf_lr)(g)
 	MOVW  REGTMP, (g_sched+gobuf_ret)(g)
-	MOVW  REGTMP, (g_sched+gobuf_ctxt)(g)
 	// Assert ctxt is zero. See func save.
 	MOVW  (g_sched+gobuf_ctxt)(g), REGTMP
-	CMP   $0, REGTMP
+	TST   REGTMP, REGTMP
 	B.EQ  2(PC)
-	CALL  runtime·badctxt(SB)
+	BL	  runtime·abort(SB)
 	RET
+
+TEXT ·asmcgocall_no_g(SB),NOSPLIT,$0-8
+	BKPT
+	B   -1(PC)
 
 // void setg(G*); set g. for use by needm.
 TEXT runtime·setg(SB),NOSPLIT|NOFRAME,$0-4
@@ -689,6 +652,10 @@ TEXT runtime·panicSlice3CU(SB),NOSPLIT,$0-8
 	MOVW  R0, x+0(FP)
 	MOVW  R1, y+4(FP)
 	JMP   runtime·goPanicSlice3CU(SB)
+TEXT runtime·panicSliceConvert(SB),NOSPLIT,$0-8
+	MOVW	R2, x+0(FP)
+	MOVW	R3, y+4(FP)
+	JMP	runtime·goPanicSliceConvert(SB)
 
 // Extended versions for 64-bit indexes.
 TEXT runtime·panicExtendIndex(SB),NOSPLIT,$0-12

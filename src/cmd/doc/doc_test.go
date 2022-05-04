@@ -7,6 +7,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -125,6 +126,9 @@ var tests = []test{
 			`func MultiLineFunc\(x interface{ ... }\) \(r struct{ ... }\)`, // Multi line function.
 			`var LongLine = newLongLine\(("someArgument[1-4]", ){4}...\)`,  // Long list of arguments.
 			`type T1 = T2`,                                                 // Type alias
+			`type SimpleConstraint interface{ ... }`,
+			`type TildeConstraint interface{ ... }`,
+			`type StructConstraint interface{ ... }`,
 		},
 		[]string{
 			`const internalConstant = 2`,       // No internal constants.
@@ -199,6 +203,9 @@ var tests = []test{
 			`Comment about exported method`,
 			`type T1 = T2`,
 			`type T2 int`,
+			`type SimpleConstraint interface {`,
+			`type TildeConstraint interface {`,
+			`type StructConstraint interface {`,
 		},
 		[]string{
 			`constThree`,
@@ -579,7 +586,7 @@ var tests = []test{
 		[]string{
 			`Comment about exported interface`, // Include comment.
 			`type ExportedInterface interface`, // Interface definition.
-			`Comment before exported method.*\n.*ExportedMethod\(\)` +
+			`Comment before exported method.\n.*//\n.*//	// Code block showing how to use ExportedMethod\n.*//	func DoSomething\(\) error {\n.*//		ExportedMethod\(\)\n.*//		return nil\n.*//	}\n.*//.*\n.*ExportedMethod\(\)` +
 				`.*Comment on line with exported method`,
 			`io.Reader.*Comment on line with embedded Reader`,
 			`error.*Comment on line with embedded error`,
@@ -599,8 +606,7 @@ var tests = []test{
 		[]string{
 			`Comment about exported interface`, // Include comment.
 			`type ExportedInterface interface`, // Interface definition.
-			`Comment before exported method.*\n.*ExportedMethod\(\)` +
-				`.*Comment on line with exported method`,
+			`Comment before exported method.\n.*//\n.*//	// Code block showing how to use ExportedMethod\n.*//	func DoSomething\(\) error {\n.*//		ExportedMethod\(\)\n.*//		return nil\n.*//	}\n.*//.*\n.*ExportedMethod\(\)` + `.*Comment on line with exported method`,
 			`unexportedMethod\(\).*Comment on line with unexported method`,
 			`io.Reader.*Comment on line with embedded Reader`,
 			`error.*Comment on line with embedded error`,
@@ -615,7 +621,7 @@ var tests = []test{
 		"interface method",
 		[]string{p, `ExportedInterface.ExportedMethod`},
 		[]string{
-			`Comment before exported method.*\n.*ExportedMethod\(\)` +
+			`Comment before exported method.\n.*//\n.*//	// Code block showing how to use ExportedMethod\n.*//	func DoSomething\(\) error {\n.*//		ExportedMethod\(\)\n.*//		return nil\n.*//	}\n.*//.*\n.*ExportedMethod\(\)` +
 				`.*Comment on line with exported method`,
 		},
 		[]string{
@@ -823,12 +829,18 @@ var tests = []test{
 
 func TestDoc(t *testing.T) {
 	maybeSkip(t)
+	defer log.SetOutput(log.Writer())
 	for _, test := range tests {
 		var b bytes.Buffer
 		var flagSet flag.FlagSet
+		var logbuf bytes.Buffer
+		log.SetOutput(&logbuf)
 		err := do(&b, &flagSet, test.args)
 		if err != nil {
 			t.Fatalf("%s %v: %s\n", test.name, test.args, err)
+		}
+		if logbuf.Len() > 0 {
+			t.Errorf("%s %v: unexpected log messages:\n%s", test.name, test.args, logbuf.Bytes())
 		}
 		output := b.Bytes()
 		failed := false

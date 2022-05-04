@@ -6,8 +6,8 @@
 
 #define REGTMP R7
 
-// func Sqrt(x float64) float64
-TEXT ·Sqrt(SB),NOSPLIT,$0
+// func archSqrt(x float64) float64
+TEXT ·archSqrt(SB),NOSPLIT,$0
 	MOVB	runtime·goarm(SB), REGTMP
 	CMP	$0x7D, REGTMP
 	BNE	softfloat

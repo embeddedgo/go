@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build openbsd,amd64 openbsd,arm64
+//go:build openbsd && !mips64
 
 package runtime
 
-import "unsafe"
+import (
+	"internal/abi"
+	"unsafe"
+)
 
 // The X versions of syscall expect the libc call to return a 64-bit result.
 // Otherwise (the non-X version) expects a 32-bit result.
@@ -19,7 +22,7 @@ import "unsafe"
 //go:cgo_unsafe_args
 func syscall_syscall(fn, a1, a2, a3 uintptr) (r1, r2, err uintptr) {
 	entersyscall()
-	libcCall(unsafe.Pointer(funcPC(syscall)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall)), unsafe.Pointer(&fn))
 	exitsyscall()
 	return
 }
@@ -30,7 +33,7 @@ func syscall()
 //go:cgo_unsafe_args
 func syscall_syscallX(fn, a1, a2, a3 uintptr) (r1, r2, err uintptr) {
 	entersyscall()
-	libcCall(unsafe.Pointer(funcPC(syscallX)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscallX)), unsafe.Pointer(&fn))
 	exitsyscall()
 	return
 }
@@ -41,7 +44,7 @@ func syscallX()
 //go:cgo_unsafe_args
 func syscall_syscall6(fn, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr) {
 	entersyscall()
-	libcCall(unsafe.Pointer(funcPC(syscall6)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall6)), unsafe.Pointer(&fn))
 	exitsyscall()
 	return
 }
@@ -52,7 +55,7 @@ func syscall6()
 //go:cgo_unsafe_args
 func syscall_syscall6X(fn, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr) {
 	entersyscall()
-	libcCall(unsafe.Pointer(funcPC(syscall6X)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall6X)), unsafe.Pointer(&fn))
 	exitsyscall()
 	return
 }
@@ -63,7 +66,7 @@ func syscall6X()
 //go:cgo_unsafe_args
 func syscall_syscall10(fn, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10 uintptr) (r1, r2, err uintptr) {
 	entersyscall()
-	libcCall(unsafe.Pointer(funcPC(syscall10)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall10)), unsafe.Pointer(&fn))
 	exitsyscall()
 	return
 }
@@ -74,7 +77,7 @@ func syscall10()
 //go:cgo_unsafe_args
 func syscall_syscall10X(fn, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10 uintptr) (r1, r2, err uintptr) {
 	entersyscall()
-	libcCall(unsafe.Pointer(funcPC(syscall10X)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall10X)), unsafe.Pointer(&fn))
 	exitsyscall()
 	return
 }
@@ -84,7 +87,7 @@ func syscall10X()
 //go:nosplit
 //go:cgo_unsafe_args
 func syscall_rawSyscall(fn, a1, a2, a3 uintptr) (r1, r2, err uintptr) {
-	libcCall(unsafe.Pointer(funcPC(syscall)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall)), unsafe.Pointer(&fn))
 	return
 }
 
@@ -92,7 +95,7 @@ func syscall_rawSyscall(fn, a1, a2, a3 uintptr) (r1, r2, err uintptr) {
 //go:nosplit
 //go:cgo_unsafe_args
 func syscall_rawSyscall6(fn, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr) {
-	libcCall(unsafe.Pointer(funcPC(syscall6)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall6)), unsafe.Pointer(&fn))
 	return
 }
 
@@ -100,7 +103,7 @@ func syscall_rawSyscall6(fn, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintpt
 //go:nosplit
 //go:cgo_unsafe_args
 func syscall_rawSyscall6X(fn, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr) {
-	libcCall(unsafe.Pointer(funcPC(syscall6X)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall6X)), unsafe.Pointer(&fn))
 	return
 }
 
@@ -108,6 +111,6 @@ func syscall_rawSyscall6X(fn, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintp
 //go:nosplit
 //go:cgo_unsafe_args
 func syscall_rawSyscall10X(fn, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10 uintptr) (r1, r2, err uintptr) {
-	libcCall(unsafe.Pointer(funcPC(syscall10X)), unsafe.Pointer(&fn))
+	libcCall(unsafe.Pointer(abi.FuncPCABI0(syscall10X)), unsafe.Pointer(&fn))
 	return
 }
