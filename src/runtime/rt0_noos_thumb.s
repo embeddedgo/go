@@ -63,8 +63,8 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	CMP   $0xD, R0
 	BNE   skipFPU
 	MOVW  $FPU_CTRL_BASE, R0  // address of CPACR
-	MOVW  $3<<20, R1
-	MOVW  R1, FPU_CPACR(R0)  // full access to CP10
+	MOVW  $0xF<<20, R1        // full access to CP10 and CP11 instructions
+	MOVW  R1, FPU_CPACR(R0)
 	SLL   $10, R1
 	MOVW  R1, FPU_FPCCR(R0)  // set LSPEN and ASPEN
 skipFPU:
