@@ -55,7 +55,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  R0, m_g0(R1)  // m0.g0 = cpu0.gh
 	MOVW  R1, g_m(R0)   // cpu0.gh.m = m0
 
-	MOVW  R0, g  // we use R0 above instead of g for shorter encoding
+	MOVW  R0, g  // set g to gh
 
 	// enable FPU if GOARM is xF or xD
 	MOVB  runtime·goarm(SB), R0
@@ -66,7 +66,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  $0xF<<20, R1        // full access to CP10 and CP11 instructions
 	MOVW  R1, FPU_CPACR(R0)
 	SLL   $10, R1
-	MOVW  R1, FPU_FPCCR(R0)  // set LSPEN and ASPEN
+	MOVW  R1, FPU_FPCCR(R0)  // set LSPEN and ASPEN (lazy auto save FP context)
 skipFPU:
 
 	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
