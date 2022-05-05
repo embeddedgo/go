@@ -58,7 +58,7 @@ func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
 // direct initialization of mheap_.arena.
 //go:nosplit
 func sysReserveMaxArena() (addr, size uintptr, mapMemory bool) {
-	return sysMem.arenaStart, sysMem.arenaSize, true
+	return sysMem.arenaStart, sysMem.arenaSize, false
 }
 
 //go:nosplit
@@ -84,9 +84,10 @@ func sysAlloc(size uintptr, sysStat *sysMemStat) unsafe.Pointer {
 	size += (_PageSize - 1)
 	size &^= (_PageSize - 1)
 	p := sysReserve1(size)
-	if p != nil {
-		sysStat.add(int64(size))
+	if p == nil {
+		throw("runtime: cannot allocate memory")
 	}
+	sysStat.add(int64(size))
 	return p
 }
 
