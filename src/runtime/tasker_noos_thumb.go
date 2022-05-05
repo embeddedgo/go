@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"embedded/mmio"
+	"internal/abi"
 	"internal/cpu/cortexm"
 	"internal/cpu/cortexm/debug/itm"
 	"internal/cpu/cortexm/mpu"
@@ -67,7 +68,7 @@ func archnewm(m *m) {
 	sp := m.g0.stack.hi - unsafe.Sizeof(cortexm.StackFrame{})
 	sf := (*cortexm.StackFrame)(unsafe.Pointer(sp))
 	sf.PSR = cortexm.T
-	sf.PC = funcPC(mstart)
+	sf.PC = abi.FuncPCABI0(mstart)
 	m.tls[msp] = sp | thrSmallCtx // small ctx
 	m.tls[mer] = cortexm.ExcReturnBase | cortexm.ExcReturnNoFPU |
 		cortexm.ExcReturnPSP

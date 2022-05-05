@@ -16,6 +16,7 @@ var (
 )
 
 var (
+	ncgocall       uint64
 	cgo_yield      = &_cgo_yield
 	cgoAlwaysFalse bool
 	cgoHasExtraM   bool
@@ -24,7 +25,8 @@ var (
 type cgoCallers [1]uintptr
 
 func cgoCheckSliceCopy(typ *_type, dst, src unsafe.Pointer, n int) {}
-func cgoCheckWriteBarrier(dst *uintptr, src uintptr)            {}
-func cgocall(fn unsafe.Pointer, arg unsafe.Pointer) int32       { return 0 }
+func cgoCheckWriteBarrier(dst *uintptr, src uintptr)               {}
+func cgocall(fn unsafe.Pointer, arg unsafe.Pointer) int32          { return 0 }
 
 func cgoCheckMemmove(typ *_type, dst unsafe.Pointer, src unsafe.Pointer, off uintptr, size uintptr) {}
+

@@ -85,6 +85,11 @@ func usleep(usec uint32) {
 }
 
 //go:nosplit
+func usleep_no_g(usec uint32) {
+	nanosleep(int64(usec) * 1000)
+}
+
+//go:nosplit
 func getRandomData(r []byte) {
 	// BUG: true random data required
 	extendRandom(r, 0)
@@ -155,6 +160,11 @@ func time_move(sec int64, nsec int32) (sec0 int64, nsec0 int32) {
 	timestart.nsec = nsec0
 	timestart.lock.unlock()
 	return
+}
+
+//go:nosplit
+func osyield_no_g() {
+	osyield()
 }
 
 func setsystim1()

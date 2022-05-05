@@ -1207,17 +1207,19 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		// By scavenging inline we deal with the failure to allocate out of
 		// memory fragments by scavenging the memory fragments that are least
 		// likely to be re-used.
-		scavengeGoal := atomic.Load64(&h.scavengeGoal)
-		if retained := heapRetained(); retained+uint64(growth) > scavengeGoal {
-			// The scavenging algorithm requires the heap lock to be dropped so it
-			// can acquire it only sparingly. This is a potentially expensive operation
-			// so it frees up other goroutines to allocate in the meanwhile. In fact,
-			// they can make use of the growth we just created.
-			todo := growth
-			if overage := uintptr(retained + uint64(growth) - scavengeGoal); todo > overage {
-				todo = overage
+		if GOOS != "noos" {
+			scavengeGoal := atomic.Load64(&h.scavengeGoal)
+			if retained := heapRetained(); retained+uint64(growth) > scavengeGoal {
+				// The scavenging algorithm requires the heap lock to be dropped so it
+				// can acquire it only sparingly. This is a potentially expensive operation
+				// so it frees up other goroutines to allocate in the meanwhile. In fact,
+				// they can make use of the growth we just created.
+				todo := growth
+				if overage := uintptr(retained + uint64(growth) - scavengeGoal); todo > overage {
+					todo = overage
+				}
+				h.pages.scavenge(todo)
 			}
-			h.pages.scavenge(todo)
 		}
 	}
 

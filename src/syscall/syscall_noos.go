@@ -5,6 +5,7 @@
 package syscall
 
 import (
+	"internal/itoa"
 	"internal/oserror"
 	"sync"
 )
@@ -74,7 +75,7 @@ func (e Errno) Error() string {
 			return s
 		}
 	}
-	return "errno " + itoa(int(e))
+	return "errno " + itoa.Itoa(int(e))
 }
 
 type Timespec struct {

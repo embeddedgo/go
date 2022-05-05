@@ -323,6 +323,9 @@ func (p *noder) processPragmas() {
 		}
 		n := ir.AsNode(typecheck.Lookup(l.local).Def)
 		if n == nil || n.Op() != ir.ONAME {
+			if buildcfg.GOOS == "noos" && filepath.Base(l.pos.RelFilename()) == "zisrnames.go" {
+				continue
+			}
 			p.errorAt(l.pos, "//go:linkname must refer to declared function or variable")
 			continue
 		}

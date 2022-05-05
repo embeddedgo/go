@@ -5174,7 +5174,7 @@ func sysmon() {
 				startm(nil, false)
 			}
 		}
-		if atomic.Load(&scavenge.sysmonWake) != 0 {
+		if GOARCH != "noos" && atomic.Load(&scavenge.sysmonWake) != 0 {
 			// Kick the scavenger awake if someone requested it.
 			wakeScavenger()
 		}
