@@ -30,7 +30,7 @@ const thrSmallCtx = 1 // context saved in mOS contains only LR, SP, g
 //go:nosplit
 func archnewm(m *m) {
 	m.tls[mstatus] = thrSmallCtx
-	m.tls[mepc] = abi.FuncPCABIInternal(mstart)
+	m.tls[mepc] = abi.FuncPCABI0(mstart)
 	m.x[numGPRS-3] = m.g0.stack.hi                 // SP
 	m.x[numGPRS-2] = uintptr(unsafe.Pointer(m.g0)) // g
 }
