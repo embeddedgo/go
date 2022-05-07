@@ -276,13 +276,13 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	// this, machine mode interrupts are globally enabled because we are now in
 	// user mode.
 
+	// create a new goroutine to start program
 	MOV   $runtime·mainPC(SB), A0  // entry
-	ADD   $-24, X2
-	MOV   A0, 16(X2)
-	MOV   ZERO, 8(X2)
-	MOV   ZERO, 0(X2)
+	ADD   $-16, X2
+	MOV   A0, 8(X2)
+	MOV   ZERO, 0(X2)  // dummy LR
 	CALL  runtime·newproc(SB)
-	ADD   $24, X2
+	ADD   $16, X2  // dummy LR
 
 	// start this M
 	CALL  runtime·mstart(SB)
