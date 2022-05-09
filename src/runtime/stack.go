@@ -1368,6 +1368,10 @@ func stkobjinit() {
 	ptr := uintptr(unsafe.Pointer(&methodValueCallFrameObjs[0]))
 	var mod *moduledata
 	for datap := &firstmoduledata; datap != nil; datap = datap.next {
+		if GOOS == "noos" {
+			mod = datap // only one module in noos, datap.gofunc can be > datap.end
+			break
+		}
 		if datap.gofunc <= ptr && ptr < datap.end {
 			mod = datap
 			break
@@ -1413,6 +1417,10 @@ func (r *stackObjectRecord) gcdata() *byte {
 	ptr := uintptr(unsafe.Pointer(r))
 	var mod *moduledata
 	for datap := &firstmoduledata; datap != nil; datap = datap.next {
+		if GOOS == "noos" {
+			mod = datap // only one module in noos, datap.gofunc can be > datap.end
+			break
+		}
 		if datap.gofunc <= ptr && ptr < datap.end {
 			mod = datap
 			break

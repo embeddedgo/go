@@ -898,15 +898,15 @@ const blockSize = 1 << 20 // 1MB chunks written at a time.
 // blocks, waiting on the writes to complete. Note that we use the sem parameter
 // to limit the number of concurrent writes taking place.
 func writeBlocks(ctxt *Link, out *OutBuf, sem chan int, ldr *loader.Loader, syms []loader.Sym, addr, size int64, pad []byte) {
-	for i, s := range syms {
-		if ldr.SymValue(s) >= addr && !ldr.AttrSubSymbol(s) {
-			syms = syms[i:]
-			break
-		}
-	}
-
 	var wg sync.WaitGroup
 	max, lastAddr, written := int64(blockSize), addr+size, int64(0)
+	syms1 := make([]loader.Sym, 0, len(syms))
+	for _, s := range syms {
+		if a := ldr.SymValue(s); addr <= a && a < lastAddr && !ldr.AttrSubSymbol(s) {
+			syms1 = append(syms1, s)
+		}
+	}
+	syms = syms1
 	for addr < lastAddr {
 		// Find the last symbol we'd write.
 		idx := -1
@@ -2667,24 +2667,21 @@ func (ctxt *Link) address() []*sym.Segment {
 	// simply because right now we know where the BSS starts.
 	Segdata.Filelen = bss.Vaddr - Segdata.Vaddr
 
-	va = uint64(Rnd(int64(va), int64(*FlagRound)))
-	la = uint64(Rnd(int64(la), int64(*FlagRound)))
+	va = uint64(Rnd(int64(la), int64(*FlagRound)))
 	order = append(order, &Segdwarf)
 	Segdwarf.Rwx = 06
 	Segdwarf.Vaddr = va
-	Segdwarf.Vaddr = la
+	Segdwarf.Laddr = va
 	for i, s := range Segdwarf.Sections {
 		vlen := int64(s.Length)
 		if i+1 < len(Segdwarf.Sections) {
 			vlen = int64(Segdwarf.Sections[i+1].Vaddr - s.Vaddr)
 		}
 		s.Vaddr = va
-		s.Laddr = la
+		s.Laddr = va
 		va += uint64(vlen)
-		la += uint64(vlen)
 		if ctxt.HeadType == objabi.Hwindows {
 			va = uint64(Rnd(int64(va), PEFILEALIGN))
-			la = uint64(Rnd(int64(la), PEFILEALIGN))
 		}
 		Segdwarf.Length = va - Segdwarf.Vaddr
 	}

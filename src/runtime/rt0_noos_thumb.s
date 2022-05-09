@@ -9,10 +9,9 @@
 
 
 TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
-
 	// initialize data and BSS
 
-	MOVW       R13, R0
+	MOVW       R13, R0  // R13 points to the top of ISR stack and the beggining of DATA segment
 	MOVW       $runtime·romdata(SB), R1
 	MOVW       $runtime·bss(SB), R3
 	MOVW       $runtime·ramend(SB), R4

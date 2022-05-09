@@ -2468,6 +2468,10 @@ func (ctxt *Link) xdefine(p string, t sym.SymKind, v int64) loader.Sym {
 }
 
 func datoff(ldr *loader.Loader, s loader.Sym, addr int64) int64 {
+	if Segdata.Vaddr < Segtext.Vaddr && uint64(addr) >= Segtext.Vaddr {
+		// noos: text and data segments can be in arbitrary order
+		return int64(uint64(addr) - Segtext.Vaddr + Segtext.Fileoff)
+	}
 	if uint64(addr) >= Segdata.Vaddr {
 		return int64(uint64(addr) - Segdata.Vaddr + Segdata.Fileoff)
 	}
