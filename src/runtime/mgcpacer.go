@@ -1277,7 +1277,7 @@ func readGOGC() int32 {
 		return n
 	}
 	if noos {
-		return 50
+		return 30
 	}
 	return 100
 }
