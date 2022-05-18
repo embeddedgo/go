@@ -13,9 +13,9 @@ const (
 	noosScaleDown              = 16
 	noosStackCacheSize         = 8 * 1024
 	noosNumStackOrders         = 2
-	noosHeapAddrBits           = 20         // enough for 1M SRAM
-	noosLogHeapArenaBytes      = 14         // 16 KiB
-	noosArenaBaseOffset        = 0x20000000 // the begginning of SRAM
+	noosHeapAddrBits           = 20         // enough for 1M OCRAM
+	noosLogHeapArenaBytes      = 15         // 32 KiB
+	noosArenaBaseOffset        = 0x20200000 // the begginning of OCRAM
 	noosMinPhysPageSize        = 256
 	noosSpanSetInitSpineCap    = 8
 	noosStackMin               = 1024

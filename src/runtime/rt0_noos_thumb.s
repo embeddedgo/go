@@ -34,9 +34,11 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 
 
 #define PALLOC_MIN 20*1024
-#define FPU_CTRL_BASE 0xE000ED88
-#define FPU_CPACR 0x000
-#define FPU_FPCCR 0x1AC
+
+#define SCB_BASE  0xE000ED00
+#define SCB_VTOR  0x008
+#define SCB_CPACR 0x088
+#define SCB_FPCCR 0x234
 
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 
@@ -56,16 +58,23 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 
 	MOVW  R0, g  // set g to gh
 
+	// Cortex-M settings
+
+	MOVW  $SCB_BASE, R1
+
+	// set VTOR (required mainly if the boot process is based on a bootloader)
+	MOVW  $runtime·vectors(SB), R0
+	MOVW  R0, SCB_VTOR(R1)
+
 	// enable FPU if GOARM is xF or xD
 	MOVB  runtime·goarm(SB), R0
 	AND   $0xD, R0
 	CMP   $0xD, R0
 	BNE   skipFPU
-	MOVW  $FPU_CTRL_BASE, R0  // address of CPACR
-	MOVW  $0xF<<20, R1        // full access to CP10 and CP11 instructions
-	MOVW  R1, FPU_CPACR(R0)
-	SLL   $10, R1
-	MOVW  R1, FPU_FPCCR(R0)  // set LSPEN and ASPEN (lazy auto save FP context)
+	MOVW  $0xF<<20, R0       // full access to CP10 and CP11 instructions
+	MOVW  R0, SCB_CPACR(R1)
+	SLL   $10, R0
+	MOVW  R0, SCB_FPCCR(R1)  // set LSPEN and ASPEN (lazy auto save FP context)
 skipFPU:
 
 	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
