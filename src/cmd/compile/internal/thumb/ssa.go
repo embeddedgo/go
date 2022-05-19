@@ -496,7 +496,11 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p.From.Reg = v.Args[0].Reg()
 		ssagen.AddAux(&p.From, v)
 		p.To.Type = obj.TYPE_REG
-		p.To.Reg = v.Reg()
+		if _, ok := v.Block.Func.RegAlloc[v.ID].(ssa.LocPair); ok {
+			p.To.Reg = v.Reg0() // LoadOnce*
+		} else {
+			p.To.Reg = v.Reg()
+		}
 	case ssa.OpThumbMOVWstore,
 		ssa.OpThumbMOVHstore,
 		ssa.OpThumbMOVBstore,
@@ -529,7 +533,13 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		ssa.OpThumbLoadOnce32shiftLL,
 		ssa.OpThumbLoadOnce16shiftLL,
 		ssa.OpThumbLoadOnce8shiftLL:
-		p := genshift(s, v, v.Op.Asm(), 0, v.Args[1].Reg(), v.Reg(), thumb.SHIFT_LL, v.AuxInt)
+		var toreg int16
+		if _, ok := v.Block.Func.RegAlloc[v.ID].(ssa.LocPair); ok {
+			toreg = v.Reg0() // LoadOnce*
+		} else {
+			toreg = v.Reg()
+		}
+		p := genshift(s, v, v.Op.Asm(), 0, v.Args[1].Reg(), toreg, thumb.SHIFT_LL, v.AuxInt)
 		p.From.Reg = v.Args[0].Reg()
 	case ssa.OpThumbMOVWstoreidx,
 		ssa.OpThumbMOVHstoreidx,
