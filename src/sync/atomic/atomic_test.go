@@ -5,7 +5,6 @@
 package atomic_test
 
 import (
-	"internal/goarch"
 	"fmt"
 	"runtime"
 	"runtime/debug"
@@ -1424,10 +1423,6 @@ func TestUnaligned64(t *testing.T) {
 	// instead of failing silently.
 	if !arch32 {
 		t.Skip("test only runs on 32-bit systems")
-	}
-	if goarch.GOARCH == "thumb" {
-		// TODO: remove this when https://github.com/golang/go/issues/51776 will be fixed
-		t.Skip("panic disabled on thumb")
 	}
 
 	x := make([]uint32, 4)

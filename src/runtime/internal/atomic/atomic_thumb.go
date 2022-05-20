@@ -43,12 +43,12 @@ func addrLock(addr *uint64) *spinlock {
 	return &locktab[(uintptr(unsafe.Pointer(addr))>>3)%uintptr(len(locktab))].l
 }
 
-const align64bit = 3
+const align64bit = 7
 
 //go:nosplit
 func goCas64(addr *uint64, old, new uint64) bool {
 	if uintptr(unsafe.Pointer(addr))&align64bit != 0 {
-		*(*int)(nil) = 0 // crash on unaligned uint64
+		panicUnaligned()
 	}
 	_ = *addr // if nil, fault before taking the lock
 	var ok bool
@@ -64,7 +64,7 @@ func goCas64(addr *uint64, old, new uint64) bool {
 //go:nosplit
 func goXadd64(addr *uint64, delta int64) uint64 {
 	if uintptr(unsafe.Pointer(addr))&align64bit != 0 {
-		*(*int)(nil) = 0 // crash on unaligned uint64
+		panicUnaligned()
 	}
 	_ = *addr // if nil, fault before taking the lock
 	var r uint64
@@ -78,7 +78,7 @@ func goXadd64(addr *uint64, delta int64) uint64 {
 //go:nosplit
 func goXchg64(addr *uint64, v uint64) uint64 {
 	if uintptr(unsafe.Pointer(addr))&align64bit != 0 {
-		*(*int)(nil) = 0 // crash on unaligned uint64
+		panicUnaligned()
 	}
 	_ = *addr // if nil, fault before taking the lock
 	var r uint64
@@ -92,7 +92,7 @@ func goXchg64(addr *uint64, v uint64) uint64 {
 //go:nosplit
 func goLoad64(addr *uint64) uint64 {
 	if uintptr(unsafe.Pointer(addr))&align64bit != 0 {
-		*(*int)(nil) = 0 // crash on unaligned uint64
+		panicUnaligned()
 	}
 	_ = *addr // if nil, fault before taking the lock
 	var r uint64
@@ -105,7 +105,7 @@ func goLoad64(addr *uint64) uint64 {
 //go:nosplit
 func goStore64(addr *uint64, v uint64) {
 	if uintptr(unsafe.Pointer(addr))&align64bit != 0 {
-		*(*int)(nil) = 0 // crash on unaligned uint64
+		panicUnaligned()
 	}
 	_ = *addr // if nil, fault before taking the lock
 	addrLock(addr).lock()

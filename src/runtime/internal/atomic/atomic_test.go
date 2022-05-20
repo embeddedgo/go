@@ -96,10 +96,6 @@ func TestUnaligned64(t *testing.T) {
 	if unsafe.Sizeof(int(0)) != 4 {
 		t.Skip("test only runs on 32-bit systems")
 	}
-	if goarch.GOARCH == "thumb" {
-		// TODO: remove this when https://github.com/golang/go/issues/51776 will be fixed
-		t.Skip("panic disabled on thumb")
-	}
 
 	x := make([]uint32, 4)
 	u := unsafe.Pointer(uintptr(unsafe.Pointer(&x[0])) | 4) // force alignment to 4
