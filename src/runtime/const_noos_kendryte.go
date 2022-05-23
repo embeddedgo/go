@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// TODO: Do not use GOTARGET tags in runtime. Come up with something smarter
+// based on some kind of memory description similar to the -M linker option.
+
 // +build noos
 // +build k210
 
