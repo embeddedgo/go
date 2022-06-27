@@ -27,5 +27,6 @@ const (
 	noosGCSweepBlockEntries    = 0
 	noosGCSweepBufInitSpineCap = 0
 	noosGCBitsChunkBytes       = 0
-	noosSemTabSize             = 31
+	noosSemTabSize             = 0
+	noosGOGC                   = 0
 )

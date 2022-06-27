@@ -1276,10 +1276,7 @@ func readGOGC() int32 {
 	if n, ok := atoi32(p); ok {
 		return n
 	}
-	if noos {
-		return 30
-	}
-	return 100
+	return 100*_OS + noosGOGC
 }
 
 type piController struct {

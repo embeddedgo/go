@@ -32,4 +32,5 @@ const (
 	noosGCSweepBufInitSpineCap = 64
 	noosGCBitsChunkBytes       = 16 * 1024
 	noosSemTabSize             = 113
+	noosGOGC                   = 50
 )
