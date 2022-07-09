@@ -1480,6 +1480,8 @@ func cmdbootstrap() {
 		os.Setenv("CC", oldcc)
 	}
 
+	copyfile(pathf("%s/emgo", gobin), cmdGo, writeExec)
+
 	// Print trailing banner unless instructed otherwise.
 	if !noBanner {
 		banner()
