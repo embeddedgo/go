@@ -8,17 +8,22 @@ import (
 	"embedded/mmio"
 	"internal/abi"
 	"internal/cpu/cortexm"
+	"internal/cpu/cortexm/acc"
+	"internal/cpu/cortexm/cmt"
 	"internal/cpu/cortexm/debug/itm"
 	"internal/cpu/cortexm/mpu"
 	"internal/cpu/cortexm/nvic"
+	"internal/cpu/cortexm/pft"
 	"internal/cpu/cortexm/scb"
 	"internal/cpu/cortexm/scid"
+	"math/bits"
 	"unsafe"
 )
 
 // for now noos/thumb supports only single CPU
 
 func sev()
+func isb()
 func curcpuSleep()
 func curcpuSavectxSched()
 func curcpuSavectxCall() {} // all registars saved on caller's stack
@@ -115,10 +120,9 @@ func taskerinit() {
 		// (sub-region disabled) fields are used to set the region address
 		// ranges.
 		//
-		// The first 64 bytes of the code region that corresponds to the first
-		// 16 exception vectors are set inaccessible to catch nil pointer
-		// dereferences. The code region is declared read/write because some
-		// MCUs use normal memory access to program Flash.
+		// The first 64 bytes of the code region are set inaccessible to catch
+		// nil pointer dereferences. The code region is declared read/write
+		// because some MCUs use normal memory access to program Flash.
 		//
 		// Tha RAM region is configured as shareable (usually shared with DMA).
 		// Shareable regions are by default not cacheable. If you enable L1
@@ -148,6 +152,46 @@ func taskerinit() {
 
 	// ensure everything is set before any subsequent memory access
 	mmio.MB()
+
+	// Enable L1 cache if present
+	PFT := pft.PFT()
+	CMT := cmt.CMT()
+	clidr := PFT.CLIDR.Load()
+	var cc scb.CCR
+	if clidr&pft.CL1I != 0 {
+		// L1 instruction cache implemented. Must invalidate it before use.
+		CMT.ICIALLU.Store(0)
+		cc |= scb.IC
+	}
+	if clidr&pft.CL1D != 0 {
+		// L1 data cache implemented. Must invalidate it before use.
+		PFT.CSSELR.Store(0) // select L1 cache size info
+		mmio.MB()
+		csi := PFT.CCSIDR.Load() // load L1 cache size info
+
+		maxset := uint32(csi&pft.NumSets) >> pft.NumSetsn
+		maxway := uint32(csi&pft.Associativity) >> pft.Associativityn
+		log2bpl := uint(csi&pft.LineSize)>>pft.LineSizen + 4
+		wayshift := uint(bits.LeadingZeros32(maxway))
+
+		for set := uint32(0); set <= maxset; set++ {
+			for way := uint32(0); way <= maxway; way++ {
+				CMT.DCISW.U32.Store(way<<wayshift | set<<log2bpl)
+			}
+		}
+
+		// Use cache in write-through mode on shareable regions.
+		acc.ACC().CACR.Store(acc.SIWT)
+
+		cc |= scb.DC
+	}
+	if cc != 0 {
+		mmio.MB()
+		isb()
+		SCB.CCR.SetBits(cc) // enable L1 caches
+		mmio.MB()
+		isb()
+	}
 }
 
 //go:nowritebarrierrec

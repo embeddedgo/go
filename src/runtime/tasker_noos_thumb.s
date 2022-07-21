@@ -30,6 +30,11 @@ TEXT ·sev(SB),NOSPLIT|NOFRAME,$0-0
 	SEV
 	RET
 
+// func isb()
+TEXT ·isb(SB),NOSPLIT|NOFRAME,$0-0
+	ISB
+	RET
+
 // func cpucontrol() uint32
 TEXT ·cpucontrol(SB),NOSPLIT|NOFRAME,$0-4
 	MOVW  CONTROL, R0
