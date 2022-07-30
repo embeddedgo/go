@@ -233,7 +233,7 @@ func syssetprivlevel(newlevel int) (oldlevel, errno int) {
 	const check byte = (thrPrivLevel - 1) * 256
 
 	ctrl := cpucontrol()
-	oldlevel = int(ctrl | 1)
+	oldlevel = int(ctrl & 1)
 	if uint(newlevel) <= 1 {
 		setcpucontrol(ctrl&^1 | uint32(newlevel))
 	} else if newlevel > 0 {
