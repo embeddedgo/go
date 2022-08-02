@@ -3545,6 +3545,9 @@ func save(pc, sp uintptr) {
 		throw("save on system g not allowed")
 	}
 
+	if GOARCH == "thumb" {
+		pc |= 1
+	}
 	_g_.sched.pc = pc
 	_g_.sched.sp = sp
 	_g_.sched.lr = 0

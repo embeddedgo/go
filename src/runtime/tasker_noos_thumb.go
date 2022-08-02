@@ -16,7 +16,6 @@ import (
 	"internal/cpu/cortexm/pft"
 	"internal/cpu/cortexm/scb"
 	"internal/cpu/cortexm/scid"
-	"math/bits"
 	"unsafe"
 )
 
@@ -84,6 +83,16 @@ var (
 	cpu0  cpuctx
 	pcpu0 = &cpu0
 )
+
+//go:nosplit
+func leadingZeros32(x uint32) uint {
+	var n uint
+	for x != 0 {
+		x >>= 1
+		n++
+	}
+	return 32 - n
+}
 
 //go:nowritebarrierrec
 //go:nosplit
@@ -172,7 +181,7 @@ func taskerinit() {
 		maxset := uint32(csi&pft.NumSets) >> pft.NumSetsn
 		maxway := uint32(csi&pft.Associativity) >> pft.Associativityn
 		log2bpl := uint(csi&pft.LineSize)>>pft.LineSizen + 4
-		wayshift := uint(bits.LeadingZeros32(maxway))
+		wayshift := leadingZeros32(maxway)
 
 		for set := uint32(0); set <= maxset; set++ {
 			for way := uint32(0); way <= maxway; way++ {
