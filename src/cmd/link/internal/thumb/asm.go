@@ -81,7 +81,7 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 	}
 
 	ld.Segdata.Laddr = 2048 // communicate the main stack size to Link.address()
-	msp := uint32(ld.RAM.Base + ld.Segdata.Laddr)
+	msp := uint32(uint64(ld.RAM.Base) + ld.Segdata.Laddr)
 	vectors.AddUint32(ctxt.Arch, msp) // Main Stack Pointer after reset
 
 	relocs := vectors.AddRelocs(irqNum + 15)

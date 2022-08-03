@@ -53,6 +53,7 @@ var (
 	ownTmpDir      bool // set to true if tmp dir created by linker (e.g. no -tmpdir)
 	RAM            MemBlock
 	NoDMA          MemBlock
+	MaxTextAddr    int64 = -1
 )
 
 func init() {
@@ -110,21 +111,21 @@ var (
 )
 
 type MemBlock struct {
-	Base, Size uint64
+	Base, Size int64
 }
 
 func (mb *MemBlock) set(descr string) {
 	i := strings.IndexByte(descr, ':')
 	if i < 0 {
-		Exitf("memory layout (-M): no BASE:SIZE separator: %s", descr)
+		Exitf("memory desciption: no BASE:SIZE separator: %s", descr)
 	}
 	var err error
-	mb.Base, err = strconv.ParseUint(descr[:i], 0, 64)
+	mb.Base, err = strconv.ParseInt(descr[:i], 0, 64)
 	if err != nil {
-		Exitf("memory layout (-M): bad BASE address: %v", err)
+		Exitf("memory desciption: bad BASE address: %v", err)
 	}
 	size := descr[i+1:]
-	scale := uint64(1)
+	scale := int64(1)
 	switch size[len(size)-1] {
 	case 'K':
 		scale = 1024
@@ -136,7 +137,7 @@ func (mb *MemBlock) set(descr string) {
 	if scale != 1 {
 		size = size[:len(size)-1]
 	}
-	mb.Size, err = strconv.ParseUint(size, 0, 64)
+	mb.Size, err = strconv.ParseInt(size, 0, 64)
 	if err != nil {
 		Exitf("memory layout (-M): bad SIZE: %v", err)
 	}
@@ -184,9 +185,10 @@ func Main(arch *sys.Arch, theArch Arch) {
 	objabi.Flagcount("v", "print link trace", &ctxt.Debugvlog)
 	objabi.Flagfn1("importcfg", "read import configuration from `file`", ctxt.readImportCfg)
 
-	var flagMemory string
+	var flagMemory, flagFlash string
 	if buildcfg.GOOS == "noos" {
-		flag.StringVar(&flagMemory, "M", "", "set memory layout: BASE1:SIZE1[,BASE2:SIZE2]")
+		flag.StringVar(&flagMemory, "M", "", "set memory layout: ADDR1:SIZE1[,ADDR2:SIZE2]")
+		flag.StringVar(&flagFlash, "F", "", "set text memory (ROM/Flash) address and size: ADDR:SIZE")
 	}
 
 	objabi.Flagparse(usage)
@@ -204,6 +206,16 @@ func Main(arch *sys.Arch, theArch Arch) {
 		}
 		if len(descr) > 2 {
 			Exitf("-M describes more than two memory blocks")
+		}
+		if len(flagFlash) > 0 {
+			var flash MemBlock
+			flash.set(flagFlash)
+			MaxTextAddr = flash.Base + flash.Size
+			if *FlagTextAddr == -1 {
+				*FlagTextAddr = flash.Base
+			} else if *FlagTextAddr < flash.Base || MaxTextAddr <= *FlagTextAddr {
+				Exitf("-T address outside the area specified by -F")
+			}
 		}
 	}
 

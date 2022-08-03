@@ -2623,7 +2623,7 @@ func (ctxt *Link) address() []*sym.Segment {
 			// Main stack on the lowest addresses so overflows can be detected
 			// even without MPU. Segdata.Laddr is set to main stack size (see
 			// ../thumb/asm.go:/Laddr = /) BUG: Assumes single-core system.
-			va = RAM.Base + Segdata.Laddr
+			va = uint64(RAM.Base) + Segdata.Laddr
 		}
 	}
 	order = append(order, &Segdata)
@@ -2661,6 +2661,10 @@ func (ctxt *Link) address() []*sym.Segment {
 		case "__libfuzzer_extra_counters":
 			fuzzCounters = s
 		}
+	}
+
+	if MaxTextAddr != -1 && la > uint64(MaxTextAddr) {
+		Exitf("text segment to big by %d bytes", la-uint64(MaxTextAddr))
 	}
 
 	// Assign Segdata's Filelen omitting the BSS. We do this here
