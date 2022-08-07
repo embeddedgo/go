@@ -190,9 +190,20 @@ func taskerinit() {
 			}
 		}
 
-		// Use cache in write-through mode on shareable regions. See also
-		// MPU configuration above.
-		acc.ACC().CACR.StoreBits(acc.SIWT, acc.SIWT)
+		// Use write-through mode on shareable regions. See also MPU above.
+		const (
+			cm7     = 0x41<<scb.Implementern | 0xc27<<scb.PartNon | scb.Constant
+			cm7r0p1 = cm7 | 0<<scb.Variantn | 1<<scb.Revisionn
+			cm7r0p2 = cm7 | 0<<scb.Variantn | 2<<scb.Revisionn
+			cm7r1p0 = cm7 | 1<<scb.Variantn | 0<<scb.Revisionn
+			cm7r1p1 = cm7 | 1<<scb.Variantn | 1<<scb.Revisionn
+		)
+		switch SCB.CPUID.Load() {
+		case cm7r0p1, cm7r0p2, cm7r1p0, cm7r1p1:
+			// Cortex-M7 1259864 write-through bug
+		default:
+			acc.ACC().CACR.StoreBits(acc.SIWT, acc.SIWT)
+		}
 
 		cc |= scb.DC
 	}
