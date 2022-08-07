@@ -137,8 +137,9 @@ func taskerinit() {
 		// Shareable regions are by default not cacheable. If you enable L1
 		// cache in Cortex-M7 set the acc.SIWT bit so the RAM will be cacheable
 		// in write-through mode. WT mode degrades performance (not as much as
-		// you may think) but allows to avoid cache maintenance operations which
-		// are problematic in case of Cortex-M7.
+		// you may think) but allows to reduce the required cache maintenance
+		// operations to just "invalidate by address" which is much less
+		// problematic than "clean by address" one, required in WB mode.
 		var (
 			noacc  = mpu.A____
 			code   = mpu.Arwrw | mpu.C

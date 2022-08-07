@@ -533,3 +533,11 @@ badPrivLevel:
 	MOV  $2, S0  // rtos.ErrBadPrivLevel
 	MOV  S0, errno+16(FP)
 	RET
+
+// func syscachemaint(op int, p unsafe.Pointer, size int)
+TEXT ·syscachemaint(SB),NOSPLIT,$0-24
+	//MOVW  op+0(FP), R0
+	//MOVW  p+8(FP), R1
+	//MOVW  size+16(FP), R2
+	EBREAK
+	JMP  -1(PC)

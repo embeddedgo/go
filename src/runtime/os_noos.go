@@ -193,6 +193,8 @@ func setirqenabled(irq, enabled int) (errno int)
 func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
 func nanosleep(ns int64)
 func nanotime() int64
+//go:noescape
+func cachemaint(op int, p unsafe.Pointer, size int)
 
 // faketime is the simulated time in nanoseconds since 1970 for the
 // playground.

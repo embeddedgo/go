@@ -14,6 +14,7 @@ DATA runtime·syscalls+(SYS_nanotime*8)(SB)/8, $·sysnanotime(SB)
 DATA runtime·syscalls+(SYS_irqctl*8)(SB)/8, $·sysirqctl(SB)
 DATA runtime·syscalls+(SYS_setprivlevel*8)(SB)/8, $·syssetprivlevel(SB)
 DATA runtime·syscalls+(SYS_write*8)(SB)/8, $·syswrite(SB)
+DATA runtime·syscalls+(SYS_cachemaint*8)(SB)/8, $·syscachemaint(SB)
 
 // syscalls disallowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_setsystim1*8)(SB)/8, $·syssetsystim1(SB)
@@ -65,6 +66,14 @@ TEXT ·write(SB),NOSPLIT|NOFRAME,$0-32
 	MOV  $(24+8), A4
 	MOV  $8, A5
 	ECALL
+	RET
+
+// func cachemaint(op int, p unsafe.Pointer, size int)
+TEXT ·cachemaint(SB),NOSPLIT|NOFRAME,$0-24
+	MOVW  $SYS_cachemaint, R4
+	MOVW  $(24+8), R5
+	MOVW  $0, R6
+	SWI
 	RET
 
 // func setsystim1()

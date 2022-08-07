@@ -7,13 +7,14 @@
 #include "textflag.h"
 #include "syscall_noos.h"
 
-// if you add new syscall you must check sysMaxArgs in tasker_noos_thumb.s
+// if you add new syscall you must check sysMaxArgs in tasker_noos_*.s
 
 // syscalls allowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_nanotime*4)(SB)/4, $·sysnanotime(SB)
 DATA runtime·syscalls+(SYS_irqctl*4)(SB)/4, $·sysirqctl(SB)
 DATA runtime·syscalls+(SYS_setprivlevel*4)(SB)/4, $·syssetprivlevel(SB)
 DATA runtime·syscalls+(SYS_write*4)(SB)/4, $·syswrite(SB)
+DATA runtime·syscalls+(SYS_cachemaint*4)(SB)/4, $·syscachemaint(SB)
 
 // syscalls disallowed for low priority interrupt handlers
 DATA runtime·syscalls+(SYS_setsystim1*4)(SB)/4, $·syssetsystim1(SB)
@@ -56,6 +57,14 @@ TEXT ·write(SB),NOSPLIT|NOFRAME,$0-16
 	MOVW  $SYS_write, R4
 	MOVW  $(12+4), R5
 	MOVW  $4, R6
+	SWI
+	RET
+
+// func cachemaint(op int, p unsafe.Pointer, size int)
+TEXT ·cachemaint(SB),NOSPLIT|NOFRAME,$0-12
+	MOVW  $SYS_cachemaint, R4
+	MOVW  $(12+4), R5
+	MOVW  $0, R6
 	SWI
 	RET
 
