@@ -8,7 +8,6 @@ import (
 	"embedded/mmio"
 	"internal/abi"
 	"internal/cpu/cortexm"
-	"internal/cpu/cortexm/acc"
 	"internal/cpu/cortexm/cmt"
 	"internal/cpu/cortexm/debug/itm"
 	"internal/cpu/cortexm/mpu"
@@ -120,7 +119,7 @@ func taskerinit() {
 
 	// All other exceptions/interrupts by default have the highest priority.
 
-	// use MPU if available to catch nil pointer dereferences (need 4 regions)
+	// Use MPU if available to catch nil pointer dereferences (need 4 regions)
 	if _, d, _ := mpu.Type(); d >= 4 {
 		// Bellow there is the MPU configuration that more or less corresponds
 		// to the default CPU behavior, without MPU enabled.
@@ -132,18 +131,10 @@ func taskerinit() {
 		// The first 64 bytes of the code region are set inaccessible to catch
 		// nil pointer dereferences. The code region is declared read/write
 		// because some MCUs use normal memory access to program Flash.
-		//
-		// Tha RAM region is configured as shareable (usually shared with DMA).
-		// Shareable regions are by default not cacheable. If you enable L1
-		// cache in Cortex-M7 set the acc.SIWT bit so the RAM will be cacheable
-		// in write-through mode. WT mode degrades performance (not as much as
-		// you may think) but allows to reduce the required cache maintenance
-		// operations to just "invalidate by address" which is much less
-		// problematic than "clean by address" one, required in WB mode.
-		var (
+		const (
 			noacc  = mpu.A____
 			code   = mpu.Arwrw | mpu.C
-			ram    = mpu.Arwrw | mpu.TEX(1) | mpu.C | mpu.B | mpu.S
+			ram    = mpu.Arwrw | mpu.C | mpu.B
 			periph = mpu.Arwrw | mpu.B | mpu.S | mpu.XN
 		)
 		mpu.SetRegion(0x00000000|mpu.VALID|0, mpu.ENA|mpu.SIZE(29)|code)
@@ -189,22 +180,6 @@ func taskerinit() {
 				CMT.DCISW.U32.Store(way<<wayshift | set<<log2bpl)
 			}
 		}
-
-		// Use write-through mode on shareable regions. See also MPU above.
-		const (
-			cm7     = 0x41<<scb.Implementern | 0xc27<<scb.PartNon | scb.Constant
-			cm7r0p1 = cm7 | 0<<scb.Variantn | 1<<scb.Revisionn
-			cm7r0p2 = cm7 | 0<<scb.Variantn | 2<<scb.Revisionn
-			cm7r1p0 = cm7 | 1<<scb.Variantn | 0<<scb.Revisionn
-			cm7r1p1 = cm7 | 1<<scb.Variantn | 1<<scb.Revisionn
-		)
-		switch SCB.CPUID.Load() {
-		case cm7r0p1, cm7r0p2, cm7r1p0, cm7r1p1:
-			// Cortex-M7 1259864 write-through bug
-		default:
-			acc.ACC().CACR.StoreBits(acc.SIWT, acc.SIWT)
-		}
-
 		cc |= scb.DC
 	}
 	if cc != 0 {
