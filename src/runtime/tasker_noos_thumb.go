@@ -190,8 +190,9 @@ func taskerinit() {
 			}
 		}
 
-		// Use cache in write-through mode on shareable regions.
-		acc.ACC().CACR.Store(acc.SIWT)
+		// Use cache in write-through mode on shareable regions. See also
+		// MPU configuration above.
+		acc.ACC().CACR.StoreBits(acc.SIWT, acc.SIWT)
 
 		cc |= scb.DC
 	}
