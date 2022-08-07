@@ -7,8 +7,15 @@ package rtos
 import "unsafe"
 
 // CacheMaint performs a cache maintenance operations specified by the
-// architecture dependent parameter op. The operation may affect the memory
-// area bigger than specified by the p and size parameters.
+// architecture dependent parameter op. The operation may affect an area of
+// memory larger than that specified by the p and size parameters.
+//
+// The meaning of "op" for different architectures:
+//
+// thumb
+//  0. invalidate to the point of coherency
+//  1. clean to the point of coherency
+//
 func CacheMaint(op int, p unsafe.Pointer, size int) {
 	cacheMaint(op, p, size)
 }

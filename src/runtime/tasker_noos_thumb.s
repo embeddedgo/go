@@ -342,12 +342,21 @@ TEXT runtime·unhandledException(SB),NOSPLIT|NOFRAME,$0-0
 
 // func syscachemaint(op int, p unsafe.Pointer, size int)
 TEXT ·syscachemaint(SB),NOSPLIT,$0-12
-	//MOVW  op+0(FP), R0
+	MOVW  op+0(FP), R0
 	MOVW  p+4(FP), R1
 	MOVW  size+8(FP), R2
-	ADD   R1, R2           // end of buffer
-	BIC   $31, R1          // align p to the D-cache line size (32 bytes)
-	MOVW  $0xE000EF5C, R3  // DCIMVAC
+
+	// check op
+	CMP  $1, R0
+	BLS  ok
+	BKPT
+	B   -1(PC)
+ok:
+	MOVW.NE  $0xE000EF5C, R3  // DCIMVAC (data cache invalidate by address)
+	MOVW.EQ  $0xE000EF68, R3  // DCCMVAC (data cache clean by address)
+
+	ADD  R1, R2   // end of buffer
+	BIC  $31, R1  // align p to the beginning of D-cache line (32 bytes)
 	DSB
 
 loop:
