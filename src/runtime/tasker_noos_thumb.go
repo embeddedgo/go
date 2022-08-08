@@ -133,9 +133,9 @@ func taskerinit() {
 		// because some MCUs use normal memory access to program Flash.
 		const (
 			noacc  = mpu.A____
-			code   = mpu.Arwrw | mpu.C
-			ram    = mpu.Arwrw | mpu.C | mpu.B
-			periph = mpu.Arwrw | mpu.B | mpu.S | mpu.XN
+			code   = mpu.Arwrw | mpu.C                    // normal WT
+			ram    = mpu.Arwrw | mpu.TEX1 | mpu.C | mpu.B // normal WB+WA
+			periph = mpu.Arwrw | mpu.B | mpu.XN           // device
 		)
 		mpu.SetRegion(0x00000000|mpu.VALID|0, mpu.ENA|mpu.SIZE(29)|code)
 		mpu.SetRegion(0x00000000|mpu.VALID|1, mpu.ENA|mpu.SIZE(6)|noacc)

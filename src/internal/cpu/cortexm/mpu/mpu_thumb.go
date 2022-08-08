@@ -61,6 +61,10 @@ const (
 	C Attr = 1 << 17 // Cacheable
 	S Attr = 1 << 18 // Shareable
 
+	TEX0 Attr = 0 << 19
+	TEX1 Attr = 1 << 19
+	TEX2 Attr = 2 << 19
+
 	// Access permissons.
 	Amask Attr = 7 << 24 // Use to extract access permission bits
 	A____ Attr = 0 << 24 // No access
