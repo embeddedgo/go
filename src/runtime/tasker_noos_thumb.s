@@ -340,20 +340,25 @@ TEXT runtime·unhandledException(SB),NOSPLIT|NOFRAME,$0-0
 	BKPT
 	B   -1(PC)
 
+DATA cmra<>+0(SB)/4, $0xE000EF5C // DCIMVAC (data cache invalidate by address)
+DATA cmra<>+4(SB)/4, $0xE000EF68 // DCCMVAC (data cache clean by address)
+DATA cmra<>+8(SB)/4, $0xE000EF70 // DCCIMVAC (data cache clean and ivalidate)
+GLOBL cmra<>(SB), RODATA, $12
+
 // func syscachemaint(op int, p unsafe.Pointer, size int)
 TEXT ·syscachemaint(SB),NOSPLIT,$0-12
 	MOVW  op+0(FP), R0
 	MOVW  p+4(FP), R1
 	MOVW  size+8(FP), R2
 
-	// check op
-	CMP  $1, R0
+	// check and decode op
+	CMP  $2, R0
 	BLS  ok
 	BKPT
 	B   -1(PC)
 ok:
-	MOVW.NE  $0xE000EF5C, R3  // DCIMVAC (data cache invalidate by address)
-	MOVW.EQ  $0xE000EF68, R3  // DCCMVAC (data cache clean by address)
+	MOVW  $cmra<>(SB), R3
+	MOVW  (R3)(R0*4), R3
 
 	ADD  R1, R2   // end of buffer
 	BIC  $31, R1  // align p to the beginning of D-cache line (32 bytes)

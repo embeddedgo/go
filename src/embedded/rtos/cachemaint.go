@@ -10,11 +10,12 @@ import "unsafe"
 // architecture dependent parameter op. The operation may affect an area of
 // memory larger than that specified by the p and size parameters.
 //
-// The meaning of "op" for different architectures:
+// The meaning of "op" for different architectures.
 //
-// thumb
-//  0. invalidate to the point of coherency
-//  1. clean to the point of coherency
+// thumb:
+//  0. data cache invalidate to the point of coherency
+//  1. data cache clean to the point of coherency
+//  2. data cache clean and invalidate to the point of coherency
 //
 func CacheMaint(op int, p unsafe.Pointer, size int) {
 	cacheMaint(op, p, size)
