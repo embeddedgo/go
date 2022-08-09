@@ -70,10 +70,10 @@ TEXT ·write(SB),NOSPLIT|NOFRAME,$0-32
 
 // func cachemaint(op int, p unsafe.Pointer, size int)
 TEXT ·cachemaint(SB),NOSPLIT|NOFRAME,$0-24
-	MOVW  $SYS_cachemaint, R4
-	MOVW  $(24+8), R5
-	MOVW  $0, R6
-	SWI
+	MOV  $SYS_cachemaint, A3
+	MOV  $(24+8), A4
+	MOV  $0, A5
+	ECALL
 	RET
 
 // func setsystim1()
