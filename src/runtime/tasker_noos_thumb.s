@@ -371,5 +371,5 @@ loop:
 	BLO   loop
 
 	DSB
-	ISB
+	//ISB - unescessary because the exception return has ISB semantics
 	RET
