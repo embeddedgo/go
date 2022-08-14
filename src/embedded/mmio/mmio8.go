@@ -23,27 +23,27 @@ func (r *U8) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
-// SetBit sets n-th bit in r. This is not an atomic operation.
-func (r *U8) SetBit(n int) {
-	store8(&r.r, load8(&r.r)|uint8(1)<<uint(n))
-}
-
-// ClearBit clears n-th bit in r. This is not an atomic operation.
-func (r *U8) ClearBit(n int) {
-	store8(&r.r, load8(&r.r)&^uint8(1)<<uint(n))
-}
-
-// Bit returns the value of n-th bit in r (0 or 1).
-func (r *U8) LoadBit(n int) int {
-	return int(load8(&r.r)>>uint(n)) & 1
-}
-
-// StoreBit sets the value of n-th bit in r to least significant bit of v. This
-// is not an atomic operation.
-func (r *U8) StoreBit(n, v int) {
-	mask := uint8(1) << uint(n)
-	store8(&r.r, load8(&r.r)&^mask|uint8(v<<uint(n))&mask)
-}
+//// SetBit sets n-th bit in r. This is not an atomic operation.
+//func (r *U8) SetBit(n int) {
+//	store8(&r.r, load8(&r.r)|uint8(1)<<uint(n))
+//}
+//
+//// ClearBit clears n-th bit in r. This is not an atomic operation.
+//func (r *U8) ClearBit(n int) {
+//	store8(&r.r, load8(&r.r)&^uint8(1)<<uint(n))
+//}
+//
+//// Bit returns the value of n-th bit in r (0 or 1).
+//func (r *U8) LoadBit(n int) int {
+//	return int(load8(&r.r)>>uint(n)) & 1
+//}
+//
+//// StoreBit sets the value of n-th bit in r to least significant bit of v.
+//// This is not an atomic operation.
+//func (r *U8) StoreBit(n, v int) {
+//	mask := uint8(1) << uint(n)
+//	store8(&r.r, load8(&r.r)&^mask|uint8(v<<uint(n))&mask)
+//}
 
 // Bits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.

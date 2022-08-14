@@ -198,7 +198,7 @@ func defaultWrite(fd int, p []byte) int {
 	port := &ITM.STIM[fd]
 	portena := mmio.UM32{&ITM.TER[fd>>5].U32, 1 << (fd & 31)}
 	for i := 0; i < len(p); {
-		for port.LoadBit(0) == 0 {
+		for port.LoadBits(1<<0) == 0 {
 			if portena.Load() == 0 || ITM.TCR.LoadBits(itm.ITMENA) == 0 {
 				return len(p) // do not block on disabled port/ITM
 			}
