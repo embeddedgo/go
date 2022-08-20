@@ -6,7 +6,10 @@ package mmio
 
 import "unsafe"
 
+type T32 interface{ ~int32 | ~uint32 }
+
 // An R32 represents 32-bit memory mapped register of type T.
+// BUG: go:notinheap broken in go 1.18
 type R32[T T32] struct {
 	r uint32
 }
@@ -16,7 +19,7 @@ func (r *R32[_]) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
-// Bits returns the value od r logicaly anded with mask. It is a convenient
+// LoadBits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
 func (r *R32[T]) LoadBits(mask T) T {
 	return T(load32(&r.r)) & mask
@@ -49,7 +52,7 @@ func (r *R32[T]) Store(v T) {
 }
 
 // An RM32 represents a set of bits in R selected by Mask.
-type RM32[T ~int32 | ~uint32] struct {
+type RM32[T T32] struct {
 	R    *R32[T]
 	Mask T
 }
@@ -65,3 +68,9 @@ func (rm RM32[T]) Load() T { return rm.R.LoadBits(rm.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
 func (rm RM32[T]) Store(bits T) { rm.R.StoreBits(rm.Mask, bits) }
+
+// U32 is an alias for the R32[uint32] type kept for backward compatibility.
+//type U32 = R32[uint32]
+
+// UM32 is an alias for the RM32[uint32] type kept for backward compatibility.
+//type UM32 = RM32[uint32]

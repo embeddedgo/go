@@ -6,7 +6,10 @@ package mmio
 
 import "unsafe"
 
+type T16 interface{ ~int16 | ~uint16 }
+
 // An R16 represents 16-bit memory mapped register of type T.
+// BUG: go:notinheap broken in go 1.18
 type R16[T T16] struct {
 	r uint16
 }
@@ -16,7 +19,7 @@ func (r *R16[_]) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
-// Bits returns the value od r logicaly anded with mask. It is a convenient
+// LoadBits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
 func (r *R16[T]) LoadBits(mask T) T {
 	return T(load16(&r.r)) & mask
@@ -49,7 +52,7 @@ func (r *R16[T]) Store(v T) {
 }
 
 // An RM16 represents a set of bits in R selected by Mask.
-type RM16[T ~int16 | ~uint16] struct {
+type RM16[T T16] struct {
 	R    *R16[T]
 	Mask T
 }
@@ -65,3 +68,9 @@ func (rm RM16[T]) Load() T { return rm.R.LoadBits(rm.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
 func (rm RM16[T]) Store(bits T) { rm.R.StoreBits(rm.Mask, bits) }
+
+// U16 is an alias for the R16[uint16] type kept for backward compatibility.
+//type U16 = R16[uint16]
+
+// UM16 is an alias for the RM16[uint16] type kept for backward compatibility.
+//type UM16 = RM16[uint16]

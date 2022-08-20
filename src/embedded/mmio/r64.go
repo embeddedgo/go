@@ -6,7 +6,10 @@ package mmio
 
 import "unsafe"
 
+type T64 interface{ ~int64 | ~uint64 }
+
 // An R64 represents 64-bit memory mapped register of type T.
+// BUG: go:notinheap broken in go 1.18
 type R64[T T64] struct {
 	r uint64
 }
@@ -16,7 +19,7 @@ func (r *R64[_]) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
-// Bits returns the value od r logicaly anded with mask. It is a convenient
+// LoadBits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
 func (r *R64[T]) LoadBits(mask T) T {
 	return T(load64(&r.r)) & mask
@@ -49,7 +52,7 @@ func (r *R64[T]) Store(v T) {
 }
 
 // An RM64 represents a set of bits in R selected by Mask.
-type RM64[T ~int64 | ~uint64] struct {
+type RM64[T T64] struct {
 	R    *R64[T]
 	Mask T
 }
@@ -65,3 +68,9 @@ func (rm RM64[T]) Load() T { return rm.R.LoadBits(rm.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
 func (rm RM64[T]) Store(bits T) { rm.R.StoreBits(rm.Mask, bits) }
+
+// U64 is an alias for the R64[uint64] type kept for backward compatibility.
+//type U64 = R64[uint64]
+
+// UM64 is an alias for the RM64[uint64] type kept for backward compatibility.
+//type UM64 = RM64[uint64]

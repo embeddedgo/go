@@ -6,7 +6,10 @@ package mmio
 
 import "unsafe"
 
+type T8 interface{ ~int8 | ~uint8 }
+
 // An R8 represents 8-bit memory mapped register of type T.
+// BUG: go:notinheap broken in go 1.18
 type R8[T T8] struct {
 	r uint8
 }
@@ -16,7 +19,7 @@ func (r *R8[_]) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
-// Bits returns the value od r logicaly anded with mask. It is a convenient
+// LoadBits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
 func (r *R8[T]) LoadBits(mask T) T {
 	return T(load8(&r.r)) & mask
@@ -49,7 +52,7 @@ func (r *R8[T]) Store(v T) {
 }
 
 // An RM8 represents a set of bits in R selected by Mask.
-type RM8[T ~int8 | ~uint8] struct {
+type RM8[T T8] struct {
 	R    *R8[T]
 	Mask T
 }
@@ -65,3 +68,9 @@ func (rm RM8[T]) Load() T { return rm.R.LoadBits(rm.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
 func (rm RM8[T]) Store(bits T) { rm.R.StoreBits(rm.Mask, bits) }
+
+// U8 is an alias for the R8[uint8] type kept for backward compatibility.
+//type U8 = R8[uint8]
+
+// UM8 is an alias for the RM8[uint8] type kept for backward compatibility.
+//type UM8 = RM8[uint8]
