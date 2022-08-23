@@ -168,7 +168,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				//
 				p = obj.Appendp(p, newprog)
 				p.As = AMOVM
-				p.Scond |= C_DB | C_WBIT
+				p.Scond = C_DB | C_WBIT
 				p.From.Type = obj.TYPE_REGLIST
 				p.From.Offset = 0xFF0
 				p.To.Type = obj.TYPE_MEM
@@ -446,14 +446,15 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				}
 				// emit interrupt handler epilogue:
 				//
-				//  TST  $0x10, LR
-				//  BNE  nofpuctx
-				//  MOVW CONTROL, R0
-				//  TST  $4, R0 // CONTROL.FPCA tells if FPU have been used
-				//  BEQ  nofpuctx
-				//  VPOP [D8-D15]
+				//  TST    $0x10, LR
+				//  BNE    nofpuctx
+				//  MOVW   CONTROL, R0
+				//  TST    $4, R0 // CONTROL.FPCA tells if FPU have been used
+				//  ADD.EQ $64, SP
+				//  B.EQ   nofpuctx
+				//  VPOP   [D8-D15]
 				// nofpuctx:
-				//  POP  [R4-R11]
+				//  POP    [R4-R11]
 				//
 				p.As = ATST
 				p.From.Type = obj.TYPE_CONST
@@ -473,8 +474,16 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.From.Type = obj.TYPE_CONST
 				p.From.Offset = 4
 				p.Reg = REG_R0
+				p = obj.Appendp(p, newprog)
+				p.As = AADD
+				p.Scond = C_SCOND_EQ
+				p.From.Type = obj.TYPE_CONST
+				p.From.Offset = 8 * 8
+				p.To.Type = obj.TYPE_REG
+				p.To.Reg = REGSP
 				beq := obj.Appendp(p, newprog)
-				beq.As = ABEQ
+				beq.As = AB
+				beq.Scond = C_SCOND_EQ
 				beq.To.Type = obj.TYPE_BRANCH
 				p = obj.Appendp(beq, newprog)
 				p.As = AHWORD
