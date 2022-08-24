@@ -9,5 +9,5 @@ package rtos
 import "unsafe"
 
 func cacheMaint(op int, p unsafe.Pointer, size int) {
-	return -1, ErrNotSuppoted
+	panic(ErrNotSupported)
 }

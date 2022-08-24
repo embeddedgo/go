@@ -7,5 +7,5 @@
 package rtos
 
 func setPrivLevel(newlevel int) (oldlevel int, err error) {
-	return -1, ErrNotSuppoted
+	return -1, ErrNotSupported
 }

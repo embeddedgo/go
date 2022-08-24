@@ -6,7 +6,7 @@ package rtos
 
 var errorsByNumber = [...]*Error{
 	0: ErrUknown,
-	1: ErrNotSuppoted,
+	1: ErrNotSupported,
 	2: ErrBadPrivLevel,
 	3: ErrInsufPrivLevel,
 	4: ErrBadIntNumber,

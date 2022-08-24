@@ -7,5 +7,5 @@
 package rtos
 
 func setSysWriter(w func(fd int, p []byte) int) error {
-	return ErrNotSuppoted
+	return ErrNotSupported
 }

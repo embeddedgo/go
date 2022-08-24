@@ -10,7 +10,7 @@ func (e *Error) Error() string { return e.s }
 
 var (
 	ErrUknown         = &Error{"rtos: unknown error"}
-	ErrNotSuppoted    = &Error{"rtos: operation not supported"}
+	ErrNotSupported   = &Error{"rtos: operation not supported"}
 	ErrBadPrivLevel   = &Error{"rtos: bad privilege level"}
 	ErrInsufPrivLevel = &Error{"rtos: insufficient privilege level"}
 	ErrBadIntNumber   = &Error{"rtos: bad interrupt number"}

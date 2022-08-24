@@ -22,15 +22,15 @@ const (
 type intCtx int
 
 func irqEnable(irq IRQ, prio int, ctx IntCtx) error {
-	return ErrNotSuppoted
+	return ErrNotSupported
 }
 
 func irqDisable(irq IRQ, ctx IntCtx) error {
-	return ErrNotSuppoted
+	return ErrNotSupported
 }
 
 func irqStatus(irq IRQ, ctx IntCtx) (enabled bool, prio int, err error) {
-	return false, 0, ErrNotSuppoted
+	return false, 0, ErrNotSupported
 }
 
 func handlerMode() bool {
