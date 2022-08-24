@@ -1,48 +1,104 @@
 pkg embedded/mmio, func MB()
+pkg embedded/mmio, method (*P32) Addr() uintptr
+pkg embedded/mmio, method (*P32) Load() uintptr
+pkg embedded/mmio, method (*P32) Store(unsafe.Pointer)
+pkg embedded/mmio, method (*P64) Addr() uintptr
+pkg embedded/mmio, method (*P64) Load() uintptr
+pkg embedded/mmio, method (*P64) Store(unsafe.Pointer)
+pkg embedded/mmio, method (*R16[$0]) Addr() uintptr
+pkg embedded/mmio, method (*R16[$0]) ClearBits($0)
+pkg embedded/mmio, method (*R16[$0]) Load() $0
+pkg embedded/mmio, method (*R16[$0]) LoadBits($0) $0
+pkg embedded/mmio, method (*R16[$0]) SetBits($0)
+pkg embedded/mmio, method (*R16[$0]) Store($0)
+pkg embedded/mmio, method (*R16[$0]) StoreBits($0, $0)
+pkg embedded/mmio, method (*R32[$0]) Addr() uintptr
+pkg embedded/mmio, method (*R32[$0]) ClearBits($0)
+pkg embedded/mmio, method (*R32[$0]) Load() $0
+pkg embedded/mmio, method (*R32[$0]) LoadBits($0) $0
+pkg embedded/mmio, method (*R32[$0]) SetBits($0)
+pkg embedded/mmio, method (*R32[$0]) Store($0)
+pkg embedded/mmio, method (*R32[$0]) StoreBits($0, $0)
+pkg embedded/mmio, method (*R64[$0]) Addr() uintptr
+pkg embedded/mmio, method (*R64[$0]) ClearBits($0)
+pkg embedded/mmio, method (*R64[$0]) Load() $0
+pkg embedded/mmio, method (*R64[$0]) LoadBits($0) $0
+pkg embedded/mmio, method (*R64[$0]) SetBits($0)
+pkg embedded/mmio, method (*R64[$0]) Store($0)
+pkg embedded/mmio, method (*R64[$0]) StoreBits($0, $0)
+pkg embedded/mmio, method (*R8[$0]) Addr() uintptr
+pkg embedded/mmio, method (*R8[$0]) ClearBits($0)
+pkg embedded/mmio, method (*R8[$0]) Load() $0
+pkg embedded/mmio, method (*R8[$0]) LoadBits($0) $0
+pkg embedded/mmio, method (*R8[$0]) SetBits($0)
+pkg embedded/mmio, method (*R8[$0]) Store($0)
+pkg embedded/mmio, method (*R8[$0]) StoreBits($0, $0)
 pkg embedded/mmio, method (*U16) Addr() uintptr
-pkg embedded/mmio, method (*U16) LoadBit(int) int
 pkg embedded/mmio, method (*U16) LoadBits(uint16) uint16
-pkg embedded/mmio, method (*U16) ClearBit(int)
 pkg embedded/mmio, method (*U16) ClearBits(uint16)
 pkg embedded/mmio, method (*U16) Load() uint16
-pkg embedded/mmio, method (*U16) SetBit(int)
 pkg embedded/mmio, method (*U16) SetBits(uint16)
 pkg embedded/mmio, method (*U16) Store(uint16)
-pkg embedded/mmio, method (*U16) StoreBit(int, int)
 pkg embedded/mmio, method (*U16) StoreBits(uint16, uint16)
 pkg embedded/mmio, method (*U32) Addr() uintptr
-pkg embedded/mmio, method (*U32) LoadBit(int) int
 pkg embedded/mmio, method (*U32) LoadBits(uint32) uint32
-pkg embedded/mmio, method (*U32) ClearBit(int)
 pkg embedded/mmio, method (*U32) ClearBits(uint32)
 pkg embedded/mmio, method (*U32) Load() uint32
-pkg embedded/mmio, method (*U32) SetBit(int)
 pkg embedded/mmio, method (*U32) SetBits(uint32)
 pkg embedded/mmio, method (*U32) Store(uint32)
-pkg embedded/mmio, method (*U32) StoreBit(int, int)
 pkg embedded/mmio, method (*U32) StoreBits(uint32, uint32)
 pkg embedded/mmio, method (*U64) Addr() uintptr
-pkg embedded/mmio, method (*U64) ClearBit(int)
 pkg embedded/mmio, method (*U64) ClearBits(uint64)
 pkg embedded/mmio, method (*U64) Load() uint64
-pkg embedded/mmio, method (*U64) LoadBit(int) int
 pkg embedded/mmio, method (*U64) LoadBits(uint64) uint64
-pkg embedded/mmio, method (*U64) SetBit(int)
 pkg embedded/mmio, method (*U64) SetBits(uint64)
 pkg embedded/mmio, method (*U64) Store(uint64)
-pkg embedded/mmio, method (*U64) StoreBit(int, int)
 pkg embedded/mmio, method (*U64) StoreBits(uint64, uint64)
 pkg embedded/mmio, method (*U8) Addr() uintptr
-pkg embedded/mmio, method (*U8) LoadBit(int) int
 pkg embedded/mmio, method (*U8) LoadBits(uint8) uint8
-pkg embedded/mmio, method (*U8) ClearBit(int)
 pkg embedded/mmio, method (*U8) ClearBits(uint8)
 pkg embedded/mmio, method (*U8) Load() uint8
-pkg embedded/mmio, method (*U8) SetBit(int)
 pkg embedded/mmio, method (*U8) SetBits(uint8)
 pkg embedded/mmio, method (*U8) Store(uint8)
-pkg embedded/mmio, method (*U8) StoreBit(int, int)
 pkg embedded/mmio, method (*U8) StoreBits(uint8, uint8)
+pkg embedded/mmio, method (RM16[$0]) Clear()
+pkg embedded/mmio, method (RM16[$0]) Load() $0
+pkg embedded/mmio, method (RM16[$0]) Set()
+pkg embedded/mmio, method (RM16[$0]) Store($0)
+pkg embedded/mmio, method (RM32[$0]) Clear()
+pkg embedded/mmio, method (RM32[$0]) Load() $0
+pkg embedded/mmio, method (RM32[$0]) Set()
+pkg embedded/mmio, method (RM32[$0]) Store($0)
+pkg embedded/mmio, method (RM64[$0]) Clear()
+pkg embedded/mmio, method (RM64[$0]) Load() $0
+pkg embedded/mmio, method (RM64[$0]) Set()
+pkg embedded/mmio, method (RM64[$0]) Store($0)
+pkg embedded/mmio, method (RM8[$0]) Clear()
+pkg embedded/mmio, method (RM8[$0]) Load() $0
+pkg embedded/mmio, method (RM8[$0]) Set()
+pkg embedded/mmio, method (RM8[$0]) Store($0)
+pkg embedded/mmio, type P32 struct
+pkg embedded/mmio, type P64 struct
+pkg embedded/mmio, type R16[$0 T16] struct
+pkg embedded/mmio, type R32[$0 T32] struct
+pkg embedded/mmio, type R64[$0 T64] struct
+pkg embedded/mmio, type R8[$0 T8] struct
+pkg embedded/mmio, type RM16[$0 T16] struct
+pkg embedded/mmio, type RM16[$0 T16] struct, Mask $0
+pkg embedded/mmio, type RM16[$0 T16] struct, R *R16
+pkg embedded/mmio, type RM32[$0 T32] struct
+pkg embedded/mmio, type RM32[$0 T32] struct, Mask $0
+pkg embedded/mmio, type RM32[$0 T32] struct, R *R32
+pkg embedded/mmio, type RM64[$0 T64] struct
+pkg embedded/mmio, type RM64[$0 T64] struct, Mask $0
+pkg embedded/mmio, type RM64[$0 T64] struct, R *R64
+pkg embedded/mmio, type RM8[$0 T8] struct
+pkg embedded/mmio, type RM8[$0 T8] struct, Mask $0
+pkg embedded/mmio, type RM8[$0 T8] struct, R *R8
+pkg embedded/mmio, type T16 interface {}
+pkg embedded/mmio, type T32 interface {}
+pkg embedded/mmio, type T64 interface {}
+pkg embedded/mmio, type T8 interface {}
 pkg embedded/mmio, method (UM16) Clear()
 pkg embedded/mmio, method (UM16) Load() uint16
 pkg embedded/mmio, method (UM16) Set()
@@ -75,6 +131,12 @@ pkg embedded/mmio, type UM64 struct, R *U64
 pkg embedded/mmio, type UM8 struct
 pkg embedded/mmio, type UM8 struct, Mask uint8
 pkg embedded/mmio, type UM8 struct, R *U8
+pkg embedded/rtos, const DCacheClean = 1
+pkg embedded/rtos, const DCacheClean ideal-int
+pkg embedded/rtos, const DCacheCleanInval = 2
+pkg embedded/rtos, const DCacheCleanInval ideal-int
+pkg embedded/rtos, const DCacheInval = 0
+pkg embedded/rtos, const DCacheInval ideal-int
 pkg embedded/rtos, const IntPrioCurrent = -1
 pkg embedded/rtos, const IntPrioCurrent ideal-int
 pkg embedded/rtos, const IntPrioHigh = 0
@@ -91,6 +153,7 @@ pkg embedded/rtos, const IntPrioSysCall = 0
 pkg embedded/rtos, const IntPrioSysCall ideal-int
 pkg embedded/rtos, const IntPrioSysTimer = 0
 pkg embedded/rtos, const IntPrioSysTimer ideal-int
+pkg embedded/rtos, func CacheMaint(int, unsafe.Pointer, int)
 pkg embedded/rtos, func HandlerMode() bool
 pkg embedded/rtos, func Nanotime() time.Duration
 pkg embedded/rtos, func SetPrivLevel(int) (int, error)
@@ -111,7 +174,7 @@ pkg embedded/rtos, var ErrBadIntNumber *Error
 pkg embedded/rtos, var ErrBadIntPrio *Error
 pkg embedded/rtos, var ErrBadPrivLevel *Error
 pkg embedded/rtos, var ErrInsufPrivLevel *Error
-pkg embedded/rtos, var ErrNotSuppoted *Error
+pkg embedded/rtos, var ErrNotSupported *Error
 pkg embedded/rtos, var ErrBadIntCtx *Error
 pkg embedded/rtos, var ErrUknown *Error
 pkg embedded/rtos, func Mount(FS, string) error
