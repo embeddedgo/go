@@ -34,6 +34,19 @@ TEXT ·Store8(SB),NOSPLIT,$0-5
 	DMB    MB_ISH
 	RET
 
+TEXT ·Xchg(SB),NOSPLIT|NOFRAME,$0-12
+	MOVW  addr+0(FP), R1
+	MOVW  v+4(FP), R2
+loop:
+	LDREX  (R1), R0
+	DMB    MB_ISHST
+	STREX  R2, (R1), R3
+	CMP    $0, R3
+	BNE    loop
+	DMB    MB_ISH
+	MOVW   R0, ret+8(FP)
+	RET
+
 TEXT ·Cas(SB),NOSPLIT|NOFRAME,$0
 	MOVW  ptr+0(FP), R1
 	MOVW  old+4(FP), R2

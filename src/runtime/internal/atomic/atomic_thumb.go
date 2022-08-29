@@ -11,7 +11,6 @@ import (
 )
 
 // Export some functions via linkname to assembly in sync/atomic.
-//go:linkname Xchg
 //go:linkname Xchguintptr
 
 type spinlock struct {
@@ -200,18 +199,11 @@ func Xadd64(addr *uint64, delta int64) uint64
 //go:noescape
 func Xchg64(addr *uint64, v uint64) uint64
 
-//go:nosplit
+//go:noescape
 func Xadduintptr(val *uintptr, delta uintptr) uintptr
 
-//go:nosplit
-func Xchg(addr *uint32, v uint32) uint32 {
-	for {
-		old := *addr
-		if Cas(addr, old, v) {
-			return old
-		}
-	}
-}
+//go:noescape
+func Xchg(addr *uint32, v uint32) uint32
 
 //go:nosplit
 func Xchguintptr(addr *uintptr, v uintptr) uintptr {
