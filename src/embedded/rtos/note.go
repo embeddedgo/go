@@ -26,7 +26,8 @@ type Note struct {
 }
 
 // Sleep sleeps on the cleared note until other goroutine or interrupt handler
-// call Wakeup or until the timeout.
+// call Wakeup or until the timeout. Reports whether it was awakened before
+// timeout.
 func (n *Note) Sleep(timeout time.Duration) bool {
 	return runtime_notetsleepg(n, int64(timeout))
 }
