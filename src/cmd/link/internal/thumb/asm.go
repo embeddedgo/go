@@ -38,6 +38,7 @@ import (
 	"cmd/link/internal/sym"
 	"debug/elf"
 	"fmt"
+	"internal/buildcfg"
 	"log"
 )
 
@@ -80,7 +81,10 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 		}
 	}
 
-	ld.Segdata.Laddr = 2048 // communicate the main stack size to Link.address()
+	ld.Segdata.Laddr = 2048 // pass the main stack size to the Link.address()
+	if buildcfg.GOARM >= 0x10 {
+		ld.Segdata.Laddr *= 2 // more space for floating-point registers
+	}
 	msp := uint32(uint64(ld.RAM.Base) + ld.Segdata.Laddr)
 	vectors.AddUint32(ctxt.Arch, msp) // Main Stack Pointer after reset
 
@@ -294,7 +298,7 @@ func archreloc(target *ld.Target, ldr *loader.Loader, syms *ld.ArchSyms, r loade
 	return val, 0, false
 }
 
-func archrelocvariant(*ld.Target, *loader.Loader, loader.Reloc, sym.RelocVariant, loader.Sym, int64, []byte) int64  {
+func archrelocvariant(*ld.Target, *loader.Loader, loader.Reloc, sym.RelocVariant, loader.Sym, int64, []byte) int64 {
 	log.Fatalf("unexpected relocation variant")
 	return -1
 }
