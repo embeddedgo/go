@@ -93,6 +93,8 @@ func leadingZeros32(x uint32) uint {
 	return 32 - n
 }
 
+const debugBusFault = true
+
 //go:nowritebarrierrec
 //go:nosplit
 func taskerinit() {
@@ -154,40 +156,45 @@ func taskerinit() {
 	// ensure everything is set before any subsequent memory access
 	mmio.MB()
 
-	// Enable L1 cache if present
-	PFT := pft.PFT()
-	CMT := cmt.CMT()
-	clidr := PFT.CLIDR.Load()
-	var cc scb.CCR
-	if clidr&pft.CL1I != 0 {
-		// L1 instruction cache implemented. Must invalidate it before use.
-		CMT.ICIALLU.Store(0)
-		cc |= scb.IC
-	}
-	if clidr&pft.CL1D != 0 {
-		// L1 data cache implemented. Must invalidate it before use.
-		PFT.CSSELR.Store(0) // select L1 cache size info
-		mmio.MB()
-		csi := PFT.CCSIDR.Load() // load L1 cache size info
-
-		maxset := uint32(csi&pft.NumSets) >> pft.NumSetsn
-		maxway := uint32(csi&pft.Associativity) >> pft.Associativityn
-		log2bpl := uint(csi&pft.LineSize)>>pft.LineSizen + 4
-		wayshift := leadingZeros32(maxway)
-
-		for set := uint32(0); set <= maxset; set++ {
-			for way := uint32(0); way <= maxway; way++ {
-				CMT.DCISW.U32.Store(way<<wayshift | set<<log2bpl)
-			}
+	if debugBusFault {
+		// Disable buffering to make bus faults synchronous.
+		scid.SCID().ACTLR.SetBits(scid.DISDEFWBUF)
+	} else {
+		// Enable L1 cache if present
+		PFT := pft.PFT()
+		CMT := cmt.CMT()
+		clidr := PFT.CLIDR.Load()
+		var cc scb.CCR
+		if clidr&pft.CL1I != 0 {
+			// L1 instruction cache implemented. Must invalidate it before use.
+			CMT.ICIALLU.Store(0)
+			cc |= scb.IC
 		}
-		cc |= scb.DC
-	}
-	if cc != 0 {
-		mmio.MB()
-		isb()
-		SCB.CCR.SetBits(cc) // enable L1 caches
-		mmio.MB()
-		isb()
+		if clidr&pft.CL1D != 0 {
+			// L1 data cache implemented. Must invalidate it before use.
+			PFT.CSSELR.Store(0) // select L1 cache size info
+			mmio.MB()
+			csi := PFT.CCSIDR.Load() // load L1 cache size info
+
+			maxset := uint32(csi&pft.NumSets) >> pft.NumSetsn
+			maxway := uint32(csi&pft.Associativity) >> pft.Associativityn
+			log2bpl := uint(csi&pft.LineSize)>>pft.LineSizen + 4
+			wayshift := leadingZeros32(maxway)
+
+			for set := uint32(0); set <= maxset; set++ {
+				for way := uint32(0); way <= maxway; way++ {
+					CMT.DCISW.U32.Store(way<<wayshift | set<<log2bpl)
+				}
+			}
+			cc |= scb.DC
+		}
+		if cc != 0 {
+			mmio.MB()
+			isb()
+			SCB.CCR.SetBits(cc) // enable L1 caches
+			mmio.MB()
+			isb()
+		}
 	}
 }
 

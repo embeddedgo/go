@@ -79,7 +79,7 @@ TEXT runtime·faultHandler(SB),NOSPLIT|NOFRAME,$0-0
 	// 6: UsageFault - see UFSR: x/xh 0xE000ED2A
 
 	// R1 should contain pointer to the exception stack frame:
-	// (R1) -> [R0, R1, R2, R3, IP, LR, PC, PSR]
+	// (R1) -> [R0, R1, R2, R3, IP, LR, PC, PSR] and D0-D7 if $lr>>4&1==0
 	// If R1 points to the valid memory examine:
 	// 1. Where PC points.
 	// 2. Thumb bit in PSR
