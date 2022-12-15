@@ -147,8 +147,8 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				//  PUSH  [R4-R11]
 				//  TST   $0x10, LR
 				//  BNE   nofpuctx
-				//	MOVW  CONTROL, R0
 				//  CPSID i
+				//	MOVW  CONTROL, R0
 				//  VPUSH [D8-D15]    // sets CONTROL.FPCA
 				//  MOVW  R0, CONTROL // clears FPCA
 				//  CPSIE i
@@ -182,13 +182,13 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				bne.As = ABNE
 				bne.To.Type = obj.TYPE_BRANCH
 				p = obj.Appendp(bne, newprog)
+				p.As = ACPSID
+				p = obj.Appendp(p, newprog)
 				p.As = AMOVW
 				p.From.Type = obj.TYPE_REG
 				p.From.Reg = REG_CONTROL
 				p.To.Type = obj.TYPE_REG
 				p.To.Reg = REG_R0
-				p = obj.Appendp(p, newprog)
-				p.As = ACPSID
 				p = obj.Appendp(p, newprog)
 				p.As = AHWORD
 				p.From.Type = obj.TYPE_CONST
