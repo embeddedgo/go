@@ -1717,7 +1717,7 @@ func (p *noder) pragma(pos syntax.Pos, blankLine bool, text string, old syntax.P
 		}
 		flag := pragmaFlag(verb)
 		const runtimePragmas = ir.Systemstack | ir.Nowritebarrier | ir.Nowritebarrierrec | ir.Yeswritebarrierrec
-		if !base.Flag.CompilingRuntime && flag&runtimePragmas != 0 {
+		if base.Ctxt.Headtype != objabi.Hnoos && !base.Flag.CompilingRuntime && flag&runtimePragmas != 0 {
 			p.error(syntax.Error{Pos: pos, Msg: fmt.Sprintf("//%s only allowed in runtime", verb)})
 		}
 		if flag == ir.Interrupthandler {

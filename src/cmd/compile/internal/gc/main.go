@@ -309,7 +309,7 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 
 	compileFunctions()
 
-	if base.Flag.CompilingRuntime {
+	if base.Flag.CompilingRuntime || base.Ctxt.Headtype == objabi.Hnoos {
 		// Write barriers are now known. Check the call graph.
 		ssagen.NoWriteBarrierRecCheck()
 	}
