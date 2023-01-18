@@ -93,7 +93,7 @@ func leadingZeros32(x uint32) uint {
 	return 32 - n
 }
 
-const debugBusFault = true
+const debugBusFault = false
 
 //go:nowritebarrierrec
 //go:nosplit

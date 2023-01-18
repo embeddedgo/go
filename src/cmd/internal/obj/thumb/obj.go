@@ -148,7 +148,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				//  TST   $0x10, LR
 				//  BNE   nofpuctx
 				//  CPSID i
-				//	MOVW  CONTROL, R0
+				//  MOVW  CONTROL, R0
 				//  VPUSH [D8-D15]    // sets CONTROL.FPCA
 				//  MOVW  R0, CONTROL // clears FPCA
 				//  CPSIE i
