@@ -188,6 +188,7 @@ var depsRules = `
 	io/fs
 	< internal/testlog
 	< internal/poll, embedded/rtos
+	< internal/safefilepath
 	< os
 	< os/signal;
 

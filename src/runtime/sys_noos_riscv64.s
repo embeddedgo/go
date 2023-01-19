@@ -100,7 +100,7 @@ TEXT ·newosproc(SB),NOSPLIT|NOFRAME,$0-8
 	ECALL
 	RET
 
-// func exitThread(wait *uint32)
+// func exitThread(wait *atomic.Uint32)
 TEXT ·exitThread(SB),NOSPLIT|NOFRAME,$0-8
 	MOV  $SYS_exitThread, A3
 	MOV  $(8+8), A4

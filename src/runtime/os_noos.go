@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"runtime/internal/atomic"
 	"unsafe"
 )
 
@@ -183,7 +184,7 @@ func futexsleep(addr *uint32, val uint32, ns int64)
 func futexwakeup(addr *uint32, cnt uint32)
 
 //go:noescape
-func exitThread(wait *uint32)
+func exitThread(wait *atomic.Uint32)
 
 // syscalls not used by runtime
 
@@ -193,6 +194,7 @@ func setirqenabled(irq, enabled int) (errno int)
 func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
 func nanosleep(ns int64)
 func nanotime() int64
+
 //go:noescape
 func cachemaint(op int, p unsafe.Pointer, size int)
 

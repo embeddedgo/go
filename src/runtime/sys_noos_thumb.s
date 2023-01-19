@@ -94,7 +94,7 @@ TEXT ·newosproc(SB),NOSPLIT|NOFRAME,$0-4
 	SWI
 	RET
 
-// func exitThread(wait *uint32)
+// func exitThread(wait *atomic.Uint32)
 TEXT ·exitThread(SB),NOSPLIT|NOFRAME,$0-4
 	MOVW  $SYS_exitThread, R4
 	MOVW  $(4+4), R5

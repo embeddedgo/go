@@ -326,7 +326,9 @@ func (p *noder) processPragmas() {
 			if buildcfg.GOOS == "noos" && filepath.Base(l.pos.RelFilename()) == "zisrnames.go" {
 				continue
 			}
-			p.errorAt(l.pos, "//go:linkname must refer to declared function or variable")
+			if types.AllowsGoVersion(types.LocalPkg, 1, 18) {
+				p.errorAt(l.pos, "//go:linkname must refer to declared function or variable")
+			}
 			continue
 		}
 		if n.Sym().Linkname != "" {
