@@ -5,7 +5,6 @@
 package syscall
 
 import (
-	"internal/itoa"
 	"internal/oserror"
 	"sync"
 )
@@ -16,47 +15,28 @@ var (
 	Stderr = 2
 )
 
-type Errno uintptr
+type Error struct{ s string }
 
-const (
-	ENOTSUP Errno = iota
-	EINVAL
-	ENOENT
-	EACCES
-	EPERM
-	EEXIST
-	ENOTEMPTY
-	EISDIR
-	ENOTDIR
-	ENAMETOOLONG
-	EBUSY
-	EMFILE
-	ENOSPC
-	EBADF
-	ECANCELED
-	EINTR // for os package only, never returned
+var (
+	ENOTSUP      = &Error{"operation not supported"}
+	EINVAL       = &Error{"operation not supported"}
+	ENOENT       = &Error{"invalid argument"}
+	EACCES       = &Error{"no such file or directory"}
+	EPERM        = &Error{"operation not permitted"}
+	EEXIST       = &Error{"file exists"}
+	ENOTEMPTY    = &Error{"directory not empty"}
+	EISDIR       = &Error{"is a directory"}
+	ENOTDIR      = &Error{"not a directory"}
+	ENAMETOOLONG = &Error{"file name too long"}
+	EBUSY        = &Error{"device or resource busy"}
+	EMFILE       = &Error{"too many open files"}
+	ENOSPC       = &Error{"no space left on device"}
+	EBADF        = &Error{"bad file descriptor"}
+	ECANCELED    = &Error{"operation canceled"}
+	EINTR        = &Error{"interrupt"} // for os package only, never returned
 )
 
-var errors = [...]string{
-	ENOTSUP:      "operation not supported",
-	EINVAL:       "invalid argument",
-	ENOENT:       "no such file or directory",
-	EACCES:       "permission denied",
-	EPERM:        "operation not permitted",
-	EEXIST:       "file exists",
-	ENOTEMPTY:    "directory not empty",
-	EISDIR:       "is a directory",
-	ENOTDIR:      "not a directory",
-	ENAMETOOLONG: "file name too long",
-	EBUSY:        "device or resource busy",
-	EMFILE:       "too many open files",
-	ENOSPC:       "no space left on device",
-	EBADF:        "bad file descriptor",
-	ECANCELED:    "operation canceled",
-	EINTR:        "interrupt",
-}
-
-func (e Errno) Is(target error) bool {
+func (e *Error) Is(target error) bool {
 	switch target {
 	case oserror.ErrPermission:
 		return e == EACCES || e == EPERM
@@ -68,14 +48,8 @@ func (e Errno) Is(target error) bool {
 	return false
 }
 
-func (e Errno) Error() string {
-	if 0 <= int(e) && int(e) < len(errors) {
-		s := errors[e]
-		if s != "" {
-			return s
-		}
-	}
-	return "errno " + itoa.Itoa(int(e))
+func (e *Error) Error() string {
+	return e.s
 }
 
 type Timespec struct {
@@ -199,3 +173,7 @@ func Getegid() int {
 func Getgroups() (gids []int, err error) {
 	return nil, ENOTSUP
 }
+
+type Sockaddr struct{}
+type SockaddrInet4 struct{}
+type SockaddrInet6 struct{}
