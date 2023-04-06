@@ -33,7 +33,8 @@ var (
 	ENOSPC       = &Error{"no space left on device"}
 	EBADF        = &Error{"bad file descriptor"}
 	ECANCELED    = &Error{"operation canceled"}
-	EINTR        = &Error{"interrupt"} // for os package only, never returned
+	EINTR        = &Error{"interrupt"}              // for os package only
+	//ENOPROTOOPT  = &Error{"protocol not available"} // for net package only
 )
 
 func (e *Error) Is(target error) bool {

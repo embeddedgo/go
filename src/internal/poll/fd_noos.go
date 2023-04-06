@@ -4,6 +4,11 @@
 
 package poll
 
+import (
+	"syscall"
+	"time"
+)
+
 type FD struct {
 	// Lock sysfd and serialize access to Read and Write methods.
 	fdmu fdMutex
@@ -13,3 +18,19 @@ type FD struct {
 }
 
 func (fd *FD) destroy() error { return nil }
+
+func (fd *FD) RawControl(f func(uintptr)) error {
+	return syscall.ENOTSUP
+}
+
+func (fd *FD) RawRead(f func(uintptr) bool) error {
+	return syscall.ENOTSUP
+}
+
+func (fd *FD) RawWrite(f func(uintptr) bool) error {
+	return syscall.ENOTSUP
+}
+
+func (fd *FD) SetDeadline(t time.Time) error {
+	return syscall.ENOTSUP
+}
