@@ -29,3 +29,41 @@ func tracegc()                                              {}
 func tracefree(p unsafe.Pointer, size uintptr)              {}
 func mProf_Free(b *bucket, size uintptr)                    {}
 func mutexevent(cycles int64, skip int)                     {}
+
+// Stack formats a stack trace of the calling goroutine into buf
+// and returns the number of bytes written to buf.
+// If all is true, Stack formats stack traces of all other goroutines
+// into buf after the trace for the current goroutine.
+func Stack(buf []byte, all bool) int {
+	if all {
+		stopTheWorld("stack trace")
+	}
+
+	n := 0
+	if len(buf) > 0 {
+		gp := getg()
+		sp := getcallersp()
+		pc := getcallerpc()
+		systemstack(func() {
+			g0 := getg()
+			// Force traceback=1 to override GOTRACEBACK setting,
+			// so that Stack's results are consistent.
+			// GOTRACEBACK is only about crash dumps.
+			g0.m.traceback = 1
+			g0.writebuf = buf[0:0:len(buf)]
+			goroutineheader(gp)
+			traceback(pc, sp, 0, gp)
+			if all {
+				tracebackothers(gp)
+			}
+			g0.m.traceback = 0
+			n = len(g0.writebuf)
+			g0.writebuf = nil
+		})
+	}
+
+	if all {
+		startTheWorld()
+	}
+	return n
+}

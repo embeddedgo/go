@@ -31,11 +31,6 @@ func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
 	return &File{&file{f: f, name: name}}, nil
 }
 
-// NewFile is not supported by GOOS=noos.
-func NewFile(fd uintptr, name string) *File {
-	return nil
-}
-
 func (f *File) readdir(n int, mode readdirMode) (names []string, dirents []DirEntry, fi []FileInfo, err error) {
 	{
 		ff, ok := f.f.(interface {
@@ -211,6 +206,22 @@ func syscallMode(i FileMode) uint32 {
 	return uint32(i.Perm())
 }
 
+func ignoringEINTR(fn func() error) error {
+	return fn()
+}
+
+// provided by package embedded/rtos
+
+func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error)
+func chmod(name string, mode FileMode) error
+func rename(oldname, newname string) error
+
+// Remove removes the named file or (empty) directory.
+// If there is an error, it will be of type *PathError.
+func Remove(name string) error
+
+// not supported on noos
+
 type rawConn struct{}
 
 func (c *rawConn) Control(f func(uintptr)) error {
@@ -233,16 +244,26 @@ func hostname() (name string, err error) {
 	return "", syscall.ENOTSUP
 }
 
-func ignoringEINTR(fn func() error) error {
-	return fn()
+func NewFile(fd uintptr, name string) *File {
+	return nil
 }
 
-// provided by package embedded/rtos
+// Link creates newname as a hard link to the oldname file.
+// If there is an error, it will be of type *LinkError.
+func Link(oldname, newname string) error {
+	return &LinkError{"link", oldname, newname, syscall.ENOTSUP}
+}
 
-func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error)
-func chmod(name string, mode FileMode) error
-func rename(oldname, newname string) error
+// Symlink creates newname as a symbolic link to oldname.
+// On Windows, a symlink to a non-existent oldname creates a file symlink;
+// if oldname is later created as a directory the symlink will not work.
+// If there is an error, it will be of type *LinkError.
+func Symlink(oldname, newname string) error {
+	return &LinkError{"symlink", oldname, newname, syscall.ENOTSUP}
+}
 
-// Remove removes the named file or (empty) directory.
+// Readlink returns the destination of the named symbolic link.
 // If there is an error, it will be of type *PathError.
-func Remove(name string) error
+func Readlink(name string) (string, error) {
+	return "", &PathError{Op: "readlink", Path: name, Err: syscall.ENOTSUP}
+}
