@@ -198,6 +198,9 @@ func nanotime() int64
 //go:noescape
 func cachemaint(op int, p unsafe.Pointer, size int)
 
+//go:noescape
+func reset(level int, addr unsafe.Pointer) bool
+
 // faketime is the simulated time in nanoseconds since 1970 for the
 // playground.
 //

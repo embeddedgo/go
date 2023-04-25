@@ -25,6 +25,7 @@ DATA runtime·syscalls+(SYS_futexsleep*4)(SB)/4, $·sysfutexsleep(SB)
 DATA runtime·syscalls+(SYS_futexwakeup*4)(SB)/4, $·sysfutexwakeup(SB)
 DATA runtime·syscalls+(SYS_osyield*4)(SB)/4, $·curcpuSchedule(SB)
 DATA runtime·syscalls+(SYS_nanosleep*4)(SB)/4, $·sysnanosleep(SB)
+DATA runtime·syscalls+(SYS_reset*4)(SB)/4, $·sysreset(SB)
 
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*4)
 
@@ -129,6 +130,14 @@ TEXT ·osyield(SB),NOSPLIT|NOFRAME,$0-0
 // func nanosleep(ns int64)
 TEXT ·nanosleep(SB),NOSPLIT|NOFRAME,$0-8
 	MOVW  $SYS_nanosleep, R4
+	MOVW  $(8+4), R5
+	MOVW  $0, R6
+	SWI
+	RET
+
+// func reset(level int, addr unsafe.Pointer) bool
+TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-8
+	MOVW  $SYS_reset, R4
 	MOVW  $(8+4), R5
 	MOVW  $0, R6
 	SWI

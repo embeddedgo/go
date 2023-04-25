@@ -23,5 +23,6 @@
 #define SYS_futexwakeup   10
 #define SYS_osyield       11
 #define SYS_nanosleep     12
+#define SYS_reset         13
 
-#define SYS_NUM           13
+#define SYS_NUM           14

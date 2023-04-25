@@ -25,6 +25,7 @@ DATA runtime·syscalls+(SYS_futexsleep*8)(SB)/8, $·sysfutexsleep(SB)
 DATA runtime·syscalls+(SYS_futexwakeup*8)(SB)/8, $·sysfutexwakeup(SB)
 DATA runtime·syscalls+(SYS_osyield*8)(SB)/8, $·curcpuSchedule(SB)
 DATA runtime·syscalls+(SYS_nanosleep*8)(SB)/8, $·sysnanosleep(SB)
+DATA runtime·syscalls+(SYS_reset*8)(SB)/8, $·sysreset(SB)
 
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*8)
 
@@ -136,6 +137,14 @@ TEXT ·osyield(SB),NOSPLIT|NOFRAME,$0-0
 TEXT ·nanosleep(SB),NOSPLIT|NOFRAME,$0-8
 	MOV  $SYS_nanosleep, A3
 	MOV  $(8+8), A4
+	MOV  $0, A5
+	ECALL
+	RET
+
+// func reset(level int, addr unsafe.Pointer) bool
+TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-16
+	MOV  $SYS_reset, A3
+	MOV  $(16+8), A4
 	MOV  $0, A5
 	ECALL
 	RET

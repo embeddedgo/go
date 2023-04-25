@@ -374,3 +374,91 @@ loop:
 	DSB
 	//ISB - unescessary because the exception return has ISB semantics
 	RET
+
+#define AIRCR 0xE000ED0C
+#define VECTKEY (0x5FA<<16)
+#define SYSRESETREQ (1<<2)
+
+#define ICTR 0xE000E004
+#define INTLINESNUM 15
+
+#define SHCRS 0xE000ED24
+#define NVIC_ICER0 0xE000E180
+#define NVIC_ICPR0 0xE000E280
+#define VTOR 0xE000ED08
+#define MPU_CTRL 0xE000ED94
+
+#define SystemReset 0
+#define UnsafeReboot 15
+
+// func sysreset(level int, addr unsafe.Pointer) bool
+TEXT ·sysreset(SB),NOSPLIT|NOFRAME,$0-12
+	MOVW  level+0(FP), R0
+
+	CMP  $SystemReset, R0
+	BNE  unsafeReboot
+
+	MOVW  $AIRCR, R0
+	MOVW  (R0), R1
+	AND   $0xffff, R1
+	ORR   $(VECTKEY | SYSRESETREQ), R1
+	DSB
+	ISB
+	MOVW  R1, (R0)
+	B     (PC)  // never returns
+
+unsafeReboot:
+	CMP  $UnsafeReboot, R0
+	BNE  end  // unknown level
+
+	// Mask interrupts and system exceptions with configurable priority.
+	CPSID  // PRIMASK = 1
+
+	// Disable all interrupts in NVIC
+	MOVW  $ICTR, R0
+	MOVW  (R0), R1
+	AND   $INTLINESNUM, R1  // R1 = (number of implemented IRQs)/32 - 1
+	MOVW  $NVIC_ICER0, R0
+	MOVW  $0xffffffff, R2
+loop:
+	MOVW   R2, (R0)
+	MOVW   R2, (NVIC_ICPR0-NVIC_ICER0)(R0)
+	ADD    $4, R0
+	SUB.S  $1, R1
+	BGE    loop
+
+	// Disable system exceptions
+	MOVW  $SHCRS, R1
+	MOVW  $(1<<7), R0  // SVCALLACT must remain set
+	MOVW  R0, (R1)
+
+	MOVW  $0, R0
+
+	// Disable MPU
+	MOVW  $MPU_CTRL, R1
+	MOVW  R0, (R1)
+
+	// Clear special registers
+	MOVW  R0, PRIMASK
+	MOVW  R0, BASEPRI
+	MOVW  R0, FAULTMASK
+	MOVW  R0, CONTROL
+
+	// Setup a stack frame to return from ISR to Thread mode and call the Reset
+	// Handler (the _rt0_thumb_noos function if addr==0).
+	MOVW  addr+4(FP), R1
+	CBNZ  R1, loadFromVT
+	MOVW  $VTOR, R1  // in case of addr==0 load the VT addr from the VTOR
+	MOVW  (R1), R1
+loadFromVT:
+	MOVW  (R1), R13        // initial MSP from the Vector Table
+	MOVW  4(R1), R1        // reset handler from VT (_rt0_thumb_noos)
+	SUB   $1, R1           // clear the Thumb bit
+	SUB   $32, R13         // allocate a non-FP Stack Frame
+	MOVW  R1, 24(R13)      // stackFrame[PC] = Reset Handler
+	MOVW  $1<<24, R1       // xPSR thumb bit
+	MOVW  R1, 28(R13)      // stackFrame[xPSR] = 0x01000000
+	MOVW  $0xFFFFFFF9, LR  // return to the Thread mode, use MSP as SP
+
+end:
+	RET

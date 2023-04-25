@@ -541,3 +541,8 @@ TEXT ·syscachemaint(SB),NOSPLIT,$0-24
 	//MOVW  size+16(FP), R2
 	EBREAK
 	JMP  -1(PC)
+
+// func sysreset(level int, addr unsafe.Pointer) bool
+TEXT ·sysreset(SB),NOSPLIT|NOFRAME,$0-24
+	EBREAK
+	JMP  -1(PC)

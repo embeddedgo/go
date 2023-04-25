@@ -121,8 +121,51 @@ func taskerinit() {
 
 	// All other exceptions/interrupts by default have the highest priority.
 
+	if debugBusFault {
+		// Disable buffering to make bus faults synchronous.
+		scid.SCID().ACTLR.SetBits(scid.DISDEFWBUF)
+	} else {
+		// Enable L1 cache if present and not enabled before (may already be
+		// enabled in case of the soft reboot)
+		PFT := pft.PFT()
+		CMT := cmt.CMT()
+		clidr := PFT.CLIDR.Load()
+		cc := SCB.CCR.Load()
+		if clidr&pft.CL1I != 0 && cc&scb.IC == 0 {
+			// L1 instruction cache implemented. Must invalidate it before use.
+			CMT.ICIALLU.Store(0)
+			mmio.MB()
+			isb()
+			SCB.CCR.SetBits(scb.IC)
+			mmio.MB()
+			isb()
+		}
+		if clidr&pft.CL1D != 0 && cc&scb.DC == 0 {
+			// L1 data cache implemented. Must invalidate it before use.
+			PFT.CSSELR.Store(0) // select L1 cache size info
+			mmio.MB()
+			csi := PFT.CCSIDR.Load() // load L1 cache size info
+
+			maxset := uint32(csi&pft.NumSets) >> pft.NumSetsn
+			maxway := uint32(csi&pft.Associativity) >> pft.Associativityn
+			log2bpl := uint(csi&pft.LineSize)>>pft.LineSizen + 4
+			wayshift := leadingZeros32(maxway)
+
+			for set := uint32(0); set <= maxset; set++ {
+				for way := uint32(0); way <= maxway; way++ {
+					CMT.DCISW.U32.Store(way<<wayshift | set<<log2bpl)
+				}
+			}
+			mmio.MB()
+			isb()
+			SCB.CCR.SetBits(scb.DC)
+			mmio.MB()
+			isb()
+		}
+	}
+
 	// Use MPU if available to catch nil pointer dereferences (need 4 regions)
-	if _, d, _ := mpu.Type(); d >= 4 {
+	if _, d, _ := mpu.Type(); d >= 4 && mpu.State()&mpu.ENABLE == 0 {
 		// Bellow there is the MPU configuration that more or less corresponds
 		// to the default CPU behavior, without MPU enabled.
 		//
@@ -149,52 +192,9 @@ func taskerinit() {
 			0x00000000|mpu.VALID|3,
 			mpu.ENA|mpu.SIZE(32)|mpu.SRD(0b11100101)|ram,
 		)
-		mmio.MB() // ensure any previous memory access is done before enable MPU
+		mmio.MB()
 		mpu.Set(mpu.ENABLE | mpu.PRIVDEFENA)
-	}
-
-	// ensure everything is set before any subsequent memory access
-	mmio.MB()
-
-	if debugBusFault {
-		// Disable buffering to make bus faults synchronous.
-		scid.SCID().ACTLR.SetBits(scid.DISDEFWBUF)
-	} else {
-		// Enable L1 cache if present
-		PFT := pft.PFT()
-		CMT := cmt.CMT()
-		clidr := PFT.CLIDR.Load()
-		var cc scb.CCR
-		if clidr&pft.CL1I != 0 {
-			// L1 instruction cache implemented. Must invalidate it before use.
-			CMT.ICIALLU.Store(0)
-			cc |= scb.IC
-		}
-		if clidr&pft.CL1D != 0 {
-			// L1 data cache implemented. Must invalidate it before use.
-			PFT.CSSELR.Store(0) // select L1 cache size info
-			mmio.MB()
-			csi := PFT.CCSIDR.Load() // load L1 cache size info
-
-			maxset := uint32(csi&pft.NumSets) >> pft.NumSetsn
-			maxway := uint32(csi&pft.Associativity) >> pft.Associativityn
-			log2bpl := uint(csi&pft.LineSize)>>pft.LineSizen + 4
-			wayshift := leadingZeros32(maxway)
-
-			for set := uint32(0); set <= maxset; set++ {
-				for way := uint32(0); way <= maxway; way++ {
-					CMT.DCISW.U32.Store(way<<wayshift | set<<log2bpl)
-				}
-			}
-			cc |= scb.DC
-		}
-		if cc != 0 {
-			mmio.MB()
-			isb()
-			SCB.CCR.SetBits(cc) // enable L1 caches
-			mmio.MB()
-			isb()
-		}
+		mmio.MB()
 	}
 }
 
