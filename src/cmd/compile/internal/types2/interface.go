@@ -4,7 +4,10 @@
 
 package types2
 
-import "cmd/compile/internal/syntax"
+import (
+	"cmd/compile/internal/syntax"
+	. "internal/types/errors"
+)
 
 // ----------------------------------------------------------------------------
 // API
@@ -12,7 +15,6 @@ import "cmd/compile/internal/syntax"
 // An Interface represents an interface type.
 type Interface struct {
 	check     *Checker      // for error reporting; nil once type set is computed
-	obj       *TypeName     // corresponding declared object; or nil (for better error messages)
 	methods   []*Func       // ordered list of explicitly declared methods
 	embeddeds []Type        // ordered list of explicitly embedded elements
 	embedPos  *[]syntax.Pos // positions of embedded elements; or nil (for error messages) - use pointer to save space
@@ -133,11 +135,7 @@ func (check *Checker) interfaceType(ityp *Interface, iface *syntax.InterfaceType
 		// We have a method with name f.Name.
 		name := f.Name.Value
 		if name == "_" {
-			if check.conf.CompilerErrorMessages {
-				check.error(f.Name, "methods must have a unique non-blank name")
-			} else {
-				check.error(f.Name, "invalid method name _")
-			}
+			check.error(f.Name, BlankIfaceMethod, "methods must have a unique non-blank name")
 			continue // ignore
 		}
 
@@ -145,7 +143,7 @@ func (check *Checker) interfaceType(ityp *Interface, iface *syntax.InterfaceType
 		sig, _ := typ.(*Signature)
 		if sig == nil {
 			if typ != Typ[Invalid] {
-				check.errorf(f.Type, invalidAST+"%s is not a method signature", typ)
+				check.errorf(f.Type, InvalidSyntaxTree, "%s is not a method signature", typ)
 			}
 			continue // ignore
 		}

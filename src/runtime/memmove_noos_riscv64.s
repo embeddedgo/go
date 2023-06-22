@@ -7,11 +7,12 @@
 // See memmove Go doc for important implementation constraints.
 
 // void runtime·memmove(void*, void*, uintptr)
-TEXT runtime·memmove(SB),NOSPLIT,$-0-24
-	MOV  n+16(FP), A2
+TEXT runtime·memmove<ABIInternal>(SB),NOSPLIT,$-0-24
+	// A0 = to
+	// A1 = from
+	// A2 = n
+
 	BEQ  A2, ZERO, done
-	MOV  to+0(FP), A0
-	MOV  from+8(FP), A1
 
 	// check alignment
 	// The code below requires all of the "to", "from", "n" are aligned

@@ -29,6 +29,7 @@
 #define SYS___sysctl			202
 #define SYS___sigaltstack14		281
 #define SYS___sigprocmask14		293
+#define SYS_issetugid			305
 #define SYS_getcontext			307
 #define SYS_setcontext			308
 #define SYS__lwp_create			309
@@ -85,21 +86,6 @@ TEXT runtime·read(SB),NOSPLIT,$-4
 	JAE	2(PC)
 	NEGL	AX			// caller expects negative errno
 	MOVL	AX, ret+12(FP)
-	RET
-
-// func pipe() (r, w int32, errno int32)
-TEXT runtime·pipe(SB),NOSPLIT,$0-12
-	MOVL	$42, AX
-	INT	$0x80
-	JCC	pipeok
-	MOVL	$-1, r+0(FP)
-	MOVL	$-1, w+4(FP)
-	MOVL	AX, errno+8(FP)
-	RET
-pipeok:
-	MOVL	AX, r+0(FP)
-	MOVL	DX, w+4(FP)
-	MOVL	$0, errno+8(FP)
 	RET
 
 // func pipe2(flags int32) (r, w int32, errno int32)
@@ -305,7 +291,7 @@ TEXT runtime·sigfwd(SB),NOSPLIT,$12-16
 	RET
 
 // Called by OS using C ABI.
-TEXT runtime·sigtramp(SB),NOSPLIT,$28
+TEXT runtime·sigtramp(SB),NOSPLIT|TOPFRAME,$28
 	NOP	SP	// tell vet SP changed - stop checking offsets
 	// Save callee-saved C registers, since the caller may be a C signal handler.
 	MOVL	BX, bx-4(SP)
@@ -472,6 +458,19 @@ TEXT runtime·kevent(SB),NOSPLIT,$0
 	MOVL	AX, ret+24(FP)
 	RET
 
+// func fcntl(fd, cmd, arg int32) (int32, int32)
+TEXT runtime·fcntl(SB),NOSPLIT,$-4
+	MOVL	$SYS_fcntl, AX
+	INT	$0x80
+	JAE	noerr
+	MOVL	$-1, ret+12(FP)
+	MOVL	AX, errno+16(FP)
+	RET
+noerr:
+	MOVL	AX, ret+12(FP)
+	MOVL	$0, errno+16(FP)
+	RET
+
 // int32 runtime·closeonexec(int32 fd)
 TEXT runtime·closeonexec(SB),NOSPLIT,$32
 	MOVL	$SYS_fcntl, AX
@@ -485,19 +484,9 @@ TEXT runtime·closeonexec(SB),NOSPLIT,$32
 	NEGL	AX
 	RET
 
-// func runtime·setNonblock(fd int32)
-TEXT runtime·setNonblock(SB),NOSPLIT,$16-4
-	MOVL	$92, AX // fcntl
-	MOVL	fd+0(FP), BX // fd
-	MOVL	BX, 4(SP)
-	MOVL	$3, 8(SP) // F_GETFL
-	MOVL	$0, 12(SP)
+// func issetugid() int32
+TEXT runtime·issetugid(SB),NOSPLIT,$0
+	MOVL	$SYS_issetugid, AX
 	INT	$0x80
-	MOVL	fd+0(FP), BX // fd
-	MOVL	BX, 4(SP)
-	MOVL	$4, 8(SP) // F_SETFL
-	ORL	$4, AX // O_NONBLOCK
-	MOVL	AX, 12(SP)
-	MOVL	$92, AX // fcntl
-	INT	$0x80
+	MOVL	AX, ret+0(FP)
 	RET

@@ -13,10 +13,89 @@ package syscall
 
 import (
 	"internal/itoa"
+	"runtime"
 	"unsafe"
 )
 
+// N.B. RawSyscall6 is provided via linkname by runtime/internal/syscall.
+//
+// Errno is uintptr and thus compatible with the runtime/internal/syscall
+// definition.
+
+func RawSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err Errno)
+
+// Pull in entersyscall/exitsyscall for Syscall/Syscall6.
+//
+// Note that this can't be a push linkname because the runtime already has a
+// nameless linkname to export to assembly here and in x/sys. Additionally,
+// entersyscall fetches the caller PC and SP and thus can't have a wrapper
+// inbetween.
+
+//go:linkname runtime_entersyscall runtime.entersyscall
+func runtime_entersyscall()
+
+//go:linkname runtime_exitsyscall runtime.exitsyscall
+func runtime_exitsyscall()
+
+// N.B. For the Syscall functions below:
+//
+// //go:uintptrkeepalive because the uintptr argument may be converted pointers
+// that need to be kept alive in the caller (this is implied for RawSyscall6
+// since it has no body).
+//
+// //go:nosplit because stack copying does not account for uintptrkeepalive, so
+// the stack must not grow. Stack copying cannot blindly assume that all
+// uintptr arguments are pointers, because some values may look like pointers,
+// but not really be pointers, and adjusting their value would break the call.
+//
+// //go:norace, on RawSyscall, to avoid race instrumentation if RawSyscall is
+// called after fork, or from a signal handler.
+//
+// //go:linkname to ensure ABI wrappers are generated for external callers
+// (notably x/sys/unix assembly).
+
+//go:uintptrkeepalive
+//go:nosplit
+//go:norace
+//go:linkname RawSyscall
+func RawSyscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
+	return RawSyscall6(trap, a1, a2, a3, 0, 0, 0)
+}
+
+//go:uintptrkeepalive
+//go:nosplit
+//go:linkname Syscall
+func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
+	runtime_entersyscall()
+	// N.B. Calling RawSyscall here is unsafe with atomic coverage
+	// instrumentation and race mode.
+	//
+	// Coverage instrumentation will add a sync/atomic call to RawSyscall.
+	// Race mode will add race instrumentation to sync/atomic. Race
+	// instrumentation requires a P, which we no longer have.
+	//
+	// RawSyscall6 is fine because it is implemented in assembly and thus
+	// has no coverage instrumentation.
+	//
+	// This is typically not a problem in the runtime because cmd/go avoids
+	// adding coverage instrumentation to the runtime in race mode.
+	r1, r2, err = RawSyscall6(trap, a1, a2, a3, 0, 0, 0)
+	runtime_exitsyscall()
+	return
+}
+
+//go:uintptrkeepalive
+//go:nosplit
+//go:linkname Syscall6
+func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err Errno) {
+	runtime_entersyscall()
+	r1, r2, err = RawSyscall6(trap, a1, a2, a3, a4, a5, a6)
+	runtime_exitsyscall()
+	return
+}
+
 func rawSyscallNoError(trap, a1, a2, a3 uintptr) (r1, r2 uintptr)
+func rawVforkSyscall(trap, a1, a2 uintptr) (r1 uintptr, err Errno)
 
 /*
  * Wrapped
@@ -38,6 +117,13 @@ func Creat(path string, mode uint32) (fd int, err error) {
 	return Open(path, O_CREAT|O_WRONLY|O_TRUNC, mode)
 }
 
+func EpollCreate(size int) (fd int, err error) {
+	if size <= 0 {
+		return -1, EINVAL
+	}
+	return EpollCreate1(0)
+}
+
 func isGroupMember(gid int) bool {
 	groups, err := Getgroups()
 	if err != nil {
@@ -52,11 +138,35 @@ func isGroupMember(gid int) bool {
 	return false
 }
 
+func isCapDacOverrideSet() bool {
+	const _CAP_DAC_OVERRIDE = 1
+	var c caps
+	c.hdr.version = _LINUX_CAPABILITY_VERSION_3
+
+	_, _, err := RawSyscall(SYS_CAPGET, uintptr(unsafe.Pointer(&c.hdr)), uintptr(unsafe.Pointer(&c.data[0])), 0)
+
+	return err == 0 && c.data[0].effective&capToMask(_CAP_DAC_OVERRIDE) != 0
+}
+
 //sys	faccessat(dirfd int, path string, mode uint32) (err error)
+//sys	faccessat2(dirfd int, path string, mode uint32, flags int) (err error) = _SYS_faccessat2
 
 func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
-	if flags & ^(_AT_SYMLINK_NOFOLLOW|_AT_EACCESS) != 0 {
-		return EINVAL
+	if flags == 0 {
+		return faccessat(dirfd, path, mode)
+	}
+
+	// Attempt to use the newer faccessat2, which supports flags directly,
+	// falling back if it doesn't exist.
+	//
+	// Don't attempt on Android, which does not allow faccessat2 through
+	// its seccomp policy [1] on any version of Android as of 2022-12-20.
+	//
+	// [1] https://cs.android.com/android/platform/superproject/+/master:bionic/libc/SECCOMP_BLOCKLIST_APP.TXT;l=4;drc=dbb8670dfdcc677f7e3b9262e93800fa14c4e417
+	if runtime.GOOS != "android" {
+		if err := faccessat2(dirfd, path, mode, flags); err != ENOSYS && err != EPERM {
+			return err
+		}
 	}
 
 	// The Linux kernel faccessat system call does not take any flags.
@@ -65,8 +175,8 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 	// Because people naturally expect syscall.Faccessat to act
 	// like C faccessat, we do the same.
 
-	if flags == 0 {
-		return faccessat(dirfd, path, mode)
+	if flags & ^(_AT_SYMLINK_NOFOLLOW|_AT_EACCESS) != 0 {
+		return EINVAL
 	}
 
 	var st Stat_t
@@ -79,9 +189,16 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 		return nil
 	}
 
+	// Fallback to checking permission bits.
 	var uid int
 	if flags&_AT_EACCESS != 0 {
 		uid = Geteuid()
+		if uid != 0 && isCapDacOverrideSet() {
+			// If CAP_DAC_OVERRIDE is set, file access check is
+			// done by the kernel in the same way as for root
+			// (see generic_permission() in the Linux sources).
+			uid = 0
+		}
 	} else {
 		uid = Getuid()
 	}
@@ -253,6 +370,13 @@ func Getwd() (wd string, err error) {
 	if n < 1 || n > len(buf) || buf[n-1] != 0 {
 		return "", EINVAL
 	}
+	// In some cases, Linux can return a path that starts with the
+	// "(unreachable)" prefix, which can potentially be a valid relative
+	// path. To work around that, return ENOENT if path is not absolute.
+	if buf[0] != '/' {
+		return "", ENOENT
+	}
+
 	return string(buf[0 : n-1]), nil
 }
 
@@ -544,21 +668,6 @@ func anyToSockaddr(rsa *RawSockaddrAny) (Sockaddr, error) {
 		return sa, nil
 	}
 	return nil, EAFNOSUPPORT
-}
-
-func Accept(fd int) (nfd int, sa Sockaddr, err error) {
-	var rsa RawSockaddrAny
-	var len _Socklen = SizeofSockaddrAny
-	nfd, err = accept4(fd, &rsa, &len, 0)
-	if err != nil {
-		return
-	}
-	sa, err = anyToSockaddr(&rsa)
-	if err != nil {
-		Close(nfd)
-		nfd = 0
-	}
-	return
 }
 
 func Accept4(fd int, flags int) (nfd int, sa Sockaddr, err error) {
@@ -949,7 +1058,7 @@ func Getpgrp() (pid int) {
 //sys	Mknodat(dirfd int, path string, mode uint32, dev int) (err error)
 //sys	Nanosleep(time *Timespec, leftover *Timespec) (err error)
 //sys	PivotRoot(newroot string, putold string) (err error) = SYS_PIVOT_ROOT
-//sysnb prlimit(pid int, resource int, newlimit *Rlimit, old *Rlimit) (err error) = SYS_PRLIMIT64
+//sysnb prlimit1(pid int, resource int, newlimit *Rlimit, old *Rlimit) (err error) = SYS_PRLIMIT64
 //sys	read(fd int, p []byte) (n int, err error)
 //sys	Removexattr(path string, attr string) (err error)
 //sys	Setdomainname(p []byte) (err error)
@@ -961,6 +1070,7 @@ func Getpgrp() (pid int) {
 // Provided by runtime.syscall_runtime_doAllThreadsSyscall which stops the
 // world and invokes the syscall on each OS thread. Once this function returns,
 // all threads are in sync.
+//
 //go:uintptrescapes
 func runtime_doAllThreadsSyscall(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr)
 
@@ -979,6 +1089,7 @@ func runtime_doAllThreadsSyscall(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, 
 // AllThreadsSyscall is unaware of any threads that are launched
 // explicitly by cgo linked code, so the function always returns
 // ENOTSUP in binaries that use cgo.
+//
 //go:uintptrescapes
 func AllThreadsSyscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
 	if cgo_libc_setegid != nil {
@@ -990,6 +1101,7 @@ func AllThreadsSyscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err Errno) {
 
 // AllThreadsSyscall6 is like AllThreadsSyscall, but extended to six
 // arguments.
+//
 //go:uintptrescapes
 func AllThreadsSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, err Errno) {
 	if cgo_libc_setegid != nil {
@@ -1000,6 +1112,7 @@ func AllThreadsSyscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2 uintptr, e
 }
 
 // linked by runtime.cgocall.go
+//
 //go:uintptrescapes
 func cgocaller(unsafe.Pointer, ...uintptr) uintptr
 
@@ -1148,3 +1261,14 @@ func Munmap(b []byte) (err error) {
 //sys	Munlock(b []byte) (err error)
 //sys	Mlockall(flags int) (err error)
 //sys	Munlockall() (err error)
+
+// prlimit changes a resource limit. We use a single definition so that
+// we can tell StartProcess to not restore the original NOFILE limit.
+// This is unexported but can be called from x/sys/unix.
+func prlimit(pid int, resource int, newlimit *Rlimit, old *Rlimit) (err error) {
+	err = prlimit1(pid, resource, newlimit, old)
+	if err == nil && newlimit != nil && resource == RLIMIT_NOFILE {
+		origRlimitNofile.Store(Rlimit{0, 0})
+	}
+	return err
+}

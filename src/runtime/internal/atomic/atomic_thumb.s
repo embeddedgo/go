@@ -47,7 +47,7 @@ loop:
 	MOVW   R0, ret+8(FP)
 	RET
 
-TEXT ·Cas(SB),NOSPLIT|NOFRAME,$0
+TEXT ·Cas(SB),NOSPLIT|NOFRAME,$0-13
 	MOVW  ptr+0(FP), R1
 	MOVW  old+4(FP), R2
 	MOVW  new+8(FP), R3

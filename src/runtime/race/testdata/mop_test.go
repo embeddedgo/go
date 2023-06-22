@@ -6,9 +6,9 @@ package race_test
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"os"
 	"runtime"
@@ -1896,6 +1896,14 @@ func TestRaceNestedStruct(t *testing.T) {
 }
 
 func TestRaceIssue5567(t *testing.T) {
+	testRaceRead(t, false)
+}
+
+func TestRaceIssue51618(t *testing.T) {
+	testRaceRead(t, true)
+}
+
+func testRaceRead(t *testing.T, pread bool) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(4))
 	in := make(chan []byte)
 	res := make(chan error)
@@ -1914,7 +1922,11 @@ func TestRaceIssue5567(t *testing.T) {
 		var n, total int
 		b := make([]byte, 17) // the race is on b buffer
 		for err == nil {
-			n, err = f.Read(b)
+			if pread {
+				n, err = f.ReadAt(b, int64(total))
+			} else {
+				n, err = f.Read(b)
+			}
 			total += n
 			if n > 0 {
 				in <- b[:n]
@@ -1924,7 +1936,7 @@ func TestRaceIssue5567(t *testing.T) {
 			err = nil
 		}
 	}()
-	h := sha1.New()
+	h := crc32.New(crc32.MakeTable(0x12345678))
 	for b := range in {
 		h.Write(b)
 	}

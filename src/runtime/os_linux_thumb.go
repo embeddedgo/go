@@ -11,6 +11,8 @@ const (
 	_HWCAP_IDIVT = 1 << 18
 )
 
+func vdsoCall()
+
 func checkgoarm() {
 	if cpu.HWCap&_HWCAP_IDIVT == 0 {
 		print("runtime: hardware division not supported, cannot run GOARCH=thumb binary")

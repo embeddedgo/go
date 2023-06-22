@@ -13,6 +13,7 @@ package tar
 import (
 	"errors"
 	"fmt"
+	"internal/godebug"
 	"io/fs"
 	"math"
 	"path"
@@ -26,11 +27,14 @@ import (
 // architectures. If a large value is encountered when decoding, the result
 // stored in Header will be the truncated version.
 
+var tarinsecurepath = godebug.New("tarinsecurepath")
+
 var (
 	ErrHeader          = errors.New("archive/tar: invalid tar header")
 	ErrWriteTooLong    = errors.New("archive/tar: write too long")
 	ErrFieldTooLong    = errors.New("archive/tar: header field too long")
 	ErrWriteAfterClose = errors.New("archive/tar: write after close")
+	ErrInsecurePath    = errors.New("archive/tar: insecure file path")
 	errMissData        = errors.New("archive/tar: sparse file references non-existent data")
 	errUnrefData       = errors.New("archive/tar: sparse file contains unreferenced data")
 	errWriteHole       = errors.New("archive/tar: write non-NUL byte in sparse hole")
@@ -55,8 +59,10 @@ func (he headerError) Error() string {
 // Type flags for Header.Typeflag.
 const (
 	// Type '0' indicates a regular file.
-	TypeReg  = '0'
-	TypeRegA = '\x00' // Deprecated: Use TypeReg instead.
+	TypeReg = '0'
+
+	// Deprecated: Use TypeReg instead.
+	TypeRegA = '\x00'
 
 	// Type '1' to '6' are header-only flags and may not have a data body.
 	TypeLink    = '1' // Hard link
@@ -221,9 +227,11 @@ func (s sparseEntry) endOffset() int64 { return s.Offset + s.Length }
 // that the file has no data in it, which is rather odd.
 //
 // As an example, if the underlying raw file contains the 10-byte data:
+//
 //	var compactFile = "abcdefgh"
 //
 // And the sparse map has the following entries:
+//
 //	var spd sparseDatas = []sparseEntry{
 //		{Offset: 2,  Length: 5},  // Data fragment for 2..6
 //		{Offset: 18, Length: 3},  // Data fragment for 18..20
@@ -235,6 +243,7 @@ func (s sparseEntry) endOffset() int64 { return s.Offset + s.Length }
 //	}
 //
 // Then the content of the resulting sparse file with a Header.Size of 25 is:
+//
 //	var sparseFile = "\x00"*2 + "abcde" + "\x00"*11 + "fgh" + "\x00"*4
 type (
 	sparseDatas []sparseEntry
@@ -293,9 +302,9 @@ func alignSparseEntries(src []sparseEntry, size int64) []sparseEntry {
 // The input must have been already validated.
 //
 // This function mutates src and returns a normalized map where:
-//	* adjacent fragments are coalesced together
-//	* only the last fragment may be empty
-//	* the endOffset of the last fragment is the total size
+//   - adjacent fragments are coalesced together
+//   - only the last fragment may be empty
+//   - the endOffset of the last fragment is the total size
 func invertSparseEntries(src []sparseEntry, size int64) []sparseEntry {
 	dst := src[:0]
 	var pre sparseEntry

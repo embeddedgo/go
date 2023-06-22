@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"go/constant"
+	. "internal/types/errors"
 )
 
 var nopos syntax.Pos
@@ -98,7 +99,7 @@ type Checker struct {
 	nextID  uint64                 // unique Id for type parameters (first valid Id is 1)
 	objMap  map[Object]*declInfo   // maps package-level objects and (non-interface) methods to declaration info
 	impMap  map[importKey]*Package // maps (import path, source directory) to (complete or fake) package
-	infoMap map[*Named]typeInfo    // maps named types to their associated type info (for cycle detection)
+	valids  instanceLookup         // valid *Named (incl. instantiated) types per the validType check
 
 	// pkgPathMap maps package names to the set of distinct import paths we've
 	// seen for that name, anywhere in the import graph. It is used for
@@ -241,7 +242,6 @@ func NewChecker(conf *Config, pkg *Package, info *Info) *Checker {
 		version: version,
 		objMap:  make(map[Object]*declInfo),
 		impMap:  make(map[importKey]*Package),
-		infoMap: make(map[*Named]typeInfo),
 	}
 }
 
@@ -268,7 +268,7 @@ func (check *Checker) initFiles(files []*syntax.File) {
 			if name != "_" {
 				pkg.name = name
 			} else {
-				check.error(file.PkgName, "invalid package name _")
+				check.error(file.PkgName, BlankPkgName, "invalid package name _")
 			}
 			fallthrough
 
@@ -276,7 +276,7 @@ func (check *Checker) initFiles(files []*syntax.File) {
 			check.files = append(check.files, file)
 
 		default:
-			check.errorf(file, "package %s; expected %s", name, pkg.name)
+			check.errorf(file, MismatchedPkgName, "package %s; expected %s", name, pkg.name)
 			// ignore this file
 		}
 	}
@@ -373,11 +373,17 @@ func (check *Checker) processDelayed(top int) {
 	// this is a sufficiently bounded process.
 	for i := top; i < len(check.delayed); i++ {
 		a := &check.delayed[i]
-		if check.conf.Trace && a.desc != nil {
-			fmt.Println()
-			check.trace(a.desc.pos.Pos(), "-- "+a.desc.format, a.desc.args...)
+		if check.conf.Trace {
+			if a.desc != nil {
+				check.trace(a.desc.pos.Pos(), "-- "+a.desc.format, a.desc.args...)
+			} else {
+				check.trace(nopos, "-- delayed %p", a.f)
+			}
 		}
 		a.f() // may append to check.delayed
+		if check.conf.Trace {
+			fmt.Println()
+		}
 	}
 	assert(top <= len(check.delayed)) // stack must not have shrunk
 	check.delayed = check.delayed[:top]
@@ -420,7 +426,7 @@ func (check *Checker) record(x *operand) {
 }
 
 func (check *Checker) recordUntyped() {
-	if !debug && check.Types == nil {
+	if !debug && !check.recordTypes() {
 		return // nothing to do
 	}
 
@@ -447,6 +453,35 @@ func (check *Checker) recordTypeAndValue(x syntax.Expr, mode operandMode, typ Ty
 	}
 	if m := check.Types; m != nil {
 		m[x] = TypeAndValue{mode, typ, val}
+	}
+	if check.StoreTypesInSyntax {
+		tv := TypeAndValue{mode, typ, val}
+		stv := syntax.TypeAndValue{Type: typ, Value: val}
+		if tv.IsVoid() {
+			stv.SetIsVoid()
+		}
+		if tv.IsType() {
+			stv.SetIsType()
+		}
+		if tv.IsBuiltin() {
+			stv.SetIsBuiltin()
+		}
+		if tv.IsValue() {
+			stv.SetIsValue()
+		}
+		if tv.IsNil() {
+			stv.SetIsNil()
+		}
+		if tv.Addressable() {
+			stv.SetAddressable()
+		}
+		if tv.Assignable() {
+			stv.SetAssignable()
+		}
+		if tv.HasOk() {
+			stv.SetHasOk()
+		}
+		x.SetTypeInfo(stv)
 	}
 }
 
@@ -484,7 +519,25 @@ func (check *Checker) recordCommaOkTypes(x syntax.Expr, a [2]Type) {
 				NewVar(pos, check.pkg, "", a[1]),
 			)
 			m[x] = tv
-			// if x is a parenthesized expression (p.X), update p.X
+			p, _ := x.(*syntax.ParenExpr)
+			if p == nil {
+				break
+			}
+			x = p.X
+		}
+	}
+	if check.StoreTypesInSyntax {
+		// Note: this loop is duplicated because the type of tv is different.
+		// Above it is types2.TypeAndValue, here it is syntax.TypeAndValue.
+		for {
+			tv := x.GetTypeInfo()
+			assert(tv.Type != nil) // should have been recorded already
+			pos := x.Pos()
+			tv.Type = NewTuple(
+				NewVar(pos, check.pkg, "", a[0]),
+				NewVar(pos, check.pkg, "", a[1]),
+			)
+			x.SetTypeInfo(tv)
 			p, _ := x.(*syntax.ParenExpr)
 			if p == nil {
 				break

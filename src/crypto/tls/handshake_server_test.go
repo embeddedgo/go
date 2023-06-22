@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/ecdh"
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -22,12 +24,17 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/curve25519"
 )
 
 func testClientHello(t *testing.T, serverConfig *Config, m handshakeMessage) {
 	testClientHelloFailure(t, serverConfig, m, "")
+}
+
+// testFatal is a hack to prevent the compiler from complaining that there is a
+// call to t.Fatal from a non-test goroutine
+func testFatal(t *testing.T, err error) {
+	t.Helper()
+	t.Fatal(err)
 }
 
 func testClientHelloFailure(t *testing.T, serverConfig *Config, m handshakeMessage, expectedSubStr string) {
@@ -37,7 +44,9 @@ func testClientHelloFailure(t *testing.T, serverConfig *Config, m handshakeMessa
 		if ch, ok := m.(*clientHelloMsg); ok {
 			cli.vers = ch.vers
 		}
-		cli.writeRecord(recordTypeHandshake, m.marshal())
+		if _, err := cli.writeHandshakeRecord(m, nil); err != nil {
+			testFatal(t, err)
+		}
 		c.Close()
 	}()
 	ctx := context.Background()
@@ -194,7 +203,9 @@ func TestRenegotiationExtension(t *testing.T) {
 	go func() {
 		cli := Client(c, testConfig)
 		cli.vers = clientHello.vers
-		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+		if _, err := cli.writeHandshakeRecord(clientHello, nil); err != nil {
+			testFatal(t, err)
+		}
 
 		buf := make([]byte, 1024)
 		n, err := c.Read(buf)
@@ -253,8 +264,10 @@ func TestTLS12OnlyCipherSuites(t *testing.T) {
 	go func() {
 		cli := Client(c, testConfig)
 		cli.vers = clientHello.vers
-		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
-		reply, err := cli.readHandshake()
+		if _, err := cli.writeHandshakeRecord(clientHello, nil); err != nil {
+			testFatal(t, err)
+		}
+		reply, err := cli.readHandshake(nil)
 		c.Close()
 		if err != nil {
 			replyChan <- err
@@ -311,8 +324,10 @@ func TestTLSPointFormats(t *testing.T) {
 			go func() {
 				cli := Client(c, testConfig)
 				cli.vers = clientHello.vers
-				cli.writeRecord(recordTypeHandshake, clientHello.marshal())
-				reply, err := cli.readHandshake()
+				if _, err := cli.writeHandshakeRecord(clientHello, nil); err != nil {
+					testFatal(t, err)
+				}
+				reply, err := cli.readHandshake(nil)
 				c.Close()
 				if err != nil {
 					replyChan <- err
@@ -338,7 +353,7 @@ func TestTLSPointFormats(t *testing.T) {
 				}
 			} else {
 				if len(serverHello.supportedPoints) != 0 {
-					t.Fatalf("unexcpected ec_point_format extension from server: %v", serverHello.supportedPoints)
+					t.Fatalf("unexpected ec_point_format extension from server: %v", serverHello.supportedPoints)
 				}
 			}
 		})
@@ -392,16 +407,6 @@ func TestVersion(t *testing.T) {
 	_, _, err = testHandshake(t, clientConfig, serverConfig)
 	if err == nil {
 		t.Fatalf("expected failure to connect with TLS 1.0/1.1")
-	}
-
-	defer func(old bool) { debugEnableTLS10 = old }(debugEnableTLS10)
-	debugEnableTLS10 = true
-	_, _, err = testHandshake(t, clientConfig, serverConfig)
-	if err != nil {
-		t.Fatalf("handshake failed: %s", err)
-	}
-	if state.Version != VersionTLS11 {
-		t.Fatalf("incorrect version %x, should be %x", state.Version, VersionTLS11)
 	}
 }
 
@@ -1436,7 +1441,9 @@ func TestSNIGivenOnFailure(t *testing.T) {
 	go func() {
 		cli := Client(c, testConfig)
 		cli.vers = clientHello.vers
-		cli.writeRecord(recordTypeHandshake, clientHello.marshal())
+		if _, err := cli.writeHandshakeRecord(clientHello, nil); err != nil {
+			testFatal(t, err)
+		}
 		c.Close()
 	}()
 	conn := Server(s, serverConfig)
@@ -1912,6 +1919,7 @@ func TestAESCipherReorderingTLS13(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			hasAESGCMHardwareSupport = tc.serverHasAESGCM
+			pk, _ := ecdh.X25519().GenerateKey(rand.Reader)
 			hs := &serverHandshakeStateTLS13{
 				c: &Conn{
 					config: &Config{},
@@ -1921,7 +1929,7 @@ func TestAESCipherReorderingTLS13(t *testing.T) {
 					cipherSuites:       tc.clientCiphers,
 					supportedVersions:  []uint16{VersionTLS13},
 					compressionMethods: []uint8{compressionNone},
-					keyShares:          []keyShare{{group: X25519, data: curve25519.Basepoint}},
+					keyShares:          []keyShare{{group: X25519, data: pk.PublicKey().Bytes()}},
 				},
 			}
 
@@ -1937,7 +1945,7 @@ func TestAESCipherReorderingTLS13(t *testing.T) {
 	}
 }
 
-// TestServerHandshakeContextCancellation tests that cancelling
+// TestServerHandshakeContextCancellation tests that canceling
 // the context given to the server side conn.HandshakeContext
 // interrupts the in-progress handshake.
 func TestServerHandshakeContextCancellation(t *testing.T) {

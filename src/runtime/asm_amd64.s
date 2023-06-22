@@ -136,9 +136,20 @@ GLOBL bad_cpu_msg<>(SB), RODATA, $84
 #define NEED_EXT_FEATURES_CX V4_EXT_FEATURES_CX
 #define NEED_EXT_FEATURES_BX V4_EXT_FEATURES_BX
 
-// Downgrading v4 OS checks on Darwin for now, see CL 285572.
+// Darwin requires a different approach to check AVX512 support, see CL 285572.
 #ifdef GOOS_darwin
 #define NEED_OS_SUPPORT_AX V3_OS_SUPPORT_AX
+// These values are from:
+// https://github.com/apple/darwin-xnu/blob/xnu-4570.1.46/osfmk/i386/cpu_capabilities.h
+#define commpage64_base_address         0x00007fffffe00000
+#define commpage64_cpu_capabilities64   (commpage64_base_address+0x010)
+#define commpage64_version              (commpage64_base_address+0x01E)
+#define hasAVX512F                      0x0000004000000000
+#define hasAVX512CD                     0x0000008000000000
+#define hasAVX512DQ                     0x0000010000000000
+#define hasAVX512BW                     0x0000020000000000
+#define hasAVX512VL                     0x0000100000000000
+#define NEED_DARWIN_SUPPORT             (hasAVX512F | hasAVX512DQ | hasAVX512CD | hasAVX512BW | hasAVX512VL)
 #else
 #define NEED_OS_SUPPORT_AX V4_OS_SUPPORT_AX
 #endif
@@ -190,16 +201,16 @@ nocpuinfo:
 	JZ	needtls
 	// arg 1: g0, already in DI
 	MOVQ	$setg_gcc<>(SB), SI // arg 2: setg_gcc
+	MOVQ	$0, DX	// arg 3, 4: not used when using platform's TLS
+	MOVQ	$0, CX
 #ifdef GOOS_android
 	MOVQ	$runtime·tls_g(SB), DX 	// arg 3: &tls_g
 	// arg 4: TLS base, stored in slot 0 (Android's TLS_SLOT_SELF).
 	// Compensate for tls_g (+16).
 	MOVQ	-16(TLS), CX
-#else
-	MOVQ	$0, DX	// arg 3, 4: not used when using platform's TLS
-	MOVQ	$0, CX
 #endif
 #ifdef GOOS_windows
+	MOVQ	$runtime·tls_g(SB), DX 	// arg 3: &tls_g
 	// Adjust for the Win64 calling convention.
 	MOVQ	CX, R9 // arg 4
 	MOVQ	DX, R8 // arg 3
@@ -238,6 +249,10 @@ needtls:
 #ifdef GOOS_openbsd
 	// skip TLS setup on OpenBSD
 	JMP ok
+#endif
+
+#ifdef GOOS_windows
+	CALL	runtime·wintls(SB)
 #endif
 
 	LEAQ	runtime·m0+m_tls(SB), DI
@@ -308,6 +323,18 @@ ok:
 	XGETBV
 	ANDL	$NEED_OS_SUPPORT_AX, AX
 	CMPL	AX, $NEED_OS_SUPPORT_AX
+	JNE	bad_cpu
+#endif
+
+#ifdef NEED_DARWIN_SUPPORT
+	MOVQ	$commpage64_version, BX
+	CMPW	(BX), $13  // cpu_capabilities64 undefined in versions < 13
+	JL	bad_cpu
+	MOVQ	$commpage64_cpu_capabilities64, BX
+	MOVQ	(BX), BX
+	MOVQ	$NEED_DARWIN_SUPPORT, CX
+	ANDQ	CX, BX
+	CMPQ	BX, CX
 	JNE	bad_cpu
 #endif
 
@@ -1752,7 +1779,7 @@ GLOBL	debugCallFrameTooLarge<>(SB), RODATA, $20	// Size duplicated below
 // 2. Push the current PC on the stack (updating SP).
 // 3. Write the desired argument frame size at SP-16 (using the SP
 //    after step 2).
-// 4. Save all machine registers (including flags and XMM reigsters)
+// 4. Save all machine registers (including flags and XMM registers)
 //    so they can be restored later by the debugger.
 // 5. Set the PC to debugCallV2 and resume execution.
 //
@@ -2001,6 +2028,9 @@ TEXT runtime·panicSliceConvert<ABIInternal>(SB),NOSPLIT,$0-16
 // Use the free TLS_SLOT_APP slot #2 on Android Q.
 // Earlier androids are set up in gcc_android.c.
 DATA runtime·tls_g+0(SB)/8, $16
+GLOBL runtime·tls_g+0(SB), NOPTR, $8
+#endif
+#ifdef GOOS_windows
 GLOBL runtime·tls_g+0(SB), NOPTR, $8
 #endif
 

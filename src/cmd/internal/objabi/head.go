@@ -83,8 +83,8 @@ func (h *HeadType) Set(s string) error {
 	return nil
 }
 
-func (h *HeadType) String() string {
-	switch *h {
+func (h HeadType) String() string {
+	switch h {
 	case Haix:
 		return "aix"
 	case Hdarwin:
@@ -110,5 +110,5 @@ func (h *HeadType) String() string {
 	case Hwindows:
 		return "windows"
 	}
-	return fmt.Sprintf("HeadType(%d)", *h)
+	return fmt.Sprintf("HeadType(%d)", h)
 }

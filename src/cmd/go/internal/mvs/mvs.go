@@ -166,7 +166,7 @@ func buildList(targets []module.Version, reqs Reqs, upgrade func(module.Version)
 			}
 			return false
 		}
-		return nil, NewBuildListError(err.(error), errPath, isUpgrade)
+		return nil, NewBuildListError(err, errPath, isUpgrade)
 	}
 
 	// The final list is the minimum version of each module found in the graph.
@@ -193,6 +193,11 @@ func Req(mainModule module.Version, base []string, reqs Reqs) ([]module.Version,
 	// Note: Not running in parallel because we assume
 	// that list came from a previous operation that paged
 	// in all the requirements, so there's no I/O to overlap now.
+
+	max := map[string]string{}
+	for _, m := range list {
+		max[m.Path] = m.Version
+	}
 
 	// Compute postorder, cache requirements.
 	var postorder []module.Version
@@ -235,14 +240,6 @@ func Req(mainModule module.Version, base []string, reqs Reqs) ([]module.Version,
 			walk(m1)
 		}
 		return nil
-	}
-	max := map[string]string{}
-	for _, m := range list {
-		if v, ok := max[m.Path]; ok {
-			max[m.Path] = reqs.Max(m.Version, v)
-		} else {
-			max[m.Path] = m.Version
-		}
 	}
 	// First walk the base modules that must be listed.
 	var min []module.Version

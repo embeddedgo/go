@@ -9,8 +9,10 @@
 
 
 TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
-	// initialize data and BSS
+	//NOP2
+	//B -1(PC)
 
+	// initialize data and BSS
 	MOVW       R13, R0  // R13 points to the top of ISR stack and the beggining of DATA segment
 	MOVW       $runtime·romdata(SB), R1
 	MOVW       $runtime·bss(SB), R3
@@ -81,7 +83,7 @@ skipFPU:
 	BL  runtime·check(SB)
 	BL  runtime·osinit(SB)
 
-	// initialize sysMem
+	// initialize noosMem
 
 	MOVW  $runtime·end(SB), R0
 	MOVW  $runtime·ramend(SB), R1
@@ -95,11 +97,12 @@ skipFPU:
 
 	MOVW  $runtime·nodmastart(SB), R2
 	MOVW  $runtime·nodmaend(SB), R3
-	SUB   R2, R3, R6  // size of non-DMA memory
+	SUB   R2, R3, R7  // size of non-DMA memory
+	ADD   R5, R7, R6  // size of the whole free memory
 
 	// we prefer the non-DMA memory for non-heap objects to preserve as much as
 	// possible of the DMA capable memory for heap allocations
-	SUB.S  R6, R4
+	SUB.S  R7, R4
 
 	// reduce the arena by the remain of the non-heap space that did not fit in
 	// the non-DMA memory, properly align the arena
@@ -108,9 +111,9 @@ skipFPU:
 	SUB     R5, R1
 	MOVW    R1, R4
 
-	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize}
-	MOVW     $runtime·sysMem(SB), R6
-	MOVM.IA  [R0-R5], (R6)
+	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize,size}
+	MOVW     $runtime·noosMem(SB), R7
+	MOVM.IA  [R0-R6], (R7)
 
 	// initialize noos tasker and Go scheduler
 

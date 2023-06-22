@@ -7,7 +7,6 @@ package reflect
 import (
 	"internal/abi"
 	"internal/goarch"
-	"internal/goexperiment"
 	"unsafe"
 )
 
@@ -30,9 +29,9 @@ import (
 // commented out there should be the actual values once
 // we're ready to use the register ABI everywhere.
 var (
-	intArgRegs   = abi.IntArgRegs * goexperiment.RegabiArgsInt
-	floatArgRegs = abi.FloatArgRegs * goexperiment.RegabiArgsInt
-	floatRegSize = uintptr(abi.EffectiveFloatRegSize * goexperiment.RegabiArgsInt)
+	intArgRegs   = abi.IntArgRegs
+	floatArgRegs = abi.FloatArgRegs
+	floatRegSize = uintptr(abi.EffectiveFloatRegSize)
 )
 
 // abiStep represents an ABI "instruction." Each instruction
@@ -238,7 +237,7 @@ func (a *abiSeq) regAssign(t *rtype, offset uintptr) bool {
 		st := (*structType)(unsafe.Pointer(t))
 		for i := range st.fields {
 			f := &st.fields[i]
-			if !a.regAssign(f.typ, offset+f.offset()) {
+			if !a.regAssign(f.typ, offset+f.offset) {
 				return false
 			}
 		}

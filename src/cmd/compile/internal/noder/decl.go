@@ -125,8 +125,26 @@ func (g *irgen) funcDecl(out *ir.Nodes, decl *syntax.FuncDecl) {
 		}
 	}
 
-	if decl.Body != nil && fn.Pragma&ir.Noescape != 0 {
-		base.ErrorfAt(fn.Pos(), "can only use //go:noescape with external func implementations")
+	if decl.Body != nil {
+		if fn.Pragma&ir.Noescape != 0 {
+			base.ErrorfAt(fn.Pos(), "can only use //go:noescape with external func implementations")
+		}
+		if (fn.Pragma&ir.UintptrKeepAlive != 0 && fn.Pragma&ir.UintptrEscapes == 0) && fn.Pragma&ir.Nosplit == 0 {
+			// Stack growth can't handle uintptr arguments that may
+			// be pointers (as we don't know which are pointers
+			// when creating the stack map). Thus uintptrkeepalive
+			// functions (and all transitive callees) must be
+			// nosplit.
+			//
+			// N.B. uintptrescapes implies uintptrkeepalive but it
+			// is OK since the arguments must escape to the heap.
+			//
+			// TODO(prattmic): Add recursive nosplit check of callees.
+			// TODO(prattmic): Functions with no body (i.e.,
+			// assembly) must also be nosplit, but we can't check
+			// that here.
+			base.ErrorfAt(fn.Pos(), "go:uintptrkeepalive requires go:nosplit")
+		}
 	}
 
 	if decl.Name.Value == "init" && decl.Recv == nil {
@@ -194,33 +212,9 @@ func (g *irgen) typeDecl(out *ir.Nodes, decl *syntax.TypeDecl) {
 		ntyp.SetVargen()
 	}
 
-	pragmas := g.pragmaFlags(decl.Pragma, typePragmas)
+	pragmas := g.pragmaFlags(decl.Pragma, 0)
 	name.SetPragma(pragmas) // TODO(mdempsky): Is this still needed?
 
-	if pragmas&ir.NotInHeap != 0 {
-		ntyp.SetNotInHeap(true)
-	}
-
-	// We need to use g.typeExpr(decl.Type) here to ensure that for
-	// chained, defined-type declarations like:
-	//
-	//	type T U
-	//
-	//	//go:notinheap
-	//	type U struct { … }
-	//
-	// we mark both T and U as NotInHeap. If we instead used just
-	// g.typ(otyp.Underlying()), then we'd instead set T's underlying
-	// type directly to the struct type (which is not marked NotInHeap)
-	// and fail to mark T as NotInHeap.
-	//
-	// Also, we rely here on Type.SetUnderlying allowing passing a
-	// defined type and handling forward references like from T to U
-	// above. Contrast with go/types's Named.SetUnderlying, which
-	// disallows this.
-	//
-	// [mdempsky: Subtleties like these are why I always vehemently
-	// object to new type pragmas.]
 	ntyp.SetUnderlying(g.typeExpr(decl.Type))
 
 	tparams := otyp.(*types2.Named).TypeParams()

@@ -8,10 +8,10 @@ package syscall
 
 import (
 	errorspkg "errors"
+	"internal/bytealg"
 	"internal/itoa"
 	"internal/oserror"
 	"internal/race"
-	"internal/unsafeheader"
 	"runtime"
 	"sync"
 	"unicode/utf16"
@@ -39,12 +39,16 @@ func StringToUTF16(s string) []uint16 {
 // s, with a terminating NUL added. If s contains a NUL byte at any
 // location, it returns (nil, EINVAL).
 func UTF16FromString(s string) ([]uint16, error) {
-	for i := 0; i < len(s); i++ {
-		if s[i] == 0 {
-			return nil, EINVAL
-		}
+	if bytealg.IndexByteString(s, 0) != -1 {
+		return nil, EINVAL
 	}
-	return utf16.Encode([]rune(s + "\x00")), nil
+	// In the worst case all characters require two uint16.
+	// Also account for the terminating NULL character.
+	buf := make([]uint16, 0, len(s)*2+1)
+	for _, r := range s {
+		buf = utf16.AppendRune(buf, r)
+	}
+	return utf16.AppendRune(buf, '\x00'), nil
 }
 
 // UTF16ToString returns the UTF-8 encoding of the UTF-16 sequence s,
@@ -73,11 +77,7 @@ func utf16PtrToString(p *uint16) string {
 		n++
 	}
 	// Turn *uint16 into []uint16.
-	var s []uint16
-	hdr := (*unsafeheader.Slice)(unsafe.Pointer(&s))
-	hdr.Data = unsafe.Pointer(p)
-	hdr.Cap = n
-	hdr.Len = n
+	s := unsafe.Slice(p, n)
 	// Decode []uint16 into string.
 	return string(utf16.Decode(s))
 }
@@ -202,8 +202,8 @@ func NewCallbackCDecl(fn any) uintptr {
 //sys	formatMessage(flags uint32, msgsrc uintptr, msgid uint32, langid uint32, buf []uint16, args *byte) (n uint32, err error) = FormatMessageW
 //sys	ExitProcess(exitcode uint32)
 //sys	CreateFile(name *uint16, access uint32, mode uint32, sa *SecurityAttributes, createmode uint32, attrs uint32, templatefile int32) (handle Handle, err error) [failretval==InvalidHandle] = CreateFileW
-//sys	ReadFile(handle Handle, buf []byte, done *uint32, overlapped *Overlapped) (err error)
-//sys	WriteFile(handle Handle, buf []byte, done *uint32, overlapped *Overlapped) (err error)
+//sys	readFile(handle Handle, buf []byte, done *uint32, overlapped *Overlapped) (err error) = ReadFile
+//sys	writeFile(handle Handle, buf []byte, done *uint32, overlapped *Overlapped) (err error) = WriteFile
 //sys	SetFilePointer(handle Handle, lowoffset int32, highoffsetptr *int32, whence uint32) (newlowoffset uint32, err error) [failretval==0xffffffff]
 //sys	CloseHandle(handle Handle) (err error)
 //sys	GetStdHandle(stdhandle int) (handle Handle, err error) [failretval==InvalidHandle]
@@ -371,8 +371,11 @@ func Open(path string, mode int, perm uint32) (fd Handle, err error) {
 			}
 		}
 	}
-	h, e := CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
-	return h, e
+	if createmode == OPEN_EXISTING && access == GENERIC_READ {
+		// Necessary for opening directory handles.
+		attrs |= FILE_FLAG_BACKUP_SEMANTICS
+	}
+	return CreateFile(pathp, access, sharemode, sa, createmode, attrs, 0)
 }
 
 func Read(fd Handle, p []byte) (n int, err error) {
@@ -385,40 +388,50 @@ func Read(fd Handle, p []byte) (n int, err error) {
 		}
 		return 0, e
 	}
-	if race.Enabled {
-		if done > 0 {
-			race.WriteRange(unsafe.Pointer(&p[0]), int(done))
-		}
-		race.Acquire(unsafe.Pointer(&ioSync))
-	}
-	if msanenabled && done > 0 {
-		msanWrite(unsafe.Pointer(&p[0]), int(done))
-	}
-	if asanenabled && done > 0 {
-		asanWrite(unsafe.Pointer(&p[0]), int(done))
-	}
 	return int(done), nil
 }
 
 func Write(fd Handle, p []byte) (n int, err error) {
-	if race.Enabled {
-		race.ReleaseMerge(unsafe.Pointer(&ioSync))
-	}
 	var done uint32
 	e := WriteFile(fd, p, &done, nil)
 	if e != nil {
 		return 0, e
 	}
-	if race.Enabled && done > 0 {
-		race.ReadRange(unsafe.Pointer(&p[0]), int(done))
-	}
-	if msanenabled && done > 0 {
-		msanRead(unsafe.Pointer(&p[0]), int(done))
-	}
-	if asanenabled && done > 0 {
-		asanRead(unsafe.Pointer(&p[0]), int(done))
-	}
 	return int(done), nil
+}
+
+func ReadFile(fd Handle, p []byte, done *uint32, overlapped *Overlapped) error {
+	err := readFile(fd, p, done, overlapped)
+	if race.Enabled {
+		if *done > 0 {
+			race.WriteRange(unsafe.Pointer(&p[0]), int(*done))
+		}
+		race.Acquire(unsafe.Pointer(&ioSync))
+	}
+	if msanenabled && *done > 0 {
+		msanWrite(unsafe.Pointer(&p[0]), int(*done))
+	}
+	if asanenabled && *done > 0 {
+		asanWrite(unsafe.Pointer(&p[0]), int(*done))
+	}
+	return err
+}
+
+func WriteFile(fd Handle, p []byte, done *uint32, overlapped *Overlapped) error {
+	if race.Enabled {
+		race.ReleaseMerge(unsafe.Pointer(&ioSync))
+	}
+	err := writeFile(fd, p, done, overlapped)
+	if race.Enabled && *done > 0 {
+		race.ReadRange(unsafe.Pointer(&p[0]), int(*done))
+	}
+	if msanenabled && *done > 0 {
+		msanRead(unsafe.Pointer(&p[0]), int(*done))
+	}
+	if asanenabled && *done > 0 {
+		asanRead(unsafe.Pointer(&p[0]), int(*done))
+	}
+	return err
 }
 
 var ioSync int64
@@ -439,12 +452,11 @@ func setFilePointerEx(handle Handle, distToMove int64, newFilePointer *int64, wh
 		default:
 			panic("unsupported 32-bit architecture")
 		case "386":
-			// distToMove is a LARGE_INTEGER:
-			// https://msdn.microsoft.com/en-us/library/windows/desktop/aa383713(v=vs.85).aspx
+			// distToMove is a LARGE_INTEGER, which is 64 bits.
 			_, _, e1 = Syscall6(procSetFilePointerEx.Addr(), 5, uintptr(handle), uintptr(distToMove), uintptr(distToMove>>32), uintptr(unsafe.Pointer(newFilePointer)), uintptr(whence), 0)
 		case "arm":
 			// distToMove must be 8-byte aligned per ARM calling convention
-			// https://msdn.microsoft.com/en-us/library/dn736986.aspx#Anchor_7
+			// https://docs.microsoft.com/en-us/cpp/build/overview-of-arm-abi-conventions#stage-c-assignment-of-arguments-to-registers-and-stack
 			_, _, e1 = Syscall6(procSetFilePointerEx.Addr(), 6, uintptr(handle), 0, uintptr(distToMove), uintptr(distToMove>>32), uintptr(unsafe.Pointer(newFilePointer)), uintptr(whence))
 		}
 	}
@@ -907,9 +919,13 @@ func Shutdown(fd Handle, how int) (err error) {
 }
 
 func WSASendto(s Handle, bufs *WSABuf, bufcnt uint32, sent *uint32, flags uint32, to Sockaddr, overlapped *Overlapped, croutine *byte) (err error) {
-	rsa, len, err := to.sockaddr()
-	if err != nil {
-		return err
+	var rsa unsafe.Pointer
+	var len int32
+	if to != nil {
+		rsa, len, err = to.sockaddr()
+		if err != nil {
+			return err
+		}
 	}
 	r1, _, e1 := Syscall9(procWSASendTo.Addr(), 9, uintptr(s), uintptr(unsafe.Pointer(bufs)), uintptr(bufcnt), uintptr(unsafe.Pointer(sent)), uintptr(flags), uintptr(unsafe.Pointer(rsa)), uintptr(len), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)))
 	if r1 == socket_error {

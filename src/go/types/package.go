@@ -39,7 +39,13 @@ func (pkg *Package) SetName(name string) { pkg.name = name }
 // Scope returns the (complete or incomplete) package scope
 // holding the objects declared at package level (TypeNames,
 // Consts, Vars, and Funcs).
-func (pkg *Package) Scope() *Scope { return pkg.scope }
+// For a nil pkg receiver, Scope returns the Universe scope.
+func (pkg *Package) Scope() *Scope {
+	if pkg != nil {
+		return pkg.scope
+	}
+	return Universe
+}
 
 // A package is complete if its scope contains (at least) all
 // exported objects; otherwise it is incomplete.
@@ -54,6 +60,9 @@ func (pkg *Package) MarkComplete() { pkg.complete = true }
 // If pkg was loaded from export data, Imports includes packages that
 // provide package-level objects referenced by pkg. This may be more or
 // less than the set of packages directly imported by pkg's source code.
+//
+// If pkg uses cgo and the FakeImportC configuration option
+// was enabled, the imports list may contain a fake "C" package.
 func (pkg *Package) Imports() []*Package { return pkg.imports }
 
 // SetImports sets the list of explicitly imported packages to list.

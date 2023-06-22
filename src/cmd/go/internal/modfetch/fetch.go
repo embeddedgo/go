@@ -26,6 +26,7 @@ import (
 	"cmd/go/internal/lockedfile"
 	"cmd/go/internal/par"
 	"cmd/go/internal/robustio"
+	"cmd/go/internal/str"
 	"cmd/go/internal/trace"
 
 	"golang.org/x/mod/module"
@@ -102,7 +103,7 @@ func download(ctx context.Context, mod module.Version) (dir string, err error) {
 	// active.
 	parentDir := filepath.Dir(dir)
 	tmpPrefix := filepath.Base(dir) + ".tmp-"
-	if old, err := filepath.Glob(filepath.Join(parentDir, tmpPrefix+"*")); err == nil {
+	if old, err := filepath.Glob(filepath.Join(str.QuoteGlob(parentDir), str.QuoteGlob(tmpPrefix)+"*")); err == nil {
 		for _, path := range old {
 			RemoveAll(path) // best effort
 		}
@@ -224,7 +225,7 @@ func downloadZip(ctx context.Context, mod module.Version, zipfile string) (err e
 	// This is only safe to do because the lock file ensures that their
 	// writers are no longer active.
 	tmpPattern := filepath.Base(zipfile) + "*.tmp"
-	if old, err := filepath.Glob(filepath.Join(filepath.Dir(zipfile), tmpPattern)); err == nil {
+	if old, err := filepath.Glob(filepath.Join(str.QuoteGlob(filepath.Dir(zipfile)), tmpPattern)); err == nil {
 		for _, path := range old {
 			os.Remove(path) // best effort
 		}
@@ -241,7 +242,7 @@ func downloadZip(ctx context.Context, mod module.Version, zipfile string) (err e
 	// contents of the file (by hashing it) before we commit it. Because the file
 	// is zip-compressed, we need an actual file — or at least an io.ReaderAt — to
 	// validate it: we can't just tee the stream as we write it.
-	f, err := os.CreateTemp(filepath.Dir(zipfile), tmpPattern)
+	f, err := tempFile(filepath.Dir(zipfile), filepath.Base(zipfile), 0666)
 	if err != nil {
 		return err
 	}
@@ -407,7 +408,7 @@ type modSumStatus struct {
 }
 
 // Reset resets globals in the modfetch package, so previous loads don't affect
-// contents of go.sum files
+// contents of go.sum files.
 func Reset() {
 	GoSumFile = ""
 	WorkspaceGoSumFiles = nil
@@ -697,9 +698,9 @@ func addModSumLocked(mod module.Version, h string) {
 func checkSumDB(mod module.Version, h string) error {
 	modWithoutSuffix := mod
 	noun := "module"
-	if strings.HasSuffix(mod.Version, "/go.mod") {
+	if before, found := strings.CutSuffix(mod.Version, "/go.mod"); found {
 		noun = "go.mod"
-		modWithoutSuffix.Version = strings.TrimSuffix(mod.Version, "/go.mod")
+		modWithoutSuffix.Version = before
 	}
 
 	db, lines, err := lookupSumDB(mod)
@@ -832,6 +833,7 @@ Outer:
 		for _, m := range mods {
 			list := goSum.m[m]
 			sort.Strings(list)
+			str.Uniq(&list)
 			for _, h := range list {
 				st := goSum.status[modSum{m, h}]
 				if (!st.dirty || (st.used && keep[m])) && !sumInWorkspaceModulesLocked(m) {

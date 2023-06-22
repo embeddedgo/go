@@ -30,6 +30,7 @@
 #define SYS___sysctl			SWI_OS_NETBSD | 202
 #define SYS___sigaltstack14		SWI_OS_NETBSD | 281
 #define SYS___sigprocmask14		SWI_OS_NETBSD | 293
+#define SYS_issetugid			SWI_OS_NETBSD | 305
 #define SYS_getcontext			SWI_OS_NETBSD | 307
 #define SYS_setcontext			SWI_OS_NETBSD | 308
 #define SYS__lwp_create			SWI_OS_NETBSD | 309
@@ -94,22 +95,6 @@ TEXT runtime·read(SB),NOSPLIT|NOFRAME,$0
 	SWI $SYS_read
 	RSB.CS	$0, R0		// caller expects negative errno
 	MOVW	R0, ret+12(FP)
-	RET
-
-// func pipe() (r, w int32, errno int32)
-TEXT runtime·pipe(SB),NOSPLIT,$0-12
-	SWI $0xa0002a
-	BCC pipeok
-	MOVW $-1,R2
-	MOVW R2, r+0(FP)
-	MOVW R2, w+4(FP)
-	MOVW R0, errno+8(FP)
-	RET
-pipeok:
-	MOVW $0, R2
-	MOVW R0, r+0(FP)
-	MOVW R1, w+4(FP)
-	MOVW R2, errno+8(FP)
 	RET
 
 // func pipe2(flags int32) (r, w int32, errno int32)
@@ -304,7 +289,7 @@ TEXT runtime·sigfwd(SB),NOSPLIT,$0-16
 	MOVW	R4, R13
 	RET
 
-TEXT runtime·sigtramp(SB),NOSPLIT,$0
+TEXT runtime·sigtramp(SB),NOSPLIT|TOPFRAME,$0
 	// Reserve space for callee-save registers and arguments.
 	MOVM.DB.W [R4-R11], (R13)
 	SUB	$16, R13
@@ -414,24 +399,25 @@ TEXT runtime·kevent(SB),NOSPLIT,$8
 	MOVW	R0, ret+24(FP)
 	RET
 
+// func fcntl(fd, cmd, args int32) int32
+TEXT runtime·fcntl(SB),NOSPLIT,$0
+	MOVW fd+0(FP), R0
+	MOVW cmd+4(FP), R1
+	MOVW arg+8(FP), R2
+	SWI $SYS_fcntl
+	MOVW $0, R1
+	MOVW.CS R0, R1
+	MOVW.CS $-1, R0
+	MOVW R0, ret+12(FP)
+	MOVW R1, errno+16(FP)
+	RET
+
 // void runtime·closeonexec(int32 fd)
 TEXT runtime·closeonexec(SB),NOSPLIT,$0
 	MOVW fd+0(FP), R0	// fd
 	MOVW $F_SETFD, R1	// F_SETFD
 	MOVW $FD_CLOEXEC, R2	// FD_CLOEXEC
 	SWI $SYS_fcntl
-	RET
-
-// func runtime·setNonblock(fd int32)
-TEXT runtime·setNonblock(SB),NOSPLIT,$0-4
-	MOVW fd+0(FP), R0	// fd
-	MOVW $3, R1	// F_GETFL
-	MOVW $0, R2
-	SWI $0xa0005c	// sys_fcntl
-	ORR $0x4, R0, R2	// O_NONBLOCK
-	MOVW fd+0(FP), R0	// fd
-	MOVW $4, R1	// F_SETFL
-	SWI $0xa0005c	// sys_fcntl
 	RET
 
 // TODO: this is only valid for ARMv7+
@@ -442,4 +428,10 @@ TEXT runtime·read_tls_fallback(SB),NOSPLIT|NOFRAME,$0
 	MOVM.WP [R1, R2, R3, R12], (R13)
 	SWI $SYS__lwp_getprivate
 	MOVM.IAW    (R13), [R1, R2, R3, R12]
+	RET
+
+// func issetugid() int32
+TEXT runtime·issetugid(SB),NOSPLIT,$0
+	SWI $SYS_issetugid
+	MOVW	R0, ret+0(FP)
 	RET

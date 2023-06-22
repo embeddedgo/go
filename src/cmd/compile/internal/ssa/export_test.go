@@ -72,6 +72,7 @@ func (TestFrontend) StringData(s string) *obj.LSym {
 }
 func (TestFrontend) Auto(pos src.XPos, t *types.Type) *ir.Name {
 	n := ir.NewNameAt(pos, &types.Sym{Name: "aFakeAuto"})
+	n.SetType(t)
 	n.Class = ir.PAUTO
 	return n
 }
@@ -101,6 +102,9 @@ func (d TestFrontend) Debug_checknil() bool                               { retu
 
 func (d TestFrontend) MyImportPath() string {
 	return "my/import/path"
+}
+func (d TestFrontend) LSym() string {
+	return "my/import/path.function"
 }
 
 var testTypes Types

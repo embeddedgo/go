@@ -11,6 +11,7 @@ import (
 )
 
 // Export some functions via linkname to assembly in sync/atomic.
+//
 //go:linkname Xchguintptr
 
 type spinlock struct {

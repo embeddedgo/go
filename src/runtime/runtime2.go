@@ -272,6 +272,7 @@ func (gp *guintptr) cas(old, new guintptr) bool {
 
 // setGNoWB performs *gp = new without a write barrier.
 // For times when it's impractical to use a guintptr.
+//
 //go:nosplit
 //go:nowritebarrier
 func setGNoWB(gp **g, new *g) {
@@ -291,10 +292,10 @@ func (pp *puintptr) set(p *p) { *pp = puintptr(unsafe.Pointer(p)) }
 // Because we do free Ms, there are some additional constrains on
 // muintptrs:
 //
-// 1. Never hold an muintptr locally across a safe point.
+//  1. Never hold an muintptr locally across a safe point.
 //
-// 2. Any muintptr in the heap must be owned by the M itself so it can
-//    ensure it is not in use when the last true *m is released.
+//  2. Any muintptr in the heap must be owned by the M itself so it can
+//     ensure it is not in use when the last true *m is released.
 type muintptr uintptr
 
 //go:nosplit
@@ -305,6 +306,7 @@ func (mp *muintptr) set(m *m) { *mp = muintptr(unsafe.Pointer(m)) }
 
 // setMNoWB performs *mp = new without a write barrier.
 // For times when it's impractical to use an muintptr.
+//
 //go:nosplit
 //go:nowritebarrier
 func setMNoWB(mp **m, new *m) {
@@ -433,9 +435,9 @@ type g struct {
 	// 3. By debugCallWrap to pass parameters to a new goroutine because allocating a
 	//    closure in the runtime is forbidden.
 	param        unsafe.Pointer
-	atomicstatus uint32
+	atomicstatus atomic.Uint32
 	stackLock    uint32 // sigprof/scang lock; TODO: fold in to atomicstatus
-	goid         int64
+	goid         uint64
 	schedlink    guintptr
 	waitsince    int64      // approx time when the g become blocked
 	waitreason   waitReason // if status==Gwaiting
@@ -459,14 +461,14 @@ type g struct {
 	activeStackChans bool
 	// parkingOnChan indicates that the goroutine is about to
 	// park on a chansend or chanrecv. Used to signal an unsafe point
-	// for stack shrinking. It's a boolean value, but is updated atomically.
-	parkingOnChan uint8
+	// for stack shrinking.
+	parkingOnChan atomic.Bool
 
 	raceignore     int8     // ignore race detection events
 	sysblocktraced bool     // StartTrace has emitted EvGoInSyscall about this goroutine
 	tracking       bool     // whether we're tracking this G for sched latency statistics
 	trackingSeq    uint8    // used to decide whether to track this G
-	runnableStamp  int64    // timestamp of when the G last became runnable, only used when tracking
+	trackingStamp  int64    // timestamp of when the G last started being tracked
 	runnableTime   int64    // the amount of time spent runnable, cleared when running, only used when tracking
 	sysexitticks   int64    // cputicks when syscall has returned (for tracing)
 	traceseq       uint64   // trace event sequencer
@@ -485,7 +487,11 @@ type g struct {
 	cgoCtxt        []uintptr      // cgo traceback context
 	labels         unsafe.Pointer // profiler labels
 	timer          *timer         // cached timer for time.Sleep
-	selectDone     uint32         // are we participating in a select and did someone win the race?
+	selectDone     atomic.Uint32  // are we participating in a select and did someone win the race?
+
+	// goroutineProfiled indicates the status of this goroutine's stack for the
+	// current in-progress goroutine profile
+	goroutineProfiled goroutineProfileStateHolder
 
 	// Per-G GC state
 
@@ -512,9 +518,9 @@ const (
 
 // Values for m.freeWait.
 const (
-	freeMStack = 0  // M done, free stack and reference.
-	freeMRef   = 1  // M done, free reference.
-	freeMWait  = 2  // M still in use.
+	freeMStack = 0 // M done, free stack and reference.
+	freeMRef   = 1 // M done, free reference.
+	freeMWait  = 2 // M still in use.
 )
 
 type m struct {
@@ -537,7 +543,7 @@ type m struct {
 	oldp          puintptr // the p that was attached before executing a syscall
 	id            int64
 	mallocing     int32
-	throwing      int32
+	throwing      throwType
 	preemptoff    string // if != "", keep curg running on this m
 	locks         int32
 	dying         int32
@@ -546,15 +552,16 @@ type m struct {
 	blocked       bool // m is blocked on a note
 	newSigstack   bool // minit on C thread called sigaltstack
 	printlock     int8
-	incgo         bool   // m is executing a cgo call
+	incgo         bool          // m is executing a cgo call
+	isextra       bool          // m is an extra m
 	freeWait      atomic.Uint32 // Whether it is safe to free g0 and delete m (one of freeMRef, freeMStack, freeMWait)
 	fastrand      uint64
 	needextram    bool
 	traceback     uint8
-	ncgocall      uint64      // number of cgo calls in total
-	ncgo          int32       // number of cgo calls currently in progress
-	cgoCallersUse uint32      // if non-zero, cgoCallers in use temporarily
-	cgoCallers    *cgoCallers // cgo traceback if crashing in cgo call
+	ncgocall      uint64        // number of cgo calls in total
+	ncgo          int32         // number of cgo calls currently in progress
+	cgoCallersUse atomic.Uint32 // if non-zero, cgoCallers in use temporarily
+	cgoCallers    *cgoCallers   // cgo traceback if crashing in cgo call
 	park          note
 	alllink       *m // on allm
 	schedlink     muintptr
@@ -587,12 +594,11 @@ type m struct {
 
 	// preemptGen counts the number of completed preemption
 	// signals. This is used to detect when a preemption is
-	// requested, but fails. Accessed atomically.
-	preemptGen uint32
+	// requested, but fails.
+	preemptGen atomic.Uint32
 
 	// Whether this is a pending preemption signal on this M.
-	// Accessed atomically.
-	signalPending uint32
+	signalPending atomic.Uint32
 
 	dlogPerM
 
@@ -670,23 +676,22 @@ type p struct {
 
 	palloc persistentAlloc // per-P to avoid mutex
 
-	_ uint32 // Alignment for atomic fields below
-
 	// The when field of the first entry on the timer heap.
-	// This is updated using atomic functions.
 	// This is 0 if the timer heap is empty.
-	timer0When uint64
+	timer0When atomic.Int64
 
 	// The earliest known nextwhen field of a timer with
 	// timerModifiedEarlier status. Because the timer may have been
 	// modified again, there need not be any timer with this value.
-	// This is updated using atomic functions.
 	// This is 0 if there are no timerModifiedEarlier timers.
-	timerModifiedEarliest uint64
+	timerModifiedEarliest atomic.Int64
 
 	// Per-P GC state
 	gcAssistTime         int64 // Nanoseconds in assistAlloc
 	gcFractionalMarkTime int64 // Nanoseconds in fractional mark worker (atomic)
+
+	// limiterEvent tracks events for the GC CPU limiter.
+	limiterEvent limiterEvent
 
 	// gcMarkWorkerMode is the mode for the next mark worker to run in.
 	// That is, this is used to communicate with the worker goroutine
@@ -712,7 +717,7 @@ type p struct {
 
 	// statsSeq is a counter indicating whether this P is currently
 	// writing any stats. Its value is even when not, odd when it is.
-	statsSeq uint32
+	statsSeq atomic.Uint32
 
 	// Lock for timers. We normally access the timers while running
 	// on this P, but the scheduler can also do it from a different P.
@@ -724,35 +729,45 @@ type p struct {
 	timers []*timer
 
 	// Number of timers in P's heap.
-	// Modified using atomic instructions.
-	numTimers uint32
+	numTimers atomic.Uint32
 
 	// Number of timerDeleted timers in P's heap.
-	// Modified using atomic instructions.
-	deletedTimers uint32
+	deletedTimers atomic.Uint32
 
 	// Race context used while executing timer functions.
 	timerRaceCtx uintptr
 
-	// scannableStackSizeDelta accumulates the amount of stack space held by
+	// maxStackScanDelta accumulates the amount of stack space held by
 	// live goroutines (i.e. those eligible for stack scanning).
-	// Flushed to gcController.scannableStackSize once scannableStackSizeSlack
-	// or -scannableStackSizeSlack is reached.
-	scannableStackSizeDelta int64
+	// Flushed to gcController.maxStackScan once maxStackScanSlack
+	// or -maxStackScanSlack is reached.
+	maxStackScanDelta int64
+
+	// gc-time statistics about current goroutines
+	// Note that this differs from maxStackScan in that this
+	// accumulates the actual stack observed to be used at GC time (hi - sp),
+	// not an instantaneous measure of the total stack size that might need
+	// to be scanned (hi - lo).
+	scannedStackSize uint64 // stack size of goroutines scanned by this P
+	scannedStacks    uint64 // number of goroutines scanned by this P
 
 	// preempt is set to indicate that this P should be enter the
 	// scheduler ASAP (regardless of what G is running on it).
 	preempt bool
+
+	// pageTraceBuf is a buffer for writing out page allocation/free/scavenge traces.
+	//
+	// Used only if GOEXPERIMENT=pagetrace.
+	pageTraceBuf pageTraceBuf
 
 	// Padding is no longer needed. False sharing is now not a worry because p is large enough
 	// that its size class is an integer multiple of the cache line size (for any of our architectures).
 }
 
 type schedt struct {
-	// accessed atomically. keep at top to ensure alignment on 32-bit systems.
-	goidgen   uint64
-	lastpoll  uint64 // time of last network poll, 0 if currently polling
-	pollUntil uint64 // time to which current poll is sleeping
+	goidgen   atomic.Uint64
+	lastpoll  atomic.Int64 // time of last network poll, 0 if currently polling
+	pollUntil atomic.Int64 // time to which current poll is sleeping
 
 	lock mutex
 
@@ -767,11 +782,12 @@ type schedt struct {
 	nmsys        int32    // number of system m's not counted for deadlock
 	nmfreed      int64    // cumulative number of freed m's
 
-	ngsys uint32 // number of system goroutines; updated atomically
+	ngsys atomic.Int32 // number of system goroutines
 
-	pidle      puintptr // idle p's
-	npidle     uint32
-	nmspinning uint32 // See "Worker thread parking/unparking" comment in proc.go.
+	pidle        puintptr // idle p's
+	npidle       atomic.Int32
+	nmspinning   atomic.Int32  // See "Worker thread parking/unparking" comment in proc.go.
+	needspinning atomic.Uint32 // See "Delicate dance" comment in proc.go. Boolean. Must hold sched.lock to set to 1.
 
 	// Global runnable queue.
 	runq     gQueue
@@ -809,10 +825,10 @@ type schedt struct {
 	// m.exited is set. Linked through m.freelink.
 	freem *m
 
-	gcwaiting  uint32 // gc is waiting to run
+	gcwaiting  atomic.Bool // gc is waiting to run
 	stopwait   int32
 	stopnote   note
-	sysmonwait uint32
+	sysmonwait atomic.Bool
 	sysmonnote note
 
 	// safepointFn should be called on each P at the next GC
@@ -835,9 +851,16 @@ type schedt struct {
 	// timeToRun is a distribution of scheduling latencies, defined
 	// as the sum of time a G spends in the _Grunnable state before
 	// it transitions to _Grunning.
-	//
-	// timeToRun is protected by sched.lock.
 	timeToRun timeHistogram
+
+	// idleTime is the total CPU time Ps have "spent" idle.
+	//
+	// Reset on each GC cycle.
+	idleTime atomic.Int64
+
+	// totalMutexWaitTime is the sum of time goroutines have spent in _Gwaiting
+	// with a waitreason of the form waitReasonSync{RW,}Mutex{R,}Lock.
+	totalMutexWaitTime atomic.Int64
 }
 
 // Values for the flags field of a sigTabT.
@@ -858,8 +881,8 @@ const (
 // Keep in sync with linker (../cmd/link/internal/ld/pcln.go:/pclntab)
 // and with package debug/gosym and with symtab.go in package runtime.
 type _func struct {
-	entryoff uint32 // start pc, as offset from moduledata.text/pcHeader.textStart
-	nameoff  int32  // function name
+	entryOff uint32 // start pc, as offset from moduledata.text/pcHeader.textStart
+	nameOff  int32  // function name, as index into moduledata.funcnametab.
 
 	args        int32  // in/out args size
 	deferreturn uint32 // offset of start of a deferreturn call instruction from entry, if any.
@@ -869,21 +892,45 @@ type _func struct {
 	pcln      uint32
 	npcdata   uint32
 	cuOffset  uint32 // runtime.cutab offset of this function's CU
+	startLine int32  // line number of start of function (func keyword/TEXT directive)
 	funcID    funcID // set for certain special runtime functions
 	flag      funcFlag
 	_         [1]byte // pad
 	nfuncdata uint8   // must be last, must end on a uint32-aligned boundary
+
+	// The end of the struct is followed immediately by two variable-length
+	// arrays that reference the pcdata and funcdata locations for this
+	// function.
+
+	// pcdata contains the offset into moduledata.pctab for the start of
+	// that index's table. e.g.,
+	// &moduledata.pctab[_func.pcdata[_PCDATA_UnsafePoint]] is the start of
+	// the unsafe point table.
+	//
+	// An offset of 0 indicates that there is no table.
+	//
+	// pcdata [npcdata]uint32
+
+	// funcdata contains the offset past moduledata.gofunc which contains a
+	// pointer to that index's funcdata. e.g.,
+	// *(moduledata.gofunc +  _func.funcdata[_FUNCDATA_ArgsPointerMaps]) is
+	// the argument pointer map.
+	//
+	// An offset of ^uint32(0) indicates that there is no entry.
+	//
+	// funcdata [nfuncdata]uint32
 }
 
 // Pseudo-Func that is returned for PCs that occur in inlined code.
 // A *Func can be either a *_func or a *funcinl, and they are distinguished
 // by the first uintptr.
 type funcinl struct {
-	ones  uint32  // set to ^0 to distinguish from _func
-	entry uintptr // entry of the real (the "outermost") frame
-	name  string
-	file  string
-	line  int
+	ones      uint32  // set to ^0 to distinguish from _func
+	entry     uintptr // entry of the real (the "outermost") frame
+	name      string
+	file      string
+	line      int32
+	startLine int32
 }
 
 // layout of Itab known to compilers
@@ -908,7 +955,7 @@ type lfnode struct {
 type forcegcstate struct {
 	lock mutex
 	g    *g
-	idle uint32
+	idle atomic.Bool
 }
 
 // extendRandom extends the random numbers in r[:n] to the whole slice r.
@@ -985,24 +1032,10 @@ type _panic struct {
 	goexit    bool
 }
 
-// stack traces
-type stkframe struct {
-	fn       funcInfo   // function being run
-	pc       uintptr    // program counter within fn
-	continpc uintptr    // program counter where execution can continue, or 0 if not
-	lr       uintptr    // program counter at caller aka link register
-	sp       uintptr    // stack pointer at pc
-	fp       uintptr    // stack pointer at caller aka frame pointer
-	varp     uintptr    // top of local variables
-	argp     uintptr    // pointer to function arguments
-	arglen   uintptr    // number of bytes at argp
-	argmap   *bitvector // force use of this argmap
-}
-
 // ancestorInfo records details of where a goroutine was started.
 type ancestorInfo struct {
 	pcs  []uintptr // pcs from the stack of this goroutine
-	goid int64     // goroutine id of this goroutine; original goroutine possibly dead
+	goid uint64    // goroutine id of this goroutine; original goroutine possibly dead
 	gopc uintptr   // pc of go statement that created this goroutine
 }
 
@@ -1041,12 +1074,17 @@ const (
 	waitReasonSemacquire                              // "semacquire"
 	waitReasonSleep                                   // "sleep"
 	waitReasonSyncCondWait                            // "sync.Cond.Wait"
-	waitReasonTimerGoroutineIdle                      // "timer goroutine (idle)"
+	waitReasonSyncMutexLock                           // "sync.Mutex.Lock"
+	waitReasonSyncRWMutexRLock                        // "sync.RWMutex.RLock"
+	waitReasonSyncRWMutexLock                         // "sync.RWMutex.Lock"
 	waitReasonTraceReaderBlocked                      // "trace reader (blocked)"
 	waitReasonWaitForGCCycle                          // "wait for GC cycle"
 	waitReasonGCWorkerIdle                            // "GC worker (idle)"
+	waitReasonGCWorkerActive                          // "GC worker (active)"
 	waitReasonPreempted                               // "preempted"
 	waitReasonDebugCall                               // "debug call"
+	waitReasonGCMarkTermination                       // "GC mark termination"
+	waitReasonStoppingTheWorld                        // "stopping the world"
 )
 
 var waitReasonStrings = [...]string{
@@ -1071,12 +1109,17 @@ var waitReasonStrings = [...]string{
 	waitReasonSemacquire:            "semacquire",
 	waitReasonSleep:                 "sleep",
 	waitReasonSyncCondWait:          "sync.Cond.Wait",
-	waitReasonTimerGoroutineIdle:    "timer goroutine (idle)",
+	waitReasonSyncMutexLock:         "sync.Mutex.Lock",
+	waitReasonSyncRWMutexRLock:      "sync.RWMutex.RLock",
+	waitReasonSyncRWMutexLock:       "sync.RWMutex.Lock",
 	waitReasonTraceReaderBlocked:    "trace reader (blocked)",
 	waitReasonWaitForGCCycle:        "wait for GC cycle",
 	waitReasonGCWorkerIdle:          "GC worker (idle)",
+	waitReasonGCWorkerActive:        "GC worker (active)",
 	waitReasonPreempted:             "preempted",
 	waitReasonDebugCall:             "debug call",
+	waitReasonGCMarkTermination:     "GC mark termination",
+	waitReasonStoppingTheWorld:      "stopping the world",
 }
 
 func (w waitReason) String() string {
@@ -1084,6 +1127,12 @@ func (w waitReason) String() string {
 		return "unknown wait reason"
 	}
 	return waitReasonStrings[w]
+}
+
+func (w waitReason) isMutexWait() bool {
+	return w == waitReasonSyncMutexLock ||
+		w == waitReasonSyncRWMutexRLock ||
+		w == waitReasonSyncRWMutexLock
 }
 
 var (
@@ -1138,5 +1187,5 @@ var (
 	isarchive bool // -buildmode=c-archive
 )
 
-// Must agree with internal/buildcfg.Experiment.FramePointer.
+// Must agree with internal/buildcfg.FramePointerEnabled.
 const framepointer_enabled = GOARCH == "amd64" || GOARCH == "arm64"

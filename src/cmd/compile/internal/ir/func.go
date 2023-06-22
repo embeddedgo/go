@@ -31,8 +31,7 @@ import (
 // using a special data structure passed in a register.
 //
 // A method declaration is represented like functions, except f.Sym
-// will be the qualified method name (e.g., "T.m") and
-// f.Func.Shortname is the bare method name (e.g., "m").
+// will be the qualified method name (e.g., "T.m").
 //
 // A method expression (T.M) is represented as an OMETHEXPR node,
 // in which n.Left and n.Right point to the type and method, respectively.
@@ -51,12 +50,9 @@ import (
 type Func struct {
 	miniNode
 	Body Nodes
-	Iota int64
 
 	Nname    *Name        // ONAME node
 	OClosure *ClosureExpr // OCLOSURE node
-
-	Shortname *types.Sym
 
 	// Extra entry code for the function. For example, allocate and initialize
 	// memory for escaping parameters.
@@ -143,7 +139,6 @@ func NewFunc(pos src.XPos) *Func {
 	f := new(Func)
 	f.pos = pos
 	f.op = ODCLFUNC
-	f.Iota = -1
 	// Most functions are ABIInternal. The importer or symabis
 	// pass may override this.
 	f.ABI = obj.ABIInternal
@@ -152,9 +147,10 @@ func NewFunc(pos src.XPos) *Func {
 
 func (f *Func) isStmt() {}
 
-func (n *Func) copy() Node                         { panic(n.no("copy")) }
-func (n *Func) doChildren(do func(Node) bool) bool { return doNodes(n.Body, do) }
-func (n *Func) editChildren(edit func(Node) Node)  { editNodes(n.Body, edit) }
+func (n *Func) copy() Node                                  { panic(n.no("copy")) }
+func (n *Func) doChildren(do func(Node) bool) bool          { return doNodes(n.Body, do) }
+func (n *Func) editChildren(edit func(Node) Node)           { editNodes(n.Body, edit) }
+func (n *Func) editChildrenWithHidden(edit func(Node) Node) { editNodes(n.Body, edit) }
 
 func (f *Func) Type() *types.Type                { return f.Nname.Type() }
 func (f *Func) Sym() *types.Sym                  { return f.Nname.Sym() }
@@ -273,14 +269,7 @@ func PkgFuncName(f *Func) string {
 	s := f.Sym()
 	pkg := s.Pkg
 
-	p := base.Ctxt.Pkgpath
-	if pkg != nil && pkg.Path != "" {
-		p = pkg.Path
-	}
-	if p == "" {
-		return s.Name
-	}
-	return p + "." + s.Name
+	return pkg.Path + "." + s.Name
 }
 
 var CurFunc *Func
@@ -311,7 +300,7 @@ func MarkFunc(n *Name) {
 }
 
 // ClosureDebugRuntimeCheck applies boilerplate checks for debug flags
-// and compiling runtime
+// and compiling runtime.
 func ClosureDebugRuntimeCheck(clo *ClosureExpr) {
 	if base.Debug.Closure > 0 {
 		if clo.Esc() == EscHeap {
@@ -373,7 +362,9 @@ func NewClosureFunc(pos src.XPos, hidden bool) *Func {
 	fn.Nname.Func = fn
 	fn.Nname.Defn = fn
 
-	fn.OClosure = NewClosureExpr(pos, fn)
+	fn.OClosure = &ClosureExpr{Func: fn}
+	fn.OClosure.op = OCLOSURE
+	fn.OClosure.pos = pos
 
 	return fn
 }

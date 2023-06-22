@@ -58,7 +58,7 @@ func (ctxt *Link) generateDebugLinesSymbol(s, lines *LSym) {
 			continue
 		}
 		newStmt := p.Pos.IsStmt() != src.PosNotStmt
-		newName, newLine := linkgetlineFromPos(ctxt, p.Pos)
+		newName, newLine := ctxt.getFileSymbolAndLine(p.Pos)
 
 		// Output debug info.
 		wrote := false
@@ -335,7 +335,7 @@ func (s *LSym) Length(dwarfContext interface{}) int64 {
 func (ctxt *Link) fileSymbol(fn *LSym) *LSym {
 	p := fn.Func().Text
 	if p != nil {
-		f, _ := linkgetlineFromPos(ctxt, p.Pos)
+		f, _ := ctxt.getFileSymbolAndLine(p.Pos)
 		fsym := ctxt.Lookup(f)
 		return fsym
 	}
@@ -408,15 +408,7 @@ func (ctxt *Link) DwarfGlobal(myimportpath, typename string, varSym *LSym) {
 	if myimportpath == "" || varSym.Local() {
 		return
 	}
-	var varname string
-	if varSym.Pkg == "_" {
-		// The frontend uses package "_" to mark symbols that should not
-		// be referenced by index, e.g. linkname'd symbols.
-		varname = varSym.Name
-	} else {
-		// Convert "".<name> into a fully qualified package.sym name.
-		varname = objabi.PathToPrefix(myimportpath) + varSym.Name[len(`""`):]
-	}
+	varname := varSym.Name
 	dieSymName := dwarf.InfoPrefix + varname
 	dieSym := ctxt.LookupInit(dieSymName, func(s *LSym) {
 		s.Type = objabi.SDWARFVAR

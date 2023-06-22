@@ -4,7 +4,7 @@
 
 package time
 
-var zoneSources = []string{}
+var platformZoneSources = []string{}
 
 func initLocal() {
 	localLoc = *UTC

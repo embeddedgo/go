@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -1082,8 +1083,36 @@ func TestUnmarshalWhitespaceAttrs(t *testing.T) {
 	}
 }
 
+// golang.org/issues/53350
+func TestUnmarshalIntoNil(t *testing.T) {
+	type T struct {
+		A int `xml:"A"`
+	}
+
+	var nilPointer *T
+	err := Unmarshal([]byte("<T><A>1</A></T>"), nilPointer)
+
+	if err == nil {
+		t.Fatalf("no error in unmarshalling")
+	}
+
+}
+
+func TestCVE202228131(t *testing.T) {
+	type nested struct {
+		Parent *nested `xml:",any"`
+	}
+	var n nested
+	err := Unmarshal(bytes.Repeat([]byte("<a>"), maxUnmarshalDepth+1), &n)
+	if err == nil {
+		t.Fatal("Unmarshal did not fail")
+	} else if !errors.Is(err, errUnmarshalDepth) {
+		t.Fatalf("Unmarshal unexpected error: got %q, want %q", err, errUnmarshalDepth)
+	}
+}
+
 func TestCVE202230633(t *testing.T) {
-	if testing.Short() {
+	if testing.Short() || runtime.GOARCH == "wasm" {
 		t.Skip("test requires significant memory")
 	}
 	defer func() {
@@ -1096,17 +1125,4 @@ func TestCVE202230633(t *testing.T) {
 		Things []string
 	}
 	Unmarshal(bytes.Repeat([]byte("<a>"), 17_000_000), &example)
-}
-
-func TestCVE202228131(t *testing.T) {
-	type nested struct {
-		Parent *nested `xml:",any"`
-	}
-	var n nested
-	err := Unmarshal(bytes.Repeat([]byte("<a>"), maxUnmarshalDepth+1), &n)
-	if err == nil {
-		t.Fatal("Unmarshal did not fail")
-	} else if !errors.Is(err, errExeceededMaxUnmarshalDepth) {
-		t.Fatalf("Unmarshal unexpected error: got %q, want %q", err, errExeceededMaxUnmarshalDepth)
-	}
 }

@@ -188,6 +188,10 @@
 	1110 1110 0d00 nnnn  dddd 1011 n0m0 mmmm   MULAD     Fm, Fn, Fd
 	1110 1110 0d00 nnnn  dddd 1010 n1m0 mmmm   MULSF     Fm, Fn, Fd
 	1110 1110 0d00 nnnn  dddd 1011 n1m0 mmmm   MULSD     Fm, Fn, Fd
+	1110 1110 1d10 nnnn  dddd 1010 n0m0 mmmm   FMULAF    Fm, Fn, Fd
+	1110 1110 1d10 nnnn  dddd 1011 n0m0 mmmm   FMULAD    Fm, Fn, Fd
+	1110 1110 1d10 nnnn  dddd 1010 n1m0 mmmm   FMULSF    Fm, Fn, Fd
+	1110 1110 1d10 nnnn  dddd 1011 n1m0 mmmm   FMULSD    Fm, Fn, Fd
 	1110 1110 0d10 nnnn  dddd 1010 n1m0 mmmm   NMULF     Fm, Fn, Fd
 	1110 1110 0d10 nnnn  dddd 1011 n1m0 mmmm   NMULD     Fm, Fn, Fd
 
@@ -284,9 +288,6 @@
 	1011 0110 0111 0010                        CPSID     i       ; outside IT
 
 -- not implemented
-
-	FMULAD - if added update compile/internal/ssagen/ssa.go addF("math", "FMA",
-	         and remove comment from ssa/gen/Thumb.rules
 
 	1110 100p ±1w0 nnnn  aaaa bbbb uuuu uuuu   MOVW.p.w  (Rta, Rtb), ±u8<<2(Rn)
 	1110 100p ±1w1 nnnn  aaaa bbbb uuuu uuuu   MOVW.p.w  ±u8<<2(Rn), (Rta, Rtb)

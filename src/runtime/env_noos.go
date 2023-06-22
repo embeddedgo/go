@@ -9,5 +9,6 @@ import "unsafe"
 var _cgo_setenv unsafe.Pointer   // pointer to C function
 var _cgo_unsetenv unsafe.Pointer // pointer to C function
 
-//go:nosplit
-func gogetenv(key string) string { return "" }
+func gogetenv(key string) (s string) { return }
+func setenv_c(k string, v string)    {}
+func unsetenv_c(k string)            {}

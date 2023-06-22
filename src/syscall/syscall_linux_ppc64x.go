@@ -6,10 +6,17 @@
 
 package syscall
 
-const _SYS_setgroups = SYS_SETGROUPS
+import (
+	"unsafe"
+)
+
+const (
+	_SYS_setgroups  = SYS_SETGROUPS
+	_SYS_clone3     = 435
+	_SYS_faccessat2 = 439
+)
 
 //sys	Dup2(oldfd int, newfd int) (err error)
-//sysnb	EpollCreate(size int) (fd int, err error)
 //sys	EpollWait(epfd int, events []EpollEvent, msec int) (n int, err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
@@ -28,22 +35,21 @@ const _SYS_setgroups = SYS_SETGROUPS
 //sys	Listen(s int, n int) (err error)
 //sys	Lstat(path string, stat *Stat_t) (err error)
 //sys	Pause() (err error)
-//sys	Pread(fd int, p []byte, offset int64) (n int, err error) = SYS_PREAD64
-//sys	Pwrite(fd int, p []byte, offset int64) (n int, err error) = SYS_PWRITE64
+//sys	pread(fd int, p []byte, offset int64) (n int, err error) = SYS_PREAD64
+//sys	pwrite(fd int, p []byte, offset int64) (n int, err error) = SYS_PWRITE64
 //sys	Renameat(olddirfd int, oldpath string, newdirfd int, newpath string) (err error)
 //sys	Seek(fd int, offset int64, whence int) (off int64, err error) = SYS_LSEEK
 //sys	Select(nfd int, r *FdSet, w *FdSet, e *FdSet, timeout *Timeval) (n int, err error) = SYS__NEWSELECT
 //sys	sendfile(outfd int, infd int, offset *int64, count int) (written int, err error)
 //sys	Setfsgid(gid int) (err error)
 //sys	Setfsuid(uid int) (err error)
-//sysnb	Setrlimit(resource int, rlim *Rlimit) (err error)
+//sysnb	setrlimit(resource int, rlim *Rlimit) (err error) = SYS_SETRLIMIT
 //sys	Shutdown(fd int, how int) (err error)
 //sys	Splice(rfd int, roff *int64, wfd int, woff *int64, len int, flags int) (n int64, err error)
 //sys	Stat(path string, stat *Stat_t) (err error)
 //sys	Statfs(path string, buf *Statfs_t) (err error)
 //sys	Truncate(path string, length int64) (err error)
 //sys	Ustat(dev int, ubuf *Ustat_t) (err error)
-//sys	accept(s int, rsa *RawSockaddrAny, addrlen *_Socklen) (fd int, err error)
 //sys	accept4(s int, rsa *RawSockaddrAny, addrlen *_Socklen, flags int) (fd int, err error)
 //sys	bind(s int, addr unsafe.Pointer, addrlen _Socklen) (err error)
 //sys	connect(s int, addr unsafe.Pointer, addrlen _Socklen) (err error)
@@ -65,6 +71,12 @@ const _SYS_setgroups = SYS_SETGROUPS
 //sysnb	Time(t *Time_t) (tt Time_t, err error)
 //sys	Utime(path string, buf *Utimbuf) (err error)
 //sys	utimes(path string, times *[2]Timeval) (err error)
+
+//go:nosplit
+func rawSetrlimit(resource int, rlim *Rlimit) Errno {
+	_, _, errno := RawSyscall(SYS_SETRLIMIT, uintptr(resource), uintptr(unsafe.Pointer(rlim)), 0)
+	return errno
+}
 
 func setTimespec(sec, nsec int64) Timespec {
 	return Timespec{Sec: sec, Nsec: nsec}
@@ -89,8 +101,6 @@ func (msghdr *Msghdr) SetControllen(length int) {
 func (cmsg *Cmsghdr) SetLen(length int) {
 	cmsg.Len = uint64(length)
 }
-
-func rawVforkSyscall(trap, a1 uintptr) (r1 uintptr, err Errno)
 
 //sys	syncFileRange2(fd int, flags int, off int64, n int64) (err error) = SYS_SYNC_FILE_RANGE2
 

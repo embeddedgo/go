@@ -5,7 +5,6 @@
 package runtime_test
 
 import (
-	"bytes"
 	"fmt"
 	"internal/abi"
 	"internal/syscall/windows/sysdll"
@@ -469,6 +468,7 @@ func sum5andPair(i1, i2, i3, i4, i5 uint8Pair) uintptr {
 // that insufficient spill slots allocated (according to the ABI)
 // may cause compiler-generated spills to clobber the return PC.
 // Then, the GC stack scanning will catch that.
+//
 //go:registerparams
 func sum9andGC(i1, i2, i3, i4, i5, i6, i7, i8, i9 uint32) uintptr {
 	runtime.GC()
@@ -628,7 +628,7 @@ func TestOutputDebugString(t *testing.T) {
 }
 
 func TestRaiseException(t *testing.T) {
-	if testenv.Builder() == "windows-amd64-2012" {
+	if strings.HasPrefix(testenv.Builder(), "windows-amd64-2012") {
 		testenv.SkipFlaky(t, 49681)
 	}
 	o := runTestProg(t, "testprog", "RaiseException")
@@ -1043,7 +1043,7 @@ func TestNumCPU(t *testing.T) {
 
 	cmd := exec.Command(os.Args[0], "-test.run=TestNumCPU")
 	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
-	var buf bytes.Buffer
+	var buf strings.Builder
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: _CREATE_SUSPENDED}
@@ -1053,7 +1053,7 @@ func TestNumCPU(t *testing.T) {
 	}
 	defer func() {
 		err = cmd.Wait()
-		childOutput := string(buf.Bytes())
+		childOutput := buf.String()
 		if err != nil {
 			t.Fatalf("child failed: %v: %v", err, childOutput)
 		}
@@ -1215,7 +1215,7 @@ func TestBigStackCallbackSyscall(t *testing.T) {
 
 // wantLoadLibraryEx reports whether we expect LoadLibraryEx to work for tests.
 func wantLoadLibraryEx() bool {
-	return testenv.Builder() == "windows-amd64-gce" || testenv.Builder() == "windows-386-gce"
+	return testenv.Builder() != "" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "386")
 }
 
 func TestLoadLibraryEx(t *testing.T) {

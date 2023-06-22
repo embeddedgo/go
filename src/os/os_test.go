@@ -5,7 +5,6 @@
 package os_test
 
 import (
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -223,6 +222,29 @@ func TestStatError(t *testing.T) {
 	}
 }
 
+func TestStatSymlinkLoop(t *testing.T) {
+	testenv.MustHaveSymlink(t)
+
+	defer chtmpdir(t)()
+
+	err := os.Symlink("x", "y")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("y")
+
+	err = os.Symlink("y", "x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("x")
+
+	_, err = os.Stat("x")
+	if _, ok := err.(*fs.PathError); !ok {
+		t.Errorf("expected *PathError, got %T: %v\n", err, err)
+	}
+}
+
 func TestFstat(t *testing.T) {
 	path := sfdir + "/" + sfname
 	file, err1 := Open(path)
@@ -252,9 +274,11 @@ func TestLstat(t *testing.T) {
 	if !equal(sfname, dir.Name()) {
 		t.Error("name should be ", sfname, "; is", dir.Name())
 	}
-	filesize := size(path, t)
-	if dir.Size() != filesize {
-		t.Error("size should be", filesize, "; is", dir.Size())
+	if dir.Mode()&ModeSymlink == 0 {
+		filesize := size(path, t)
+		if dir.Size() != filesize {
+			t.Error("size should be", filesize, "; is", dir.Size())
+		}
 	}
 }
 
@@ -292,12 +316,8 @@ func TestReadClosed(t *testing.T) {
 	_, err = file.Read(b)
 
 	e, ok := err.(*PathError)
-	if !ok {
-		t.Fatalf("Read: %T(%v), want PathError", e, e)
-	}
-
-	if e.Err != ErrClosed {
-		t.Errorf("Read: %v, want PathError(ErrClosed)", e)
+	if !ok || e.Err != ErrClosed {
+		t.Fatalf("Read: got %T(%v), want %T(%v)", err, err, e, ErrClosed)
 	}
 }
 
@@ -1144,7 +1164,7 @@ func exec(t *testing.T, dir, cmd string, args []string, expect string) {
 	}
 	w.Close()
 
-	var b bytes.Buffer
+	var b strings.Builder
 	io.Copy(&b, r)
 	output := b.String()
 
@@ -1676,21 +1696,26 @@ func runBinHostname(t *testing.T) string {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	const path = "/bin/hostname"
+
+	path, err := osexec.LookPath("hostname")
+	if err != nil {
+		if errors.Is(err, osexec.ErrNotFound) {
+			t.Skip("skipping test; test requires hostname but it does not exist")
+		}
+		t.Fatal(err)
+	}
+
 	argv := []string{"hostname"}
 	if runtime.GOOS == "aix" {
 		argv = []string{"hostname", "-s"}
 	}
 	p, err := StartProcess(path, argv, &ProcAttr{Files: []*File{nil, w, Stderr}})
 	if err != nil {
-		if _, err := Stat(path); IsNotExist(err) {
-			t.Skipf("skipping test; test requires %s but it does not exist", path)
-		}
 		t.Fatal(err)
 	}
 	w.Close()
 
-	var b bytes.Buffer
+	var b strings.Builder
 	io.Copy(&b, r)
 	_, err = p.Wait()
 	if err != nil {
@@ -1712,8 +1737,8 @@ func runBinHostname(t *testing.T) string {
 }
 
 func testWindowsHostname(t *testing.T, hostname string) {
-	cmd := osexec.Command("hostname")
-	out, err := cmd.CombinedOutput()
+	cmd := testenv.Command(t, "hostname")
+	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("Failed to execute hostname command: %v %s", err, out)
 	}
@@ -1989,18 +2014,8 @@ func TestSameFile(t *testing.T) {
 	}
 }
 
-func testDevNullFileInfo(t *testing.T, statname, devNullName string, fi FileInfo, ignoreCase bool) {
+func testDevNullFileInfo(t *testing.T, statname, devNullName string, fi FileInfo) {
 	pre := fmt.Sprintf("%s(%q): ", statname, devNullName)
-	name := filepath.Base(devNullName)
-	if ignoreCase {
-		if strings.ToUpper(fi.Name()) != strings.ToUpper(name) {
-			t.Errorf(pre+"wrong file name have %v want %v", fi.Name(), name)
-		}
-	} else {
-		if fi.Name() != name {
-			t.Errorf(pre+"wrong file name have %v want %v", fi.Name(), name)
-		}
-	}
 	if fi.Size() != 0 {
 		t.Errorf(pre+"wrong file size have %d want 0", fi.Size())
 	}
@@ -2015,7 +2030,7 @@ func testDevNullFileInfo(t *testing.T, statname, devNullName string, fi FileInfo
 	}
 }
 
-func testDevNullFile(t *testing.T, devNullName string, ignoreCase bool) {
+func testDevNullFile(t *testing.T, devNullName string) {
 	f, err := Open(devNullName)
 	if err != nil {
 		t.Fatalf("Open(%s): %v", devNullName, err)
@@ -2026,17 +2041,21 @@ func testDevNullFile(t *testing.T, devNullName string, ignoreCase bool) {
 	if err != nil {
 		t.Fatalf("Stat(%s): %v", devNullName, err)
 	}
-	testDevNullFileInfo(t, "f.Stat", devNullName, fi, ignoreCase)
+	testDevNullFileInfo(t, "f.Stat", devNullName, fi)
 
 	fi, err = Stat(devNullName)
 	if err != nil {
 		t.Fatalf("Stat(%s): %v", devNullName, err)
 	}
-	testDevNullFileInfo(t, "Stat", devNullName, fi, ignoreCase)
+	testDevNullFileInfo(t, "Stat", devNullName, fi)
 }
 
 func TestDevNullFile(t *testing.T) {
-	testDevNullFile(t, DevNull, false)
+	testDevNullFile(t, DevNull)
+	if runtime.GOOS == "windows" {
+		testDevNullFile(t, "./nul")
+		testDevNullFile(t, "//./nul")
+	}
 }
 
 var testLargeWrite = flag.Bool("large_write", false, "run TestLargeWriteToConsole test that floods console with output")
@@ -2113,9 +2132,9 @@ func TestStatStdin(t *testing.T) {
 
 	var cmd *osexec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = osexec.Command("cmd", "/c", "echo output | "+Args[0]+" -test.run=TestStatStdin")
+		cmd = testenv.Command(t, "cmd", "/c", "echo output | "+Args[0]+" -test.run=TestStatStdin")
 	} else {
-		cmd = osexec.Command("/bin/sh", "-c", "echo output | "+Args[0]+" -test.run=TestStatStdin")
+		cmd = testenv.Command(t, "/bin/sh", "-c", "echo output | "+Args[0]+" -test.run=TestStatStdin")
 	}
 	cmd.Env = append(Environ(), "GO_WANT_HELPER_PROCESS=1")
 
@@ -2270,7 +2289,7 @@ func testKillProcess(t *testing.T, processKiller func(p *Process)) {
 	t.Parallel()
 
 	// Re-exec the test binary to start a process that hangs until stdin is closed.
-	cmd := osexec.Command(Args[0])
+	cmd := testenv.Command(t, Args[0])
 	cmd.Env = append(os.Environ(), "GO_OS_TEST_DRAIN_STDIN=1")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -2321,7 +2340,7 @@ func TestGetppid(t *testing.T) {
 		Exit(0)
 	}
 
-	cmd := osexec.Command(Args[0], "-test.run=TestGetppid")
+	cmd := testenv.Command(t, Args[0], "-test.run=TestGetppid")
 	cmd.Env = append(Environ(), "GO_WANT_HELPER_PROCESS=1")
 
 	// verify that Getppid() from the forked process reports our process id
@@ -2405,6 +2424,9 @@ func TestRemoveAllRace(t *testing.T) {
 		// them open. The racing doesn't work out nicely
 		// like it does on Unix.
 		t.Skip("skipping on windows")
+	}
+	if runtime.GOOS == "dragonfly" {
+		testenv.SkipFlaky(t, 52301)
 	}
 
 	n := runtime.GOMAXPROCS(16)
@@ -2513,9 +2535,9 @@ func testDoubleCloseError(t *testing.T, path string) {
 	if err := file.Close(); err == nil {
 		t.Error("second Close did not fail")
 	} else if pe, ok := err.(*PathError); !ok {
-		t.Errorf("second Close returned unexpected error type %T; expected fs.PathError", pe)
+		t.Errorf("second Close: got %T, want %T", err, pe)
 	} else if pe.Err != ErrClosed {
-		t.Errorf("second Close returned %q, wanted %q", err, ErrClosed)
+		t.Errorf("second Close: got %q, want %q", pe.Err, ErrClosed)
 	} else {
 		t.Logf("second close returned expected error %q", err)
 	}
@@ -2544,9 +2566,6 @@ func TestUserHomeDir(t *testing.T) {
 }
 
 func TestDirSeek(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		testenv.SkipFlaky(t, 36019)
-	}
 	wd, err := Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -2589,9 +2608,6 @@ func TestReaddirSmallSeek(t *testing.T) {
 	// See issue 37161. Read only one entry from a directory,
 	// seek to the beginning, and read again. We should not see
 	// duplicate entries.
-	if runtime.GOOS == "windows" {
-		testenv.SkipFlaky(t, 36019)
-	}
 	wd, err := Getwd()
 	if err != nil {
 		t.Fatal(err)
@@ -2686,13 +2702,29 @@ func TestDirFS(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := fstest.TestFS(DirFS("./testdata/dirfs"), "a", "b", "dir/x"); err != nil {
+	fs := DirFS("./testdata/dirfs")
+	if err := fstest.TestFS(fs, "a", "b", "dir/x"); err != nil {
 		t.Fatal(err)
+	}
+
+	// Test that the error message does not contain a backslash,
+	// and does not contain the DirFS argument.
+	const nonesuch = "dir/nonesuch"
+	_, err := fs.Open(nonesuch)
+	if err == nil {
+		t.Error("fs.Open of nonexistent file succeeded")
+	} else {
+		if !strings.Contains(err.Error(), nonesuch) {
+			t.Errorf("error %q does not contain %q", err, nonesuch)
+		}
+		if strings.Contains(err.(*PathError).Path, "testdata") {
+			t.Errorf("error %q contains %q", err, "testdata")
+		}
 	}
 
 	// Test that Open does not accept backslash as separator.
 	d := DirFS(".")
-	_, err := d.Open(`testdata\dirfs`)
+	_, err = d.Open(`testdata\dirfs`)
 	if err == nil {
 		t.Fatalf(`Open testdata\dirfs succeeded`)
 	}
@@ -2797,5 +2829,117 @@ func TestWriteStringAlloc(t *testing.T) {
 	})
 	if allocs != 0 {
 		t.Errorf("expected 0 allocs for File.WriteString, got %v", allocs)
+	}
+}
+
+// Test that it's OK to have parallel I/O and Close on a pipe.
+func TestPipeIOCloseRace(t *testing.T) {
+	// Skip on wasm, which doesn't have pipes.
+	if runtime.GOOS == "js" {
+		t.Skip("skipping on js: no pipes")
+	}
+
+	r, w, err := Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		for {
+			n, err := w.Write([]byte("hi"))
+			if err != nil {
+				// We look at error strings as the
+				// expected errors are OS-specific.
+				switch {
+				case errors.Is(err, ErrClosed),
+					strings.Contains(err.Error(), "broken pipe"),
+					strings.Contains(err.Error(), "pipe is being closed"),
+					strings.Contains(err.Error(), "hungup channel"):
+					// Ignore an expected error.
+				default:
+					// Unexpected error.
+					t.Error(err)
+				}
+				return
+			}
+			if n != 2 {
+				t.Errorf("wrote %d bytes, expected 2", n)
+				return
+			}
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for {
+			var buf [2]byte
+			n, err := r.Read(buf[:])
+			if err != nil {
+				if err != io.EOF && !errors.Is(err, ErrClosed) {
+					t.Error(err)
+				}
+				return
+			}
+			if n != 2 {
+				t.Errorf("read %d bytes, want 2", n)
+			}
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		// Let the other goroutines start. This is just to get
+		// a better test, the test will still pass if they
+		// don't start.
+		time.Sleep(time.Millisecond)
+
+		if err := r.Close(); err != nil {
+			t.Error(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	wg.Wait()
+}
+
+// Test that it's OK to call Close concurrently on a pipe.
+func TestPipeCloseRace(t *testing.T) {
+	// Skip on wasm, which doesn't have pipes.
+	if runtime.GOOS == "js" {
+		t.Skip("skipping on js: no pipes")
+	}
+
+	r, w, err := Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	c := make(chan error, 4)
+	f := func() {
+		defer wg.Done()
+		c <- r.Close()
+		c <- w.Close()
+	}
+	wg.Add(2)
+	go f()
+	go f()
+	nils, errs := 0, 0
+	for i := 0; i < 4; i++ {
+		err := <-c
+		if err == nil {
+			nils++
+		} else {
+			errs++
+		}
+	}
+	if nils != 2 || errs != 2 {
+		t.Errorf("got nils %d errs %d, want 2 2", nils, errs)
 	}
 }

@@ -202,7 +202,10 @@ func (enc *Encoder) Encode(v any) error {
 	if enc.err != nil {
 		return enc.err
 	}
+
 	e := newEncodeState()
+	defer encodeStatePool.Put(e)
+
 	err := e.marshal(v, encOpts{escapeHTML: enc.escapeHTML})
 	if err != nil {
 		return err
@@ -231,7 +234,6 @@ func (enc *Encoder) Encode(v any) error {
 	if _, err = enc.w.Write(b); err != nil {
 		enc.err = err
 	}
-	encodeStatePool.Put(e)
 	return err
 }
 
@@ -287,7 +289,6 @@ var _ Unmarshaler = (*RawMessage)(nil)
 //	Number, for JSON numbers
 //	string, for JSON string literals
 //	nil, for JSON null
-//
 type Token any
 
 const (

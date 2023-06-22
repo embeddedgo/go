@@ -37,6 +37,7 @@ func main() {
 	gen("arm", notags, zeroARM, copyARM)
 	gen("thumb", notags, zeroARM, copyARM)
 	gen("arm64", notags, zeroARM64, copyARM64)
+	gen("loong64", notags, zeroLOONG64, copyLOONG64)
 	gen("ppc64x", tagsPPC64x, zeroPPC64x, copyPPC64x)
 	gen("mips64x", tagsMIPS64x, zeroMIPS64x, copyMIPS64x)
 	gen("riscv64", notags, zeroRISCV64, copyRISCV64)
@@ -177,6 +178,30 @@ func copyARM64(w io.Writer) {
 	fmt.Fprintln(w, "\tRET")
 }
 
+func zeroLOONG64(w io.Writer) {
+	// R0: always zero
+	// R19 (aka REGRT1): ptr to memory to be zeroed - 8
+	// On return, R19 points to the last zeroed dword.
+	fmt.Fprintln(w, "TEXT runtime·duffzero(SB), NOSPLIT|NOFRAME, $0-0")
+	for i := 0; i < 128; i++ {
+		fmt.Fprintln(w, "\tMOVV\tR0, 8(R19)")
+		fmt.Fprintln(w, "\tADDV\t$8, R19")
+	}
+	fmt.Fprintln(w, "\tRET")
+}
+
+func copyLOONG64(w io.Writer) {
+	fmt.Fprintln(w, "TEXT runtime·duffcopy(SB), NOSPLIT|NOFRAME, $0-0")
+	for i := 0; i < 128; i++ {
+		fmt.Fprintln(w, "\tMOVV\t(R19), R30")
+		fmt.Fprintln(w, "\tADDV\t$8, R19")
+		fmt.Fprintln(w, "\tMOVV\tR30, (R20)")
+		fmt.Fprintln(w, "\tADDV\t$8, R20")
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintln(w, "\tRET")
+}
+
 func tagsPPC64x(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "//go:build ppc64 || ppc64le")
@@ -236,26 +261,26 @@ func copyMIPS64x(w io.Writer) {
 
 func zeroRISCV64(w io.Writer) {
 	// ZERO: always zero
-	// X10: ptr to memory to be zeroed
-	// X10 is updated as a side effect.
-	fmt.Fprintln(w, "TEXT runtime·duffzero(SB), NOSPLIT|NOFRAME, $0-0")
+	// X25: ptr to memory to be zeroed
+	// X25 is updated as a side effect.
+	fmt.Fprintln(w, "TEXT runtime·duffzero<ABIInternal>(SB), NOSPLIT|NOFRAME, $0-0")
 	for i := 0; i < 128; i++ {
-		fmt.Fprintln(w, "\tMOV\tZERO, (X10)")
-		fmt.Fprintln(w, "\tADD\t$8, X10")
+		fmt.Fprintln(w, "\tMOV\tZERO, (X25)")
+		fmt.Fprintln(w, "\tADD\t$8, X25")
 	}
 	fmt.Fprintln(w, "\tRET")
 }
 
 func copyRISCV64(w io.Writer) {
-	// X10: ptr to source memory
-	// X11: ptr to destination memory
-	// X10 and X11 are updated as a side effect
-	fmt.Fprintln(w, "TEXT runtime·duffcopy(SB), NOSPLIT|NOFRAME, $0-0")
+	// X24: ptr to source memory
+	// X25: ptr to destination memory
+	// X24 and X25 are updated as a side effect
+	fmt.Fprintln(w, "TEXT runtime·duffcopy<ABIInternal>(SB), NOSPLIT|NOFRAME, $0-0")
 	for i := 0; i < 128; i++ {
-		fmt.Fprintln(w, "\tMOV\t(X10), X31")
-		fmt.Fprintln(w, "\tADD\t$8, X10")
-		fmt.Fprintln(w, "\tMOV\tX31, (X11)")
-		fmt.Fprintln(w, "\tADD\t$8, X11")
+		fmt.Fprintln(w, "\tMOV\t(X24), X31")
+		fmt.Fprintln(w, "\tADD\t$8, X24")
+		fmt.Fprintln(w, "\tMOV\tX31, (X25)")
+		fmt.Fprintln(w, "\tADD\t$8, X25")
 		fmt.Fprintln(w)
 	}
 	fmt.Fprintln(w, "\tRET")

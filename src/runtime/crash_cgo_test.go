@@ -8,6 +8,7 @@ package runtime_test
 
 import (
 	"fmt"
+	"internal/goos"
 	"internal/testenv"
 	"os"
 	"os/exec"
@@ -217,7 +218,9 @@ func TestCgoCCodeSIGPROF(t *testing.T) {
 }
 
 func TestCgoPprofCallback(t *testing.T) {
-	t.Parallel()
+	if testing.Short() {
+		t.Skip("skipping in short mode") // takes a full second
+	}
 	switch runtime.GOOS {
 	case "windows", "plan9":
 		t.Skipf("skipping cgo pprof callback test on %s", runtime.GOOS)
@@ -234,6 +237,7 @@ func TestCgoCrashTraceback(t *testing.T) {
 	switch platform := runtime.GOOS + "/" + runtime.GOARCH; platform {
 	case "darwin/amd64":
 	case "linux/amd64":
+	case "linux/arm64":
 	case "linux/ppc64le":
 	default:
 		t.Skipf("not yet supported on %s", platform)
@@ -251,6 +255,7 @@ func TestCgoCrashTracebackGo(t *testing.T) {
 	switch platform := runtime.GOOS + "/" + runtime.GOARCH; platform {
 	case "darwin/amd64":
 	case "linux/amd64":
+	case "linux/arm64":
 	case "linux/ppc64le":
 	default:
 		t.Skipf("not yet supported on %s", platform)
@@ -284,7 +289,7 @@ func TestCgoTracebackContextPreemption(t *testing.T) {
 
 func testCgoPprof(t *testing.T, buildArg, runArg, top, bottom string) {
 	t.Parallel()
-	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "ppc64le") {
+	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "ppc64le" && runtime.GOARCH != "arm64") {
 		t.Skipf("not yet supported on %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	testenv.MustHaveGoRun(t)
@@ -601,8 +606,14 @@ func TestSegv(t *testing.T) {
 		t.Skipf("no signals on %s", runtime.GOOS)
 	}
 
-	for _, test := range []string{"Segv", "SegvInCgo"} {
+	for _, test := range []string{"Segv", "SegvInCgo", "TgkillSegv", "TgkillSegvInCgo"} {
 		test := test
+
+		// The tgkill variants only run on Linux.
+		if runtime.GOOS != "linux" && strings.HasPrefix(test, "Tgkill") {
+			continue
+		}
+
 		t.Run(test, func(t *testing.T) {
 			t.Parallel()
 			got := runTestProg(t, "testprogcgo", test)
@@ -627,13 +638,18 @@ func TestSegv(t *testing.T) {
 					testenv.SkipFlaky(t, 50504)
 				}
 			}
-			if test == "SegvInCgo" && strings.Contains(got, "runtime: unknown pc") {
+			if test == "SegvInCgo" && strings.Contains(got, "unknown pc") {
 				testenv.SkipFlaky(t, 50979)
 			}
 
-			nowant := "runtime: "
-			if strings.Contains(got, nowant) {
-				t.Errorf("unexpectedly saw %q in output", nowant)
+			for _, nowant := range []string{"fatal error: ", "runtime: "} {
+				if strings.Contains(got, nowant) {
+					if runtime.GOOS == "darwin" && strings.Contains(got, "0xb01dfacedebac1e") {
+						// See the comment in signal_darwin_amd64.go.
+						t.Skip("skipping due to Darwin handling of malformed addresses")
+					}
+					t.Errorf("unexpectedly saw %q in output", nowant)
+				}
 			}
 		})
 	}
@@ -706,5 +722,49 @@ func TestCgoTracebackGoroutineProfile(t *testing.T) {
 	want := "OK\n"
 	if output != want {
 		t.Fatalf("want %s, got %s\n", want, output)
+	}
+}
+
+func TestCgoTraceParser(t *testing.T) {
+	// Test issue 29707.
+	switch runtime.GOOS {
+	case "plan9", "windows":
+		t.Skipf("no pthreads on %s", runtime.GOOS)
+	}
+	output := runTestProg(t, "testprogcgo", "CgoTraceParser")
+	want := "OK\n"
+	ErrTimeOrder := "ErrTimeOrder\n"
+	if output == ErrTimeOrder {
+		t.Skipf("skipping due to golang.org/issue/16755: %v", output)
+	} else if output != want {
+		t.Fatalf("want %s, got %s\n", want, output)
+	}
+}
+
+func TestCgoTraceParserWithOneProc(t *testing.T) {
+	// Test issue 29707.
+	switch runtime.GOOS {
+	case "plan9", "windows":
+		t.Skipf("no pthreads on %s", runtime.GOOS)
+	}
+	output := runTestProg(t, "testprogcgo", "CgoTraceParser", "GOMAXPROCS=1")
+	want := "OK\n"
+	ErrTimeOrder := "ErrTimeOrder\n"
+	if output == ErrTimeOrder {
+		t.Skipf("skipping due to golang.org/issue/16755: %v", output)
+	} else if output != want {
+		t.Fatalf("GOMAXPROCS=1, want %s, got %s\n", want, output)
+	}
+}
+
+func TestCgoSigfwd(t *testing.T) {
+	t.Parallel()
+	if !goos.IsUnix {
+		t.Skipf("no signals on %s", runtime.GOOS)
+	}
+
+	got := runTestProg(t, "testprogcgo", "CgoSigfwd", "GO_TEST_CGOSIGFWD=1")
+	if want := "OK\n"; got != want {
+		t.Fatalf("expected %q, but got:\n%s", want, got)
 	}
 }

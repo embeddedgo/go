@@ -7,9 +7,10 @@
 package types2
 
 import (
-	"bytes"
 	"cmd/compile/internal/syntax"
 	"fmt"
+	. "internal/types/errors"
+	"strings"
 )
 
 const useConstraintTypeInference = true
@@ -21,13 +22,12 @@ const useConstraintTypeInference = true
 // If successful, infer returns the complete list of type arguments, one for each type parameter.
 // Otherwise the result is nil and appropriate errors will be reported.
 //
-// Inference proceeds as follows:
+// Inference proceeds as follows. Starting with given type arguments:
 //
-//   Starting with given type arguments
-//   1) apply FTI (function type inference) with typed arguments,
-//   2) apply CTI (constraint type inference),
-//   3) apply FTI with untyped function arguments,
-//   4) apply CTI.
+//  1. apply FTI (function type inference) with typed arguments,
+//  2. apply CTI (constraint type inference),
+//  3. apply FTI with untyped function arguments,
+//  4. apply CTI.
 //
 // The process stops as soon as all type arguments are known or an error occurs.
 func (check *Checker) infer(pos syntax.Pos, tparams []*TypeParam, targs []Type, params *Tuple, args []*operand) (result []Type) {
@@ -89,34 +89,22 @@ func (check *Checker) infer(pos syntax.Pos, tparams []*TypeParam, targs []Type, 
 		//    f(p)
 		//  }
 		//
-		// We can turn the first example into the second example by renaming type
-		// parameters in the original signature to give them a new identity. As an
-		// optimization, we do this only for self-recursive calls.
-
-		// We can detect if we are in a self-recursive call by comparing the
-		// identity of the first type parameter in the current function with the
-		// first type parameter in tparams. This works because type parameters are
-		// unique to their type parameter list.
-		selfRecursive := check.sig != nil && check.sig.tparams.Len() > 0 && tparams[0] == check.sig.tparams.At(0)
-
-		if selfRecursive {
-			// In self-recursive inference, rename the type parameters with new type
-			// parameters that are the same but for their pointer identity.
-			tparams2 := make([]*TypeParam, len(tparams))
-			for i, tparam := range tparams {
-				tname := NewTypeName(tparam.Obj().Pos(), tparam.Obj().Pkg(), tparam.Obj().Name(), nil)
-				tparams2[i] = NewTypeParam(tname, nil)
-				tparams2[i].index = tparam.index // == i
-			}
-
-			renameMap := makeRenameMap(tparams, tparams2)
-			for i, tparam := range tparams {
-				tparams2[i].bound = check.subst(pos, tparam.bound, renameMap, nil)
-			}
-
-			tparams = tparams2
-			params = check.subst(pos, params, renameMap, nil).(*Tuple)
+		// We turn the first example into the second example by renaming type
+		// parameters in the original signature to give them a new identity.
+		tparams2 := make([]*TypeParam, len(tparams))
+		for i, tparam := range tparams {
+			tname := NewTypeName(tparam.Obj().Pos(), tparam.Obj().Pkg(), tparam.Obj().Name(), nil)
+			tparams2[i] = NewTypeParam(tname, nil)
+			tparams2[i].index = tparam.index // == i
 		}
+
+		renameMap := makeRenameMap(tparams, tparams2)
+		for i, tparam := range tparams {
+			tparams2[i].bound = check.subst(pos, tparam.bound, renameMap, nil, check.context())
+		}
+
+		tparams = tparams2
+		params = check.subst(pos, params, renameMap, nil, check.context()).(*Tuple)
 	}
 
 	// If we have more than 2 arguments, we may have arguments with named and unnamed types.
@@ -129,11 +117,8 @@ func (check *Checker) infer(pos syntax.Pos, tparams []*TypeParam, targs []Type, 
 	// named and unnamed types are passed to parameters with identical type, different types
 	// (named vs underlying) may be inferred depending on the order of the arguments.
 	// By ensuring that named types are seen first, order dependence is avoided and unification
-	// succeeds where it can.
-	//
-	// This code is disabled for now pending decision whether we want to address cases like
-	// these and make the spec on type inference more complicated (see issue #43056).
-	const enableArgSorting = false
+	// succeeds where it can (issue #43056).
+	const enableArgSorting = true
 	if m := len(args); m >= 2 && enableArgSorting {
 		// Determine indices of arguments with named and unnamed types.
 		var named, unnamed []int
@@ -189,7 +174,7 @@ func (check *Checker) infer(pos syntax.Pos, tparams []*TypeParam, targs []Type, 
 	//           but that doesn't impact the isParameterized check for now).
 	if params.Len() > 0 {
 		smap := makeSubstMap(tparams, targs)
-		params = check.subst(nopos, params, smap, nil).(*Tuple)
+		params = check.subst(nopos, params, smap, nil, check.context()).(*Tuple)
 	}
 
 	// Unify parameter and argument types for generic parameters with typed arguments
@@ -220,16 +205,20 @@ func (check *Checker) infer(pos syntax.Pos, tparams []*TypeParam, targs []Type, 
 				}
 			}
 			if allFailed {
-				check.errorf(arg, "%s %s of %s does not match %s (cannot infer %s)", kind, targ, arg.expr, tpar, typeParamsString(tparams))
+				check.errorf(arg, CannotInferTypeArgs, "%s %s of %s does not match %s (cannot infer %s)", kind, targ, arg.expr, tpar, typeParamsString(tparams))
 				return
 			}
 		}
 		smap := makeSubstMap(tparams, targs)
-		inferred := check.subst(arg.Pos(), tpar, smap, nil)
+		inferred := check.subst(arg.Pos(), tpar, smap, nil, check.context())
+		// _CannotInferTypeArgs indicates a failure of inference, though the actual
+		// error may be better attributed to a user-provided type argument (hence
+		// _InvalidTypeArg). We can't differentiate these cases, so fall back on
+		// the more general _CannotInferTypeArgs.
 		if inferred != tpar {
-			check.errorf(arg, "%s %s of %s does not match inferred type %s for %s", kind, targ, arg.expr, inferred, tpar)
+			check.errorf(arg, CannotInferTypeArgs, "%s %s of %s does not match inferred type %s for %s", kind, targ, arg.expr, inferred, tpar)
 		} else {
-			check.errorf(arg, "%s %s of %s does not match %s", kind, targ, arg.expr, tpar)
+			check.errorf(arg, CannotInferTypeArgs, "%s %s of %s does not match %s", kind, targ, arg.expr, tpar)
 		}
 	}
 
@@ -323,7 +312,7 @@ func (check *Checker) infer(pos syntax.Pos, tparams []*TypeParam, targs []Type, 
 	// At least one type argument couldn't be inferred.
 	assert(targs != nil && index >= 0 && targs[index] == nil)
 	tpar := tparams[index]
-	check.errorf(pos, "cannot infer %s (%s)", tpar.obj.name, tpar.obj.pos)
+	check.errorf(pos, CannotInferTypeArgs, "cannot infer %s (%s)", tpar.obj.name, tpar.obj.pos)
 	return nil
 }
 
@@ -342,20 +331,19 @@ func typeParamsString(list []*TypeParam) string {
 	}
 
 	// general case (n > 2)
-	// Would like to use strings.Builder but it's not available in Go 1.4.
-	var b bytes.Buffer
+	var buf strings.Builder
 	for i, tname := range list[:n-1] {
 		if i > 0 {
-			b.WriteString(", ")
+			buf.WriteString(", ")
 		}
-		b.WriteString(tname.obj.name)
+		buf.WriteString(tname.obj.name)
 	}
-	b.WriteString(", and ")
-	b.WriteString(list[n-1].obj.name)
-	return b.String()
+	buf.WriteString(", and ")
+	buf.WriteString(list[n-1].obj.name)
+	return buf.String()
 }
 
-// IsParameterized reports whether typ contains any of the type parameters of tparams.
+// isParameterized reports whether typ contains any of the type parameters of tparams.
 func isParameterized(tparams []*TypeParam, typ Type) bool {
 	w := tpWalker{
 		seen:    make(map[Type]bool),
@@ -435,7 +423,7 @@ func (w *tpWalker) isParameterized(typ Type) (res bool) {
 		return w.isParameterized(t.elem)
 
 	case *Named:
-		return w.isParameterizedTypeList(t.targs.list())
+		return w.isParameterizedTypeList(t.TypeArgs().list())
 
 	case *TypeParam:
 		// t must be one of w.tparams
@@ -537,7 +525,7 @@ func (check *Checker) inferB(pos syntax.Pos, tparams []*TypeParam, targs []Type)
 						if core.tilde {
 							tilde = "~"
 						}
-						check.errorf(pos, "%s does not match %s%s", tpar, tilde, core.typ)
+						check.errorf(pos, InvalidTypeArg, "%s does not match %s%s", tx, tilde, core.typ)
 						return nil, 0
 					}
 
@@ -627,7 +615,7 @@ func (check *Checker) inferB(pos syntax.Pos, tparams []*TypeParam, targs []Type)
 		n := 0
 		for _, index := range dirty {
 			t0 := types[index]
-			if t1 := check.subst(nopos, t0, smap, nil); t1 != t0 {
+			if t1 := check.subst(nopos, t0, smap, nil, check.context()); t1 != t0 {
 				types[index] = t1
 				dirty[n] = index
 				n++

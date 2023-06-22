@@ -38,6 +38,7 @@ type SymKind uint8
 // Defined SymKind values.
 //
 // TODO(rsc): Give idiomatic Go names.
+//
 //go:generate stringer -type=SymKind
 const (
 	Sxxx SymKind = iota
@@ -96,7 +97,9 @@ const (
 	SXCOFFTOC
 	SBSS
 	SNOPTRBSS
-	SLIBFUZZER_EXTRA_COUNTER
+	SLIBFUZZER_8BIT_COUNTER
+	SCOVERAGE_COUNTER
+	SCOVERAGE_AUXVAR
 	STLSBSS
 	SXREF
 	SMACHOSYMSTR
@@ -125,24 +128,26 @@ const (
 // AbiSymKindToSymKind maps values read from object files (which are
 // of type cmd/internal/objabi.SymKind) to values of type SymKind.
 var AbiSymKindToSymKind = [...]SymKind{
-	objabi.Sxxx:                     Sxxx,
-	objabi.STEXT:                    STEXT,
-	objabi.SRODATA:                  SRODATA,
-	objabi.SNOPTRDATA:               SNOPTRDATA,
-	objabi.SDATA:                    SDATA,
-	objabi.SBSS:                     SBSS,
-	objabi.SNOPTRBSS:                SNOPTRBSS,
-	objabi.STLSBSS:                  STLSBSS,
-	objabi.SDWARFCUINFO:             SDWARFCUINFO,
-	objabi.SDWARFCONST:              SDWARFCONST,
-	objabi.SDWARFFCN:                SDWARFFCN,
-	objabi.SDWARFABSFCN:             SDWARFABSFCN,
-	objabi.SDWARFTYPE:               SDWARFTYPE,
-	objabi.SDWARFVAR:                SDWARFVAR,
-	objabi.SDWARFRANGE:              SDWARFRANGE,
-	objabi.SDWARFLOC:                SDWARFLOC,
-	objabi.SDWARFLINES:              SDWARFLINES,
-	objabi.SLIBFUZZER_EXTRA_COUNTER: SLIBFUZZER_EXTRA_COUNTER,
+	objabi.Sxxx:                    Sxxx,
+	objabi.STEXT:                   STEXT,
+	objabi.SRODATA:                 SRODATA,
+	objabi.SNOPTRDATA:              SNOPTRDATA,
+	objabi.SDATA:                   SDATA,
+	objabi.SBSS:                    SBSS,
+	objabi.SNOPTRBSS:               SNOPTRBSS,
+	objabi.STLSBSS:                 STLSBSS,
+	objabi.SDWARFCUINFO:            SDWARFCUINFO,
+	objabi.SDWARFCONST:             SDWARFCONST,
+	objabi.SDWARFFCN:               SDWARFFCN,
+	objabi.SDWARFABSFCN:            SDWARFABSFCN,
+	objabi.SDWARFTYPE:              SDWARFTYPE,
+	objabi.SDWARFVAR:               SDWARFVAR,
+	objabi.SDWARFRANGE:             SDWARFRANGE,
+	objabi.SDWARFLOC:               SDWARFLOC,
+	objabi.SDWARFLINES:             SDWARFLINES,
+	objabi.SLIBFUZZER_8BIT_COUNTER: SLIBFUZZER_8BIT_COUNTER,
+	objabi.SCOVERAGE_COUNTER:       SCOVERAGE_COUNTER,
+	objabi.SCOVERAGE_AUXVAR:        SCOVERAGE_AUXVAR,
 }
 
 // ReadOnly are the symbol kinds that form read-only sections. In some

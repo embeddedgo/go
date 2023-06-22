@@ -48,7 +48,6 @@ import (
 //go:cgo_import_dynamic libc_sysconf sysconf "libc.so"
 //go:cgo_import_dynamic libc_usleep usleep "libc.so"
 //go:cgo_import_dynamic libc_write write "libc.so"
-//go:cgo_import_dynamic libc_pipe pipe "libc.so"
 //go:cgo_import_dynamic libc_pipe2 pipe2 "libc.so"
 
 //go:linkname libc____errno libc____errno
@@ -84,7 +83,6 @@ import (
 //go:linkname libc_sysconf libc_sysconf
 //go:linkname libc_usleep libc_usleep
 //go:linkname libc_write libc_write
-//go:linkname libc_pipe libc_pipe
 //go:linkname libc_pipe2 libc_pipe2
 
 var (
@@ -121,7 +119,6 @@ var (
 	libc_sysconf,
 	libc_usleep,
 	libc_write,
-	libc_pipe,
 	libc_pipe2 libcFunc
 )
 
@@ -145,6 +142,7 @@ func osinit() {
 func tstart_sysvicall(newm *m) uint32
 
 // May run with m.p==nil, so write barriers are not allowed.
+//
 //go:nowritebarrier
 func newosproc(mp *m) {
 	var (
@@ -174,11 +172,13 @@ func newosproc(mp *m) {
 	// Disable signals during create, so that the new thread starts
 	// with signals disabled. It will enable them in minit.
 	sigprocmask(_SIG_SETMASK, &sigset_all, &oset)
-	ret = pthread_create(&tid, &attr, abi.FuncPCABI0(tstart_sysvicall), unsafe.Pointer(mp))
+	ret = retryOnEAGAIN(func() int32 {
+		return pthread_create(&tid, &attr, abi.FuncPCABI0(tstart_sysvicall), unsafe.Pointer(mp))
+	})
 	sigprocmask(_SIG_SETMASK, &oset, nil)
 	if ret != 0 {
 		print("runtime: failed to create new OS thread (have ", mcount(), " already; errno=", ret, ")\n")
-		if ret == -_EAGAIN {
+		if ret == _EAGAIN {
 			println("runtime: may need to increase max user processes (ulimit -u)")
 		}
 		throw("newosproc")
@@ -270,7 +270,8 @@ func getsig(i uint32) uintptr {
 	return *((*uintptr)(unsafe.Pointer(&sa._funcptr)))
 }
 
-// setSignaltstackSP sets the ss_sp field of a stackt.
+// setSignalstackSP sets the ss_sp field of a stackt.
+//
 //go:nosplit
 func setSignalstackSP(s *stackt, sp uintptr) {
 	*(*uintptr)(unsafe.Pointer(&s.ss_sp)) = sp
@@ -310,18 +311,17 @@ func semacreate(mp *m) {
 	}
 
 	var sem *semt
-	_g_ := getg()
 
 	// Call libc's malloc rather than malloc. This will
 	// allocate space on the C heap. We can't call malloc
 	// here because it could cause a deadlock.
-	_g_.m.libcall.fn = uintptr(unsafe.Pointer(&libc_malloc))
-	_g_.m.libcall.n = 1
-	_g_.m.scratch = mscratch{}
-	_g_.m.scratch.v[0] = unsafe.Sizeof(*sem)
-	_g_.m.libcall.args = uintptr(unsafe.Pointer(&_g_.m.scratch))
-	asmcgocall(unsafe.Pointer(&asmsysvicall6x), unsafe.Pointer(&_g_.m.libcall))
-	sem = (*semt)(unsafe.Pointer(_g_.m.libcall.r1))
+	mp.libcall.fn = uintptr(unsafe.Pointer(&libc_malloc))
+	mp.libcall.n = 1
+	mp.scratch = mscratch{}
+	mp.scratch.v[0] = unsafe.Sizeof(*sem)
+	mp.libcall.args = uintptr(unsafe.Pointer(&mp.scratch))
+	asmcgocall(unsafe.Pointer(&asmsysvicall6x), unsafe.Pointer(&mp.libcall))
+	sem = (*semt)(unsafe.Pointer(mp.libcall.r1))
 	if sem_init(sem, 0, 0) != 0 {
 		throw("sem_init")
 	}
@@ -563,13 +563,6 @@ func write1(fd uintptr, buf unsafe.Pointer, nbyte int32) int32 {
 }
 
 //go:nosplit
-func pipe() (r, w int32, errno int32) {
-	var p [2]int32
-	_, e := sysvicall1Err(&libc_pipe, uintptr(noescape(unsafe.Pointer(&p))))
-	return p[0], p[1], int32(e)
-}
-
-//go:nosplit
 func pipe2(flags int32) (r, w int32, errno int32) {
 	var p [2]int32
 	_, e := sysvicall2Err(&libc_pipe2, uintptr(noescape(unsafe.Pointer(&p))), uintptr(flags))
@@ -577,14 +570,14 @@ func pipe2(flags int32) (r, w int32, errno int32) {
 }
 
 //go:nosplit
-func closeonexec(fd int32) {
-	fcntl(fd, _F_SETFD, _FD_CLOEXEC)
+func fcntl(fd, cmd, arg int32) (ret int32, errno int32) {
+	r1, err := sysvicall3Err(&libc_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg))
+	return int32(r1), int32(err)
 }
 
 //go:nosplit
-func setNonblock(fd int32) {
-	flags := fcntl(fd, _F_GETFL, 0)
-	fcntl(fd, _F_SETFL, flags|_O_NONBLOCK)
+func closeonexec(fd int32) {
+	fcntl(fd, _F_SETFD, _FD_CLOEXEC)
 }
 
 func osyield1()

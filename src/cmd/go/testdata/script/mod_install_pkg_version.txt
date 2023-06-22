@@ -16,7 +16,8 @@ env GO111MODULE=auto
 cd m
 cp go.mod go.mod.orig
 ! go list -m all
-stderr '^go: example.com/cmd@v1.1.0-doesnotexist: missing go.sum entry; to add it:\n\tgo mod download example.com/cmd$'
+stderr '^go: example.com/cmd@v1.1.0-doesnotexist: reading http.*/mod/example.com/cmd/@v/v1.1.0-doesnotexist.info: 404 Not Found\n\tserver response: 404 page not found$'
+stderr '^go: example.com/cmd@v1.1.0-doesnotexist: missing go.sum entry for go.mod file; to add it:\n\tgo mod download example.com/cmd$'
 go install example.com/cmd/a@latest
 cmp go.mod go.mod.orig
 exists $GOPATH/bin/a$GOEXE
@@ -106,7 +107,7 @@ stdout '^example.com/cmd v1.0.0$'
 env GO111MODULE=auto
 
 ! go install example.com/cmd/a@v1.0.0 example.com/cmd/b@latest
-stderr '^go: example.com/cmd/b@latest: all arguments must have the same version \(@v1.0.0\)$'
+stderr '^go: example.com/cmd/b@latest: all arguments must refer to packages in the same module at the same version \(@v1.0.0\)$'
 
 
 # 'go install pkg@version' should report an error if the arguments are in

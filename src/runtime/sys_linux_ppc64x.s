@@ -20,9 +20,7 @@
 #define SYS_close		  6
 #define SYS_getpid		 20
 #define SYS_kill		 37
-#define SYS_pipe		 42
 #define SYS_brk			 45
-#define SYS_fcntl		 55
 #define SYS_mmap		 90
 #define SYS_munmap		 91
 #define SYS_setitimer		104
@@ -39,15 +37,11 @@
 #define SYS_futex		221
 #define SYS_sched_getaffinity	223
 #define SYS_exit_group		234
-#define SYS_epoll_create	236
-#define SYS_epoll_ctl		237
-#define SYS_epoll_wait		238
 #define SYS_timer_create	240
 #define SYS_timer_settime	241
 #define SYS_timer_delete	244
 #define SYS_clock_gettime	246
 #define SYS_tgkill		250
-#define SYS_epoll_create1	315
 #define SYS_pipe2		317
 
 TEXT runtime·exit(SB),NOSPLIT|NOFRAME,$0-4
@@ -104,13 +98,6 @@ TEXT runtime·read(SB),NOSPLIT|NOFRAME,$0-28
 	MOVW	R3, ret+24(FP)
 	RET
 
-// func pipe() (r, w int32, errno int32)
-TEXT runtime·pipe(SB),NOSPLIT|NOFRAME,$0-12
-	ADD	$FIXED_FRAME, R1, R3
-	SYSCALL	$SYS_pipe
-	MOVW	R3, errno+8(FP)
-	RET
-
 // func pipe2(flags int32) (r, w int32, errno int32)
 TEXT runtime·pipe2(SB),NOSPLIT|NOFRAME,$0-20
 	ADD	$FIXED_FRAME+8, R1, R3
@@ -125,8 +112,7 @@ TEXT runtime·usleep(SB),NOSPLIT,$16-4
 
 	// Use magic constant 0x8637bd06 and shift right 51
 	// to perform usec/1000000.
-	ORIS	$0x8637, R0, R4	// Note, R0 always contains 0 here.
-	OR	$0xbd06, R4, R4
+	MOVD	$0x8637bd06, R4
 	MULLD	R3, R4, R4	// Convert usec to S.
 	SRD	$51, R4, R4
 	MOVD	R4, 8(R1)	// Store to tv_sec
@@ -474,7 +460,7 @@ TEXT runtime·sigtramp(SB),NOSPLIT|NOFRAME,$0
 	DWORD	$sigtramp<>(SB)
 	DWORD	$0
 	DWORD	$0
-TEXT sigtramp<>(SB),NOSPLIT|NOFRAME,$0
+TEXT sigtramp<>(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 #endif
 	// Start with standard C stack frame layout and linkage.
 	MOVD    LR, R0
@@ -889,67 +875,6 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT|NOFRAME,$0
 	BVC	2(PC)
 	NEG	R3	// caller expects negative errno
 	MOVW	R3, ret+24(FP)
-	RET
-
-// int32 runtime·epollcreate(int32 size);
-TEXT runtime·epollcreate(SB),NOSPLIT|NOFRAME,$0
-	MOVW    size+0(FP), R3
-	SYSCALL	$SYS_epoll_create
-	BVC	2(PC)
-	NEG	R3	// caller expects negative errno
-	MOVW	R3, ret+8(FP)
-	RET
-
-// int32 runtime·epollcreate1(int32 flags);
-TEXT runtime·epollcreate1(SB),NOSPLIT|NOFRAME,$0
-	MOVW	flags+0(FP), R3
-	SYSCALL	$SYS_epoll_create1
-	BVC	2(PC)
-	NEG	R3	// caller expects negative errno
-	MOVW	R3, ret+8(FP)
-	RET
-
-// func epollctl(epfd, op, fd int32, ev *epollEvent) int
-TEXT runtime·epollctl(SB),NOSPLIT|NOFRAME,$0
-	MOVW	epfd+0(FP), R3
-	MOVW	op+4(FP), R4
-	MOVW	fd+8(FP), R5
-	MOVD	ev+16(FP), R6
-	SYSCALL	$SYS_epoll_ctl
-	NEG	R3	// caller expects negative errno
-	MOVW	R3, ret+24(FP)
-	RET
-
-// int32 runtime·epollwait(int32 epfd, EpollEvent *ev, int32 nev, int32 timeout);
-TEXT runtime·epollwait(SB),NOSPLIT|NOFRAME,$0
-	MOVW	epfd+0(FP), R3
-	MOVD	ev+8(FP), R4
-	MOVW	nev+16(FP), R5
-	MOVW	timeout+20(FP), R6
-	SYSCALL	$SYS_epoll_wait
-	BVC	2(PC)
-	NEG	R3	// caller expects negative errno
-	MOVW	R3, ret+24(FP)
-	RET
-
-// void runtime·closeonexec(int32 fd);
-TEXT runtime·closeonexec(SB),NOSPLIT|NOFRAME,$0
-	MOVW    fd+0(FP), R3  // fd
-	MOVD    $2, R4  // F_SETFD
-	MOVD    $1, R5  // FD_CLOEXEC
-	SYSCALL	$SYS_fcntl
-	RET
-
-// func runtime·setNonblock(int32 fd)
-TEXT runtime·setNonblock(SB),NOSPLIT|NOFRAME,$0-4
-	MOVW	fd+0(FP), R3 // fd
-	MOVD	$3, R4	// F_GETFL
-	MOVD	$0, R5
-	SYSCALL	$SYS_fcntl
-	OR	$0x800, R3, R5 // O_NONBLOCK
-	MOVW	fd+0(FP), R3 // fd
-	MOVD	$4, R4	// F_SETFL
-	SYSCALL	$SYS_fcntl
 	RET
 
 // func sbrk0() uintptr

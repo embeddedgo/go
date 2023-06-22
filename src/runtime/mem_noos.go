@@ -8,22 +8,22 @@ import "unsafe"
 
 // Simple memory allocator that emulates OS allocator
 //
-// There are sysReserveMaxArena and sysPersistentAlloc functions specific to
+// There are noosMemory and noosPersistentAlloc functions specific to
 // noos target.
 //
-// sysReserveMaxArena allocates maximum arena space heapArenaBytes aligned for
-// mheap. It is intended to be run only once by mallocinit.
+// noosMemory returns the address and size of the memory allocated to the arena
+// (heapArenaBytes aligned) and the memory limit for GC.
 //
-// sysReserve allocates down from sysMem.end always returning _PageSize aligned
+// sysReserve allocates down from noosMem.end always returning _PageSize aligned
 // memory.
 //
-// sysPersistentAlloc is fast and memory efficient implementation of
-// persistentalloc1. It uses sysReserve for _PageSize alignned allocations.
-// Otherwise it allocates from sysMem.start.
+// noosPersistentAlloc is provides fast and memory efficient implementation of
+// the persistentalloc1 function.
 
-var sysMem struct {
+var noosMem struct {
 	free, nodma           pamem
 	arenaStart, arenaSize uintptr
+	size                  uintptr // initial sum of free, nodma and arena bytes
 	mx                    mutex
 }
 
@@ -53,78 +53,77 @@ func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
 	return unsafe.Pointer(p)
 }
 
-// sysReserveMaxArena is for initial reservation, must not be called
-// concurrently with any other reservation. TODO: Consider replace this by
-// direct initialization of mheap_.arena.
-//go:nosplit
-func sysReserveMaxArena() (addr, size uintptr, mapMemory bool) {
-	return sysMem.arenaStart, sysMem.arenaSize, false
-}
-
 //go:nosplit
 func sysReserve1(size uintptr) unsafe.Pointer {
-	lock(&sysMem.mx)
-	p := sysMem.free.allocPages(size)
+	lock(&noosMem.mx)
+	p := noosMem.free.allocPages(size)
 	if p == nil {
-		p = sysMem.nodma.allocPages(size)
+		p = noosMem.nodma.allocPages(size)
 	}
-	unlock(&sysMem.mx)
+	unlock(&noosMem.mx)
 	return p
 }
 
 //go:nosplit
-func sysReserve(v unsafe.Pointer, size uintptr) unsafe.Pointer {
+func sysReserveOS(v unsafe.Pointer, size uintptr) unsafe.Pointer {
+	if v != nil {
+		// The address space of NOOS memory is contiguous,
+		// so requesting specific addresses is not supported. We could use
+		// a different address, but then mheap.sysAlloc discards the result
+		// right away and we don't reuse chunks passed to sysFree.
+		return nil
+	}
 	size += (_PageSize - 1)
 	size &^= (_PageSize - 1)
 	return sysReserve1(size)
 }
 
 //go:nosplit
-func sysAlloc(size uintptr, sysStat *sysMemStat) unsafe.Pointer {
+func sysAllocOS(size uintptr) unsafe.Pointer {
 	size += (_PageSize - 1)
 	size &^= (_PageSize - 1)
 	p := sysReserve1(size)
 	if p == nil {
 		throw("runtime: cannot allocate memory")
 	}
-	sysStat.add(int64(size))
 	return p
 }
 
-// align must be power of two
+func sysFreeOS(v unsafe.Pointer, n uintptr)     {}
+func sysMapOS(v unsafe.Pointer, n uintptr)      {}
+func sysUnusedOS(v unsafe.Pointer, n uintptr)   {}
+func sysUsedOS(v unsafe.Pointer, n uintptr)     {}
+func sysFaultOS(v unsafe.Pointer, n uintptr)    {}
+func sysHugePageOS(v unsafe.Pointer, n uintptr) {}
+
+//  TODO: consider replace this function by direct initialization of mheap_.arena.
+//
 //go:nosplit
-func sysPersistentAlloc(size, align uintptr, sysStat *sysMemStat) (p *notInHeap) {
+func noosMemory() (heapBase, heapSize, limit uintptr) {
+	return noosMem.arenaStart, noosMem.arenaSize, noosMem.size
+}
+
+// align must be power of two
+//
+//go:nosplit
+func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) (p *notInHeap) {
 	if size&(_PageSize-1) == 0 {
 		p = (*notInHeap)(sysReserve1(size))
 	} else {
 		if align == 0 {
 			align = 8
 		}
-		lock(&sysMem.mx)
-		p = (*notInHeap)(sysMem.free.alloc(size, align))
+		lock(&noosMem.mx)
+		p = (*notInHeap)(noosMem.free.alloc(size, align))
 		if p == nil {
-			p = (*notInHeap)(sysMem.nodma.alloc(size, align))
+			p = (*notInHeap)(noosMem.nodma.alloc(size, align))
 		}
-		unlock(&sysMem.mx)
+		unlock(&noosMem.mx)
 	}
 	if p == nil {
 		throw("runtime: cannot allocate memory")
 	}
 	sysStat.add(int64(size))
+	gcController.mappedReady.Add(int64(size))
 	return
 }
-
-//go:nosplit
-func sysMap(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
-	sysStat.add(int64(n))
-}
-
-//go:nosplit
-func sysFree(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
-	sysStat.add(-int64(n))
-}
-
-func sysUnused(v unsafe.Pointer, n uintptr)   {}
-func sysUsed(v unsafe.Pointer, n uintptr)     {}
-func sysFault(v unsafe.Pointer, n uintptr)    {}
-func sysHugePage(v unsafe.Pointer, n uintptr) {}

@@ -12,16 +12,13 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
+	. "internal/types/errors"
 )
 
 // debugging/development support
 const (
 	debug = false // leave on during development
 	trace = false // turn on for detailed type resolution traces
-
-	// TODO(rfindley): add compiler error message handling from types2, guarded
-	// behind this flag, so that we can keep the code in sync.
-	compilerErrorMessages = false // match compiler error messages
 )
 
 // exprInfo stores information about an untyped expression.
@@ -105,7 +102,7 @@ type Checker struct {
 	nextID  uint64                 // unique Id for type parameters (first valid Id is 1)
 	objMap  map[Object]*declInfo   // maps package-level objects and (non-interface) methods to declaration info
 	impMap  map[importKey]*Package // maps (import path, source directory) to (complete or fake) package
-	infoMap map[*Named]typeInfo    // maps named types to their associated type info (for cycle detection)
+	valids  instanceLookup         // valid *Named (incl. instantiated) types per the validType check
 
 	// pkgPathMap maps package names to the set of distinct import paths we've
 	// seen for that name, anywhere in the import graph. It is used for
@@ -249,7 +246,6 @@ func NewChecker(conf *Config, fset *token.FileSet, pkg *Package, info *Info) *Ch
 		version: version,
 		objMap:  make(map[Object]*declInfo),
 		impMap:  make(map[importKey]*Package),
-		infoMap: make(map[*Named]typeInfo),
 	}
 }
 
@@ -276,7 +272,7 @@ func (check *Checker) initFiles(files []*ast.File) {
 			if name != "_" {
 				pkg.name = name
 			} else {
-				check.errorf(file.Name, _BlankPkgName, "invalid package name _")
+				check.error(file.Name, BlankPkgName, "invalid package name _")
 			}
 			fallthrough
 
@@ -284,7 +280,7 @@ func (check *Checker) initFiles(files []*ast.File) {
 			check.files = append(check.files, file)
 
 		default:
-			check.errorf(atPos(file.Package), _MismatchedPkgName, "package %s; expected %s", name, pkg.name)
+			check.errorf(atPos(file.Package), MismatchedPkgName, "package %s; expected %s", name, pkg.name)
 			// ignore this file
 		}
 	}
@@ -381,11 +377,17 @@ func (check *Checker) processDelayed(top int) {
 	// this is a sufficiently bounded process.
 	for i := top; i < len(check.delayed); i++ {
 		a := &check.delayed[i]
-		if trace && a.desc != nil {
-			fmt.Println()
-			check.trace(a.desc.pos.Pos(), "-- "+a.desc.format, a.desc.args...)
+		if trace {
+			if a.desc != nil {
+				check.trace(a.desc.pos.Pos(), "-- "+a.desc.format, a.desc.args...)
+			} else {
+				check.trace(token.NoPos, "-- delayed %p", a.f)
+			}
 		}
 		a.f() // may append to check.delayed
+		if trace {
+			fmt.Println()
+		}
 	}
 	assert(top <= len(check.delayed)) // stack must not have shrunk
 	check.delayed = check.delayed[:top]

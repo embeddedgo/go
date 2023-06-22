@@ -140,12 +140,11 @@ type posetNode struct {
 // to record that A<I, A<J, A<K (with no known relation between I,J,K), we create the
 // following DAG:
 //
-//         A
-//        / \
-//       I  extra
-//           /  \
-//          J    K
-//
+//	  A
+//	 / \
+//	I  extra
+//	    /  \
+//	   J    K
 type poset struct {
 	lastidx   uint32            // last generated dense index
 	flags     uint8             // internal flags
@@ -451,7 +450,7 @@ func (po *poset) aliasnodes(n1 *Value, i2s bitset) {
 			po.upush(undoSetChr, uint32(idx), r)
 		}
 
-		// Connect all chidren of i2s to i1 (unless those children
+		// Connect all children of i2s to i1 (unless those children
 		// are in i2s as well, in which case it would be useless)
 		if i2s.Test(uint32(idx)) {
 			if l != 0 && !i2s.Test(l.Target()) {

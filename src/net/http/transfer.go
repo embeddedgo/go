@@ -196,10 +196,11 @@ func (t *transferWriter) shouldSendChunkedRequestBody() bool {
 // headers before the pipe is fed data), we need to be careful and bound how
 // long we wait for it. This delay will only affect users if all the following
 // are true:
-//   * the request body blocks
-//   * the content length is not set (or set to -1)
-//   * the method doesn't usually have a body (GET, HEAD, DELETE, ...)
-//   * there is no transfer-encoding=chunked already set.
+//   - the request body blocks
+//   - the content length is not set (or set to -1)
+//   - the method doesn't usually have a body (GET, HEAD, DELETE, ...)
+//   - there is no transfer-encoding=chunked already set.
+//
 // In other words, this delay will not normally affect anybody, and there
 // are workarounds if it does.
 func (t *transferWriter) probeRequestBody() {
@@ -421,8 +422,8 @@ func (t *transferWriter) doBodyCopy(dst io.Writer, src io.Reader) (n int64, err 
 //
 // This function is only intended for use in writeBody.
 func (t *transferWriter) unwrapBody() io.Reader {
-	if reflect.TypeOf(t.Body) == nopCloserType {
-		return reflect.ValueOf(t.Body).Field(0).Interface().(io.Reader)
+	if r, ok := unwrapNopCloser(t.Body); ok {
+		return r
 	}
 	if r, ok := t.Body.(*readTrackingBody); ok {
 		r.didRead = true
@@ -467,6 +468,7 @@ func bodyAllowedForStatus(status int) bool {
 var (
 	suppressedHeaders304    = []string{"Content-Type", "Content-Length", "Transfer-Encoding"}
 	suppressedHeadersNoBody = []string{"Content-Length", "Transfer-Encoding"}
+	excludedHeadersNoBody   = map[string]bool{"Content-Length": true, "Transfer-Encoding": true}
 )
 
 func suppressedHeaders(status int) []string {
@@ -555,7 +557,7 @@ func readTransfer(msg any, r *bufio.Reader) (err error) {
 	// or close connection when finished, since multipart is not supported yet
 	switch {
 	case t.Chunked:
-		if noResponseBodyExpected(t.RequestMethod) || !bodyAllowedForStatus(t.StatusCode) {
+		if isResponse && (noResponseBodyExpected(t.RequestMethod) || !bodyAllowedForStatus(t.StatusCode)) {
 			t.Body = NoBody
 		} else {
 			t.Body = &body{src: internal.NewChunkedReader(r), hdr: msg, r: r, closing: t.Close}
@@ -598,7 +600,7 @@ func readTransfer(msg any, r *bufio.Reader) (err error) {
 	return nil
 }
 
-// Checks whether chunked is part of the encodings stack
+// Checks whether chunked is part of the encodings stack.
 func chunked(te []string) bool { return len(te) > 0 && te[0] == "chunked" }
 
 // Checks whether the encoding is explicitly "identity".
@@ -689,14 +691,7 @@ func fixLength(isResponse bool, status int, requestMethod string, header Header,
 	}
 
 	// Logic based on response type or status
-	if noResponseBodyExpected(requestMethod) {
-		// For HTTP requests, as part of hardening against request
-		// smuggling (RFC 7230), don't allow a Content-Length header for
-		// methods which don't permit bodies. As an exception, allow
-		// exactly one Content-Length header if its value is "0".
-		if isRequest && len(contentLens) > 0 && !(len(contentLens) == 1 && contentLens[0] == "0") {
-			return 0, fmt.Errorf("http: method cannot contain a Content-Length; got %q", contentLens)
-		}
+	if isResponse && noResponseBodyExpected(requestMethod) {
 		return 0, nil
 	}
 	if status/100 == 1 {
@@ -743,7 +738,7 @@ func fixLength(isResponse bool, status int, requestMethod string, header Header,
 
 // Determine whether to hang up after sending a request and body, or
 // receiving a response and body
-// 'header' is the request headers
+// 'header' is the request headers.
 func shouldClose(major, minor int, header Header, removeCloseHeader bool) bool {
 	if major < 1 {
 		return true
@@ -762,7 +757,7 @@ func shouldClose(major, minor int, header Header, removeCloseHeader bool) bool {
 	return hasClose
 }
 
-// Parse the trailer header
+// Parse the trailer header.
 func fixTrailer(header Header, chunked bool) (Header, error) {
 	vv, ok := header["Trailer"]
 	if !ok {
@@ -1080,6 +1075,21 @@ func (fr finishAsyncByteRead) Read(p []byte) (n int, err error) {
 }
 
 var nopCloserType = reflect.TypeOf(io.NopCloser(nil))
+var nopCloserWriterToType = reflect.TypeOf(io.NopCloser(struct {
+	io.Reader
+	io.WriterTo
+}{}))
+
+// unwrapNopCloser return the underlying reader and true if r is a NopCloser
+// else it return false.
+func unwrapNopCloser(r io.Reader) (underlyingReader io.Reader, isNopCloser bool) {
+	switch reflect.TypeOf(r) {
+	case nopCloserType, nopCloserWriterToType:
+		return reflect.ValueOf(r).Field(0).Interface().(io.Reader), true
+	default:
+		return nil, false
+	}
+}
 
 // isKnownInMemoryReader reports whether r is a type known to not
 // block on Read. Its caller uses this as an optional optimization to
@@ -1089,8 +1099,8 @@ func isKnownInMemoryReader(r io.Reader) bool {
 	case *bytes.Reader, *bytes.Buffer, *strings.Reader:
 		return true
 	}
-	if reflect.TypeOf(r) == nopCloserType {
-		return isKnownInMemoryReader(reflect.ValueOf(r).Field(0).Interface().(io.Reader))
+	if r, ok := unwrapNopCloser(r); ok {
+		return isKnownInMemoryReader(r)
 	}
 	if r, ok := r.(*readTrackingBody); ok {
 		return isKnownInMemoryReader(r.ReadCloser)

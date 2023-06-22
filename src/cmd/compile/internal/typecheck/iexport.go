@@ -236,7 +236,6 @@ package typecheck
 
 import (
 	"bytes"
-	"crypto/md5"
 	"encoding/binary"
 	"fmt"
 	"go/constant"
@@ -250,6 +249,7 @@ import (
 	"cmd/compile/internal/ir"
 	"cmd/compile/internal/types"
 	"cmd/internal/goobj"
+	"cmd/internal/notsha256"
 	"cmd/internal/src"
 )
 
@@ -258,7 +258,7 @@ import (
 // 1: added column details to Pos
 // 2: added information for generic function/types.  The export of non-generic
 // functions/types remains largely backward-compatible.  Breaking changes include:
-//    - a 'kind' byte is added to constant values
+//   - a 'kind' byte is added to constant values
 const (
 	iexportVersionGo1_11   = 0
 	iexportVersionPosCol   = 1
@@ -353,7 +353,7 @@ func WriteExports(out io.Writer, extensions bool) {
 	hdr.uint64(dataLen)
 
 	// Flush output.
-	h := md5.New()
+	h := notsha256.New()
 	wr := io.MultiWriter(out, h)
 	io.Copy(wr, &hdr)
 	io.Copy(wr, &p.strings)
@@ -394,15 +394,18 @@ func (w *exportWriter) writeIndex(index map[*types.Sym]uint64, mainIndex bool) {
 		pkgs = append(pkgs, pkg)
 	}
 	sort.Slice(pkgs, func(i, j int) bool {
-		return pkgs[i].Path < pkgs[j].Path
+		return exportPath(pkgs[i]) < exportPath(pkgs[j])
 	})
+	if mainIndex {
+		base.Assertf(pkgs[0] == types.LocalPkg, "LocalPkg must be first")
+	}
 
 	w.uint64(uint64(len(pkgs)))
 	for _, pkg := range pkgs {
-		w.string(pkg.Path)
+		w.string(exportPath(pkg))
 		if mainIndex {
 			w.string(pkg.Name)
-			w.uint64(uint64(pkg.Height))
+			w.uint64(0) // was package height, but not necessary anymore.
 		}
 
 		// Sort symbols within a package by name.
@@ -607,7 +610,7 @@ func (p *iexporter) doDecl(n *ir.Name) {
 			// Do same for ComparableType as for ErrorType.
 			underlying = types.ComparableType
 		}
-		if base.Flag.G > 0 && underlying == types.AnyType.Underlying() {
+		if underlying == types.AnyType.Underlying() {
 			// Do same for AnyType as for ErrorType.
 			underlying = types.AnyType
 		}
@@ -621,12 +624,7 @@ func (p *iexporter) doDecl(n *ir.Name) {
 			break
 		}
 
-		// Sort methods, for consistency with types2.
-		methods := append([]*types.Field(nil), t.Methods().Slice()...)
-		if base.Debug.UnifiedQuirks != 0 {
-			sort.Sort(types.MethodsByName(methods))
-		}
-
+		methods := t.Methods().Slice()
 		w.uint64(uint64(len(methods)))
 		for _, m := range methods {
 			w.pos(m.Pos)
@@ -719,7 +717,18 @@ func (w *exportWriter) pkg(pkg *types.Pkg) {
 	// Ensure any referenced packages are declared in the main index.
 	w.p.allPkgs[pkg] = true
 
-	w.string(pkg.Path)
+	w.string(exportPath(pkg))
+}
+
+// exportPath returns the path for pkg as it appears in the iexport
+// file format. For historical reasons (before cmd/compile required
+// the -p flag), the local package is represented as the empty string,
+// instead of its actual path.
+func exportPath(pkg *types.Pkg) string {
+	if pkg == types.LocalPkg {
+		return ""
+	}
+	return pkg.Path
 }
 
 func (w *exportWriter) qualifiedIdent(n *ir.Name) {
@@ -954,7 +963,6 @@ func (w *exportWriter) startType(k itag) {
 func (w *exportWriter) doTyp(t *types.Type) {
 	s := t.Sym()
 	if s != nil && t.OrigType() != nil {
-		assert(base.Flag.G > 0)
 		// This is an instantiated type - could be a re-instantiation like
 		// Value[T2] or a full instantiation like Value[int].
 		if strings.Index(s.Name, "[") < 0 {
@@ -979,7 +987,6 @@ func (w *exportWriter) doTyp(t *types.Type) {
 	// type, rather than a defined type with typeparam underlying type, like:
 	// type orderedAbs[T any] T
 	if t.IsTypeParam() && t.Underlying() == t {
-		assert(base.Flag.G > 0)
 		if s.Pkg == types.BuiltinPkg || s.Pkg == types.UnsafePkg {
 			base.Fatalf("builtin type missing from typIndex: %v", t)
 		}
@@ -1052,14 +1059,6 @@ func (w *exportWriter) doTyp(t *types.Type) {
 			}
 		}
 
-		// Sort methods and embedded types, for consistency with types2.
-		// Note: embedded types may be anonymous, and types2 sorts them
-		// with sort.Stable too.
-		if base.Debug.UnifiedQuirks != 0 {
-			sort.Sort(types.MethodsByName(methods))
-			sort.Stable(types.EmbeddedsByName(embeddeds))
-		}
-
 		w.startType(interfaceType)
 		w.setPkg(t.Pkg(), true)
 
@@ -1077,7 +1076,6 @@ func (w *exportWriter) doTyp(t *types.Type) {
 		}
 
 	case types.TUNION:
-		assert(base.Flag.G > 0)
 		// TODO(danscales): possibly put out the tilde bools in more
 		// compact form.
 		w.startType(unionType)
@@ -1606,11 +1604,7 @@ func (w *exportWriter) stmt(n ir.Node) {
 
 	case ir.OAS2, ir.OAS2DOTTYPE, ir.OAS2FUNC, ir.OAS2MAPR, ir.OAS2RECV:
 		n := n.(*ir.AssignListStmt)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.OAS2)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.stmtList(n.Init())
 		w.exprList(n.Lhs)
@@ -1775,9 +1769,7 @@ func (w *exportWriter) expr(n ir.Node) {
 			// Indicate that this is not an OKEY entry.
 			w.bool(false)
 			w.qualifiedIdent(n)
-			if go117ExportTypes {
-				w.typ(n.Type())
-			}
+			w.typ(n.Type())
 			break
 		}
 
@@ -1806,9 +1798,7 @@ func (w *exportWriter) expr(n ir.Node) {
 		s := n.Sym()
 		w.string(s.Name)
 		w.pkg(s.Pkg)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	// case OPACK:
 	// 	should have been resolved by typechecking - handled by default case
@@ -1821,12 +1811,9 @@ func (w *exportWriter) expr(n ir.Node) {
 		n := n.(*ir.DynamicType)
 		w.op(ir.ODYNAMICTYPE)
 		w.pos(n.Pos())
-		w.expr(n.X)
-		if n.ITab != nil {
-			w.bool(true)
+		w.expr(n.RType)
+		if w.bool(n.ITab != nil) {
 			w.expr(n.ITab)
-		} else {
-			w.bool(false)
 		}
 		w.typ(n.Type())
 
@@ -1880,16 +1867,10 @@ func (w *exportWriter) expr(n ir.Node) {
 
 	case ir.OPTRLIT:
 		n := n.(*ir.AddrExpr)
-		if go117ExportTypes {
-			w.op(ir.OPTRLIT)
-		} else {
-			w.op(ir.OADDR)
-		}
+		w.op(ir.OPTRLIT)
 		w.pos(n.Pos())
 		w.expr(n.X)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.OSTRUCTLIT:
 		n := n.(*ir.CompLitExpr)
@@ -1900,15 +1881,11 @@ func (w *exportWriter) expr(n ir.Node) {
 
 	case ir.OCOMPLIT, ir.OARRAYLIT, ir.OSLICELIT, ir.OMAPLIT:
 		n := n.(*ir.CompLitExpr)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.OCOMPLIT)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.typ(n.Type())
 		w.exprList(n.List)
-		if go117ExportTypes && n.Op() == ir.OSLICELIT {
+		if n.Op() == ir.OSLICELIT {
 			w.uint64(uint64(n.Len))
 		}
 	case ir.OKEY:
@@ -1923,37 +1900,25 @@ func (w *exportWriter) expr(n ir.Node) {
 
 	case ir.OXDOT, ir.ODOT, ir.ODOTPTR, ir.ODOTINTER, ir.ODOTMETH, ir.OMETHVALUE, ir.OMETHEXPR:
 		n := n.(*ir.SelectorExpr)
-		if go117ExportTypes {
-			// For go117ExportTypes, we usually see all ops except
-			// OXDOT, but we can see OXDOT for generic functions.
-			w.op(n.Op())
-		} else {
-			w.op(ir.OXDOT)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
 		w.exoticSelector(n.Sel)
-		if go117ExportTypes {
-			w.exoticType(n.Type())
-			if n.Op() == ir.OXDOT {
-				// n.Selection for method references will be
-				// reconstructed during import.
-				w.bool(n.Selection != nil)
-			} else if n.Op() == ir.ODOT || n.Op() == ir.ODOTPTR || n.Op() == ir.ODOTINTER {
-				w.exoticField(n.Selection)
-			}
-			// n.Selection is not required for OMETHEXPR, ODOTMETH, and OMETHVALUE. It will
-			// be reconstructed during import.  n.Selection is computed during
-			// transformDot() for OXDOT.
+		w.exoticType(n.Type())
+		if n.Op() == ir.OXDOT {
+			// n.Selection for method references will be
+			// reconstructed during import.
+			w.bool(n.Selection != nil)
+		} else if n.Op() == ir.ODOT || n.Op() == ir.ODOTPTR || n.Op() == ir.ODOTINTER {
+			w.exoticField(n.Selection)
 		}
+		// n.Selection is not required for OMETHEXPR, ODOTMETH, and OMETHVALUE. It will
+		// be reconstructed during import.  n.Selection is computed during
+		// transformDot() for OXDOT.
 
 	case ir.ODOTTYPE, ir.ODOTTYPE2:
 		n := n.(*ir.TypeAssertExpr)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.ODOTTYPE)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
 		w.typ(n.Type())
@@ -1963,96 +1928,74 @@ func (w *exportWriter) expr(n ir.Node) {
 		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
-		w.expr(n.T)
+		if w.bool(n.RType != nil) {
+			w.expr(n.RType)
+		}
+		if w.bool(n.ITab != nil) {
+			w.expr(n.ITab)
+		}
 		w.typ(n.Type())
 
 	case ir.OINDEX, ir.OINDEXMAP:
 		n := n.(*ir.IndexExpr)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.OINDEX)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
 		w.expr(n.Index)
-		if go117ExportTypes {
-			w.exoticType(n.Type())
-			if n.Op() == ir.OINDEXMAP {
-				w.bool(n.Assigned)
-			}
+		w.exoticType(n.Type())
+		if n.Op() == ir.OINDEXMAP {
+			w.bool(n.Assigned)
 		}
 
 	case ir.OSLICE, ir.OSLICESTR, ir.OSLICEARR:
 		n := n.(*ir.SliceExpr)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.OSLICE)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
 		w.exprsOrNil(n.Low, n.High)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.OSLICE3, ir.OSLICE3ARR:
 		n := n.(*ir.SliceExpr)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.OSLICE3)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
 		w.exprsOrNil(n.Low, n.High)
 		w.expr(n.Max)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
-	case ir.OCOPY, ir.OCOMPLEX, ir.OUNSAFEADD, ir.OUNSAFESLICE:
+	case ir.OCOPY, ir.OCOMPLEX, ir.OUNSAFEADD, ir.OUNSAFESLICE, ir.OUNSAFESTRING:
 		// treated like other builtin calls (see e.g., OREAL)
 		n := n.(*ir.BinaryExpr)
 		w.op(n.Op())
 		w.pos(n.Pos())
+		w.stmtList(n.Init())
 		w.expr(n.X)
 		w.expr(n.Y)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		} else {
-			w.op(ir.OEND)
-		}
+		w.typ(n.Type())
 
-	case ir.OCONV, ir.OCONVIFACE, ir.OCONVIDATA, ir.OCONVNOP, ir.OBYTES2STR, ir.ORUNES2STR, ir.OSTR2BYTES, ir.OSTR2RUNES, ir.ORUNESTR, ir.OSLICE2ARRPTR:
+	case ir.OCONV, ir.OCONVIFACE, ir.OCONVIDATA, ir.OCONVNOP, ir.OBYTES2STR, ir.ORUNES2STR, ir.OSTR2BYTES, ir.OSTR2RUNES, ir.ORUNESTR, ir.OSLICE2ARR, ir.OSLICE2ARRPTR:
 		n := n.(*ir.ConvExpr)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.OCONV)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.typ(n.Type())
 		w.expr(n.X)
+		w.bool(n.Implicit())
 
-	case ir.OREAL, ir.OIMAG, ir.OCAP, ir.OCLOSE, ir.OLEN, ir.ONEW, ir.OPANIC:
+	case ir.OREAL, ir.OIMAG, ir.OCAP, ir.OCLOSE, ir.OLEN, ir.ONEW, ir.OPANIC, ir.OUNSAFESTRINGDATA, ir.OUNSAFESLICEDATA:
 		n := n.(*ir.UnaryExpr)
 		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
-		if go117ExportTypes {
-			if n.Op() != ir.OPANIC {
-				w.typ(n.Type())
-			}
-		} else {
-			w.op(ir.OEND)
+		if n.Op() != ir.OPANIC {
+			w.typ(n.Type())
 		}
 
 	case ir.OAPPEND, ir.ODELETE, ir.ORECOVER, ir.OPRINT, ir.OPRINTN:
 		n := n.(*ir.CallExpr)
 		w.op(n.Op())
 		w.pos(n.Pos())
+		w.stmtList(n.Init())
 		w.exprList(n.Args) // emits terminating OEND
 		// only append() calls may contain '...' arguments
 		if n.Op() == ir.OAPPEND {
@@ -2060,27 +2003,19 @@ func (w *exportWriter) expr(n ir.Node) {
 		} else if n.IsDDD {
 			base.Fatalf("exporter: unexpected '...' with %v call", n.Op())
 		}
-		if go117ExportTypes {
-			if n.Op() != ir.ODELETE && n.Op() != ir.OPRINT && n.Op() != ir.OPRINTN {
-				w.typ(n.Type())
-			}
+		if n.Op() != ir.ODELETE && n.Op() != ir.OPRINT && n.Op() != ir.OPRINTN {
+			w.typ(n.Type())
 		}
 
 	case ir.OCALL, ir.OCALLFUNC, ir.OCALLMETH, ir.OCALLINTER, ir.OGETG:
 		n := n.(*ir.CallExpr)
-		if go117ExportTypes {
-			w.op(n.Op())
-		} else {
-			w.op(ir.OCALL)
-		}
+		w.op(n.Op())
 		w.pos(n.Pos())
 		w.stmtList(n.Init())
 		w.expr(n.X)
 		w.exprList(n.Args)
 		w.bool(n.IsDDD)
-		if go117ExportTypes {
-			w.exoticType(n.Type())
-		}
+		w.exoticType(n.Type())
 
 	case ir.OMAKEMAP, ir.OMAKECHAN, ir.OMAKESLICE:
 		n := n.(*ir.MakeExpr)
@@ -2101,7 +2036,7 @@ func (w *exportWriter) expr(n ir.Node) {
 			// an argument. Don't serialize that argument here.
 			w.expr(n.Len)
 			w.op(ir.OEND)
-		case n.Len != nil && go117ExportTypes:
+		case n.Len != nil:
 			w.expr(n.Len)
 			w.op(ir.OEND)
 		}
@@ -2120,27 +2055,21 @@ func (w *exportWriter) expr(n ir.Node) {
 		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.OADDR:
 		n := n.(*ir.AddrExpr)
 		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.ODEREF:
 		n := n.(*ir.StarExpr)
 		w.op(n.Op())
 		w.pos(n.Pos())
 		w.expr(n.X)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.OSEND:
 		n := n.(*ir.SendStmt)
@@ -2157,9 +2086,7 @@ func (w *exportWriter) expr(n ir.Node) {
 		w.pos(n.Pos())
 		w.expr(n.X)
 		w.expr(n.Y)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.OANDAND, ir.OOROR:
 		n := n.(*ir.LogicalExpr)
@@ -2167,18 +2094,14 @@ func (w *exportWriter) expr(n ir.Node) {
 		w.pos(n.Pos())
 		w.expr(n.X)
 		w.expr(n.Y)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.OADDSTR:
 		n := n.(*ir.AddStringExpr)
 		w.op(ir.OADDSTR)
 		w.pos(n.Pos())
 		w.exprList(n.List)
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.ODCLCONST:
 		// if exporting, DCLCONST should just be removed as its usage
@@ -2193,9 +2116,7 @@ func (w *exportWriter) expr(n ir.Node) {
 		for _, targ := range n.Targs {
 			w.typ(targ.Type())
 		}
-		if go117ExportTypes {
-			w.typ(n.Type())
-		}
+		w.typ(n.Type())
 
 	case ir.OSELRECV2:
 		n := n.(*ir.AssignListStmt)
@@ -2310,16 +2231,6 @@ func (w *intWriter) uint64(x uint64) {
 	n := binary.PutUvarint(buf[:], x)
 	w.Write(buf[:n])
 }
-
-// If go117ExportTypes is true, then we write type information when
-// exporting function bodies, so those function bodies don't need to
-// be re-typechecked on import.
-// This flag adds some other info to the serialized stream as well
-// which was previously recomputed during typechecking, like
-// specializing opcodes (e.g. OXDOT to ODOTPTR) and ancillary
-// information (e.g. length field for OSLICELIT).
-const go117ExportTypes = true
-const Go117ExportTypes = go117ExportTypes
 
 // The name used for dictionary parameters or local variables.
 const LocalDictName = ".dict"

@@ -146,6 +146,7 @@ func regalloc(f *Func) {
 	var s regAllocState
 	s.init(f)
 	s.regalloc(f)
+	s.close()
 }
 
 type register uint8
@@ -357,6 +358,12 @@ func (s *regAllocState) clobberRegs(m regMask) {
 // setOrig records that c's original value is the same as
 // v's original value.
 func (s *regAllocState) setOrig(c *Value, v *Value) {
+	if int(c.ID) >= cap(s.orig) {
+		x := s.f.Cache.allocValueSlice(int(c.ID) + 1)
+		copy(x, s.orig)
+		s.f.Cache.freeValueSlice(s.orig)
+		s.orig = x
+	}
 	for int(c.ID) >= len(s.orig) {
 		s.orig = append(s.orig, nil)
 	}
@@ -626,7 +633,7 @@ func (s *regAllocState) init(f *Func) {
 			// Note that for Flag_shared (position independent code)
 			// we do need to be careful, but that carefulness is hidden
 			// in the rewrite rules so we always have a free register
-			// available for global load/stores. See gen/386.rules (search for Flag_shared).
+			// available for global load/stores. See _gen/386.rules (search for Flag_shared).
 		case "amd64":
 			s.allocatable &^= 1 << 15 // R15
 		case "arm", "thumb":
@@ -664,7 +671,7 @@ func (s *regAllocState) init(f *Func) {
 		s.f.Cache.regallocValues = make([]valState, nv)
 	}
 	s.values = s.f.Cache.regallocValues
-	s.orig = make([]*Value, nv)
+	s.orig = s.f.Cache.allocValueSlice(nv)
 	s.copies = make(map[*Value]bool)
 	for _, b := range s.visitOrder {
 		for _, v := range b.Values {
@@ -726,6 +733,10 @@ func (s *regAllocState) init(f *Func) {
 		// TODO: honor GOCLOBBERDEADHASH, or maybe GOSSAHASH.
 		s.doClobber = true
 	}
+}
+
+func (s *regAllocState) close() {
+	s.f.Cache.freeValueSlice(s.orig)
 }
 
 // Adds a use record for id at distance dist from the start of the block.
@@ -840,6 +851,9 @@ func (s *regAllocState) regspec(v *Value) regInfo {
 func (s *regAllocState) isGReg(r register) bool {
 	return s.f.Config.hasGReg && s.GReg == r
 }
+
+// Dummy value used to represent the value being held in a temporary register.
+var tmpVal Value
 
 func (s *regAllocState) regalloc(f *Func) {
 	regValLiveSet := f.newSparseSet(f.NumValues()) // set of values that may be live in register
@@ -1237,7 +1251,7 @@ func (s *regAllocState) regalloc(f *Func) {
 				desired.clobber(j.regs)
 				desired.add(v.Args[j.idx].ID, pickReg(j.regs))
 			}
-			if opcodeTable[v.Op].resultInArg0 {
+			if opcodeTable[v.Op].resultInArg0 || v.Op == OpAMD64ADDQconst || v.Op == OpAMD64ADDLconst || v.Op == OpSelect0 {
 				if opcodeTable[v.Op].commutative {
 					desired.addList(v.Args[1].ID, prefs)
 				}
@@ -1255,6 +1269,7 @@ func (s *regAllocState) regalloc(f *Func) {
 
 		// Process all the non-phi values.
 		for idx, v := range oldSched {
+			tmpReg := noRegister
 			if s.f.pass.debug > regDebug {
 				fmt.Printf("  processing %s\n", v.LongString())
 			}
@@ -1290,7 +1305,7 @@ func (s *regAllocState) regalloc(f *Func) {
 				}
 				b.Values = append(b.Values, v)
 				s.advanceUses(v)
-				goto issueSpill
+				continue
 			}
 			if v.Op == OpGetG && s.f.Config.hasGReg {
 				// use hardware g register
@@ -1300,7 +1315,7 @@ func (s *regAllocState) regalloc(f *Func) {
 				s.assignReg(s.GReg, v, v)
 				b.Values = append(b.Values, v)
 				s.advanceUses(v)
-				goto issueSpill
+				continue
 			}
 			if v.Op == OpArg {
 				// Args are "pre-spilled" values. We don't allocate
@@ -1539,6 +1554,20 @@ func (s *regAllocState) regalloc(f *Func) {
 			}
 
 		ok:
+			// Pick a temporary register if needed.
+			// It should be distinct from all the input registers, so we
+			// allocate it after all the input registers, but before
+			// the input registers are freed via advanceUses below.
+			// (Not all instructions need that distinct part, but it is conservative.)
+			if opcodeTable[v.Op].needIntTemp {
+				m := s.allocatable & s.f.Config.gpRegMask
+				if m&^desired.avoid&^s.nospill != 0 {
+					m &^= desired.avoid
+				}
+				tmpReg = s.allocReg(m, &tmpVal)
+				s.nospill |= regMask(1) << tmpReg
+			}
+
 			// Now that all args are in regs, we're ready to issue the value itself.
 			// Before we pick a register for the output value, allow input registers
 			// to be deallocated. We do this here so that the output can use the
@@ -1563,6 +1592,11 @@ func (s *regAllocState) regalloc(f *Func) {
 				outRegs := noRegisters // TODO if this is costly, hoist and clear incrementally below.
 				maxOutIdx := -1
 				var used regMask
+				if tmpReg != noRegister {
+					// Ensure output registers are distinct from the temporary register.
+					// (Not all instructions need that distinct part, but it is conservative.)
+					used |= regMask(1) << tmpReg
+				}
 				for _, out := range regspec.outputs {
 					mask := out.regs & s.allocatable &^ used
 					if mask == 0 {
@@ -1598,11 +1632,13 @@ func (s *regAllocState) regalloc(f *Func) {
 							}
 						}
 					}
-					for _, r := range dinfo[idx].out {
-						if r != noRegister && (mask&^s.used)>>r&1 != 0 {
-							// Desired register is allowed and unused.
-							mask = regMask(1) << r
-							break
+					if out.idx == 0 { // desired registers only apply to the first element of a tuple result
+						for _, r := range dinfo[idx].out {
+							if r != noRegister && (mask&^s.used)>>r&1 != 0 {
+								// Desired register is allowed and unused.
+								mask = regMask(1) << r
+								break
+							}
 						}
 					}
 					// Avoid registers we're saving for other values.
@@ -1642,6 +1678,13 @@ func (s *regAllocState) regalloc(f *Func) {
 						s.assignReg(r, v, v)
 					}
 				}
+				if tmpReg != noRegister {
+					// Remember the temp register allocation, if any.
+					if s.f.tempRegs == nil {
+						s.f.tempRegs = map[ID]*Register{}
+					}
+					s.f.tempRegs[v.ID] = &s.registers[tmpReg]
+				}
 			}
 
 			// deallocate dead args, if we have not done so
@@ -1656,8 +1699,6 @@ func (s *regAllocState) regalloc(f *Func) {
 				v.SetArg(i, a) // use register version of arguments
 			}
 			b.Values = append(b.Values, v)
-
-		issueSpill:
 		}
 
 		// Copy the control values - we need this so we can reduce the
@@ -2496,10 +2537,10 @@ func (s *regAllocState) computeLive() {
 	s.desired = make([]desiredState, f.NumBlocks())
 	var phis []*Value
 
-	live := f.newSparseMap(f.NumValues())
-	defer f.retSparseMap(live)
-	t := f.newSparseMap(f.NumValues())
-	defer f.retSparseMap(t)
+	live := f.newSparseMapPos(f.NumValues())
+	defer f.retSparseMapPos(live)
+	t := f.newSparseMapPos(f.NumValues())
+	defer f.retSparseMapPos(t)
 
 	// Keep track of which value we want in each register.
 	var desired desiredState
@@ -2581,7 +2622,12 @@ func (s *regAllocState) computeLive() {
 					desired.add(v.Args[j.idx].ID, pickReg(j.regs))
 				}
 				// Set desired register of input 0 if this is a 2-operand instruction.
-				if opcodeTable[v.Op].resultInArg0 {
+				if opcodeTable[v.Op].resultInArg0 || v.Op == OpAMD64ADDQconst || v.Op == OpAMD64ADDLconst || v.Op == OpSelect0 {
+					// ADDQconst is added here because we want to treat it as resultInArg0 for
+					// the purposes of desired registers, even though it is not an absolute requirement.
+					// This is because we'd rather implement it as ADDQ instead of LEAQ.
+					// Same for ADDLconst
+					// Select0 is added here to propagate the desired register to the tuple-generating instruction.
 					if opcodeTable[v.Op].commutative {
 						desired.addList(v.Args[1].ID, prefs)
 					}
@@ -2623,7 +2669,7 @@ func (s *regAllocState) computeLive() {
 					d := e.val + delta
 					if !t.contains(e.key) || d < t.get(e.key) {
 						update = true
-						t.set(e.key, d, e.aux)
+						t.set(e.key, d, e.pos)
 					}
 				}
 				// Also add the correct arg from the saved phi values.
@@ -2646,7 +2692,7 @@ func (s *regAllocState) computeLive() {
 					l = make([]liveInfo, 0, t.size())
 				}
 				for _, e := range t.contents() {
-					l = append(l, liveInfo{e.key, e.val, e.aux})
+					l = append(l, liveInfo{e.key, e.val, e.pos})
 				}
 				s.live[p.ID] = l
 				changed = true
@@ -2706,6 +2752,8 @@ type desiredStateEntry struct {
 	ID ID
 	// Registers it would like to be in, in priority order.
 	// Unused slots are filled with noRegister.
+	// For opcodes that return tuples, we track desired registers only
+	// for the first element of the tuple.
 	regs [4]register
 }
 

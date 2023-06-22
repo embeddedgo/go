@@ -106,7 +106,7 @@ DATA	runtime·mainPC+0(SB)/8,$runtime·main<ABIInternal>(SB)
 GLOBL	runtime·mainPC(SB),RODATA,$8
 
 TEXT runtime·breakpoint(SB),NOSPLIT|NOFRAME,$0-0
-	MOVD	R0, 0(R0) // TODO: TD
+	TW	$31, R0, R0
 	RET
 
 TEXT runtime·asminit(SB),NOSPLIT|NOFRAME,$0-0
@@ -167,11 +167,7 @@ TEXT gogo<>(SB), NOSPLIT|NOFRAME, $0
 TEXT runtime·mcall<ABIInternal>(SB), NOSPLIT|NOFRAME, $0-8
 	// Save caller state in g->sched
 	// R11 should be safe across save_g??
-#ifdef GOEXPERIMENT_regabiargs
 	MOVD	R3, R11
-#else
-	MOVD	fn+0(FP), R11
-#endif
 	MOVD	R1, (g_sched+gobuf_sp)(g)
 	MOVD	LR, R31
 	MOVD	R31, (g_sched+gobuf_pc)(g)
@@ -343,8 +339,11 @@ TEXT runtime·morestack_noctxt(SB),NOSPLIT|NOFRAME,$0-0
 	// the caller doesn't save LR on stack but passes it as a
 	// register (R5), and the unwinder currently doesn't understand.
 	// Make it SPWRITE to stop unwinding. (See issue 54332)
-	MOVD	R1, R1
+	// Use OR R0, R1 instead of MOVD R1, R1 as the MOVD instruction
+	// has a special affect on Power8,9,10 by lowering the thread 
+	// priority and causing a slowdown in execution time
 
+	OR	R0, R1
 	MOVD	R0, R11
 	BR	runtime·morestack(SB)
 
@@ -795,7 +794,6 @@ TEXT runtime·cputicks(SB),NOSPLIT,$0-8
 	MOVD	R3, ret+0(FP)
 	RET
 
-#ifdef GOEXPERIMENT_regabireflect
 // spillArgs stores return values from registers to a *internal/abi.RegArgs in R20.
 TEXT runtime·spillArgs(SB),NOSPLIT,$0-0
 	MOVD    R3, 0(R20)
@@ -851,14 +849,6 @@ TEXT runtime·unspillArgs(SB),NOSPLIT,$0-0
 	FMOVD	176(R20), F11
 	FMOVD	184(R20), F12
 	RET
-#else
-
-TEXT runtime·spillArgs(SB),NOSPLIT,$0-0
-        RET
-
-TEXT runtime·unspillArgs(SB),NOSPLIT,$0-0
-        RET
-#endif
 
 // AES hashing not implemented for ppc64
 TEXT runtime·memhash<ABIInternal>(SB),NOSPLIT|NOFRAME,$0-32
@@ -1016,137 +1006,261 @@ flush:
 // then tail call to the corresponding runtime handler.
 // The tail call makes these stubs disappear in backtraces.
 TEXT runtime·panicIndex<ABIInternal>(SB),NOSPLIT,$0-16
-#ifndef GOEXPERIMENT_regabiargs
-	MOVD	R3, x+0(FP)
-	MOVD	R4, y+8(FP)
-#endif
 	JMP	runtime·goPanicIndex<ABIInternal>(SB)
 TEXT runtime·panicIndexU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifndef GOEXPERIMENT_regabiargs
-	MOVD	R3, x+0(FP)
-	MOVD	R4, y+8(FP)
-#endif
 	JMP	runtime·goPanicIndexU<ABIInternal>(SB)
 TEXT runtime·panicSliceAlen<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef GOEXPERIMENT_regabiargs
 	MOVD	R4, R3
 	MOVD	R5, R4
-#else
-	MOVD	R4, x+0(FP)
-	MOVD	R5, y+8(FP)
-#endif
 	JMP	runtime·goPanicSliceAlen<ABIInternal>(SB)
 TEXT runtime·panicSliceAlenU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef GOEXPERIMENT_regabiargs
 	MOVD	R4, R3
 	MOVD	R5, R4
-#else
-	MOVD	R4, x+0(FP)
-	MOVD	R5, y+8(FP)
-#endif
 	JMP	runtime·goPanicSliceAlenU<ABIInternal>(SB)
 TEXT runtime·panicSliceAcap<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef GOEXPERIMENT_regabiargs
 	MOVD	R4, R3
 	MOVD	R5, R4
-#else
-	MOVD	R4, x+0(FP)
-	MOVD	R5, y+8(FP)
-#endif
 	JMP	runtime·goPanicSliceAcap<ABIInternal>(SB)
 TEXT runtime·panicSliceAcapU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef GOEXPERIMENT_regabiargs
 	MOVD	R4, R3
 	MOVD	R5, R4
-#else
-	MOVD	R4, x+0(FP)
-	MOVD	R5, y+8(FP)
-#endif
 	JMP	runtime·goPanicSliceAcapU<ABIInternal>(SB)
 TEXT runtime·panicSliceB<ABIInternal>(SB),NOSPLIT,$0-16
-#ifndef GOEXPERIMENT_regabiargs
-	MOVD	R3, x+0(FP)
-	MOVD	R4, y+8(FP)
-#endif
 	JMP	runtime·goPanicSliceB<ABIInternal>(SB)
 TEXT runtime·panicSliceBU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifndef GOEXPERIMENT_regabiargs
-	MOVD	R3, x+0(FP)
-	MOVD	R4, y+8(FP)
-#endif
 	JMP	runtime·goPanicSliceBU<ABIInternal>(SB)
 TEXT runtime·panicSlice3Alen<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef GOEXPERIMENT_regabiargs
 	MOVD	R5, R3
 	MOVD	R6, R4
-#else
-	MOVD	R5, x+0(FP)
-	MOVD	R6, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3Alen<ABIInternal>(SB)
 TEXT runtime·panicSlice3AlenU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef	GOEXPERIMENT_regabiargs
 	MOVD	R5, R3
 	MOVD	R6, R4
-#else
-	MOVD	R5, x+0(FP)
-	MOVD	R6, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3AlenU<ABIInternal>(SB)
 TEXT runtime·panicSlice3Acap<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef	GOEXPERIMENT_regabiargs
 	MOVD	R5, R3
 	MOVD	R6, R4
-#else
-	MOVD	R5, x+0(FP)
-	MOVD	R6, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3Acap<ABIInternal>(SB)
 TEXT runtime·panicSlice3AcapU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef	GOEXPERIMENT_regabiargs
 	MOVD	R5, R3
 	MOVD	R6, R4
-#else
-	MOVD	R5, x+0(FP)
-	MOVD	R6, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3AcapU<ABIInternal>(SB)
 TEXT runtime·panicSlice3B<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef	GOEXPERIMENT_regabiargs
 	MOVD	R4, R3
 	MOVD	R5, R4
-#else
-	MOVD	R4, x+0(FP)
-	MOVD	R5, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3B<ABIInternal>(SB)
 TEXT runtime·panicSlice3BU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef	GOEXPERIMENT_regabiargs
 	MOVD	R4, R3
 	MOVD	R5, R4
-#else
-	MOVD	R4, x+0(FP)
-	MOVD	R5, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3BU<ABIInternal>(SB)
 TEXT runtime·panicSlice3C<ABIInternal>(SB),NOSPLIT,$0-16
-#ifndef GOEXPERIMENT_regabiargs
-	MOVD	R3, x+0(FP)
-	MOVD	R4, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3C<ABIInternal>(SB)
 TEXT runtime·panicSlice3CU<ABIInternal>(SB),NOSPLIT,$0-16
-#ifndef GOEXPERIMENT_regabiargs
-	MOVD	R3, x+0(FP)
-	MOVD	R4, y+8(FP)
-#endif
 	JMP	runtime·goPanicSlice3CU<ABIInternal>(SB)
 TEXT runtime·panicSliceConvert<ABIInternal>(SB),NOSPLIT,$0-16
-#ifdef	GOEXPERIMENT_regabiargs
 	MOVD	R5, R3
 	MOVD	R6, R4
-#else
-	MOVD	R5, x+0(FP)
-	MOVD	R6, y+8(FP)
-#endif
 	JMP	runtime·goPanicSliceConvert<ABIInternal>(SB)
+
+// These functions are used when internal linking cgo with external
+// objects compiled with the -Os on gcc. They reduce prologue/epilogue
+// size by deferring preservation of callee-save registers to a shared
+// function. These are defined in PPC64 ELFv2 2.3.3 (but also present
+// in ELFv1)
+//
+// These appear unused, but the linker will redirect calls to functions
+// like _savegpr0_14 or _restgpr1_14 to runtime.elf_savegpr0 or
+// runtime.elf_restgpr1 with an appropriate offset based on the number
+// register operations required when linking external objects which
+// make these calls. For GPR/FPR saves, the minimum register value is
+// 14, for VR it is 20.
+//
+// These are only used when linking such cgo code internally. Note, R12
+// and R0 may be used in different ways than regular ELF compliant
+// functions.
+TEXT runtime·elf_savegpr0(SB),NOSPLIT|NOFRAME,$0
+	// R0 holds the LR of the caller's caller, R1 holds save location
+	MOVD	R14, -144(R1)
+	MOVD	R15, -136(R1)
+	MOVD	R16, -128(R1)
+	MOVD	R17, -120(R1)
+	MOVD	R18, -112(R1)
+	MOVD	R19, -104(R1)
+	MOVD	R20, -96(R1)
+	MOVD	R21, -88(R1)
+	MOVD	R22, -80(R1)
+	MOVD	R23, -72(R1)
+	MOVD	R24, -64(R1)
+	MOVD	R25, -56(R1)
+	MOVD	R26, -48(R1)
+	MOVD	R27, -40(R1)
+	MOVD	R28, -32(R1)
+	MOVD	R29, -24(R1)
+	MOVD	g, -16(R1)
+	MOVD	R31, -8(R1)
+	MOVD	R0, 16(R1)
+	RET
+TEXT runtime·elf_restgpr0(SB),NOSPLIT|NOFRAME,$0
+	// R1 holds save location. This returns to the LR saved on stack (bypassing the caller)
+	MOVD	-144(R1), R14
+	MOVD	-136(R1), R15
+	MOVD	-128(R1), R16
+	MOVD	-120(R1), R17
+	MOVD	-112(R1), R18
+	MOVD	-104(R1), R19
+	MOVD	-96(R1), R20
+	MOVD	-88(R1), R21
+	MOVD	-80(R1), R22
+	MOVD	-72(R1), R23
+	MOVD	-64(R1), R24
+	MOVD	-56(R1), R25
+	MOVD	-48(R1), R26
+	MOVD	-40(R1), R27
+	MOVD	-32(R1), R28
+	MOVD	-24(R1), R29
+	MOVD	-16(R1), g
+	MOVD	-8(R1), R31
+	MOVD	16(R1), R0	// Load and return to saved LR
+	MOVD	R0, LR
+	RET
+TEXT runtime·elf_savegpr1(SB),NOSPLIT|NOFRAME,$0
+	// R12 holds the save location
+	MOVD	R14, -144(R12)
+	MOVD	R15, -136(R12)
+	MOVD	R16, -128(R12)
+	MOVD	R17, -120(R12)
+	MOVD	R18, -112(R12)
+	MOVD	R19, -104(R12)
+	MOVD	R20, -96(R12)
+	MOVD	R21, -88(R12)
+	MOVD	R22, -80(R12)
+	MOVD	R23, -72(R12)
+	MOVD	R24, -64(R12)
+	MOVD	R25, -56(R12)
+	MOVD	R26, -48(R12)
+	MOVD	R27, -40(R12)
+	MOVD	R28, -32(R12)
+	MOVD	R29, -24(R12)
+	MOVD	g, -16(R12)
+	MOVD	R31, -8(R12)
+	RET
+TEXT runtime·elf_restgpr1(SB),NOSPLIT|NOFRAME,$0
+	// R12 holds the save location
+	MOVD	-144(R12), R14
+	MOVD	-136(R12), R15
+	MOVD	-128(R12), R16
+	MOVD	-120(R12), R17
+	MOVD	-112(R12), R18
+	MOVD	-104(R12), R19
+	MOVD	-96(R12), R20
+	MOVD	-88(R12), R21
+	MOVD	-80(R12), R22
+	MOVD	-72(R12), R23
+	MOVD	-64(R12), R24
+	MOVD	-56(R12), R25
+	MOVD	-48(R12), R26
+	MOVD	-40(R12), R27
+	MOVD	-32(R12), R28
+	MOVD	-24(R12), R29
+	MOVD	-16(R12), g
+	MOVD	-8(R12), R31
+	RET
+TEXT runtime·elf_savefpr(SB),NOSPLIT|NOFRAME,$0
+	// R0 holds the LR of the caller's caller, R1 holds save location
+	FMOVD	F14, -144(R1)
+	FMOVD	F15, -136(R1)
+	FMOVD	F16, -128(R1)
+	FMOVD	F17, -120(R1)
+	FMOVD	F18, -112(R1)
+	FMOVD	F19, -104(R1)
+	FMOVD	F20, -96(R1)
+	FMOVD	F21, -88(R1)
+	FMOVD	F22, -80(R1)
+	FMOVD	F23, -72(R1)
+	FMOVD	F24, -64(R1)
+	FMOVD	F25, -56(R1)
+	FMOVD	F26, -48(R1)
+	FMOVD	F27, -40(R1)
+	FMOVD	F28, -32(R1)
+	FMOVD	F29, -24(R1)
+	FMOVD	F30, -16(R1)
+	FMOVD	F31, -8(R1)
+	MOVD	R0, 16(R1)
+	RET
+TEXT runtime·elf_restfpr(SB),NOSPLIT|NOFRAME,$0
+	// R1 holds save location. This returns to the LR saved on stack (bypassing the caller)
+	FMOVD	-144(R1), F14
+	FMOVD	-136(R1), F15
+	FMOVD	-128(R1), F16
+	FMOVD	-120(R1), F17
+	FMOVD	-112(R1), F18
+	FMOVD	-104(R1), F19
+	FMOVD	-96(R1), F20
+	FMOVD	-88(R1), F21
+	FMOVD	-80(R1), F22
+	FMOVD	-72(R1), F23
+	FMOVD	-64(R1), F24
+	FMOVD	-56(R1), F25
+	FMOVD	-48(R1), F26
+	FMOVD	-40(R1), F27
+	FMOVD	-32(R1), F28
+	FMOVD	-24(R1), F29
+	FMOVD	-16(R1), F30
+	FMOVD	-8(R1), F31
+	MOVD	16(R1), R0	// Load and return to saved LR
+	MOVD	R0, LR
+	RET
+TEXT runtime·elf_savevr(SB),NOSPLIT|NOFRAME,$0
+	// R0 holds the save location, R12 is clobbered
+	MOVD	$-192, R12
+	STVX	V20, (R0+R12)
+	MOVD	$-176, R12
+	STVX	V21, (R0+R12)
+	MOVD	$-160, R12
+	STVX	V22, (R0+R12)
+	MOVD	$-144, R12
+	STVX	V23, (R0+R12)
+	MOVD	$-128, R12
+	STVX	V24, (R0+R12)
+	MOVD	$-112, R12
+	STVX	V25, (R0+R12)
+	MOVD	$-96, R12
+	STVX	V26, (R0+R12)
+	MOVD	$-80, R12
+	STVX	V27, (R0+R12)
+	MOVD	$-64, R12
+	STVX	V28, (R0+R12)
+	MOVD	$-48, R12
+	STVX	V29, (R0+R12)
+	MOVD	$-32, R12
+	STVX	V30, (R0+R12)
+	MOVD	$-16, R12
+	STVX	V31, (R0+R12)
+	RET
+TEXT runtime·elf_restvr(SB),NOSPLIT|NOFRAME,$0
+	// R0 holds the save location, R12 is clobbered
+	MOVD	$-192, R12
+	LVX	(R0+R12), V20
+	MOVD	$-176, R12
+	LVX	(R0+R12), V21
+	MOVD	$-160, R12
+	LVX	(R0+R12), V22
+	MOVD	$-144, R12
+	LVX	(R0+R12), V23
+	MOVD	$-128, R12
+	LVX	(R0+R12), V24
+	MOVD	$-112, R12
+	LVX	(R0+R12), V25
+	MOVD	$-96, R12
+	LVX	(R0+R12), V26
+	MOVD	$-80, R12
+	LVX	(R0+R12), V27
+	MOVD	$-64, R12
+	LVX	(R0+R12), V28
+	MOVD	$-48, R12
+	LVX	(R0+R12), V29
+	MOVD	$-32, R12
+	LVX	(R0+R12), V30
+	MOVD	$-16, R12
+	LVX	(R0+R12), V31
+	RET

@@ -293,6 +293,10 @@ var optab = [...]Optab{
 	{as: AMULAD},
 	{as: AMULSF},
 	{as: AMULSD},
+	{as: AFMULAF},
+	{as: AFMULAD},
+	{as: AFMULSF},
+	{as: AFMULSD},
 	{as: ANMULF},
 	{as: ANMULD},
 
@@ -1558,6 +1562,17 @@ func _ADDF__Fm__Fn__Fd(c *Ctx, p *obj.Prog, out []uint16) int {
 	case AMULSF:
 		o2 |= 0x040
 	case AMULSD:
+		o2 |= 0x140
+	case AFMULAF:
+		o1 |= 0x0a0
+	case AFMULAD:
+		o1 |= 0x0a0
+		o2 |= 0x100
+	case AFMULSF:
+		o1 |= 0x0a0
+		o2 |= 0x040
+	case AFMULSD:
+		o1 |= 0x0a0
 		o2 |= 0x140
 	case ANMULF:
 		o1 |= 0x020

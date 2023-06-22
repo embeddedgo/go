@@ -87,10 +87,27 @@ func IsInterface(t Type) bool {
 	return ok
 }
 
+// isNonTypeParamInterface reports whether t is an interface type but not a type parameter.
+func isNonTypeParamInterface(t Type) bool {
+	return !isTypeParam(t) && IsInterface(t)
+}
+
 // isTypeParam reports whether t is a type parameter.
 func isTypeParam(t Type) bool {
 	_, ok := t.(*TypeParam)
 	return ok
+}
+
+// hasEmptyTypeset reports whether t is a type parameter with an empty type set.
+// The function does not force the computation of the type set and so is safe to
+// use anywhere, but it may report a false negative if the type set has not been
+// computed yet.
+func hasEmptyTypeset(t Type) bool {
+	if tpar, _ := t.(*TypeParam); tpar != nil && tpar.bound != nil {
+		iface, _ := safeUnderlying(tpar.bound).(*Interface)
+		return iface != nil && iface.tset != nil && iface.tset.IsEmpty()
+	}
+	return false
 }
 
 // isGeneric reports whether a type is a generic, uninstantiated type
@@ -99,7 +116,7 @@ func isTypeParam(t Type) bool {
 func isGeneric(t Type) bool {
 	// A parameterized type is only generic if it doesn't have an instantiation already.
 	named, _ := t.(*Named)
-	return named != nil && named.obj != nil && named.targs == nil && named.TypeParams() != nil
+	return named != nil && named.obj != nil && named.inst == nil && named.TypeParams().Len() > 0
 }
 
 // Comparable reports whether values of type T are comparable.
@@ -144,7 +161,17 @@ func comparable(T Type, dynamic bool, seen map[Type]bool, reportf func(string, .
 		}
 		return true
 	case *Interface:
-		return dynamic && !isTypeParam(T) || t.typeSet().IsComparable(seen)
+		if dynamic && !isTypeParam(T) || t.typeSet().IsComparable(seen) {
+			return true
+		}
+		if reportf != nil {
+			if t.typeSet().IsEmpty() {
+				reportf("empty type set")
+			} else {
+				reportf("incomparable types in type set")
+			}
+		}
+		// fallthrough
 	}
 	return false
 }
@@ -280,18 +307,19 @@ func identical(x, y Type, cmpTags bool, p *ifacePair) bool {
 			}
 			smap := makeSubstMap(ytparams, targs)
 
-			var check *Checker // ok to call subst on a nil *Checker
+			var check *Checker   // ok to call subst on a nil *Checker
+			ctxt := NewContext() // need a non-nil Context for the substitution below
 
 			// Constraints must be pair-wise identical, after substitution.
 			for i, xtparam := range xtparams {
-				ybound := check.subst(token.NoPos, ytparams[i].bound, smap, nil)
+				ybound := check.subst(token.NoPos, ytparams[i].bound, smap, nil, ctxt)
 				if !identical(xtparam.bound, ybound, cmpTags, p) {
 					return false
 				}
 			}
 
-			yparams = check.subst(token.NoPos, y.params, smap, nil).(*Tuple)
-			yresults = check.subst(token.NoPos, y.results, smap, nil).(*Tuple)
+			yparams = check.subst(token.NoPos, y.params, smap, nil, ctxt).(*Tuple)
+			yresults = check.subst(token.NoPos, y.results, smap, nil, ctxt).(*Tuple)
 		}
 
 		return x.variadic == y.variadic &&
@@ -398,7 +426,7 @@ func identical(x, y Type, cmpTags bool, p *ifacePair) bool {
 			if len(xargs) > 0 {
 				// Instances are identical if their original type and type arguments
 				// are identical.
-				if !Identical(x.orig, y.orig) {
+				if !Identical(x.Origin(), y.Origin()) {
 					return false
 				}
 				for i, xa := range xargs {

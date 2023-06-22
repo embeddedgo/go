@@ -43,6 +43,8 @@ const (
 	ErrMissingRepeatArgument ErrorCode = "missing argument to repetition operator"
 	ErrTrailingBackslash     ErrorCode = "trailing backslash at end of expression"
 	ErrUnexpectedParen       ErrorCode = "unexpected )"
+	ErrNestingDepth          ErrorCode = "expression nests too deeply"
+	ErrLarge                 ErrorCode = "expression too large"
 )
 
 func (e ErrorCode) String() string {
@@ -158,7 +160,7 @@ func (p *parser) reuse(re *Regexp) {
 
 func (p *parser) checkLimits(re *Regexp) {
 	if p.numRunes > maxRunes {
-		panic(ErrInternalError)
+		panic(ErrLarge)
 	}
 	p.checkSize(re)
 	p.checkHeight(re)
@@ -202,7 +204,7 @@ func (p *parser) checkSize(re *Regexp) {
 	}
 
 	if p.calcSize(re, true) > maxSize {
-		panic(ErrInternalError)
+		panic(ErrLarge)
 	}
 }
 
@@ -265,7 +267,7 @@ func (p *parser) checkHeight(re *Regexp) {
 		}
 	}
 	if p.calcHeight(re, true) > maxHeight {
-		panic(ErrInternalError)
+		panic(ErrNestingDepth)
 	}
 }
 
@@ -577,12 +579,16 @@ func (p *parser) collapse(subs []*Regexp, op Op) *Regexp {
 // frees (passes to p.reuse) any removed *Regexps.
 //
 // For example,
-//     ABC|ABD|AEF|BCX|BCY
-// simplifies by literal prefix extraction to
-//     A(B(C|D)|EF)|BC(X|Y)
-// which simplifies by character class introduction to
-//     A(B[CD]|EF)|BC[XY]
 //
+//	ABC|ABD|AEF|BCX|BCY
+//
+// simplifies by literal prefix extraction to
+//
+//	A(B(C|D)|EF)|BC(X|Y)
+//
+// which simplifies by character class introduction to
+//
+//	A(B[CD]|EF)|BC[XY]
 func (p *parser) factor(sub []*Regexp) []*Regexp {
 	if len(sub) < 2 {
 		return sub
@@ -892,8 +898,10 @@ func parse(s string, flags Flags) (_ *Regexp, err error) {
 			panic(r)
 		case nil:
 			// ok
-		case ErrInternalError:
-			err = &Error{Code: ErrInternalError, Expr: s}
+		case ErrLarge: // too big
+			err = &Error{Code: ErrLarge, Expr: s}
+		case ErrNestingDepth:
+			err = &Error{Code: ErrNestingDepth, Expr: s}
 		}
 	}()
 
@@ -1930,7 +1938,7 @@ func appendClass(r []rune, x []rune) []rune {
 	return r
 }
 
-// appendFolded returns the result of appending the case folding of the class x to the class r.
+// appendFoldedClass returns the result of appending the case folding of the class x to the class r.
 func appendFoldedClass(r []rune, x []rune) []rune {
 	for i := 0; i < len(x); i += 2 {
 		r = appendFoldedRange(r, x[i], x[i+1])

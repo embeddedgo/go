@@ -11,13 +11,32 @@ const (
 	mutexprofilerate = 0
 )
 
-var (
-	proflock       mutex
-	MemProfileRate int = 0
+const (
+	goroutineProfileAbsent = iota
+	goroutineProfileInProgress
+	goroutineProfileSatisfied
 )
 
-//go:notinheap
+var (
+	disableMemoryProfiling bool
+	profInsertLock         mutex
+	profBlockLock          mutex
+	profMemActiveLock      mutex
+	profMemFutureLock      [len(memRecord{}.future)]mutex
+	goroutineProfile       struct{ active bool }
+	MemProfileRate         int
+)
+
 type bucket struct{}
+type memRecordCycle struct{}
+
+type memRecord struct {
+	future [0]memRecordCycle
+}
+
+type goroutineProfileStateHolder struct{}
+
+func (p *goroutineProfileStateHolder) Store(x int) {}
 
 func blockevent(cycles int64, skip int)                     {}
 func tracealloc(p unsafe.Pointer, size uintptr, typ *_type) {}
@@ -29,6 +48,8 @@ func tracegc()                                              {}
 func tracefree(p unsafe.Pointer, size uintptr)              {}
 func mProf_Free(b *bucket, size uintptr)                    {}
 func mutexevent(cycles int64, skip int)                     {}
+func tryRecordGoroutineProfileWB(gp1 *g)                    {}
+func tryRecordGoroutineProfile(gp1 *g, yield func())        {}
 
 // Stack formats a stack trace of the calling goroutine into buf
 // and returns the number of bytes written to buf.

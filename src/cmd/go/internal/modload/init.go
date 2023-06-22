@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"go/build"
 	"internal/lazyregexp"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -592,7 +591,7 @@ func loadWorkFile(path string) (goVersion string, modRoots []string, replaces []
 
 // ReadWorkFile reads and parses the go.work file at the given path.
 func ReadWorkFile(path string) (*modfile.WorkFile, error) {
-	workData, err := ioutil.ReadFile(path)
+	workData, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -606,7 +605,7 @@ func WriteWorkFile(path string, wf *modfile.WorkFile) error {
 	wf.Cleanup()
 	out := modfile.Format(wf.Syntax)
 
-	return ioutil.WriteFile(path, out, 0666)
+	return os.WriteFile(path, out, 0666)
 }
 
 // UpdateWorkFile updates comments on directory directives in the go.work
@@ -674,7 +673,7 @@ func LoadModFile(ctx context.Context) *Requirements {
 			modfetch.WorkspaceGoSumFiles = append(modfetch.WorkspaceGoSumFiles, sumFile)
 		}
 		modfetch.GoSumFile = workFilePath + ".sum"
-	} else if modRoots == nil {
+	} else if len(modRoots) == 0 {
 		// We're in module mode, but not inside a module.
 		//
 		// Commands like 'go build', 'go run', 'go list' have no go.mod file to
@@ -708,6 +707,12 @@ func LoadModFile(ctx context.Context) *Requirements {
 			pruning = workspace
 		}
 		requirements = newRequirements(pruning, nil, nil)
+		if cfg.BuildMod == "vendor" {
+			// For issue 56536: Some users may have GOFLAGS=-mod=vendor set.
+			// Make sure it behaves as though the fake module is vendored
+			// with no dependencies.
+			requirements.initVendor(nil)
+		}
 		return requirements
 	}
 
@@ -719,7 +724,11 @@ func LoadModFile(ctx context.Context) *Requirements {
 		var fixed bool
 		data, f, err := ReadModFile(gomod, fixVersion(ctx, &fixed))
 		if err != nil {
-			base.Fatalf("go: %v", err)
+			if inWorkspaceMode() {
+				base.Fatalf("go: cannot load module listed in go.work file: %v", err)
+			} else {
+				base.Fatalf("go: %v", err)
+			}
 		}
 
 		modFiles = append(modFiles, f)
@@ -993,6 +1002,9 @@ func makeMainModules(ms []module.Version, rootDirs []string, modFiles []*modfile
 	}
 	mainModulePaths := make(map[string]bool)
 	for _, m := range ms {
+		if mainModulePaths[m.Path] {
+			base.Errorf("go: module %s appears multiple times in workspace", m.Path)
+		}
 		mainModulePaths[m.Path] = true
 	}
 	replacedByWorkFile := make(map[string]bool)
@@ -1148,7 +1160,7 @@ func setDefaultBuildMod() {
 		return
 	}
 
-	if len(modRoots) == 1 {
+	if len(modRoots) == 1 && !inWorkspaceMode() {
 		index := MainModules.GetSingleIndexOrNil()
 		if fi, err := fsys.Stat(filepath.Join(modRoots[0], "vendor")); err == nil && fi.IsDir() {
 			modGo := "unspecified"
@@ -1571,7 +1583,8 @@ func commitRequirements(ctx context.Context) (err error) {
 // keepSums returns the set of modules (and go.mod file entries) for which
 // checksums would be needed in order to reload the same set of packages
 // loaded by the most recent call to LoadPackages or ImportFromFiles,
-// including any go.mod files needed to reconstruct the MVS result,
+// including any go.mod files needed to reconstruct the MVS result
+// or identify go versions,
 // in addition to the checksums for every module in keepMods.
 func keepSums(ctx context.Context, ld *loader, rs *Requirements, which whichSums) map[module.Version]bool {
 	// Every module in the full module graph contributes its requirements,
@@ -1591,6 +1604,16 @@ func keepSums(ctx context.Context, ld *loader, rs *Requirements, which whichSums
 			// shouldn't force loading the whole module graph).
 			if pkg.testOf != nil || (pkg.mod.Path == "" && pkg.err == nil) || module.CheckImportPath(pkg.path) != nil {
 				continue
+			}
+
+			// We need the checksum for the go.mod file for pkg.mod
+			// so that we know what Go version to use to compile pkg.
+			// However, we didn't do so before Go 1.21, and the bug is relatively
+			// minor, so we maintain the previous (buggy) behavior in 'go mod tidy' to
+			// avoid introducing unnecessary churn.
+			if !ld.Tidy || semver.Compare("v"+ld.GoVersion, tidyGoModSumVersionV) >= 0 {
+				r := resolveReplacement(pkg.mod)
+				keep[modkey(r)] = true
 			}
 
 			if rs.pruning == pruned && pkg.mod.Path != "" {
@@ -1648,6 +1671,7 @@ func keepSums(ctx context.Context, ld *loader, rs *Requirements, which whichSums
 		if which == addBuildListZipSums {
 			for _, m := range mg.BuildList() {
 				r := resolveReplacement(m)
+				keep[modkey(r)] = true // we need the go version from the go.mod file to do anything useful with the zipfile
 				keep[r] = true
 			}
 		}
@@ -1663,7 +1687,7 @@ const (
 	addBuildListZipSums
 )
 
-// modKey returns the module.Version under which the checksum for m's go.mod
+// modkey returns the module.Version under which the checksum for m's go.mod
 // file is stored in the go.sum file.
 func modkey(m module.Version) module.Version {
 	return module.Version{Path: m.Path, Version: m.Version + "/go.mod"}

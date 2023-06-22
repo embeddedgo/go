@@ -21,12 +21,12 @@ type mOS struct {
 	// profileTimer holds the ID of the POSIX interval timer for profiling CPU
 	// usage on this thread.
 	//
-	// It is valid when the profileTimerValid field is non-zero. A thread
+	// It is valid when the profileTimerValid field is true. A thread
 	// creates and manages its own timer, and these fields are read and written
 	// only by this thread. But because some of the reads on profileTimerValid
-	// are in signal handling code, access to that field uses atomic operations.
+	// are in signal handling code, this field should be atomic type.
 	profileTimer      int32
-	profileTimerValid uint32
+	profileTimerValid atomic.Bool
 
 	// needPerThreadSyscall indicates that a per-thread syscall is required
 	// for doAllThreadsSyscall.
@@ -52,9 +52,12 @@ const (
 )
 
 // Atomically,
+//
 //	if(*addr == val) sleep
+//
 // Might be woken up spuriously; that's allowed.
 // Don't sleep longer than ns; ns < 0 means forever.
+//
 //go:nosplit
 func futexsleep(addr *uint32, val uint32, ns int64) {
 	// Some Linux kernels have a bug where futex of
@@ -73,6 +76,7 @@ func futexsleep(addr *uint32, val uint32, ns int64) {
 }
 
 // If any procs are sleeping on addr, wake up at most cnt.
+//
 //go:nosplit
 func futexwakeup(addr *uint32, cnt uint32) {
 	ret := futex(unsafe.Pointer(addr), _FUTEX_WAKE_PRIVATE, cnt, nil, nil, 0)
@@ -157,6 +161,7 @@ const (
 func clone(flags int32, stk, mp, gp, fn unsafe.Pointer) int32
 
 // May run with m.p==nil, so write barriers are not allowed.
+//
 //go:nowritebarrier
 func newosproc(mp *m) {
 	stk := unsafe.Pointer(mp.g0.stack.hi)
@@ -171,12 +176,20 @@ func newosproc(mp *m) {
 	// with signals disabled. It will enable them in minit.
 	var oset sigset
 	sigprocmask(_SIG_SETMASK, &sigset_all, &oset)
-	ret := clone(cloneFlags, stk, unsafe.Pointer(mp), unsafe.Pointer(mp.g0), unsafe.Pointer(abi.FuncPCABI0(mstart)))
+	ret := retryOnEAGAIN(func() int32 {
+		r := clone(cloneFlags, stk, unsafe.Pointer(mp), unsafe.Pointer(mp.g0), unsafe.Pointer(abi.FuncPCABI0(mstart)))
+		// clone returns positive TID, negative errno.
+		// We don't care about the TID.
+		if r >= 0 {
+			return 0
+		}
+		return -r
+	})
 	sigprocmask(_SIG_SETMASK, &oset, nil)
 
-	if ret < 0 {
-		print("runtime: failed to create new OS thread (have ", mcount(), " already; errno=", -ret, ")\n")
-		if ret == -_EAGAIN {
+	if ret != 0 {
+		print("runtime: failed to create new OS thread (have ", mcount(), " already; errno=", ret, ")\n")
+		if ret == _EAGAIN {
 			println("runtime: may need to increase max user processes (ulimit -u)")
 		}
 		throw("newosproc")
@@ -184,27 +197,26 @@ func newosproc(mp *m) {
 }
 
 // Version of newosproc that doesn't require a valid G.
+//
 //go:nosplit
 func newosproc0(stacksize uintptr, fn unsafe.Pointer) {
 	stack := sysAlloc(stacksize, &memstats.stacks_sys)
 	if stack == nil {
-		write(2, unsafe.Pointer(&failallocatestack[0]), int32(len(failallocatestack)))
+		writeErrStr(failallocatestack)
 		exit(1)
 	}
 	ret := clone(cloneFlags, unsafe.Pointer(uintptr(stack)+stacksize), nil, nil, fn)
 	if ret < 0 {
-		write(2, unsafe.Pointer(&failthreadcreate[0]), int32(len(failthreadcreate)))
+		writeErrStr(failthreadcreate)
 		exit(1)
 	}
 }
-
-var failallocatestack = []byte("runtime: failed to allocate stack for the new OS thread\n")
-var failthreadcreate = []byte("runtime: failed to create new OS thread\n")
 
 const (
 	_AT_NULL   = 0  // End of vector
 	_AT_PAGESZ = 6  // System physical page size
 	_AT_HWCAP  = 16 // hardware capability bit vector
+	_AT_SECURE = 23 // secure mode boolean
 	_AT_RANDOM = 25 // introduced in 2.6.29
 	_AT_HWCAP2 = 26 // hardware capability bit vector 2
 )
@@ -274,6 +286,9 @@ func sysargs(argc int32, argv **byte) {
 // the ELF AT_RANDOM auxiliary vector.
 var startupRandomData []byte
 
+// secureMode holds the value of AT_SECURE passed in the auxiliary vector.
+var secureMode bool
+
 func sysauxv(auxv []uintptr) int {
 	var i int
 	for ; auxv[i] != _AT_NULL; i += 2 {
@@ -286,6 +301,9 @@ func sysauxv(auxv []uintptr) int {
 
 		case _AT_PAGESZ:
 			physPageSize = val
+
+		case _AT_SECURE:
+			secureMode = val == 1
 		}
 
 		archauxv(tag, val)
@@ -365,6 +383,7 @@ func goenvs() {
 // Called to do synchronous initialization of Go code built with
 // -buildmode=c-archive or -buildmode=c-shared.
 // None of the Go runtime is initialized.
+//
 //go:nosplit
 //go:nowritebarrierrec
 func libpreinit() {
@@ -392,6 +411,7 @@ func minit() {
 }
 
 // Called from dropm to undo the effect of an minit.
+//
 //go:nosplit
 func unminit() {
 	unminitSignals()
@@ -446,9 +466,13 @@ func osyield_no_g() {
 	osyield()
 }
 
-func pipe() (r, w int32, errno int32)
 func pipe2(flags int32) (r, w int32, errno int32)
-func setNonblock(fd int32)
+
+//go:nosplit
+func fcntl(fd, cmd, arg int32) (ret int32, errno int32) {
+	r, _, err := syscall.Syscall6(syscall.SYS_FCNTL, uintptr(fd), uintptr(cmd), uintptr(arg), 0, 0, 0)
+	return int32(r), int32(err)
+}
 
 const (
 	_si_max_size    = 128
@@ -498,7 +522,8 @@ func getsig(i uint32) uintptr {
 	return sa.sa_handler
 }
 
-// setSignaltstackSP sets the ss_sp field of a stackt.
+// setSignalstackSP sets the ss_sp field of a stackt.
+//
 //go:nosplit
 func setSignalstackSP(s *stackt, sp uintptr) {
 	*(*uintptr)(unsafe.Pointer(&s.ss_sp)) = sp
@@ -509,6 +534,7 @@ func (c *sigctxt) fixsigcode(sig uint32) {
 }
 
 // sysSigaction calls the rt_sigaction system call.
+//
 //go:nosplit
 func sysSigaction(sig uint32, new, old *sigactiont) {
 	if rt_sigaction(uintptr(sig), new, old, unsafe.Sizeof(sigactiont{}.sa_mask)) != 0 {
@@ -533,6 +559,7 @@ func sysSigaction(sig uint32, new, old *sigactiont) {
 }
 
 // rt_sigaction is implemented in assembly.
+//
 //go:noescape
 func rt_sigaction(sig uintptr, new, old *sigactiont, size uintptr) int32
 
@@ -584,7 +611,7 @@ func validSIGPROF(mp *m, c *sigctxt) bool {
 
 	// Having an M means the thread interacts with the Go scheduler, and we can
 	// check whether there's an active per-thread timer for this thread.
-	if atomic.Load(&mp.profileTimerValid) != 0 {
+	if mp.profileTimerValid.Load() {
 		// If this M has its own per-thread CPU profiling interval timer, we
 		// should track the SIGPROF signals that come from that timer (for
 		// accurate reporting of its CPU usage; see issue 35057) and ignore any
@@ -610,9 +637,9 @@ func setThreadCPUProfiler(hz int32) {
 	}
 
 	// destroy any active timer
-	if atomic.Load(&mp.profileTimerValid) != 0 {
+	if mp.profileTimerValid.Load() {
 		timerid := mp.profileTimer
-		atomic.Store(&mp.profileTimerValid, 0)
+		mp.profileTimerValid.Store(false)
 		mp.profileTimer = 0
 
 		ret := timer_delete(timerid)
@@ -672,7 +699,7 @@ func setThreadCPUProfiler(hz int32) {
 	}
 
 	mp.profileTimer = timerid
-	atomic.Store(&mp.profileTimerValid, 1)
+	mp.profileTimerValid.Store(true)
 }
 
 // perThreadSyscallArgs contains the system call number, arguments, and
@@ -855,6 +882,7 @@ func syscall_runtime_doAllThreadsSyscall(trap, a1, a2, a3, a4, a5, a6 uintptr) (
 //
 // This function throws if the system call returns with anything other than the
 // expected values.
+//
 //go:nosplit
 func runPerThreadSyscall() {
 	gp := getg()
@@ -870,9 +898,23 @@ func runPerThreadSyscall() {
 	}
 	if errno != 0 || r1 != args.r1 || r2 != args.r2 {
 		print("trap:", args.trap, ", a123456=[", args.a1, ",", args.a2, ",", args.a3, ",", args.a4, ",", args.a5, ",", args.a6, "]\n")
-		print("results: got {r1=", r1, ",r2=", r2, ",errno=", errno, "}, want {r1=", args.r1, ",r2=", args.r2, ",errno=0\n")
-		throw("AllThreadsSyscall6 results differ between threads; runtime corrupted")
+		print("results: got {r1=", r1, ",r2=", r2, ",errno=", errno, "}, want {r1=", args.r1, ",r2=", args.r2, ",errno=0}\n")
+		fatal("AllThreadsSyscall6 results differ between threads; runtime corrupted")
 	}
 
 	gp.m.needPerThreadSyscall.Store(0)
+}
+
+const (
+	_SI_USER  = 0
+	_SI_TKILL = -6
+)
+
+// sigFromUser reports whether the signal was sent because of a call
+// to kill or tgkill.
+//
+//go:nosplit
+func (c *sigctxt) sigFromUser() bool {
+	code := int32(c.sigcode())
+	return code == _SI_USER || code == _SI_TKILL
 }

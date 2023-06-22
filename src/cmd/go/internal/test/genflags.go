@@ -9,9 +9,9 @@ package main
 import (
 	"bytes"
 	"flag"
-	exec "internal/execabs"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"text/template"
@@ -68,13 +68,14 @@ func testFlags() []string {
 
 	var names []string
 	flag.VisitAll(func(f *flag.Flag) {
-		if !strings.HasPrefix(f.Name, "test.") {
+		var name string
+		var found bool
+		if name, found = strings.CutPrefix(f.Name, "test."); !found {
 			return
 		}
-		name := strings.TrimPrefix(f.Name, "test.")
 
 		switch name {
-		case "testlogfile", "paniconexit0", "fuzzcachedir", "fuzzworker":
+		case "testlogfile", "paniconexit0", "fuzzcachedir", "fuzzworker", "gocoverdir":
 			// These flags are only for use by cmd/go.
 		default:
 			names = append(names, name)

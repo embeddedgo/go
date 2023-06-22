@@ -72,7 +72,7 @@ func storeByType(t *types.Type) obj.As {
 	panic("bad store type")
 }
 
-// shift type is used as Offset in obj.TYPE_SHIFT operands to encode shifted register operands
+// shift type is used as Offset in obj.TYPE_SHIFT operands to encode shifted register operands.
 type shift int64
 
 // copied from ../../../internal/obj/util.go:/TYPE_SHIFT
@@ -87,7 +87,7 @@ func (v shift) String() string {
 	}
 }
 
-// makeshift encodes a register shifted by a constant
+// makeshift encodes a register shifted by a constant.
 func makeshift(v *ssa.Value, reg int16, typ int64, s int64) shift {
 	if s < 0 || s >= 32 {
 		v.Fatalf("shift out of range: %d", s)
@@ -95,7 +95,7 @@ func makeshift(v *ssa.Value, reg int16, typ int64, s int64) shift {
 	return shift(int64(reg&0xf) | typ | (s&31)<<7)
 }
 
-// genshift generates a Prog for r = r0 op (r1 shifted by n)
+// genshift generates a Prog for r = r0 op (r1 shifted by n).
 func genshift(s *ssagen.State, v *ssa.Value, as obj.As, r0, r1, r int16, typ int64, n int64) *obj.Prog {
 	p := s.Prog(as)
 	p.From.Type = obj.TYPE_SHIFT
@@ -793,7 +793,7 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		// caller's SP is FixedFrameSize below the address of the first arg
 		p := s.Prog(thumb.AMOVW)
 		p.From.Type = obj.TYPE_ADDR
-		p.From.Offset = -base.Ctxt.FixedFrameSize()
+		p.From.Offset = -base.Ctxt.Arch.FixedFrameSize
 		p.From.Name = obj.NAME_PARAM
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
@@ -848,13 +848,13 @@ var blockJump = map[ssa.BlockKind]struct {
 	ssa.BlockThumbGEnoov: {thumb.ABPL, thumb.ABMI},
 }
 
-// To model a 'LEnoov' ('<=' without overflow checking) branching
+// To model a 'LEnoov' ('<=' without overflow checking) branching.
 var leJumps = [2][2]ssagen.IndexJump{
 	{{Jump: thumb.ABEQ, Index: 0}, {Jump: thumb.ABPL, Index: 1}}, // next == b.Succs[0]
 	{{Jump: thumb.ABMI, Index: 0}, {Jump: thumb.ABEQ, Index: 0}}, // next == b.Succs[1]
 }
 
-// To model a 'GTnoov' ('>' without overflow checking) branching
+// To model a 'GTnoov' ('>' without overflow checking) branching.
 var gtJumps = [2][2]ssagen.IndexJump{
 	{{Jump: thumb.ABMI, Index: 1}, {Jump: thumb.ABEQ, Index: 1}}, // next == b.Succs[0]
 	{{Jump: thumb.ABEQ, Index: 1}, {Jump: thumb.ABPL, Index: 0}}, // next == b.Succs[1]

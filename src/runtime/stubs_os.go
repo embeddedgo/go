@@ -10,10 +10,10 @@ func isr() bool {
 	return false
 }
 
-func sysReserveMaxArena() (addr, size uintptr, mapMemory bool) {
-	return 0, 0, false
+func noosMemory() (heapBase, heapSize, limit uintptr) {
+	return 0, 0, 0
 }
 
-func sysPersistentAlloc(size, align uintptr, sysStat *sysMemStat) *notInHeap {
+func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) *notInHeap {
 	return nil
 }

@@ -1028,6 +1028,27 @@ func testResumption(t *testing.T, version uint16) {
 	deleteTicket()
 	testResumeState("WithoutSessionTicket", false)
 
+	// In TLS 1.3, HelloRetryRequest is sent after incorrect key share.
+	// See https://www.rfc-editor.org/rfc/rfc8446#page-14.
+	if version == VersionTLS13 {
+		deleteTicket()
+		serverConfig = &Config{
+			// Use a different curve than the client to force a HelloRetryRequest.
+			CurvePreferences: []CurveID{CurveP521, CurveP384, CurveP256},
+			MaxVersion:       version,
+			Certificates:     testConfig.Certificates,
+		}
+		testResumeState("InitialHandshake", false)
+		testResumeState("WithHelloRetryRequest", true)
+
+		// Reset serverConfig back.
+		serverConfig = &Config{
+			MaxVersion:   version,
+			CipherSuites: []uint16{TLS_RSA_WITH_RC4_128_SHA, TLS_ECDHE_RSA_WITH_RC4_128_SHA},
+			Certificates: testConfig.Certificates,
+		}
+	}
+
 	// Session resumption should work when using client certificates
 	deleteTicket()
 	serverConfig.ClientCAs = rootCAs
@@ -1257,7 +1278,7 @@ func TestServerSelectingUnconfiguredApplicationProtocol(t *testing.T) {
 		cipherSuite:  TLS_RSA_WITH_AES_128_GCM_SHA256,
 		alpnProtocol: "how-about-this",
 	}
-	serverHelloBytes := serverHello.marshal()
+	serverHelloBytes := mustMarshal(t, serverHello)
 
 	s.Write([]byte{
 		byte(recordTypeHandshake),
@@ -1500,7 +1521,7 @@ func TestServerSelectingUnconfiguredCipherSuite(t *testing.T) {
 		random:      make([]byte, 32),
 		cipherSuite: TLS_RSA_WITH_AES_256_GCM_SHA384,
 	}
-	serverHelloBytes := serverHello.marshal()
+	serverHelloBytes := mustMarshal(t, serverHello)
 
 	s.Write([]byte{
 		byte(recordTypeHandshake),
@@ -2564,7 +2585,7 @@ func testResumptionKeepsOCSPAndSCT(t *testing.T, ver uint16) {
 	}
 }
 
-// TestClientHandshakeContextCancellation tests that cancelling
+// TestClientHandshakeContextCancellation tests that canceling
 // the context given to the client side conn.HandshakeContext
 // interrupts the in-progress handshake.
 func TestClientHandshakeContextCancellation(t *testing.T) {

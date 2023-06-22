@@ -8,6 +8,7 @@ import (
 	"cmd/internal/sys"
 	"fmt"
 	"internal/buildcfg"
+	"internal/platform"
 )
 
 // A BuildMode indicates the sort of object we are building.
@@ -185,7 +186,7 @@ func mustLinkExternal(ctxt *Link) (res bool, reason string) {
 		}()
 	}
 
-	if sys.MustLinkExternal(buildcfg.GOOS, buildcfg.GOARCH) {
+	if platform.MustLinkExternal(buildcfg.GOOS, buildcfg.GOARCH) {
 		return true, fmt.Sprintf("%s/%s requires external linking", buildcfg.GOOS, buildcfg.GOARCH)
 	}
 
@@ -199,7 +200,7 @@ func mustLinkExternal(ctxt *Link) (res bool, reason string) {
 
 	// Internally linking cgo is incomplete on some architectures.
 	// https://golang.org/issue/14449
-	if iscgo && ctxt.Arch.InFamily(sys.MIPS64, sys.MIPS, sys.RISCV64) {
+	if iscgo && ctxt.Arch.InFamily(sys.Loong64, sys.MIPS64, sys.MIPS, sys.RISCV64) {
 		return true, buildcfg.GOARCH + " does not support internal cgo"
 	}
 	if iscgo && (buildcfg.GOOS == "android" || buildcfg.GOOS == "dragonfly") {
@@ -246,6 +247,15 @@ func mustLinkExternal(ctxt *Link) (res bool, reason string) {
 		return true, "some input objects have an unrecognized file format"
 	}
 
+	if len(dynimportfail) > 0 {
+		// This error means that we were unable to generate
+		// the _cgo_import.go file for some packages.
+		// This typically means that there are some dependencies
+		// that the cgo tool could not figure out.
+		// See issue #52863.
+		return true, fmt.Sprintf("some packages could not be built to support internal linking (%v)", dynimportfail)
+	}
+
 	return false, ""
 }
 
@@ -271,7 +281,11 @@ func determineLinkMode(ctxt *Link) {
 			ctxt.LinkMode = LinkExternal
 			via = "via GO_EXTLINK_ENABLED "
 		default:
-			if extNeeded || (iscgo && externalobj) {
+			preferExternal := len(preferlinkext) != 0
+			if preferExternal && ctxt.Debugvlog > 0 {
+				ctxt.Logf("external linking prefer list is %v\n", preferlinkext)
+			}
+			if extNeeded || (iscgo && (externalobj || preferExternal)) {
 				ctxt.LinkMode = LinkExternal
 			} else {
 				ctxt.LinkMode = LinkInternal

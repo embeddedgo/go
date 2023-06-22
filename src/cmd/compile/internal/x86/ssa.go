@@ -18,7 +18,7 @@ import (
 	"cmd/internal/obj/x86"
 )
 
-// markMoves marks any MOVXconst ops that need to avoid clobbering flags.
+// ssaMarkMoves marks any MOVXconst ops that need to avoid clobbering flags.
 func ssaMarkMoves(s *ssagen.State, b *ssa.Block) {
 	flive := b.FlagsLiveAtEnd
 	for _, c := range b.ControlValues() {
@@ -106,7 +106,9 @@ func moveByType(t *types.Type) obj.As {
 }
 
 // opregreg emits instructions for
-//     dest := dest(To) op src(From)
+//
+//	dest := dest(To) op src(From)
+//
 // and also returns the created obj.Prog so it
 // may be further adjusted (offset, scale, etc).
 func opregreg(s *ssagen.State, op obj.As, dest, src int16) *obj.Prog {
@@ -156,6 +158,7 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		ssa.Op386SHLL,
 		ssa.Op386SHRL, ssa.Op386SHRW, ssa.Op386SHRB,
 		ssa.Op386SARL, ssa.Op386SARW, ssa.Op386SARB,
+		ssa.Op386ROLL, ssa.Op386ROLW, ssa.Op386ROLB,
 		ssa.Op386ADDSS, ssa.Op386ADDSD, ssa.Op386SUBSS, ssa.Op386SUBSD,
 		ssa.Op386MULSS, ssa.Op386MULSD, ssa.Op386DIVSS, ssa.Op386DIVSD,
 		ssa.Op386PXOR,
@@ -725,7 +728,7 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		// caller's SP is the address of the first arg
 		p := s.Prog(x86.AMOVL)
 		p.From.Type = obj.TYPE_ADDR
-		p.From.Offset = -base.Ctxt.FixedFrameSize() // 0 on 386, just to be consistent with other architectures
+		p.From.Offset = -base.Ctxt.Arch.FixedFrameSize // 0 on 386, just to be consistent with other architectures
 		p.From.Name = obj.NAME_PARAM
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()

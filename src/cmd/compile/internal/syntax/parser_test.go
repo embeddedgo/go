@@ -8,7 +8,8 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"internal/testenv"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -26,29 +27,15 @@ var (
 )
 
 func TestParse(t *testing.T) {
-	ParseFile(*src_, func(err error) { t.Error(err) }, nil, AllowGenerics)
+	ParseFile(*src_, func(err error) { t.Error(err) }, nil, 0)
 }
 
 func TestVerify(t *testing.T) {
-	ast, err := ParseFile(*src_, func(err error) { t.Error(err) }, nil, AllowGenerics)
+	ast, err := ParseFile(*src_, func(err error) { t.Error(err) }, nil, 0)
 	if err != nil {
 		return // error already reported
 	}
 	verifyPrint(t, *src_, ast)
-}
-
-func TestParseGo2(t *testing.T) {
-	dir := filepath.Join(testdata, "go2")
-	list, err := ioutil.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, fi := range list {
-		name := fi.Name()
-		if !fi.IsDir() && !strings.HasPrefix(name, ".") {
-			ParseFile(filepath.Join(dir, name), func(err error) { t.Error(err) }, nil, AllowGenerics|AllowMethodTypeParams)
-		}
-	}
 }
 
 func TestStdLib(t *testing.T) {
@@ -74,11 +61,14 @@ func TestStdLib(t *testing.T) {
 		lines    uint
 	}
 
+	goroot := testenv.GOROOT(t)
+
 	results := make(chan parseResult)
 	go func() {
 		defer close(results)
 		for _, dir := range []string{
-			runtime.GOROOT(),
+			filepath.Join(goroot, "src"),
+			filepath.Join(goroot, "misc"),
 		} {
 			walkDirs(t, dir, func(filename string) {
 				if skipRx != nil && skipRx.MatchString(filename) {
@@ -90,7 +80,7 @@ func TestStdLib(t *testing.T) {
 				if debug {
 					fmt.Printf("parsing %s\n", filename)
 				}
-				ast, err := ParseFile(filename, nil, nil, AllowGenerics)
+				ast, err := ParseFile(filename, nil, nil, 0)
 				if err != nil {
 					t.Error(err)
 					return
@@ -122,21 +112,21 @@ func TestStdLib(t *testing.T) {
 }
 
 func walkDirs(t *testing.T, dir string, action func(string)) {
-	fis, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	var files, dirs []string
-	for _, fi := range fis {
-		if fi.Mode().IsRegular() {
-			if strings.HasSuffix(fi.Name(), ".go") {
-				path := filepath.Join(dir, fi.Name())
+	for _, entry := range entries {
+		if entry.Type().IsRegular() {
+			if strings.HasSuffix(entry.Name(), ".go") {
+				path := filepath.Join(dir, entry.Name())
 				files = append(files, path)
 			}
-		} else if fi.IsDir() && fi.Name() != "testdata" {
-			path := filepath.Join(dir, fi.Name())
+		} else if entry.IsDir() && entry.Name() != "testdata" {
+			path := filepath.Join(dir, entry.Name())
 			if !strings.HasSuffix(path, string(filepath.Separator)+"test") {
 				dirs = append(dirs, path)
 			}

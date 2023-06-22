@@ -4,16 +4,30 @@
 
 package runtime
 
+import "runtime/internal/atomic"
+
 var scavenge struct {
-	sysmonWake uint32
+	gcPercentGoal  atomic.Uint64
+	assistTime     atomic.Int64
+	backgroundTime atomic.Int64
 }
 
-func bgscavenge(c chan int)                                    {}
-func gcPaceScavenger(heapGoal, lastHeapGoal uint64)            {}
-func wakeScavenger()                                           {}
-func readyForScavenger()                                       {}
-func heapRetained() uint64                                     { return 0 }
-func printScavTrace(gen uint32, released uintptr, forced bool) {}
+var scavenger scavengerState
 
-func (p *pageAlloc) scavengeStartGen()               {}
-func (p *pageAlloc) scavenge(nbytes uintptr) uintptr { return 0 }
+type scavengerState struct {
+	sysmonWake atomic.Uint32
+}
+
+func (s *scavengerState) ready() {}
+func (s *scavengerState) wake()  {}
+
+type scavengeIndex struct{}
+
+func (s *scavengeIndex) mark(base, limit uintptr) {}
+
+func bgscavenge(c chan int)                                            {}
+func gcPaceScavenger(memoryLimit int64, heapGoal, lastHeapGoal uint64) {}
+func heapRetained() uint64                                             { return 0 }
+func printScavTrace(released uintptr, forced bool)                     {}
+
+func (p *pageAlloc) scavenge(nbytes uintptr, shouldStop func() bool) uintptr { return 0 }

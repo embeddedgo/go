@@ -350,14 +350,14 @@ TEXT runtime·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 	BEQ  ZERO, A0, currentStack
 
 	// saved stack (called from thread)
-	MOV   (g_sched+gobuf_sp)(g), A0
+	MOV   (g_sched+gobuf_sp)(g), S8 // duffcopy src
 	BGEU  S0, A3, continue  // fast syscall
 	// save thread context (small): LR, SP, g, thrSmallCtx+prio, mepc
 	MOV  (g_sched+gobuf_g)(g), A1
 	MOV  _LR(X2), A2
 	MOV  (cpuctx_exe)(g), S0
 	MOV  A2, (m_mOS+(const_numGPRS-4)*8)(S0)  // LR
-	MOV  A0, (m_mOS+(const_numGPRS-3)*8)(S0)  // SP
+	MOV  S8, (m_mOS+(const_numGPRS-3)*8)(S0)  // SP
 	MOV  A1, (m_mOS+(const_numGPRS-2)*8)(S0)  // g
 	MOV  _mstatus(X2), A1
 	SRL  $7, A1  // MPP field is in a very unfortunate place
@@ -370,22 +370,22 @@ TEXT runtime·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 
 currentStack: // called from handler
 	BLTU  S0, A3, slowSyscallFromHandler  // handlers can use fast syscalls only
-	ADD   $trapCtxSize, X2, A0
+	ADD   $trapCtxSize, X2, S8 // duffcopy src
 
 continue:
 	// make a space on the stack for arguments + 3 registers
 	ADD  $-envCallFrameSize, X2
 
 	// copy arguments from the caller's stack
-	MOV   $·duffcopy+2048(SB), A2
+	MOV   $·duffcopy<ABIInternal>+2048(SB), A2
 	SLL   $1, A4
 	SUB   A4, A2
-	MOV   X2, A1
+	MOV   X2, S9 // duffcopy dst
 	CALL  A2
 
 	// save data needed to copy the return values back to the caller's stack
-	MOV  A0, (sysMaxArgs+0*8)(X2)
-	MOV  A1, (sysMaxArgs+1*8)(X2)
+	MOV  S8, (sysMaxArgs+0*8)(X2)
+	MOV  S9, (sysMaxArgs+1*8)(X2)
 	MOV  A5, (sysMaxArgs+2*8)(X2)
 
 	// call the service routine
@@ -398,9 +398,9 @@ continue:
 	// copy the return values back to the caller's stack
 	MOV   (sysMaxArgs+2*8)(X2), A4
 	BEQ   ZERO, A4, nothingToCopy
-	MOV   (sysMaxArgs+0*8)(X2), A1
-	MOV   (sysMaxArgs+1*8)(X2), A0
-	MOV   $·duffcopy+2048(SB), A2
+	MOV   (sysMaxArgs+0*8)(X2), S9 // duffcopy dst
+	MOV   (sysMaxArgs+1*8)(X2), S8 // duffcopy src
+	MOV   $·duffcopy<ABIInternal>+2048(SB), A2
 	SLL   $1, A4
 	SUB   A4, A2
 	CALL  A2

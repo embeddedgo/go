@@ -574,7 +574,7 @@ func TestWriteInvalidRune(t *testing.T) {
 	// Invalid runes, including negative ones, should be written as the
 	// replacement character.
 	for _, r := range []rune{-1, utf8.MaxRune + 1} {
-		var buf bytes.Buffer
+		var buf strings.Builder
 		w := NewWriter(&buf)
 		w.WriteRune(r)
 		w.Flush()
@@ -746,7 +746,7 @@ func TestNewWriterSizeIdempotent(t *testing.T) {
 
 func TestWriteString(t *testing.T) {
 	const BufSize = 8
-	buf := new(bytes.Buffer)
+	buf := new(strings.Builder)
 	b := NewWriterSize(buf, BufSize)
 	b.WriteString("0")                         // easy
 	b.WriteString("123456")                    // still easy
@@ -757,8 +757,69 @@ func TestWriteString(t *testing.T) {
 		t.Error("WriteString", err)
 	}
 	s := "01234567890abcdefghijklmnopqrstuvwxyz"
-	if string(buf.Bytes()) != s {
-		t.Errorf("WriteString wants %q gets %q", s, string(buf.Bytes()))
+	if buf.String() != s {
+		t.Errorf("WriteString wants %q gets %q", s, buf.String())
+	}
+}
+
+func TestWriteStringStringWriter(t *testing.T) {
+	const BufSize = 8
+	{
+		tw := &teststringwriter{}
+		b := NewWriterSize(tw, BufSize)
+		b.WriteString("1234")
+		tw.check(t, "", "")
+		b.WriteString("56789012")   // longer than BufSize
+		tw.check(t, "12345678", "") // but not enough (after filling the partially-filled buffer)
+		b.Flush()
+		tw.check(t, "123456789012", "")
+	}
+	{
+		tw := &teststringwriter{}
+		b := NewWriterSize(tw, BufSize)
+		b.WriteString("123456789")   // long string, empty buffer:
+		tw.check(t, "", "123456789") // use WriteString
+	}
+	{
+		tw := &teststringwriter{}
+		b := NewWriterSize(tw, BufSize)
+		b.WriteString("abc")
+		tw.check(t, "", "")
+		b.WriteString("123456789012345")      // long string, non-empty buffer
+		tw.check(t, "abc12345", "6789012345") // use Write and then WriteString since the remaining part is still longer than BufSize
+	}
+	{
+		tw := &teststringwriter{}
+		b := NewWriterSize(tw, BufSize)
+		b.Write([]byte("abc")) // same as above, but use Write instead of WriteString
+		tw.check(t, "", "")
+		b.WriteString("123456789012345")
+		tw.check(t, "abc12345", "6789012345") // same as above
+	}
+}
+
+type teststringwriter struct {
+	write       string
+	writeString string
+}
+
+func (w *teststringwriter) Write(b []byte) (int, error) {
+	w.write += string(b)
+	return len(b), nil
+}
+
+func (w *teststringwriter) WriteString(s string) (int, error) {
+	w.writeString += s
+	return len(s), nil
+}
+
+func (w *teststringwriter) check(t *testing.T, write, writeString string) {
+	t.Helper()
+	if w.write != write {
+		t.Errorf("write: expected %q, got %q", write, w.write)
+	}
+	if w.writeString != writeString {
+		t.Errorf("writeString: expected %q, got %q", writeString, w.writeString)
 	}
 }
 
@@ -940,7 +1001,7 @@ func TestReadAfterLines(t *testing.T) {
 	line1 := "this is line1"
 	restData := "this is line2\nthis is line 3\n"
 	inbuf := bytes.NewReader([]byte(line1 + "\n" + restData))
-	outbuf := new(bytes.Buffer)
+	outbuf := new(strings.Builder)
 	maxLineLength := len(line1) + len(restData)/2
 	l := NewReaderSize(inbuf, maxLineLength)
 	line, isPrefix, err := l.ReadLine()
@@ -1112,7 +1173,7 @@ func TestWriterReadFrom(t *testing.T) {
 	for ri, rfunc := range rs {
 		for wi, wfunc := range ws {
 			input := createTestInput(8192)
-			b := new(bytes.Buffer)
+			b := new(strings.Builder)
 			w := NewWriter(wfunc(b))
 			r := rfunc(bytes.NewReader(input))
 			if n, err := w.ReadFrom(r); err != nil || n != int64(len(input)) {
@@ -1328,7 +1389,7 @@ func TestWriterReadFromUntilEOF(t *testing.T) {
 		t.Fatalf("ReadFrom returned (%v, %v), want (4, nil)", n2, err)
 	}
 	w.Flush()
-	if got, want := string(buf.Bytes()), "0123abcd"; got != want {
+	if got, want := buf.String(), "0123abcd"; got != want {
 		t.Fatalf("buf.Bytes() returned %q, want %q", got, want)
 	}
 }
@@ -1449,7 +1510,7 @@ func TestReaderReset(t *testing.T) {
 }
 
 func TestWriterReset(t *testing.T) {
-	var buf1, buf2, buf3 bytes.Buffer
+	var buf1, buf2, buf3 strings.Builder
 	w := NewWriter(&buf1)
 	w.WriteString("foo")
 

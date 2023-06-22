@@ -101,21 +101,14 @@ clear:
 	MOV  ZERO, (A0)
 
 	// clear the BSS and the whole unallocated memory
-	ADD   $-24, X2
 	MOV   $runtime·bss(SB), A0
 	MOV   $runtime·ramend(SB), A1
 	SUB   A0, A1
-	MOV   ZERO, 0(X2)
-	MOV   A0, 8(X2)
-	MOV   A1, 16(X2)
-	CALL  runtime·memclrNoHeapPointers(SB)
+	CALL  ·memclrNoHeapPointers<ABIInternal>(SB)
 	MOV   $runtime·nodmastart(SB), A0
 	MOV   $runtime·nodmaend(SB), A1
 	SUB   A0, A1
-	MOV   A0, 8(X2)
-	MOV   A1, 16(X2)
-	CALL  runtime·memclrNoHeapPointers(SB)
-	ADD   $24, X2
+	CALL  ·memclrNoHeapPointers<ABIInternal>(SB)
 
 cleared:
 	// setup handler stack in harts[mhartid].gh
@@ -182,10 +175,10 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV  g, m_g0(A0)  // m0.g0 = harts[0].gh
 	MOV  A0, g_m(g)   // harts[0].gh.m = m0
 
-	CALL  runtime·check(SB)
-	CALL  runtime·osinit(SB)
+	CALL  runtime·check<ABIInternal>(SB)
+	CALL  runtime·osinit<ABIInternal>(SB)
 
-	// initialize sysMem
+	// initialize noosMem
 
 	// calculate the beginning of free memory (just after handler stacks)
 	MOV  $runtime·end(SB), A0
@@ -203,6 +196,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV  $runtime·nodmastart(SB), A2
 	MOV  $runtime·nodmaend(SB), A3
 	SUB  A2, A3, S0  // size of non-DMA memory
+	ADD  A5, S0, S1  // size of the whole free memory
 
 	// we prefer the non-DMA memory for non-heap objects to preserve as much as
 	// possible of the DMA capable memory for heap allocations
@@ -215,18 +209,19 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	AND  $~(const_heapArenaBytes-1), A5
 	SUB  A5, A1
 
-	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize}
-	MOV  $runtime·sysMem(SB), S0
+	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize,size}
+	MOV  $runtime·noosMem(SB), S0
 	MOV  A0, 0(S0)
 	MOV  A1, 8(S0)
 	MOV  A2, 16(S0)
 	MOV  A3, 24(S0)
 	MOV  A1, 32(S0)
 	MOV  A5, 40(S0)
+	MOV  S1, 48(S0)
 
 	// initialize noos tasker and Go scheduler
-	CALL  runtime·taskerinit(SB)
-	CALL  runtime·schedinit(SB)
+	CALL  ·taskerinit<ABIInternal>(SB)
+	CALL  ·schedinit<ABIInternal>(SB)
 
 	// run other harts
 	MOV   $·waitInit(SB), A0
@@ -234,12 +229,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// allocate g0 for m0
 	MOV   $(2*const__StackMin), A0
-	ADD   $-24, X2
-	MOV   ZERO, 0(X2)
-	MOV   A0, 8(X2)
-	CALL  runtime·malg(SB)
-	MOV   16(X2), A0  // newg in A0
-	ADD   $24, X2
+	CALL  runtime·malg<ABIInternal>(SB)
 
 	// stackguard check during newproc requires valid stackguard1 but malg
 	// sets it to 0xFFFFFFFFFFFFFFFF (mstart fixes this but is called later)
@@ -278,13 +268,9 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 
 	// create a new goroutine to start program
 	MOV   $runtime·mainPC(SB), A0  // entry
-	ADD   $-16, X2
-	MOV   A0, 8(X2)
-	MOV   ZERO, 0(X2)  // dummy LR
-	CALL  runtime·newproc(SB)
-	ADD   $16, X2  // dummy LR
+	CALL  ·newproc<ABIInternal>(SB)
 
 	// start this M
-	CALL  runtime·mstart(SB)
+	CALL  ·mstart<ABIInternal>(SB)
 
 	UNDEF  // fail

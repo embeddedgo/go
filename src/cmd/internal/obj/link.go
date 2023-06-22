@@ -94,6 +94,12 @@ import (
 //			type = TYPE_SCONST
 //			val = string
 //
+//	<symbolic constant name>
+//		Special symbolic constants for ARM64, such as conditional flags, tlbi_op and so on.
+//		Encoding:
+//			type = TYPE_SPECIAL
+//			offset = The constant value corresponding to this symbol
+//
 //	<register name>
 //		Any register: integer, floating point, control, segment, and so on.
 //		If looking for specific register kind, must check type and reg value range.
@@ -236,6 +242,7 @@ const (
 	TYPE_REGREG2
 	TYPE_INDIR
 	TYPE_REGLIST
+	TYPE_SPECIAL
 )
 
 func (a *Addr) Target() *Prog {
@@ -312,7 +319,7 @@ type Prog struct {
 	Isize    uint8     // for x86 back end: size of the instruction in bytes
 }
 
-// Pos indicates whether the oprand is the source or the destination.
+// AddrPos indicates whether the operand is the source or the destination.
 type AddrPos struct {
 	Addr
 	Pos OperandPos
@@ -435,6 +442,7 @@ const (
 	ABasePPC64
 	ABaseARM64
 	ABaseMIPS
+	ABaseLoong64
 	ABaseRISCV
 	ABaseS390X
 	ABaseThumb
@@ -465,16 +473,17 @@ type LSym struct {
 
 // A FuncInfo contains extra fields for STEXT symbols.
 type FuncInfo struct {
-	Args     int32
-	Locals   int32
-	Align    int32
-	FuncID   objabi.FuncID
-	FuncFlag objabi.FuncFlag
-	Text     *Prog
-	Autot    map[*LSym]struct{}
-	Pcln     Pcln
-	InlMarks []InlMark
-	spills   []RegSpill
+	Args      int32
+	Locals    int32
+	Align     int32
+	FuncID    objabi.FuncID
+	FuncFlag  objabi.FuncFlag
+	StartLine int32
+	Text      *Prog
+	Autot     map[*LSym]struct{}
+	Pcln      Pcln
+	InlMarks  []InlMark
+	spills    []RegSpill
 
 	dwarfInfoSym       *LSym
 	dwarfLocSym        *LSym
@@ -489,8 +498,18 @@ type FuncInfo struct {
 	ArgInfo            *LSym // argument info for traceback
 	ArgLiveInfo        *LSym // argument liveness info for traceback
 	WrapInfo           *LSym // for wrapper, info of wrapped function
+	JumpTables         []JumpTable
 
 	FuncInfoSym *LSym
+}
+
+// JumpTable represents a table used for implementing multi-way
+// computed branching, used typically for implementing switches.
+// Sym is the table itself, and Targets is a list of target
+// instructions to go to for the computed branch index.
+type JumpTable struct {
+	Sym     *LSym
+	Targets []*Prog
 }
 
 // NewFuncInfo allocates and returns a FuncInfo for LSym.
@@ -886,11 +905,12 @@ type Link struct {
 	Flag_linkshared    bool
 	Flag_optimize      bool
 	Flag_locationlists bool
+	Flag_noRefName     bool   // do not include referenced symbol names in object file
 	Retpoline          bool   // emit use of retpoline stubs for indirect jmp/call
 	Flag_maymorestack  string // If not "", call this function before stack checks
 	Bso                *bufio.Writer
 	Pathname           string
-	Pkgpath            string           // the current package's import path, "" if unknown
+	Pkgpath            string           // the current package's import path
 	hashmu             sync.Mutex       // protects hash, funchash
 	hash               map[string]*LSym // name -> sym mapping
 	funchash           map[string]*LSym // name -> sym mapping for ABIInternal syms
@@ -970,23 +990,6 @@ func (fi *FuncInfo) UnspillRegisterArgs(last *Prog, pa ProgAlloc) *Prog {
 		last = unspill
 	}
 	return last
-}
-
-// The smallest possible offset from the hardware stack pointer to a local
-// variable on the stack. Architectures that use a link register save its value
-// on the stack in the function prologue and so always have a pointer between
-// the hardware stack pointer and the local variable area.
-func (ctxt *Link) FixedFrameSize() int64 {
-	switch ctxt.Arch.Family {
-	case sys.AMD64, sys.I386, sys.Wasm:
-		return 0
-	case sys.PPC64:
-		// PIC code on ppc64le requires 32 bytes of stack, and it's easier to
-		// just use that much stack always on ppc64x.
-		return int64(4 * ctxt.Arch.PtrSize)
-	default:
-		return int64(ctxt.Arch.PtrSize)
-	}
 }
 
 // LinkArch is the definition of a single architecture.

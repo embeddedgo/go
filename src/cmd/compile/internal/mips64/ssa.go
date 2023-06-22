@@ -17,12 +17,12 @@ import (
 	"cmd/internal/obj/mips"
 )
 
-// isFPreg reports whether r is an FP register
+// isFPreg reports whether r is an FP register.
 func isFPreg(r int16) bool {
 	return mips.REG_F0 <= r && r <= mips.REG_F31
 }
 
-// isHILO reports whether r is HI or LO register
+// isHILO reports whether r is HI or LO register.
 func isHILO(r int16) bool {
 	return r == mips.REG_HI || r == mips.REG_LO
 }
@@ -762,7 +762,7 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		// caller's SP is FixedFrameSize below the address of the first arg
 		p := s.Prog(mips.AMOVV)
 		p.From.Type = obj.TYPE_ADDR
-		p.From.Offset = -base.Ctxt.FixedFrameSize()
+		p.From.Offset = -base.Ctxt.Arch.FixedFrameSize
 		p.From.Name = obj.NAME_PARAM
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()

@@ -1,5 +1,5 @@
-// Code generated from gen/Thumb.rules; DO NOT EDIT.
-// generated with: cd gen; go run *.go
+// Code generated from _gen/Thumb.rules; DO NOT EDIT.
+// generated with: cd _gen; go run .
 
 package ssa
 
@@ -4276,22 +4276,6 @@ func rewriteValueThumb_OpThumbADDshiftLL(v *Value) bool {
 		v.AddArg(x)
 		return true
 	}
-	// match: (ADDshiftLL [c] (SRLconst x [32-c]) x)
-	// result: (SRRconst [32-c] x)
-	for {
-		c := auxIntToInt32(v.AuxInt)
-		if v_0.Op != OpThumbSRLconst || auxIntToInt32(v_0.AuxInt) != 32-c {
-			break
-		}
-		x := v_0.Args[0]
-		if x != v_1 {
-			break
-		}
-		v.reset(OpThumbSRRconst)
-		v.AuxInt = int32ToAuxInt(32 - c)
-		v.AddArg(x)
-		return true
-	}
 	// match: (ADDshiftLL <typ.UInt16> [8] (BFXU <typ.UInt16> [int32(armBFAuxInt(8, 8))] x) x)
 	// result: (REV16 x)
 	for {
@@ -4395,22 +4379,6 @@ func rewriteValueThumb_OpThumbADDshiftRL(v *Value) bool {
 		c := auxIntToInt32(v_1.AuxInt)
 		v.reset(OpThumbADDconst)
 		v.AuxInt = int32ToAuxInt(int32(uint32(c) >> uint64(d)))
-		v.AddArg(x)
-		return true
-	}
-	// match: (ADDshiftRL [c] (SLLconst x [32-c]) x)
-	// result: (SRRconst [ c] x)
-	for {
-		c := auxIntToInt32(v.AuxInt)
-		if v_0.Op != OpThumbSLLconst || auxIntToInt32(v_0.AuxInt) != 32-c {
-			break
-		}
-		x := v_0.Args[0]
-		if x != v_1 {
-			break
-		}
-		v.reset(OpThumbSRRconst)
-		v.AuxInt = int32ToAuxInt(c)
 		v.AddArg(x)
 		return true
 	}
@@ -11320,22 +11288,6 @@ func rewriteValueThumb_OpThumbORshiftLL(v *Value) bool {
 		v.AddArg(x)
 		return true
 	}
-	// match: ( ORshiftLL [c] (SRLconst x [32-c]) x)
-	// result: (SRRconst [32-c] x)
-	for {
-		c := auxIntToInt32(v.AuxInt)
-		if v_0.Op != OpThumbSRLconst || auxIntToInt32(v_0.AuxInt) != 32-c {
-			break
-		}
-		x := v_0.Args[0]
-		if x != v_1 {
-			break
-		}
-		v.reset(OpThumbSRRconst)
-		v.AuxInt = int32ToAuxInt(32 - c)
-		v.AddArg(x)
-		return true
-	}
 	// match: (ORshiftLL <typ.UInt16> [8] (BFXU <typ.UInt16> [int32(armBFAuxInt(8, 8))] x) x)
 	// result: (REV16 x)
 	for {
@@ -11469,22 +11421,6 @@ func rewriteValueThumb_OpThumbORshiftRL(v *Value) bool {
 		c := auxIntToInt32(v_1.AuxInt)
 		v.reset(OpThumbORconst)
 		v.AuxInt = int32ToAuxInt(int32(uint32(c) >> uint64(d)))
-		v.AddArg(x)
-		return true
-	}
-	// match: ( ORshiftRL [c] (SLLconst x [32-c]) x)
-	// result: (SRRconst [ c] x)
-	for {
-		c := auxIntToInt32(v.AuxInt)
-		if v_0.Op != OpThumbSLLconst || auxIntToInt32(v_0.AuxInt) != 32-c {
-			break
-		}
-		x := v_0.Args[0]
-		if x != v_1 {
-			break
-		}
-		v.reset(OpThumbSRRconst)
-		v.AuxInt = int32ToAuxInt(c)
 		v.AddArg(x)
 		return true
 	}
@@ -14031,22 +13967,6 @@ func rewriteValueThumb_OpThumbXORshiftLL(v *Value) bool {
 		v.AddArg(x)
 		return true
 	}
-	// match: (XORshiftLL [c] (SRLconst x [32-c]) x)
-	// result: (SRRconst [32-c] x)
-	for {
-		c := auxIntToInt32(v.AuxInt)
-		if v_0.Op != OpThumbSRLconst || auxIntToInt32(v_0.AuxInt) != 32-c {
-			break
-		}
-		x := v_0.Args[0]
-		if x != v_1 {
-			break
-		}
-		v.reset(OpThumbSRRconst)
-		v.AuxInt = int32ToAuxInt(32 - c)
-		v.AddArg(x)
-		return true
-	}
 	// match: (XORshiftLL <typ.UInt16> [8] (BFXU <typ.UInt16> [int32(armBFAuxInt(8, 8))] x) x)
 	// result: (REV16 x)
 	for {
@@ -14180,22 +14100,6 @@ func rewriteValueThumb_OpThumbXORshiftRL(v *Value) bool {
 		c := auxIntToInt32(v_1.AuxInt)
 		v.reset(OpThumbXORconst)
 		v.AuxInt = int32ToAuxInt(int32(uint32(c) >> uint64(d)))
-		v.AddArg(x)
-		return true
-	}
-	// match: (XORshiftRL [c] (SLLconst x [32-c]) x)
-	// result: (SRRconst [ c] x)
-	for {
-		c := auxIntToInt32(v.AuxInt)
-		if v_0.Op != OpThumbSLLconst || auxIntToInt32(v_0.AuxInt) != 32-c {
-			break
-		}
-		x := v_0.Args[0]
-		if x != v_1 {
-			break
-		}
-		v.reset(OpThumbSRRconst)
-		v.AuxInt = int32ToAuxInt(c)
 		v.AddArg(x)
 		return true
 	}

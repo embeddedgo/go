@@ -9,32 +9,41 @@ import "internal/buildcfg"
 // For the linkers. Must match Go definitions.
 
 const (
-	STACKSYSTEM = 0
-	StackBig    = 4096
-	StackSmall  = 128
+	StackBig   = 4096
+	StackSmall = 128
 )
 
-var StackGuard, StackLimit, StackSystem int
+var StackSystem, rawGuard int
 
-// Initialize StackGuard and StackLimit according to target system.
 func init() {
 	if buildcfg.GOOS == "noos" && buildcfg.GOARCH == "thumb" {
 		StackSystem = 27 * 4
-		StackGuard = 464 + StackSystem
+		rawGuard = 464
 	} else {
-		StackSystem = STACKSYSTEM
-		StackGuard = 928*stackGuardMultiplier() + StackSystem
+		rawGuard = 928
 	}
-	StackLimit = StackGuard - StackSystem - StackSmall
+}
+
+func StackLimit(race bool) int {
+	// This arithmetic must match that in runtime/stack.go:{_StackGuard,_StackLimit}.
+	stackGuard := rawGuard*stackGuardMultiplier(race) + StackSystem
+	stackLimit := stackGuard - StackSystem - StackSmall
+	return stackLimit
 }
 
 // stackGuardMultiplier returns a multiplier to apply to the default
 // stack guard size. Larger multipliers are used for non-optimized
 // builds that have larger stack frames or for specific targets.
-func stackGuardMultiplier() int {
+func stackGuardMultiplier(race bool) int {
+	// This arithmetic must match that in runtime/internal/sys/consts.go:StackGuardMultiplier.
+	n := 1
 	// On AIX, a larger stack is needed for syscalls.
 	if buildcfg.GOOS == "aix" {
-		return 2
+		n += 1
 	}
-	return stackGuardMultiplierDefault
+	// The race build also needs more stack.
+	if race {
+		n += 1
+	}
+	return n
 }

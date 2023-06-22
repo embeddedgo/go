@@ -34,7 +34,7 @@ import _ "rsc.io/sampler"
 -- go.mod --
 module example
 
-go 1.18
+go 1.19
 
 require rsc.io/sampler v1.3.0
 
@@ -45,7 +45,7 @@ require (
 -- sub/go.mod --
 module example/sub
 
-go 1.18
+go 1.19
 
 require rsc.io/quote v1.5.1
 

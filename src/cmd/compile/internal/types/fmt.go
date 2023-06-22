@@ -6,7 +6,6 @@ package types
 
 import (
 	"bytes"
-	"crypto/md5"
 	"encoding/binary"
 	"fmt"
 	"go/constant"
@@ -15,6 +14,7 @@ import (
 	"sync"
 
 	"cmd/compile/internal/base"
+	"cmd/internal/notsha256"
 )
 
 // BuiltinPkg is a fake package that declares the universe block.
@@ -72,7 +72,6 @@ const (
 	fmtDebug
 	fmtTypeID
 	fmtTypeIDName
-	fmtTypeIDHash
 )
 
 // Sym
@@ -83,7 +82,6 @@ const (
 //	%v	Go syntax: Name for symbols in the local package, PkgName.Name for imported symbols.
 //	%+v	Debug syntax: always include PkgName. prefix even for local names.
 //	%S	Short syntax: Name only, no matter what.
-//
 func (s *Sym) Format(f fmt.State, verb rune) {
 	mode := fmtGo
 	switch verb {
@@ -145,22 +143,6 @@ func symfmt(b *bytes.Buffer, s *Sym, verb rune, mode fmtMode) {
 	if q := pkgqual(s.Pkg, verb, mode); q != "" {
 		b.WriteString(q)
 		b.WriteByte('.')
-		switch mode {
-		case fmtTypeIDName:
-			// If name is a generic instantiation, it might have local package placeholders
-			// in it. Replace those placeholders with the package name. See issue 49547.
-			name = strings.Replace(name, LocalPkg.Prefix, q, -1)
-		case fmtTypeIDHash:
-			// If name is a generic instantiation, don't hash the instantiating types.
-			// This isn't great, but it is safe. If we hash the instantiating types, then
-			// we need to make sure they have just the package name. At this point, they
-			// either have "", or the whole package path, and it is hard to reconcile
-			// the two without depending on -p (which we might do someday).
-			// See issue 51250.
-			if i := strings.Index(name, "["); i >= 0 {
-				name = name[:i]
-			}
-		}
 	}
 	b.WriteString(name)
 }
@@ -169,6 +151,9 @@ func symfmt(b *bytes.Buffer, s *Sym, verb rune, mode fmtMode) {
 // symbols from the given package in the given mode.
 // If it returns the empty string, no qualification is needed.
 func pkgqual(pkg *Pkg, verb rune, mode fmtMode) string {
+	if pkg == nil {
+		return ""
+	}
 	if verb != 'S' {
 		switch mode {
 		case fmtGo: // This is for the user
@@ -185,7 +170,7 @@ func pkgqual(pkg *Pkg, verb rune, mode fmtMode) string {
 		case fmtDebug:
 			return pkg.Name
 
-		case fmtTypeIDName, fmtTypeIDHash:
+		case fmtTypeIDName:
 			// dcommontype, typehash
 			return pkg.Name
 
@@ -238,7 +223,6 @@ var fmtBufferPool = sync.Pool{
 //	%L	Go syntax for underlying type if t is named
 //	%S	short Go syntax: drop leading "func" in function type
 //	%-S	special case for method receiver symbol
-//
 func (t *Type) Format(s fmt.State, verb rune) {
 	mode := fmtGo
 	switch verb {
@@ -260,24 +244,13 @@ func (t *Type) String() string {
 	return tconv(t, 0, fmtGo)
 }
 
-// LinkString returns an unexpanded string description of t, suitable
-// for use in link symbols. "Unexpanded" here means that the
-// description uses `"".` to qualify identifiers from the current
-// package, and "expansion" refers to the renaming step performed by
-// the linker to replace these qualifiers with proper `path/to/pkg.`
-// qualifiers.
+// LinkString returns a string description of t, suitable for use in
+// link symbols.
 //
-// After expansion, the description corresponds to type identity. That
-// is, for any pair of types t1 and t2, Identical(t1, t2) and
-// expand(t1.LinkString()) == expand(t2.LinkString()) report the same
-// value.
-//
-// Within a single compilation unit, LinkString always returns the
-// same unexpanded description for identical types. Thus it's safe to
-// use as a map key to implement a type-identity-keyed map. However,
-// make sure all LinkString calls used for this purpose happen within
-// the same compile process; the string keys are not stable across
-// multiple processes.
+// The description corresponds to type identity. That is, for any pair
+// of types t1 and t2, Identical(t1, t2) == (t1.LinkString() ==
+// t2.LinkString()) is true. Thus it's safe to use as a map key to
+// implement a type-identity-keyed map.
 func (t *Type) LinkString() string {
 	return tconv(t, 0, fmtTypeID)
 }
@@ -343,7 +316,7 @@ func tconv2(b *bytes.Buffer, t *Type, verb rune, mode fmtMode, visited map[*Type
 	if t == AnyType || t == ByteType || t == RuneType {
 		// in %-T mode collapse predeclared aliases with their originals.
 		switch mode {
-		case fmtTypeIDName, fmtTypeIDHash, fmtTypeID:
+		case fmtTypeIDName, fmtTypeID:
 			t = Types[t.Kind()]
 		default:
 			sconv2(b, t.Sym(), 'S', mode)
@@ -367,13 +340,9 @@ func tconv2(b *bytes.Buffer, t *Type, verb rune, mode fmtMode, visited map[*Type
 		// non-fmtTypeID modes.
 		sym := t.Sym()
 		if mode != fmtTypeID {
-			i := len(sym.Name)
-			for i > 0 && sym.Name[i-1] >= '0' && sym.Name[i-1] <= '9' {
-				i--
-			}
-			const dot = "·"
-			if i >= len(dot) && sym.Name[i-len(dot):i] == dot {
-				sym = &Sym{Pkg: sym.Pkg, Name: sym.Name[:i-len(dot)]}
+			base, _ := SplitVargenSuffix(sym.Name)
+			if len(base) < len(sym.Name) {
+				sym = &Sym{Pkg: sym.Pkg, Name: base}
 			}
 		}
 		sconv2(b, sym, verb, mode)
@@ -434,7 +403,7 @@ func tconv2(b *bytes.Buffer, t *Type, verb rune, mode fmtMode, visited map[*Type
 	case TPTR:
 		b.WriteByte('*')
 		switch mode {
-		case fmtTypeID, fmtTypeIDName, fmtTypeIDHash:
+		case fmtTypeID, fmtTypeIDName:
 			if verb == 'S' {
 				tconv2(b, t.Elem(), 'S', mode, visited)
 				return
@@ -496,7 +465,7 @@ func tconv2(b *bytes.Buffer, t *Type, verb rune, mode fmtMode, visited map[*Type
 			case IsExported(f.Sym.Name):
 				sconv2(b, f.Sym, 'S', mode)
 			default:
-				if mode != fmtTypeIDName && mode != fmtTypeIDHash {
+				if mode != fmtTypeIDName {
 					mode = fmtTypeID
 				}
 				sconv2(b, f.Sym, 'v', mode)
@@ -566,7 +535,7 @@ func tconv2(b *bytes.Buffer, t *Type, verb rune, mode fmtMode, visited map[*Type
 			b.WriteByte(byte(open))
 			fieldVerb := 'v'
 			switch mode {
-			case fmtTypeID, fmtTypeIDName, fmtTypeIDHash, fmtGo:
+			case fmtTypeID, fmtTypeIDName, fmtGo:
 				// no argument names on function signature, and no "noescape"/"nosplit" tags
 				fieldVerb = 'S'
 			}
@@ -608,7 +577,7 @@ func tconv2(b *bytes.Buffer, t *Type, verb rune, mode fmtMode, visited map[*Type
 		} else {
 			b.WriteString("tp")
 			// Print out the pointer value for now to disambiguate type params
-			b.WriteString(fmt.Sprintf("%p", t))
+			fmt.Fprintf(b, "%p", t)
 		}
 
 	case TUNION:
@@ -700,7 +669,7 @@ func fldconv(b *bytes.Buffer, f *Field, verb rune, mode fmtMode, visited map[*Ty
 				if name == ".F" {
 					name = "F" // Hack for toolstash -cmp.
 				}
-				if !IsExported(name) && mode != fmtTypeIDName && mode != fmtTypeIDHash {
+				if !IsExported(name) && mode != fmtTypeIDName {
 					name = sconv(s, 0, mode) // qualify non-exported names (used on structs, not on funarg)
 				}
 			} else {
@@ -729,6 +698,21 @@ func fldconv(b *bytes.Buffer, f *Field, verb rune, mode fmtMode, visited map[*Ty
 		b.WriteString(" ")
 		b.WriteString(strconv.Quote(f.Note))
 	}
+}
+
+// SplitVargenSuffix returns name split into a base string and a ·N
+// suffix, if any.
+func SplitVargenSuffix(name string) (base, suffix string) {
+	i := len(name)
+	for i > 0 && name[i-1] >= '0' && name[i-1] <= '9' {
+		i--
+	}
+	const dot = "·"
+	if i >= len(dot) && name[i-len(dot):i] == dot {
+		i -= len(dot)
+		return name[:i], name[i:]
+	}
+	return name, ""
 }
 
 // Val
@@ -768,9 +752,9 @@ func FmtConst(v constant.Value, sharp bool) string {
 
 // TypeHash computes a hash value for type t to use in type switch statements.
 func TypeHash(t *Type) uint32 {
-	p := tconv(t, 0, fmtTypeIDHash)
+	p := t.LinkString()
 
-	// Using MD5 is overkill, but reduces accidental collisions.
-	h := md5.Sum([]byte(p))
+	// Using SHA256 is overkill, but reduces accidental collisions.
+	h := notsha256.Sum256([]byte(p))
 	return binary.LittleEndian.Uint32(h[:4])
 }

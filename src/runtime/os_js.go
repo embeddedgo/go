@@ -50,13 +50,13 @@ func osyield_no_g() {
 const _SIGSEGV = 0xb
 
 func sigpanic() {
-	g := getg()
-	if !canpanic(g) {
+	gp := getg()
+	if !canpanic() {
 		throw("unexpected signal during runtime execution")
 	}
 
 	// js only invokes the exception handler for memory faults.
-	g.sig = _SIGSEGV
+	gp.sig = _SIGSEGV
 	panicmem()
 }
 
@@ -127,9 +127,10 @@ func initsig(preinit bool) {
 }
 
 // May run with m.p==nil, so write barriers are not allowed.
+//
 //go:nowritebarrier
 func newosproc(mp *m) {
-	panic("newosproc: not implemented")
+	throw("newosproc: not implemented")
 }
 
 func setProcessCPUProfiler(hz int32) {}

@@ -8,12 +8,15 @@ package syscall
 
 import "unsafe"
 
-const _SYS_setgroups = SYS_SETGROUPS
+const (
+	_SYS_setgroups  = SYS_SETGROUPS
+	_SYS_clone3     = 4435
+	_SYS_faccessat2 = 4439
+)
 
 func Syscall9(trap, a1, a2, a3, a4, a5, a6, a7, a8, a9 uintptr) (r1, r2 uintptr, err Errno)
 
 //sys	Dup2(oldfd int, newfd int) (err error)
-//sysnb	EpollCreate(size int) (fd int, err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	fstatat(dirfd int, path string, stat *Stat_t, flags int) (err error) = SYS_FSTATAT64
 //sys	Ftruncate(fd int, length int64) (err error) = SYS_FTRUNCATE64
@@ -24,8 +27,8 @@ func Syscall9(trap, a1, a2, a3, a4, a5, a6, a7, a8, a9 uintptr) (r1, r2 uintptr,
 //sys	Lchown(path string, uid int, gid int) (err error)
 //sys	Listen(s int, n int) (err error)
 //sys	Pause() (err error)
-//sys	Pread(fd int, p []byte, offset int64) (n int, err error) = SYS_PREAD64
-//sys	Pwrite(fd int, p []byte, offset int64) (n int, err error) = SYS_PWRITE64
+//sys	pread(fd int, p []byte, offset int64) (n int, err error) = SYS_PREAD64
+//sys	pwrite(fd int, p []byte, offset int64) (n int, err error) = SYS_PWRITE64
 //sys	Renameat(olddirfd int, oldpath string, newdirfd int, newpath string) (err error)
 //sys	Select(nfd int, r *FdSet, w *FdSet, e *FdSet, timeout *Timeval) (n int, err error) = SYS__NEWSELECT
 //sys	sendfile(outfd int, infd int, offset *int64, count int) (written int, err error) = SYS_SENDFILE64
@@ -37,7 +40,6 @@ func Syscall9(trap, a1, a2, a3, a4, a5, a6, a7, a8, a9 uintptr) (r1, r2 uintptr,
 //sys	SyncFileRange(fd int, off int64, n int64, flags int) (err error)
 //sys	Truncate(path string, length int64) (err error) = SYS_TRUNCATE64
 //sys	Ustat(dev int, ubuf *Ustat_t) (err error)
-//sys	accept(s int, rsa *RawSockaddrAny, addrlen *_Socklen) (fd int, err error)
 //sys	accept4(s int, rsa *RawSockaddrAny, addrlen *_Socklen, flags int) (fd int, err error)
 //sys	bind(s int, addr unsafe.Pointer, addrlen _Socklen) (err error)
 //sys	connect(s int, addr unsafe.Pointer, addrlen _Socklen) (err error)
@@ -150,9 +152,9 @@ func Getrlimit(resource int, rlim *Rlimit) (err error) {
 	return
 }
 
-//sysnb setrlimit(resource int, rlim *rlimit32) (err error) = SYS_SETRLIMIT
+//sysnb setrlimit1(resource int, rlim *rlimit32) (err error) = SYS_SETRLIMIT
 
-func Setrlimit(resource int, rlim *Rlimit) (err error) {
+func setrlimit(resource int, rlim *Rlimit) (err error) {
 	err = prlimit(0, resource, rlim, nil)
 	if err != ENOSYS {
 		return err
@@ -174,7 +176,34 @@ func Setrlimit(resource int, rlim *Rlimit) (err error) {
 		return EINVAL
 	}
 
-	return setrlimit(resource, &rl)
+	return setrlimit1(resource, &rl)
+}
+
+//go:nosplit
+func rawSetrlimit(resource int, rlim *Rlimit) Errno {
+	_, _, errno := RawSyscall6(SYS_PRLIMIT64, 0, uintptr(resource), uintptr(unsafe.Pointer(rlim)), 0, 0, 0)
+	if errno != ENOSYS {
+		return errno
+	}
+
+	rl := rlimit32{}
+	if rlim.Cur == rlimInf64 {
+		rl.Cur = rlimInf32
+	} else if rlim.Cur < uint64(rlimInf32) {
+		rl.Cur = uint32(rlim.Cur)
+	} else {
+		return EINVAL
+	}
+	if rlim.Max == rlimInf64 {
+		rl.Max = rlimInf32
+	} else if rlim.Max < uint64(rlimInf32) {
+		rl.Max = uint32(rlim.Max)
+	} else {
+		return EINVAL
+	}
+
+	_, _, errno = RawSyscall(SYS_SETRLIMIT, uintptr(resource), uintptr(unsafe.Pointer(rlim)), 0)
+	return errno
 }
 
 func (r *PtraceRegs) PC() uint64 { return uint64(r.Regs[64]) }
@@ -192,5 +221,3 @@ func (msghdr *Msghdr) SetControllen(length int) {
 func (cmsg *Cmsghdr) SetLen(length int) {
 	cmsg.Len = uint32(length)
 }
-
-func rawVforkSyscall(trap, a1 uintptr) (r1 uintptr, err Errno)

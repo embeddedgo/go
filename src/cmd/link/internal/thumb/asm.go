@@ -166,7 +166,7 @@ func elfreloc1(ctxt *ld.Link, out *ld.OutBuf, ldr *loader.Loader, s loader.Sym, 
 	return true
 }
 
-// Convert the direct jump relocation r to refer to a trampoline if the target is too far
+// Convert the direct jump relocation r to refer to a trampoline if the target is too far.
 func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 	relocs := ldr.Relocs(s)
 	r := relocs.At(ri)
@@ -237,7 +237,7 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 	}
 }
 
-// generate a trampoline to target+offset
+// generate a trampoline to target+offset.
 func gentramp(arch *sys.Arch, linkmode ld.LinkMode, ldr *loader.Loader, tramp *loader.SymbolBuilder, target loader.Sym, offset int64) {
 	tramp.SetSize(8) // 2+1 instructions
 	P := make([]byte, tramp.Size())

@@ -27,10 +27,7 @@ func (g *irgen) expr(expr syntax.Expr) ir.Node {
 		return ir.BlankNode
 	}
 
-	tv, ok := g.info.Types[expr]
-	if !ok {
-		base.FatalfAt(g.pos(expr), "missing type for %v (%T)", expr, expr)
-	}
+	tv := g.typeAndValue(expr)
 	switch {
 	case tv.IsBuiltin():
 		// Qualified builtins, such as unsafe.Add and unsafe.Slice.
@@ -52,23 +49,9 @@ func (g *irgen) expr(expr syntax.Expr) ir.Node {
 
 	base.Assert(g.exprStmtOK)
 
-	// The gc backend expects all expressions to have a concrete type, and
-	// types2 mostly satisfies this expectation already. But there are a few
-	// cases where the Go spec doesn't require converting to concrete type,
-	// and so types2 leaves them untyped. So we need to fix those up here.
-	typ := tv.Type
-	if basic, ok := typ.(*types2.Basic); ok && basic.Info()&types2.IsUntyped != 0 {
-		switch basic.Kind() {
-		case types2.UntypedNil:
-			// ok; can appear in type switch case clauses
-			// TODO(mdempsky): Handle as part of type switches instead?
-		case types2.UntypedBool:
-			typ = types2.Typ[types2.Bool] // expression in "if" or "for" condition
-		case types2.UntypedString:
-			typ = types2.Typ[types2.String] // argument to "append" or "copy" calls
-		default:
-			base.FatalfAt(g.pos(expr), "unexpected untyped type: %v", basic)
-		}
+	typ := idealType(tv)
+	if typ == nil {
+		base.FatalfAt(g.pos(expr), "unexpected untyped type: %v", tv.Type)
 	}
 
 	// Constant expression.
@@ -119,8 +102,7 @@ func (g *irgen) expr0(typ types2.Type, expr syntax.Expr) ir.Node {
 	case *syntax.IndexExpr:
 		args := unpackListExpr(expr.Index)
 		if len(args) == 1 {
-			tv, ok := g.info.Types[args[0]]
-			assert(ok)
+			tv := g.typeAndValue(args[0])
 			if tv.IsValue() {
 				// This is just a normal index expression
 				n := Index(pos, g.typ(typ), g.expr(expr.X), g.expr(args[0]))
@@ -188,7 +170,7 @@ func (g *irgen) expr0(typ types2.Type, expr syntax.Expr) ir.Node {
 // substType does a normal type substition, but tparams is in the form of a field
 // list, and targs is in terms of a slice of type nodes. substType records any newly
 // instantiated types into g.instTypeList.
-func (g *irgen) substType(typ *types.Type, tparams *types.Type, targs []ir.Node) *types.Type {
+func (g *irgen) substType(typ *types.Type, tparams *types.Type, targs []ir.Ntype) *types.Type {
 	fields := tparams.FieldSlice()
 	tparams1 := make([]*types.Type, len(fields))
 	for i, f := range fields {
@@ -330,7 +312,7 @@ func (g *irgen) selectorExpr(pos src.XPos, typ types2.Type, expr *syntax.Selecto
 				typed(method.Type(), n)
 
 				xt := deref(x.Type())
-				targs := make([]ir.Node, len(xt.RParams()))
+				targs := make([]ir.Ntype, len(xt.RParams()))
 				for i := range targs {
 					targs[i] = ir.TypeNode(xt.RParams()[i])
 				}
@@ -439,7 +421,6 @@ func (g *irgen) funcLit(typ2 types2.Type, expr *syntax.FuncLit) ir.Node {
 	for _, cv := range fn.ClosureVars {
 		cv.SetType(cv.Canonical().Type())
 		cv.SetTypecheck(1)
-		cv.SetWalkdef(1)
 	}
 
 	if g.topFuncIsGeneric {

@@ -58,10 +58,6 @@ var Syms struct {
 	// Wasm
 	WasmDiv *obj.LSym
 	// Wasm
-	WasmMove *obj.LSym
-	// Wasm
-	WasmZero *obj.LSym
-	// Wasm
 	WasmTruncS *obj.LSym
 	// Wasm
 	WasmTruncU *obj.LSym
@@ -69,7 +65,8 @@ var Syms struct {
 
 // Pkgs holds known packages.
 var Pkgs struct {
-	Go      *types.Pkg
-	Itab    *types.Pkg
-	Runtime *types.Pkg
+	Go       *types.Pkg
+	Itab     *types.Pkg
+	Runtime  *types.Pkg
+	Coverage *types.Pkg
 }

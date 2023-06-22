@@ -210,6 +210,9 @@ func (b *batch) walkFunc(fn *ir.Func) {
 		switch n.Op() {
 		case ir.OLABEL:
 			n := n.(*ir.LabelStmt)
+			if n.Label.IsBlank() {
+				break
+			}
 			if e.labels == nil {
 				e.labels = make(map[*types.Sym]labelState)
 			}
@@ -296,14 +299,6 @@ func (b *batch) finish(fns []*ir.Func) {
 		// Historically, we haven't printed them, and test cases don't expect them.
 		// TODO(mdempsky): Update tests to expect this.
 		goDeferWrapper := n.Op() == ir.OCLOSURE && n.(*ir.ClosureExpr).Func.Wrapper()
-
-		if n.Op() == ir.OCONVIDATA && n.(*ir.ConvExpr).NonEscaping {
-			// The allocation for the data word of an interface is known to not escape.
-			// See issue 50182.
-			// (But we do still need to process that allocation, as pointers inside
-			// the data word may escape.)
-			loc.escapes = false
-		}
 
 		if loc.escapes {
 			if n.Op() == ir.ONAME {
@@ -427,8 +422,6 @@ func (b *batch) paramTag(fn *ir.Func, narg int, f *types.Field) string {
 	}
 
 	if fn.Pragma&ir.UintptrEscapes != 0 {
-		fn.Pragma |= ir.UintptrKeepAlive
-
 		if f.Type.IsUintptr() {
 			if diagnose {
 				base.WarnfAt(f.Pos, "marking %v as escaping uintptr", name())

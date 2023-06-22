@@ -191,7 +191,7 @@ func taskerFutexwakeup(fb *mcl, addr *uint32, cnt uint32) (schedule bool) {
 		wt := mwt(m)
 		if wt != nil {
 			// this thread sleeps also in the cpuctx.waitingt
-			owned = atomic.Cas(mownedptr(m), 0, 1)
+			owned = mownedptr(m).CompareAndSwap(0, 1)
 		}
 		if owned {
 			fb.remove(m)
@@ -245,7 +245,7 @@ func curcpuRunScheduler() {
 			addr := mkey(m)
 			if addr != 0 {
 				// this thread sleeps also in the tasker.waitingf
-				owned = atomic.Cas(mownedptr(m), 0, 1)
+				owned = mownedptr(m).CompareAndSwap(0, 1)
 			}
 			if owned {
 				wt.remove(m)
@@ -438,7 +438,7 @@ func sysfutexsleep(addr *uint32, val uint32, ns int64) {
 		// pre-insert m into curcpu.waitingt, m is not visible for other CPUs
 		// until it is published in the thetasker.waitingf.
 		msetval(m, curcpu.t.nanotime()+ns)
-		msetowned(m, 0)
+		mclearowned(m)
 		wt := &curcpu.waitingt
 		msetwt(m, wt)
 		wt.lock()
@@ -514,10 +514,10 @@ func sysreset(level int, addr unsafe.Pointer) bool
 // m fields used
 
 //go:nosplit
-func mownedptr(m *m) *uint32 { return &m.cgoCallersUse }
+func mownedptr(m *m) *atomic.Uint32 { return &m.cgoCallersUse }
 
 //go:nosplit
-func msetowned(m *m, owned uint32) { m.cgoCallersUse = owned }
+func mclearowned(m *m) { m.cgoCallersUse.Store(0) }
 
 //go:nosplit
 func mwt(m *m) *msl { return (*msl)(unsafe.Pointer(m.caughtsig)) }

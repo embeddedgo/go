@@ -14,6 +14,7 @@ import (
 	"cmd/link/internal/sym"
 	"debug/elf"
 	"fmt"
+	"io"
 	"log"
 	"math/bits"
 	"os"
@@ -75,8 +76,7 @@ func (a Aux) Sym() Sym { return a.l.resolve(a.r, a.Aux.Sym()) }
 type oReader struct {
 	*goobj.Reader
 	unit         *sym.CompilationUnit
-	version      int    // version of static symbol
-	flags        uint32 // read from object file
+	version      int // version of static symbol
 	pkgprefix    string
 	syms         []Sym    // Sym's global index, indexed by local index
 	pkg          []uint32 // indices of referenced package by PkgIdx (index into loader.objs array)
@@ -167,21 +167,21 @@ type symAndSize struct {
 //
 // Notes on the layout of global symbol index space:
 //
-// - Go object files are read before host object files; each Go object
-//   read adds its defined package symbols to the global index space.
-//   Nonpackage symbols are not yet added.
+//   - Go object files are read before host object files; each Go object
+//     read adds its defined package symbols to the global index space.
+//     Nonpackage symbols are not yet added.
 //
-// - In loader.LoadNonpkgSyms, add non-package defined symbols and
-//   references in all object files to the global index space.
+//   - In loader.LoadNonpkgSyms, add non-package defined symbols and
+//     references in all object files to the global index space.
 //
-// - Host object file loading happens; the host object loader does a
-//   name/version lookup for each symbol it finds; this can wind up
-//   extending the external symbol index space range. The host object
-//   loader stores symbol payloads in loader.payloads using SymbolBuilder.
+//   - Host object file loading happens; the host object loader does a
+//     name/version lookup for each symbol it finds; this can wind up
+//     extending the external symbol index space range. The host object
+//     loader stores symbol payloads in loader.payloads using SymbolBuilder.
 //
-// - Each symbol gets a unique global index. For duplicated and
-//   overwriting/overwritten symbols, the second (or later) appearance
-//   of the symbol gets the same global index as the first appearance.
+//   - Each symbol gets a unique global index. For duplicated and
+//     overwriting/overwritten symbols, the second (or later) appearance
+//     of the symbol gets the same global index as the first appearance.
 type Loader struct {
 	start       map[*oReader]Sym // map from object file to its start index
 	objs        []objIdx         // sorted by start index (i.e. objIdx.i)
@@ -261,8 +261,6 @@ type Loader struct {
 	CgoExports map[string]Sym
 
 	flags uint32
-
-	hasUnknownPkgPath bool // if any Go object has unknown package path
 
 	strictDupMsgs int // number of strict-dup warning/errors, when FlagStrictDups is enabled
 
@@ -361,9 +359,6 @@ func (l *Loader) addObj(pkg string, r *oReader) Sym {
 	i := Sym(len(l.objSyms))
 	l.start[r] = i
 	l.objs = append(l.objs, objIdx{r, i})
-	if r.NeedNameExpansion() && !r.FromAssembly() {
-		l.hasUnknownPkgPath = true
-	}
 	return i
 }
 
@@ -674,7 +669,7 @@ func (l *Loader) resolve(r *oReader, s goobj.SymRef) Sym {
 // when the runtime package is built. The canonical example is
 // "runtime.racefuncenter" -- currently if you do something like
 //
-//    go build -gcflags=-race myprogram.go
+//	go build -gcflags=-race myprogram.go
 //
 // the compiler will insert calls to the builtin runtime.racefuncenter,
 // but the version of the runtime used for linkage won't actually contain
@@ -727,9 +722,9 @@ func (l *Loader) checkdup(name string, r *oReader, li uint32, dup Sym) {
 	// here is that we get different line numbers on formal
 	// params; I am guessing that the pos is being inherited
 	// from the spot where the wrapper is needed.
-	allowed := strings.HasPrefix(name, "go.info.go.interface") ||
-		strings.HasPrefix(name, "go.info.go.builtin") ||
-		strings.HasPrefix(name, "go.debuglines")
+	allowed := strings.HasPrefix(name, "go:info.go.interface") ||
+		strings.HasPrefix(name, "go:info.go.builtin") ||
+		strings.HasPrefix(name, "go:debuglines")
 	if !allowed {
 		l.strictDupMsgs++
 	}
@@ -752,17 +747,7 @@ func (l *Loader) NReachableSym() int {
 	return l.attrReachable.Count()
 }
 
-// Returns the raw (unpatched) name of the i-th symbol.
-func (l *Loader) RawSymName(i Sym) string {
-	if l.IsExternal(i) {
-		pp := l.getPayload(i)
-		return pp.name
-	}
-	r, li := l.toLocal(i)
-	return r.Sym(li).Name(r.Reader)
-}
-
-// Returns the (patched) name of the i-th symbol.
+// Returns the name of the i-th symbol.
 func (l *Loader) SymName(i Sym) string {
 	if l.IsExternal(i) {
 		pp := l.getPayload(i)
@@ -772,11 +757,7 @@ func (l *Loader) SymName(i Sym) string {
 	if r == nil {
 		return "?"
 	}
-	name := r.Sym(li).Name(r.Reader)
-	if !r.NeedNameExpansion() {
-		return name
-	}
-	return strings.Replace(name, "\"\".", r.pkgprefix, -1)
+	return r.Sym(li).Name(r.Reader)
 }
 
 // Returns the version of the i-th symbol.
@@ -1015,7 +996,7 @@ func (l *Loader) AttrExternal(i Sym) bool {
 // symbol (see AttrExternal).
 func (l *Loader) SetAttrExternal(i Sym, v bool) {
 	if !l.IsExternal(i) {
-		panic(fmt.Sprintf("tried to set external attr on non-external symbol %q", l.RawSymName(i)))
+		panic(fmt.Sprintf("tried to set external attr on non-external symbol %q", l.SymName(i)))
 	}
 	if v {
 		l.attrExternal.Set(l.extIndex(i))
@@ -1581,13 +1562,12 @@ func (l *Loader) SetSymPkg(i Sym, pkg string) {
 	l.symPkg[i] = pkg
 }
 
-// SymLocalentry returns the "local entry" value for the specified
-// symbol.
+// SymLocalentry returns an offset in bytes of the "local entry" of a symbol.
 func (l *Loader) SymLocalentry(i Sym) uint8 {
 	return l.localentry[i]
 }
 
-// SetSymLocalentry sets the "local entry" attribute for a symbol.
+// SetSymLocalentry sets the "local entry" offset attribute for a symbol.
 func (l *Loader) SetSymLocalentry(i Sym, value uint8) {
 	// reject bad symbols
 	if i >= Sym(len(l.objSyms)) || i == 0 {
@@ -1718,7 +1698,7 @@ func (l *Loader) OuterSym(i Sym) Sym {
 // SubSym gets the subsymbol for host object loaded symbols.
 func (l *Loader) SubSym(i Sym) Sym {
 	// NB: note -- no check for l.isExternal(), since I am pretty sure
-	// that later phases in the linker set subsym for "type." syms
+	// that later phases in the linker set subsym for "type:" syms
 	return l.sub[i]
 }
 
@@ -1731,7 +1711,7 @@ func (l *Loader) SubSym(i Sym) Sym {
 // emits named string symbols (type SGOSTRING) when compiling a
 // package; after being deduplicated, these symbols are collected into
 // a single unit by assigning them a new carrier symbol named
-// "go.string.*" (which appears in the final symbol table for the
+// "go:string.*" (which appears in the final symbol table for the
 // output load module).
 func (l *Loader) SetCarrierSym(s Sym, c Sym) {
 	if c == 0 {
@@ -1978,6 +1958,10 @@ func (fi *FuncInfo) FuncFlag() objabi.FuncFlag {
 	return (*goobj.FuncInfo)(nil).ReadFuncFlag(fi.data)
 }
 
+func (fi *FuncInfo) StartLine() int32 {
+	return (*goobj.FuncInfo)(nil).ReadStartLine(fi.data)
+}
+
 // Preload has to be called prior to invoking the various methods
 // below related to pcdata, funcdataoff, files, and inltree nodes.
 func (fi *FuncInfo) Preload() {
@@ -2071,13 +2055,16 @@ func (l *Loader) Preload(localSymVersion int, f *bio.Reader, lib *sym.Library, u
 		Reader:       r,
 		unit:         unit,
 		version:      localSymVersion,
-		flags:        r.Flags(),
 		pkgprefix:    pkgprefix,
 		syms:         make([]Sym, ndef+nhashed64def+nhasheddef+r.NNonpkgdef()+r.NNonpkgref()),
 		ndef:         ndef,
 		nhasheddef:   nhasheddef,
 		nhashed64def: nhashed64def,
 		objidx:       uint32(len(l.objs)),
+	}
+
+	if r.Unlinkable() {
+		log.Fatalf("link: unlinkable object (from package %s) - compiler requires -p flag", lib.Pkg)
 	}
 
 	// Autolib
@@ -2093,7 +2080,7 @@ func (l *Loader) Preload(localSymVersion int, f *bio.Reader, lib *sym.Library, u
 	l.addObj(lib.Pkg, or)
 
 	// The caller expects us consuming all the data
-	f.MustSeek(length, os.SEEK_CUR)
+	f.MustSeek(length, io.SeekCurrent)
 
 	return r.Fingerprint()
 }
@@ -2119,16 +2106,6 @@ func (st *loadState) preloadSyms(r *oReader, kind int) {
 	case hashedDef:
 		start = uint32(r.ndef + r.nhashed64def)
 		end = uint32(r.ndef + r.nhashed64def + r.nhasheddef)
-		if l.hasUnknownPkgPath {
-			// The content hash depends on symbol name expansion. If any package is
-			// built without fully expanded names, the content hash is unreliable.
-			// Treat them as named symbols.
-			// This is rare.
-			// (We don't need to do this for hashed64Def case, as there the hash
-			// function is simply the identity function, which doesn't depend on
-			// name expansion.)
-			kind = nonPkgDef
-		}
 	case nonPkgDef:
 		start = uint32(r.ndef + r.nhashed64def + r.nhasheddef)
 		end = uint32(r.ndef + r.nhashed64def + r.nhasheddef + r.NNonpkgdef())
@@ -2136,7 +2113,6 @@ func (st *loadState) preloadSyms(r *oReader, kind int) {
 		panic("preloadSyms: bad kind")
 	}
 	l.growAttrBitmaps(len(l.objSyms) + int(end-start))
-	needNameExpansion := r.NeedNameExpansion()
 	loadingRuntimePkg := r.unit.Lib.Pkg == "runtime"
 	for i := start; i < end; i++ {
 		osym := r.Sym(i)
@@ -2144,9 +2120,6 @@ func (st *loadState) preloadSyms(r *oReader, kind int) {
 		var v int
 		if kind != hashed64Def && kind != hashedDef { // we don't need the name, etc. for hashed symbols
 			name = osym.Name(r.Reader)
-			if needNameExpansion {
-				name = strings.Replace(name, "\"\".", r.pkgprefix, -1)
-			}
 			v = abiToVer(osym.ABI(), r.version)
 		}
 		gi := st.addSym(name, v, r, i, kind, osym)
@@ -2158,7 +2131,7 @@ func (st *loadState) preloadSyms(r *oReader, kind int) {
 			l.SetAttrUsedInIface(gi, true)
 		}
 		if strings.HasPrefix(name, "runtime.") ||
-			(loadingRuntimePkg && strings.HasPrefix(name, "type.")) {
+			(loadingRuntimePkg && strings.HasPrefix(name, "type:")) {
 			if bi := goobj.BuiltinIdx(name, int(osym.ABI())); bi != -1 {
 				// This is a definition of a builtin symbol. Record where it is.
 				l.builtinSyms[bi] = gi
@@ -2210,13 +2183,9 @@ func (l *Loader) LoadSyms(arch *sys.Arch) {
 func loadObjRefs(l *Loader, r *oReader, arch *sys.Arch) {
 	// load non-package refs
 	ndef := uint32(r.NAlldef())
-	needNameExpansion := r.NeedNameExpansion()
 	for i, n := uint32(0), uint32(r.NNonpkgref()); i < n; i++ {
 		osym := r.Sym(ndef + i)
 		name := osym.Name(r.Reader)
-		if needNameExpansion {
-			name = strings.Replace(name, "\"\".", r.pkgprefix, -1)
-		}
 		v := abiToVer(osym.ABI(), r.version)
 		r.syms[ndef+i] = l.LookupOrCreateSym(name, v)
 		gi := r.syms[ndef+i]
@@ -2269,7 +2238,7 @@ func abiToVer(abi uint16, localSymVersion int) int {
 // anonymous aux or sub-symbol containing some sub-part or payload of
 // another symbol.
 func (l *Loader) TopLevelSym(s Sym) bool {
-	return topLevelSym(l.RawSymName(s), l.SymType(s))
+	return topLevelSym(l.SymName(s), l.SymType(s))
 }
 
 // topLevelSym tests a symbol name and kind to determine whether
@@ -2304,9 +2273,6 @@ func (l *Loader) cloneToExternal(symIdx Sym) {
 	r, li := l.toLocal(symIdx)
 	osym := r.Sym(li)
 	sname := osym.Name(r.Reader)
-	if r.NeedNameExpansion() {
-		sname = strings.Replace(sname, "\"\".", r.pkgprefix, -1)
-	}
 	sver := abiToVer(osym.ABI(), r.version)
 	skind := sym.AbiSymKindToSymKind[objabi.SymKind(osym.Type())]
 
@@ -2426,26 +2392,30 @@ func (l *Loader) RelocVariant(s Sym, ri int) sym.RelocVariant {
 // space, looking for symbols with relocations targeting undefined
 // references. The linker's loadlib method uses this to determine if
 // there are unresolved references to functions in system libraries
-// (for example, libgcc.a), presumably due to CGO code. Return
-// value is a list of loader.Sym's corresponding to the undefined
-// cross-refs. The "limit" param controls the maximum number of
-// results returned; if "limit" is -1, then all undefs are returned.
-func (l *Loader) UndefinedRelocTargets(limit int) []Sym {
-	result := []Sym{}
+// (for example, libgcc.a), presumably due to CGO code. Return value
+// is a pair of lists of loader.Sym's. First list corresponds to the
+// corresponding to the undefined symbols themselves, the second list
+// is the symbol that is making a reference to the undef. The "limit"
+// param controls the maximum number of results returned; if "limit"
+// is -1, then all undefs are returned.
+func (l *Loader) UndefinedRelocTargets(limit int) ([]Sym, []Sym) {
+	result, fromr := []Sym{}, []Sym{}
+outerloop:
 	for si := Sym(1); si < Sym(len(l.objSyms)); si++ {
 		relocs := l.Relocs(si)
 		for ri := 0; ri < relocs.Count(); ri++ {
 			r := relocs.At(ri)
 			rs := r.Sym()
-			if rs != 0 && l.SymType(rs) == sym.SXREF && l.RawSymName(rs) != ".got" {
+			if rs != 0 && l.SymType(rs) == sym.SXREF && l.SymName(rs) != ".got" {
 				result = append(result, rs)
+				fromr = append(fromr, si)
 				if limit != -1 && len(result) >= limit {
-					break
+					break outerloop
 				}
 			}
 		}
 	}
-	return result
+	return result, fromr
 }
 
 // AssignTextSymbolOrder populates the Textp slices within each
@@ -2563,7 +2533,6 @@ type ErrorReporter struct {
 //
 // Logging an error means that on exit cmd/link will delete any
 // output file and return a non-zero error code.
-//
 func (reporter *ErrorReporter) Errorf(s Sym, format string, args ...interface{}) {
 	if s != 0 && reporter.ldr.SymName(s) != "" {
 		// Note: Replace is needed here because symbol names might have % in them,

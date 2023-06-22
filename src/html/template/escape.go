@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"html"
+	"internal/godebug"
 	"io"
 	"text/template"
 	"text/template/parse"
@@ -44,7 +45,7 @@ func escapeTemplate(tmpl *Template, node parse.Node, name string) error {
 }
 
 // evalArgs formats the list of arguments into a string. It is equivalent to
-// fmt.Sprint(args...), except that it deferences all pointers.
+// fmt.Sprint(args...), except that it dereferences all pointers.
 func evalArgs(args ...any) string {
 	// Optimization for simple common case of a single string argument.
 	if len(args) == 1 {
@@ -160,6 +161,8 @@ func (e *escaper) escape(c context, n parse.Node) context {
 	panic("escaping " + n.String() + " is unimplemented")
 }
 
+var debugAllowActionJSTmpl = godebug.New("jstmpllitinterp")
+
 // escapeAction escapes an action template node.
 func (e *escaper) escapeAction(c context, n *parse.ActionNode) context {
 	if len(n.Pipe.Decl) != 0 {
@@ -223,6 +226,15 @@ func (e *escaper) escapeAction(c context, n *parse.ActionNode) context {
 		c.jsCtx = jsCtxDivOp
 	case stateJSDqStr, stateJSSqStr:
 		s = append(s, "_html_template_jsstrescaper")
+	case stateJSBqStr:
+		if debugAllowActionJSTmpl.Value() == "1" {
+			s = append(s, "_html_template_jsstrescaper")
+		} else {
+			return context{
+				state: stateError,
+				err:   errorf(errJSTmplLit, n, n.Line, "%s appears in a JS template literal", n),
+			}
+		}
 	case stateJSRegexp:
 		s = append(s, "_html_template_jsregexpescaper")
 	case stateCSS:
@@ -369,9 +381,8 @@ func normalizeEscFn(e string) string {
 // for all x.
 var redundantFuncs = map[string]map[string]bool{
 	"_html_template_commentescaper": {
-		"_html_template_attrescaper":    true,
-		"_html_template_nospaceescaper": true,
-		"_html_template_htmlescaper":    true,
+		"_html_template_attrescaper": true,
+		"_html_template_htmlescaper": true,
 	},
 	"_html_template_cssescaper": {
 		"_html_template_attrescaper": true,
@@ -411,13 +422,19 @@ func newIdentCmd(identifier string, pos parse.Pos) *parse.CommandNode {
 // nudge returns the context that would result from following empty string
 // transitions from the input context.
 // For example, parsing:
-//     `<a href=`
+//
+//	`<a href=`
+//
 // will end in context{stateBeforeValue, attrURL}, but parsing one extra rune:
-//     `<a href=x`
+//
+//	`<a href=x`
+//
 // will end in context{stateURL, delimSpaceOrTagEnd, ...}.
 // There are two transitions that happen when the 'x' is seen:
 // (1) Transition from a before-value state to a start-of-value state without
-//     consuming any character.
+//
+//	consuming any character.
+//
 // (2) Consume 'x' and transition past the first value character.
 // In this case, nudging produces the context after (1) happens.
 func nudge(c context) context {
@@ -690,7 +707,7 @@ func (e *escaper) escapeTemplateBody(c context, t *template.Template) (context, 
 		return c.eq(c1)
 	}
 	// We need to assume an output context so that recursive template calls
-	// take the fast path out of escapeTree instead of infinitely recursing.
+	// take the fast path out of escapeTree instead of infinitely recurring.
 	// Naively assuming that the input context is the same as the output
 	// works >90% of the time.
 	e.output[t.Name()] = c

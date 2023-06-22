@@ -208,9 +208,15 @@ func (g *genInst) scanForGenCalls(decl ir.Node) {
 
 			st := g.getInstantiation(gf, targs, true).fun
 			dictValue, usingSubdict := g.getDictOrSubdict(declInfo, n, gf, targs, true)
-			// We have to be using a subdictionary, since this is
-			// a generic method call.
-			assert(usingSubdict)
+			if hasShapeTypes(targs) {
+				// We have to be using a subdictionary, since this is
+				// a generic method call.
+				assert(usingSubdict)
+			} else {
+				// We should use main dictionary, because the receiver is
+				// an instantiation already, see issue #53406.
+				assert(!usingSubdict)
+			}
 
 			// Transform to a function call, by appending the
 			// dictionary and the receiver to the args.
@@ -328,10 +334,6 @@ func (g *genInst) buildClosure(outer *ir.Func, x ir.Node) ir.Node {
 	} else { // ir.OMETHEXPR or ir.METHVALUE
 		// Method expression T.M where T is a generic type.
 		se := x.(*ir.SelectorExpr)
-		targs := deref(se.X.Type()).RParams()
-		if len(targs) == 0 {
-			panic("bad")
-		}
 		if x.Op() == ir.OMETHVALUE {
 			rcvrValue = se.X
 		}
@@ -342,7 +344,8 @@ func (g *genInst) buildClosure(outer *ir.Func, x ir.Node) ir.Node {
 		// of se.Selection, since that will be the type that actually has
 		// the method.
 		recv := deref(se.Selection.Type.Recv().Type)
-		if len(recv.RParams()) == 0 {
+		targs := recv.RParams()
+		if len(targs) == 0 {
 			// The embedded type that actually has the method is not
 			// actually generic, so no need to build a closure.
 			return x
@@ -407,6 +410,7 @@ func (g *genInst) buildClosure(outer *ir.Func, x ir.Node) ir.Node {
 
 	// Make a new internal function.
 	fn, formalParams, formalResults := startClosure(pos, outer, typ)
+	fn.SetWrapper(true) // See issue 52237
 
 	// This is the dictionary we want to use.
 	// It may be a constant, it may be the outer functions's dictionary, or it may be
@@ -416,8 +420,7 @@ func (g *genInst) buildClosure(outer *ir.Func, x ir.Node) ir.Node {
 	var dictVar *ir.Name
 	var dictAssign *ir.AssignStmt
 	if outer != nil {
-		dictVar = ir.NewNameAt(pos, typecheck.LookupNum(typecheck.LocalDictName, g.dnum))
-		dictVar.SetSym(outer.Sym().Pkg.Lookup(dictVar.Sym().Name))
+		dictVar = ir.NewNameAt(pos, closureSym(outer, typecheck.LocalDictName, g.dnum))
 		g.dnum++
 		dictVar.Class = ir.PAUTO
 		typed(types.Types[types.TUINTPTR], dictVar)
@@ -431,10 +434,7 @@ func (g *genInst) buildClosure(outer *ir.Func, x ir.Node) ir.Node {
 	var rcvrVar *ir.Name
 	var rcvrAssign ir.Node
 	if rcvrValue != nil {
-		rcvrVar = ir.NewNameAt(pos, typecheck.LookupNum(".rcvr", g.dnum))
-		if outer != nil {
-			rcvrVar.SetSym(outer.Sym().Pkg.Lookup(rcvrVar.Sym().Name))
-		}
+		rcvrVar = ir.NewNameAt(pos, closureSym(outer, ".rcvr", g.dnum))
 		g.dnum++
 		typed(rcvrValue.Type(), rcvrVar)
 		rcvrAssign = ir.NewAssignStmt(pos, rcvrVar, rcvrValue)
@@ -547,7 +547,7 @@ func (g *genInst) instantiateMethods() {
 			// Lookup the method on the base generic type, since methods may
 			// not be set on imported instantiated types.
 			baseType := typ.OrigType()
-			for j, _ := range typ.Methods().Slice() {
+			for j := range typ.Methods().Slice() {
 				if baseType.Methods().Slice()[j].Nointerface() {
 					typ.Methods().Slice()[j].SetNointerface(true)
 				}
@@ -620,7 +620,7 @@ func checkFetchBody(nameNode *ir.Name) {
 	}
 }
 
-// getInstantiation gets the instantiantion and dictionary of the function or method nameNode
+// getInstantiation gets the instantiation and dictionary of the function or method nameNode
 // with the type arguments shapes. If the instantiated function is not already
 // cached, then it calls genericSubst to create the new instantiation.
 func (g *genInst) getInstantiation(nameNode *ir.Name, shapes []*types.Type, isMeth bool) *instInfo {
@@ -724,11 +724,12 @@ func (g *genInst) getInstantiation(nameNode *ir.Name, shapes []*types.Type, isMe
 // Struct containing info needed for doing the substitution as we create the
 // instantiation of a generic function with specified type arguments.
 type subster struct {
-	g        *genInst
-	isMethod bool     // If a method is being instantiated
-	newf     *ir.Func // Func node for the new stenciled function
-	ts       typecheck.Tsubster
-	info     *instInfo // Place to put extra info in the instantiation
+	g           *genInst
+	isMethod    bool     // If a method is being instantiated
+	newf        *ir.Func // Func node for the new stenciled function
+	ts          typecheck.Tsubster
+	info        *instInfo // Place to put extra info in the instantiation
+	skipClosure bool      // Skip substituting closures
 
 	// Map from non-nil, non-ONAME node n to slice of all m, where m.Defn = n
 	defnMap map[ir.Node][]**ir.Name
@@ -745,6 +746,7 @@ func (g *genInst) genericSubst(newsym *types.Sym, nameNode *ir.Name, tparams []*
 	// Pos of the instantiated function is same as the generic function
 	newf := ir.NewFunc(gf.Pos())
 	newf.Pragma = gf.Pragma // copy over pragmas from generic function to stenciled implementation.
+	newf.Endlineno = gf.Endlineno
 	newf.Nname = ir.NewNameAt(gf.Pos(), newsym)
 	newf.Nname.Func = newf
 	newf.Nname.Defn = newf
@@ -892,6 +894,13 @@ func getDictionaryEntry(pos src.XPos, dict *ir.Name, i int, size int) ir.Node {
 	return r
 }
 
+// getDictionaryEntryAddr gets the address of the i'th entry in dictionary dict.
+func getDictionaryEntryAddr(pos src.XPos, dict *ir.Name, i int, size int) ir.Node {
+	a := ir.NewAddrExpr(pos, getDictionaryEntry(pos, dict, i, size))
+	typed(types.Types[types.TUINTPTR].PtrTo(), a)
+	return a
+}
+
 // getDictionaryType returns a *runtime._type from the dictionary entry i (which
 // refers to a type param or a derived type that uses type params). It uses the
 // specified dictionary dictParam, rather than the one in info.dictParam.
@@ -973,7 +982,20 @@ func (subst *subster) node(n ir.Node) ir.Node {
 			}
 		}
 
+		old := subst.skipClosure
+		// For unsafe.{Alignof,Offsetof,Sizeof}, subster will transform them to OLITERAL nodes,
+		// and discard their arguments. However, their children nodes were already process before,
+		// thus if they contain any closure, the closure was still be added to package declarations
+		// queue for processing later. Thus, genInst will fail to generate instantiation for the
+		// closure because of lacking dictionary information, see issue #53390.
+		if call, ok := m.(*ir.CallExpr); ok && call.X.Op() == ir.ONAME {
+			switch call.X.Name().BuiltinOp {
+			case ir.OALIGNOF, ir.OOFFSETOF, ir.OSIZEOF:
+				subst.skipClosure = true
+			}
+		}
 		ir.EditChildren(m, edit)
+		subst.skipClosure = old
 
 		m.SetTypecheck(1)
 
@@ -1118,6 +1140,9 @@ func (subst *subster) node(n ir.Node) ir.Node {
 			}
 
 		case ir.OCLOSURE:
+			if subst.skipClosure {
+				break
+			}
 			// We're going to create a new closure from scratch, so clear m
 			// to avoid using the ir.Copy by accident until we reassign it.
 			m = nil
@@ -1186,6 +1211,9 @@ func (subst *subster) node(n ir.Node) ir.Node {
 			if m.Tag != nil && m.Tag.Op() == ir.OTYPESW {
 				break // Nothing to do here for type switches.
 			}
+			if m.Tag != nil && !types.IsComparable(m.Tag.Type()) {
+				break // Nothing to do here for un-comparable types.
+			}
 			if m.Tag != nil && !m.Tag.Type().IsEmptyInterface() && m.Tag.Type().HasShape() {
 				// To implement a switch on a value that is or has a type parameter, we first convert
 				// that thing we're switching on to an interface{}.
@@ -1214,8 +1242,14 @@ func (g *genInst) dictPass(info *instInfo) {
 	savef := ir.CurFunc
 	ir.CurFunc = info.fun
 
+	callMap := make(map[ir.Node]bool)
+
 	var edit func(ir.Node) ir.Node
 	edit = func(m ir.Node) ir.Node {
+		if m.Op() == ir.OCALL && m.(*ir.CallExpr).X.Op() == ir.OXDOT {
+			callMap[m.(*ir.CallExpr).X] = true
+		}
+
 		ir.EditChildren(m, edit)
 
 		switch m.Op() {
@@ -1243,9 +1277,10 @@ func (g *genInst) dictPass(info *instInfo) {
 
 			if mse.X.Op() == ir.OTYPE {
 				// Method expression T.M
-				m = g.buildClosure2(info, m)
-				// No need for transformDot - buildClosure2 has already
-				// transformed to OCALLINTER/ODOTINTER.
+				idx := findMethodExprClosure(info.dictInfo, mse)
+				c := getDictionaryEntryAddr(m.Pos(), info.dictParam, info.dictInfo.startMethodExprClosures+idx, info.dictInfo.dictLen)
+				m = ir.NewConvExpr(m.Pos(), ir.OCONVNOP, mse.Type(), c)
+				m.SetTypecheck(1)
 			} else {
 				// If we can't find the selected method in the
 				// AllMethods of the bound, then this must be an access
@@ -1253,20 +1288,23 @@ func (g *genInst) dictPass(info *instInfo) {
 				// dictionary lookups - transformDot() will convert to
 				// the desired direct field access.
 				if isBoundMethod(info.dictInfo, mse) {
+					if callMap[m] {
+						// The OCALL surrounding this XDOT will rewrite the call
+						// to use the method expression closure directly.
+						break
+					}
+					// Convert this method value to a closure.
+					// TODO: use method expression closure.
 					dst := info.dictInfo.shapeToBound[mse.X.Type()]
 					// Implement x.M as a conversion-to-bound-interface
 					//  1) convert x to the bound interface
-					//  2) call M on that interface
+					//  2) select method value M on that interface
 					if src.IsInterface() {
 						// If type arg is an interface (unusual case),
 						// we do a type assert to the type bound.
 						mse.X = assertToBound(info, info.dictParam, m.Pos(), mse.X, dst)
 					} else {
-						mse.X = convertUsingDictionary(info, info.dictParam, m.Pos(), mse.X, m, dst, true)
-						// Note: we set nonEscaping==true, because we can assume the backing store for the
-						// interface conversion doesn't escape. The method call will immediately go to
-						// a wrapper function which copies all the data out of the interface value.
-						// (It only matters for non-pointer-shaped interface conversions. See issue 50182.)
+						mse.X = convertUsingDictionary(info, info.dictParam, m.Pos(), mse.X, m, dst)
 					}
 				}
 				transformDot(mse, false)
@@ -1274,6 +1312,25 @@ func (g *genInst) dictPass(info *instInfo) {
 		case ir.OCALL:
 			call := m.(*ir.CallExpr)
 			op := call.X.Op()
+			if op == ir.OXDOT {
+				// This is a call of a method value where the value has a type parameter type.
+				// We transform to a call of the appropriate method expression closure
+				// in the dictionary.
+				// So if x has a type parameter type:
+				//   _ = x.m(a)
+				// Rewrite to:
+				//   _ = methexpr<m>(x, a)
+				se := call.X.(*ir.SelectorExpr)
+				call.SetOp(ir.OCALLFUNC)
+				idx := findMethodExprClosure(info.dictInfo, se)
+				c := getDictionaryEntryAddr(se.Pos(), info.dictParam, info.dictInfo.startMethodExprClosures+idx, info.dictInfo.dictLen)
+				t := typecheck.NewMethodType(se.Type(), se.X.Type())
+				call.X = ir.NewConvExpr(se.Pos(), ir.OCONVNOP, t, c)
+				typed(t, call.X)
+				call.Args.Prepend(se.X)
+				break
+				// TODO: deref case?
+			}
 			if op == ir.OMETHVALUE {
 				// Redo the transformation of OXDOT, now that we
 				// know the method value is being called.
@@ -1292,20 +1349,23 @@ func (g *genInst) dictPass(info *instInfo) {
 			mce := m.(*ir.ConvExpr)
 			// Note: x's argument is still typed as a type parameter.
 			// m's argument now has an instantiated type.
-
-			if mce.X.Type().HasShape() || m.Type().HasShape() {
-				m = convertUsingDictionary(info, info.dictParam, m.Pos(), mce.X, m, m.Type(), false)
+			if mce.X.Type().HasShape() || (m.Type().HasShape() && !m.Type().IsEmptyInterface()) {
+				m = convertUsingDictionary(info, info.dictParam, m.Pos(), mce.X, m, m.Type())
 			}
 		case ir.ODOTTYPE, ir.ODOTTYPE2:
-			if !m.Type().HasShape() {
+			dt := m.(*ir.TypeAssertExpr)
+			if dt.Type().IsEmptyInterface() || (dt.Type().IsInterface() && !dt.Type().HasShape()) {
 				break
 			}
-			dt := m.(*ir.TypeAssertExpr)
-			var rt ir.Node
+			if !dt.Type().HasShape() && !(dt.X.Type().HasShape() && !dt.X.Type().IsEmptyInterface()) {
+				break
+			}
+			var rtype, itab ir.Node
 			if dt.Type().IsInterface() || dt.X.Type().IsEmptyInterface() {
+				// TODO(mdempsky): Investigate executing this block unconditionally.
 				ix := findDictType(info, m.Type())
 				assert(ix >= 0)
-				rt = getDictionaryType(info, info.dictParam, dt.Pos(), ix)
+				rtype = getDictionaryType(info, info.dictParam, dt.Pos(), ix)
 			} else {
 				// nonempty interface to noninterface. Need an itab.
 				ix := -1
@@ -1316,13 +1376,14 @@ func (g *genInst) dictPass(info *instInfo) {
 					}
 				}
 				assert(ix >= 0)
-				rt = getDictionaryEntry(dt.Pos(), info.dictParam, ix, info.dictInfo.dictLen)
+				itab = getDictionaryEntry(dt.Pos(), info.dictParam, ix, info.dictInfo.dictLen)
 			}
 			op := ir.ODYNAMICDOTTYPE
 			if m.Op() == ir.ODOTTYPE2 {
 				op = ir.ODYNAMICDOTTYPE2
 			}
-			m = ir.NewDynamicTypeAssertExpr(dt.Pos(), op, dt.X, rt)
+			m = ir.NewDynamicTypeAssertExpr(dt.Pos(), op, dt.X, rtype)
+			m.(*ir.DynamicTypeAssertExpr).ITab = itab
 			m.SetType(dt.Type())
 			m.SetTypecheck(1)
 		case ir.OCASE:
@@ -1387,10 +1448,8 @@ func findDictType(info *instInfo, t *types.Type) int {
 // type dst, by returning a new set of nodes that make use of a dictionary entry. in is the
 // instantiated node of the CONVIFACE node or XDOT node (for a bound method call) that is causing the
 // conversion.
-// If nonEscaping is true, the caller guarantees that the backing store needed for the interface data
-// word will not escape.
-func convertUsingDictionary(info *instInfo, dictParam *ir.Name, pos src.XPos, v ir.Node, in ir.Node, dst *types.Type, nonEscaping bool) ir.Node {
-	assert(v.Type().HasShape() || in.Type().HasShape())
+func convertUsingDictionary(info *instInfo, dictParam *ir.Name, pos src.XPos, v ir.Node, in ir.Node, dst *types.Type) ir.Node {
+	assert(v.Type().HasShape() || (in.Type().HasShape() && !in.Type().IsEmptyInterface()))
 	assert(dst.IsInterface())
 
 	if v.Type().IsInterface() {
@@ -1459,7 +1518,6 @@ func convertUsingDictionary(info *instInfo, dictParam *ir.Name, pos src.XPos, v 
 	// Figure out what the data field of the interface will be.
 	data := ir.NewConvExpr(pos, ir.OCONVIDATA, nil, v)
 	typed(types.Types[types.TUNSAFEPTR], data)
-	data.NonEscaping = nonEscaping
 
 	// Build an interface from the type and data parts.
 	var i ir.Node = ir.NewBinaryExpr(pos, ir.OEFACE, rt, data)
@@ -1598,9 +1656,11 @@ func (g *genInst) getDictionarySym(gf *ir.Name, targs []*types.Type, isMeth bool
 				var nameNode *ir.Name
 				se := call.X.(*ir.SelectorExpr)
 				if se.X.Type().IsShape() {
-					// This is a method call enabled by a type bound.
 					tparam := se.X.Type()
-					if call.X.Op() == ir.ODOTMETH {
+					// Ensure methods on all instantiating types are computed.
+					typecheck.CalcMethods(tparam)
+					if typecheck.Lookdot1(nil, se.Sel, tparam, tparam.AllMethods(), 0) != nil {
+						// This is a method call enabled by a type bound.
 						// We need this extra check for method expressions,
 						// which don't add in the implicit XDOTs.
 						tmpse := ir.NewSelectorExpr(src.NoXPos, ir.OXDOT, se.X, se.Sel)
@@ -1727,7 +1787,9 @@ func (g *genInst) getSymForMethodCall(se *ir.SelectorExpr, subst *typecheck.Tsub
 // dictionaries and method instantiations to be complete, so, to avoid recursive
 // dependencies, we finalize the itab lsyms only after all dictionaries syms and
 // instantiations have been created.
+// Also handles writing method expression closures into the dictionaries.
 func (g *genInst) finalizeSyms() {
+Outer:
 	for _, d := range g.dictSymsToFinalize {
 		infoPrint("=== Finalizing dictionary %s\n", d.sym.Name)
 
@@ -1776,6 +1838,54 @@ func (g *genInst) finalizeSyms() {
 			}
 		}
 
+		// Emit an entry for each method expression closure.
+		// Each entry is a (captureless) closure pointing to the method on the instantiating type.
+		// In other words, the entry is a runtime.funcval whose fn field is set to the method
+		// in question, and has no other fields. The address of this dictionary entry can be
+		// cast to a func of the appropriate type.
+		// TODO: do these need to be done when finalizing, or can we do them earlier?
+		for _, bf := range info.methodExprClosures {
+			rcvr := d.targs[bf.idx]
+			rcvr2 := deref(rcvr)
+			found := false
+			typecheck.CalcMethods(rcvr2) // Ensure methods on all instantiating types are computed.
+			for _, f := range rcvr2.AllMethods().Slice() {
+				if f.Sym.Name == bf.name {
+					codePtr := ir.MethodSym(rcvr, f.Sym).Linksym()
+					d.off = objw.SymPtr(lsym, d.off, codePtr, 0)
+					infoPrint(" + MethodExprClosure for %v.%s\n", rcvr, bf.name)
+					found = true
+					break
+				}
+			}
+			if !found {
+				// We failed to find a method expression needed for this
+				// dictionary. This may happen because we tried to create a
+				// dictionary for an invalid instantiation.
+				//
+				// For example, in test/typeparam/issue54225.go, we attempt to
+				// construct a dictionary for "Node[struct{}].contentLen",
+				// even though "struct{}" does not implement "Value", so it
+				// cannot actually be used as a type argument to "Node".
+				//
+				// The real issue here is we shouldn't be attempting to create
+				// those dictionaries in the first place (e.g., CL 428356),
+				// but that fix is scarier for backporting to Go 1.19. Too
+				// many backport CLs to this code have fixed one issue while
+				// introducing another.
+				//
+				// So as a hack, instead of calling Fatalf, we simply skip
+				// calling objw.Global below, which prevents us from emitting
+				// the broken dictionary. The linker's dead code elimination
+				// should then naturally prune this invalid, unneeded
+				// dictionary. Worst case, if the dictionary somehow *is*
+				// needed by the final executable, we've just turned an ICE
+				// into a link-time missing symbol failure.
+				infoPrint(" ! abandoning dictionary %v; missing method expression %v.%s\n", d.sym.Name, rcvr, bf.name)
+				continue Outer
+			}
+		}
+
 		objw.Global(lsym, int32(d.off), obj.DUPOK|obj.RODATA)
 		infoPrint("=== Finalized dictionary %s\n", d.sym.Name)
 	}
@@ -1812,7 +1922,7 @@ func (g *genInst) getDictionaryValue(pos src.XPos, gf *ir.Name, targs []*types.T
 }
 
 // hasShapeNodes returns true if the type of any node in targs has a shape.
-func hasShapeNodes(targs []ir.Node) bool {
+func hasShapeNodes(targs []ir.Ntype) bool {
 	for _, n := range targs {
 		if n.Type().HasShape() {
 			return true
@@ -1832,7 +1942,7 @@ func hasShapeTypes(targs []*types.Type) bool {
 }
 
 // getInstInfo get the dictionary format for a function instantiation- type params, derived
-// types, and needed subdictionaries and itabs.
+// types, and needed subdictionaries, itabs, and method expression closures.
 func (g *genInst) getInstInfo(st *ir.Func, shapes []*types.Type, instInfo *instInfo) {
 	info := instInfo.dictInfo
 	info.shapeParams = shapes
@@ -1928,10 +2038,22 @@ func (g *genInst) getInstInfo(st *ir.Func, shapes []*types.Type, instInfo *instI
 			}
 		case ir.OXDOT:
 			se := n.(*ir.SelectorExpr)
+			if se.X.Op() == ir.OTYPE && se.X.Type().IsShape() {
+				// Method expression.
+				addMethodExprClosure(info, se)
+				break
+			}
 			if isBoundMethod(info, se) {
+				if callMap[n] {
+					// Method value called directly. Use method expression closure.
+					addMethodExprClosure(info, se)
+					break
+				}
+				// Method value not called directly. Still doing the old way.
 				infoPrint("  Itab for bound call: %v\n", n)
 				info.itabConvs = append(info.itabConvs, n)
 			}
+
 		case ir.ODOTTYPE, ir.ODOTTYPE2:
 			if !n.(*ir.TypeAssertExpr).Type().IsInterface() && !n.(*ir.TypeAssertExpr).X.Type().IsEmptyInterface() {
 				infoPrint("  Itab for dot type: %v\n", n)
@@ -1981,7 +2103,8 @@ func (g *genInst) getInstInfo(st *ir.Func, shapes []*types.Type, instInfo *instI
 	}
 	info.startSubDict = len(info.shapeParams) + len(info.derivedTypes)
 	info.startItabConv = len(info.shapeParams) + len(info.derivedTypes) + len(info.subDictCalls)
-	info.dictLen = len(info.shapeParams) + len(info.derivedTypes) + len(info.subDictCalls) + len(info.itabConvs)
+	info.startMethodExprClosures = len(info.shapeParams) + len(info.derivedTypes) + len(info.subDictCalls) + len(info.itabConvs)
+	info.dictLen = len(info.shapeParams) + len(info.derivedTypes) + len(info.subDictCalls) + len(info.itabConvs) + len(info.methodExprClosures)
 }
 
 // isBoundMethod returns true if the selection indicated by se is a bound method of
@@ -1991,6 +2114,46 @@ func (g *genInst) getInstInfo(st *ir.Func, shapes []*types.Type, instInfo *instI
 func isBoundMethod(info *dictInfo, se *ir.SelectorExpr) bool {
 	bound := info.shapeToBound[se.X.Type()]
 	return typecheck.Lookdot1(se, se.Sel, bound, bound.AllMethods(), 1) != nil
+}
+
+func shapeIndex(info *dictInfo, t *types.Type) int {
+	for i, s := range info.shapeParams {
+		if s == t {
+			return i
+		}
+	}
+	base.Fatalf("can't find type %v in shape params", t)
+	return -1
+}
+
+// addMethodExprClosure adds the T.M method expression to the list of bound method expressions
+// used in the generic body.
+// isBoundMethod must have returned true on the same arguments.
+func addMethodExprClosure(info *dictInfo, se *ir.SelectorExpr) {
+	idx := shapeIndex(info, se.X.Type())
+	name := se.Sel.Name
+	for _, b := range info.methodExprClosures {
+		if idx == b.idx && name == b.name {
+			return
+		}
+	}
+	infoPrint("  Method expression closure for %v.%s\n", info.shapeParams[idx], name)
+	info.methodExprClosures = append(info.methodExprClosures, methodExprClosure{idx: idx, name: name})
+}
+
+// findMethodExprClosure finds the entry in the dictionary to use for the T.M
+// method expression encoded in se.
+// isBoundMethod must have returned true on the same arguments.
+func findMethodExprClosure(info *dictInfo, se *ir.SelectorExpr) int {
+	idx := shapeIndex(info, se.X.Type())
+	name := se.Sel.Name
+	for i, b := range info.methodExprClosures {
+		if idx == b.idx && name == b.name {
+			return i
+		}
+	}
+	base.Fatalf("can't find method expression closure for %s %s", se.X.Type(), name)
+	return -1
 }
 
 // addType adds t to info.derivedTypes if it is parameterized type (which is not
@@ -2102,7 +2265,7 @@ func parameterizedBy1(t *types.Type, params []*types.Type, visited map[*types.Ty
 	}
 }
 
-// startClosures starts creation of a closure that has the function type typ. It
+// startClosure starts creation of a closure that has the function type typ. It
 // creates all the formal params and results according to the type typ. On return,
 // the body and closure variables of the closure must still be filled in, and
 // ir.UseClosure() called.
@@ -2116,10 +2279,7 @@ func startClosure(pos src.XPos, outer *ir.Func, typ *types.Type) (*ir.Func, []*t
 	var formalResults []*types.Field // returns of closure
 	for i := 0; i < typ.NumParams(); i++ {
 		t := typ.Params().Field(i).Type
-		arg := ir.NewNameAt(pos, typecheck.LookupNum("a", i))
-		if outer != nil {
-			arg.SetSym(outer.Sym().Pkg.Lookup(arg.Sym().Name))
-		}
+		arg := ir.NewNameAt(pos, closureSym(outer, "a", i))
 		arg.Class = ir.PPARAM
 		typed(t, arg)
 		arg.Curfn = fn
@@ -2131,10 +2291,7 @@ func startClosure(pos src.XPos, outer *ir.Func, typ *types.Type) (*ir.Func, []*t
 	}
 	for i := 0; i < typ.NumResults(); i++ {
 		t := typ.Results().Field(i).Type
-		result := ir.NewNameAt(pos, typecheck.LookupNum("r", i)) // TODO: names not needed?
-		if outer != nil {
-			result.SetSym(outer.Sym().Pkg.Lookup(result.Sym().Name))
-		}
+		result := ir.NewNameAt(pos, closureSym(outer, "r", i)) // TODO: names not needed?
 		result.Class = ir.PPARAMOUT
 		typed(t, result)
 		result.Curfn = fn
@@ -2153,83 +2310,25 @@ func startClosure(pos src.XPos, outer *ir.Func, typ *types.Type) (*ir.Func, []*t
 
 }
 
+// closureSym returns outer.Sym().Pkg.LookupNum(prefix, n).
+// If outer is nil, then types.LocalPkg is used instead.
+func closureSym(outer *ir.Func, prefix string, n int) *types.Sym {
+	pkg := types.LocalPkg
+	if outer != nil {
+		pkg = outer.Sym().Pkg
+	}
+	return pkg.LookupNum(prefix, n)
+}
+
 // assertToBound returns a new node that converts a node rcvr with interface type to
 // the 'dst' interface type.
 func assertToBound(info *instInfo, dictVar *ir.Name, pos src.XPos, rcvr ir.Node, dst *types.Type) ir.Node {
-	if dst.HasShape() {
-		ix := findDictType(info, dst)
-		assert(ix >= 0)
-		rt := getDictionaryType(info, dictVar, pos, ix)
-		rcvr = ir.NewDynamicTypeAssertExpr(pos, ir.ODYNAMICDOTTYPE, rcvr, rt)
-		typed(dst, rcvr)
-	} else {
-		rcvr = ir.NewTypeAssertExpr(pos, rcvr, nil)
-		typed(dst, rcvr)
-	}
-	return rcvr
-}
-
-// buildClosure2 makes a closure to implement a method expression m (generic form x)
-// which has a shape type as receiver. If the receiver is exactly a shape (i.e. from
-// a typeparam), then the body of the closure converts m.X (the receiver) to the
-// interface bound type, and makes an interface call with the remaining arguments.
-//
-// The returned closure is fully substituted and has already had any needed
-// transformations done.
-func (g *genInst) buildClosure2(info *instInfo, m ir.Node) ir.Node {
-	outer := info.fun
-	pos := m.Pos()
-	typ := m.Type() // type of the closure
-
-	fn, formalParams, formalResults := startClosure(pos, outer, typ)
-
-	// Capture dictionary calculated in the outer function
-	dictVar := ir.CaptureName(pos, fn, info.dictParam)
-	typed(types.Types[types.TUINTPTR], dictVar)
-
-	// Build arguments to call inside the closure.
-	var args []ir.Node
-	for i := 0; i < typ.NumParams(); i++ {
-		args = append(args, formalParams[i].Nname.(*ir.Name))
+	if !dst.HasShape() {
+		return typed(dst, ir.NewTypeAssertExpr(pos, rcvr, nil))
 	}
 
-	// Build call itself. This involves converting the first argument to the
-	// bound type (an interface) using the dictionary, and then making an
-	// interface call with the remaining arguments.
-	var innerCall ir.Node
-	rcvr := args[0]
-	args = args[1:]
-	assert(m.(*ir.SelectorExpr).X.Type().IsShape())
-	dst := info.dictInfo.shapeToBound[m.(*ir.SelectorExpr).X.Type()]
-	if m.(*ir.SelectorExpr).X.Type().IsInterface() {
-		// If type arg is an interface (unusual case), we do a type assert to
-		// the type bound.
-		rcvr = assertToBound(info, dictVar, pos, rcvr, dst)
-	} else {
-		rcvr = convertUsingDictionary(info, dictVar, pos, rcvr, m, dst, false)
-	}
-	dot := ir.NewSelectorExpr(pos, ir.ODOTINTER, rcvr, m.(*ir.SelectorExpr).Sel)
-	dot.Selection = typecheck.Lookdot1(dot, dot.Sel, dot.X.Type(), dot.X.Type().AllMethods(), 1)
-
-	typed(dot.Selection.Type, dot)
-	innerCall = ir.NewCallExpr(pos, ir.OCALLINTER, dot, args)
-	t := m.Type()
-	if t.NumResults() == 0 {
-		innerCall.SetTypecheck(1)
-	} else if t.NumResults() == 1 {
-		typed(t.Results().Field(0).Type, innerCall)
-	} else {
-		typed(t.Results(), innerCall)
-	}
-	if len(formalResults) > 0 {
-		innerCall = ir.NewReturnStmt(pos, []ir.Node{innerCall})
-		innerCall.SetTypecheck(1)
-	}
-	fn.Body = []ir.Node{innerCall}
-
-	// We're all done with the captured dictionary
-	ir.FinishCaptureNames(pos, outer, fn)
-
-	// Do final checks on closure and return it.
-	return ir.UseClosure(fn.OClosure, typecheck.Target)
+	ix := findDictType(info, dst)
+	assert(ix >= 0)
+	rt := getDictionaryType(info, dictVar, pos, ix)
+	return typed(dst, ir.NewDynamicTypeAssertExpr(pos, ir.ODYNAMICDOTTYPE, rcvr, rt))
 }

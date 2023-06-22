@@ -107,7 +107,7 @@ func Info(fnsym *obj.LSym, infosym *obj.LSym, curfn interface{}) ([]dwarf.Scope,
 	// the function symbol to insure that the type included in DWARF
 	// processing during linking.
 	typesyms := []*obj.LSym{}
-	for t, _ := range fnsym.Func().Autot {
+	for t := range fnsym.Func().Autot {
 		typesyms = append(typesyms, t)
 	}
 	sort.Sort(obj.BySymName(typesyms))
@@ -150,6 +150,21 @@ func createDwarfVars(fnsym *obj.LSym, complexOK bool, fn *ir.Func, apDecls []*ir
 		decls, vars, selected = createABIVars(fnsym, fn, apDecls)
 	} else {
 		decls, vars, selected = createSimpleVars(fnsym, apDecls)
+	}
+	if fn.DebugInfo != nil {
+		// Recover zero sized variables eliminated by the stackframe pass
+		for _, n := range fn.DebugInfo.(*ssa.FuncDebug).OptDcl {
+			if n.Class != ir.PAUTO {
+				continue
+			}
+			types.CalcSize(n.Type())
+			if n.Type().Size() == 0 {
+				decls = append(decls, n)
+				vars = append(vars, createSimpleVar(fnsym, n))
+				vars[len(vars)-1].StackOffset = 0
+				fnsym.Func().RecordAutoType(reflectdata.TypeLinksym(n.Type()))
+			}
+		}
 	}
 
 	dcl := apDecls
@@ -344,7 +359,7 @@ func createSimpleVar(fnsym *obj.LSym, n *ir.Name) *dwarf.Var {
 
 	localAutoOffset := func() int64 {
 		offs = n.FrameOffset()
-		if base.Ctxt.FixedFrameSize() == 0 {
+		if base.Ctxt.Arch.FixedFrameSize == 0 {
 			offs -= int64(types.PtrSize)
 		}
 		if buildcfg.FramePointerEnabled {
@@ -362,7 +377,7 @@ func createSimpleVar(fnsym *obj.LSym, n *ir.Name) *dwarf.Var {
 		if n.IsOutputParamInRegisters() {
 			offs = localAutoOffset()
 		} else {
-			offs = n.FrameOffset() + base.Ctxt.FixedFrameSize()
+			offs = n.FrameOffset() + base.Ctxt.Arch.FixedFrameSize
 		}
 
 	default:
@@ -471,7 +486,7 @@ func createComplexVar(fnsym *obj.LSym, fn *ir.Func, varID ssa.VarID) *dwarf.Var 
 
 	gotype := reflectdata.TypeLinksym(n.Type())
 	delete(fnsym.Func().Autot, gotype)
-	typename := dwarf.InfoPrefix + gotype.Name[len("type."):]
+	typename := dwarf.InfoPrefix + gotype.Name[len("type:"):]
 	inlIndex := 0
 	if base.Flag.GenDwarfInl > 1 {
 		if n.InlFormal() || n.InlLocal() {
@@ -552,7 +567,7 @@ func RecordFlags(flags ...string) {
 		fmt.Fprintf(&cmd, " -%s=%v", f.Name, getter.Get())
 	}
 
-	// Adds flag to producer string singalling whether regabi is turned on or
+	// Adds flag to producer string signaling whether regabi is turned on or
 	// off.
 	// Once regabi is turned on across the board and the relative GOEXPERIMENT
 	// knobs no longer exist this code should be removed.

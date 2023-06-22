@@ -8,7 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"internal/buildcfg"
+	"internal/platform"
 	"io"
 	"log"
 	"os"
@@ -23,23 +23,24 @@ import (
 	"cmd/go/internal/str"
 	"cmd/internal/objabi"
 	"cmd/internal/quoted"
-	"cmd/internal/sys"
 	"crypto/sha1"
 )
 
 // The 'path' used for GOROOT_FINAL when -trimpath is specified
-const trimPathGoRootFinal = "go"
+const trimPathGoRootFinal string = "$GOROOT"
 
 var runtimePackages = map[string]struct{}{
-	"internal/abi":            struct{}{},
-	"internal/bytealg":        struct{}{},
-	"internal/cpu":            struct{}{},
-	"internal/goarch":         struct{}{},
-	"internal/goos":           struct{}{},
-	"runtime":                 struct{}{},
-	"runtime/internal/atomic": struct{}{},
-	"runtime/internal/math":   struct{}{},
-	"runtime/internal/sys":    struct{}{},
+	"internal/abi":             struct{}{},
+	"internal/bytealg":         struct{}{},
+	"internal/coverage/rtcov":  struct{}{},
+	"internal/cpu":             struct{}{},
+	"internal/goarch":          struct{}{},
+	"internal/goos":            struct{}{},
+	"runtime":                  struct{}{},
+	"runtime/internal/atomic":  struct{}{},
+	"runtime/internal/math":    struct{}{},
+	"runtime/internal/sys":     struct{}{},
+	"runtime/internal/syscall": struct{}{},
 }
 
 // The Go toolchain.
@@ -137,8 +138,14 @@ func (gcToolchain) gc(b *Builder, a *Action, archive string, importcfg, embedcfg
 	if p.Internal.OmitDebug || cfg.Goos == "plan9" || cfg.Goarch == "wasm" {
 		defaultGcFlags = append(defaultGcFlags, "-dwarf=false")
 	}
-	if strings.HasPrefix(runtimeVersion, "go1") && !strings.Contains(os.Args[0], "go_bootstrap") {
-		defaultGcFlags = append(defaultGcFlags, "-goversion", runtimeVersion)
+	if strings.HasPrefix(RuntimeVersion, "go1") && !strings.Contains(os.Args[0], "go_bootstrap") {
+		defaultGcFlags = append(defaultGcFlags, "-goversion", RuntimeVersion)
+	}
+	if p.Internal.CoverageCfg != "" {
+		defaultGcFlags = append(defaultGcFlags, "-coveragecfg="+p.Internal.CoverageCfg)
+	}
+	if cfg.BuildPGOFile != "" {
+		defaultGcFlags = append(defaultGcFlags, "-pgoprofile="+cfg.BuildPGOFile)
 	}
 	if symabis != "" {
 		defaultGcFlags = append(defaultGcFlags, "-symabis", symabis)
@@ -230,22 +237,8 @@ func gcBackendConcurrency(gcflags []string) int {
 		log.Fatalf("GO19CONCURRENTCOMPILATION must be 0, 1, or unset, got %q", e)
 	}
 
-CheckFlags:
-	for _, flag := range gcflags {
-		// Concurrent compilation is presumed incompatible with any gcflags,
-		// except for known commonly used flags.
-		// If the user knows better, they can manually add their own -c to the gcflags.
-		switch flag {
-		case "-N", "-l", "-S", "-B", "-C", "-I", "-shared":
-			// OK
-		default:
-			canDashC = false
-			break CheckFlags
-		}
-	}
-
 	// TODO: Test and delete these conditions.
-	if buildcfg.Experiment.FieldTrack || buildcfg.Experiment.PreemptibleLoops {
+	if cfg.ExperimentErr != nil || cfg.Experiment.FieldTrack || cfg.Experiment.PreemptibleLoops {
 		canDashC = false
 	}
 
@@ -398,6 +391,21 @@ func asmArgs(a *Action, p *load.Package) []any {
 		args = append(args, "-D", "GOMIPS64_"+cfg.GOMIPS64)
 	}
 
+	if cfg.Goarch == "ppc64" || cfg.Goarch == "ppc64le" {
+		// Define GOPPC64_power8..N from cfg.PPC64.
+		// We treat each powerpc version as a superset of functionality.
+		switch cfg.GOPPC64 {
+		case "power10":
+			args = append(args, "-D", "GOPPC64_power10")
+			fallthrough
+		case "power9":
+			args = append(args, "-D", "GOPPC64_power9")
+			fallthrough
+		default: // This should always be power8.
+			args = append(args, "-D", "GOPPC64_power8")
+		}
+	}
+
 	return args
 }
 
@@ -502,8 +510,7 @@ func (gcToolchain) pack(b *Builder, a *Action, afile string, ofiles []string) er
 		return nil
 	}
 	if err := packInternal(absAfile, absOfiles); err != nil {
-		b.showOutput(a, p.Dir, p.Desc(), err.Error()+"\n")
-		return errPrintedOutput
+		return formatOutput(b.WorkDir, p.Dir, p.ImportPath, p.Desc(), err.Error()+"\n")
 	}
 	return nil
 }
@@ -636,7 +643,7 @@ func (gcToolchain) ld(b *Builder, root *Action, out, importcfg, mainpkg string) 
 		// linker's build id, which will cause our build id to not
 		// match the next time the tool is built.
 		// Rely on the external build id instead.
-		if !sys.MustLinkExternal(cfg.Goos, cfg.Goarch) {
+		if !platform.MustLinkExternal(cfg.Goos, cfg.Goarch) {
 			ldflags = append(ldflags, "-X=cmd/internal/objabi.buildID="+root.buildID)
 		}
 	}

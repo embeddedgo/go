@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
+//go:build unix
 
 // Fork, exec, wait, etc.
 
@@ -281,6 +281,11 @@ func Exec(argv0 string, argv []string, envv []string) (err error) {
 		return err
 	}
 	runtime_BeforeExec()
+
+	rlim, rlimOK := origRlimitNofile.Load().(Rlimit)
+	if rlimOK && rlim.Cur != 0 {
+		Setrlimit(RLIMIT_NOFILE, &rlim)
+	}
 
 	var err1 error
 	if runtime.GOOS == "solaris" || runtime.GOOS == "illumos" || runtime.GOOS == "aix" {

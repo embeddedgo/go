@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build aix || darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
+//go:build unix
 
 package syscall_test
 
@@ -96,9 +96,6 @@ func TestDirentRepeat(t *testing.T) {
 	if runtime.GOOS == "freebsd" || runtime.GOOS == "netbsd" {
 		if size < 1024 {
 			size = 1024 // DIRBLKSIZ, see issue 31403.
-		}
-		if runtime.GOOS == "freebsd" {
-			t.Skip("need to fix issue 31416 first")
 		}
 	}
 

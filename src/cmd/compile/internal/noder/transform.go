@@ -74,8 +74,7 @@ func stringtoruneslit(n *ir.ConvExpr) ir.Node {
 		i++
 	}
 
-	nn := ir.NewCompLitExpr(base.Pos, ir.OCOMPLIT, ir.TypeNode(n.Type()), nil)
-	nn.List = list
+	nn := ir.NewCompLitExpr(base.Pos, ir.OCOMPLIT, n.Type(), list)
 	typed(n.Type(), nn)
 	// Need to transform the OCOMPLIT.
 	return transformCompLit(nn)
@@ -163,6 +162,7 @@ func transformCall(n *ir.CallExpr) {
 	ir.SetPos(n)
 	// n.Type() can be nil for calls with no return value
 	assert(n.Typecheck() == 1)
+	typecheck.RewriteNonNameCall(n)
 	transformArgs(n)
 	l := n.X
 	t := l.Type()
@@ -730,11 +730,11 @@ func transformAppend(n *ir.CallExpr) ir.Node {
 	assert(t.IsSlice())
 
 	if n.IsDDD {
-		if t.Elem().IsKind(types.TUINT8) && args[1].Type().IsString() {
-			return n
-		}
-
-		args[1] = assignconvfn(args[1], t.Underlying())
+		// assignconvfn is of args[1] not required here, as the
+		// types of args[0] and args[1] don't need to match
+		// (They will both have an underlying type which are
+		// slices of identical base types, or be []byte and string.)
+		// See issue 53888.
 		return n
 	}
 
@@ -900,7 +900,7 @@ func transformBuiltin(n *ir.CallExpr) ir.Node {
 		transformArgs(n)
 		fallthrough
 
-	case ir.ONEW, ir.OALIGNOF, ir.OOFFSETOF, ir.OSIZEOF:
+	case ir.ONEW, ir.OALIGNOF, ir.OOFFSETOF, ir.OSIZEOF, ir.OUNSAFESLICEDATA, ir.OUNSAFESTRINGDATA:
 		u := ir.NewUnaryExpr(n.Pos(), op, n.Args[0])
 		u1 := typed(n.Type(), ir.InitExpr(n.Init(), u)) // typecheckargs can add to old.Init
 		switch op {
@@ -913,12 +913,12 @@ func transformBuiltin(n *ir.CallExpr) ir.Node {
 		case ir.OALIGNOF, ir.OOFFSETOF, ir.OSIZEOF:
 			// This corresponds to the EvalConst() call near end of typecheck().
 			return typecheck.EvalConst(u1)
-		case ir.OCLOSE, ir.ONEW:
+		case ir.OCLOSE, ir.ONEW, ir.OUNSAFESTRINGDATA, ir.OUNSAFESLICEDATA:
 			// nothing more to do
 			return u1
 		}
 
-	case ir.OCOMPLEX, ir.OCOPY, ir.OUNSAFEADD, ir.OUNSAFESLICE:
+	case ir.OCOMPLEX, ir.OCOPY, ir.OUNSAFEADD, ir.OUNSAFESLICE, ir.OUNSAFESTRING:
 		transformArgs(n)
 		b := ir.NewBinaryExpr(n.Pos(), op, n.Args[0], n.Args[1])
 		n1 := typed(n.Type(), ir.InitExpr(n.Init(), b))
@@ -1046,13 +1046,7 @@ func transformCompLit(n *ir.CompLitExpr) (res ir.Node) {
 				kv := l.(*ir.KeyExpr)
 				key := kv.Key
 
-				// Sym might have resolved to name in other top-level
-				// package, because of import dot. Redirect to correct sym
-				// before we do the lookup.
 				s := key.Sym()
-				if id, ok := key.(*ir.Ident); ok && typecheck.DotImportRefs[id] != nil {
-					s = typecheck.Lookup(s.Name)
-				}
 				if types.IsExported(s.Name) && s.Pkg != types.LocalPkg {
 					// Exported field names should always have
 					// local pkg. We only need to do this

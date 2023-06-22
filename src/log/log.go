@@ -32,8 +32,11 @@ import (
 // The prefix is followed by a colon only when Llongfile or Lshortfile
 // is specified.
 // For example, flags Ldate | Ltime (or LstdFlags) produce,
+//
 //	2009/01/23 01:23:23 message
+//
 // while flags Ldate | Ltime | Lmicroseconds | Llongfile produce,
+//
 //	2009/01/23 01:23:23.123123 /a/b/c/d.go:23: message
 const (
 	Ldate         = 1 << iota     // the date in the local time zone: 2009/01/23
@@ -51,12 +54,12 @@ const (
 // the Writer's Write method. A Logger can be used simultaneously from
 // multiple goroutines; it guarantees to serialize access to the Writer.
 type Logger struct {
-	mu        sync.Mutex // ensures atomic writes; protects the following fields
-	prefix    string     // prefix on each line to identify the logger (but see Lmsgprefix)
-	flag      int        // properties
-	out       io.Writer  // destination for output
-	buf       []byte     // for accumulating text to write
-	isDiscard int32      // atomic boolean: whether out == io.Discard
+	mu        sync.Mutex  // ensures atomic writes; protects the following fields
+	prefix    string      // prefix on each line to identify the logger (but see Lmsgprefix)
+	flag      int         // properties
+	out       io.Writer   // destination for output
+	buf       []byte      // for accumulating text to write
+	isDiscard atomic.Bool // whether out == io.Discard
 }
 
 // New creates a new Logger. The out variable sets the
@@ -67,7 +70,7 @@ type Logger struct {
 func New(out io.Writer, prefix string, flag int) *Logger {
 	l := &Logger{out: out, prefix: prefix, flag: flag}
 	if out == io.Discard {
-		l.isDiscard = 1
+		l.isDiscard.Store(true)
 	}
 	return l
 }
@@ -77,11 +80,7 @@ func (l *Logger) SetOutput(w io.Writer) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.out = w
-	isDiscard := int32(0)
-	if w == io.Discard {
-		isDiscard = 1
-	}
-	atomic.StoreInt32(&l.isDiscard, isDiscard)
+	l.isDiscard.Store(w == io.Discard)
 }
 
 var std = New(os.Stderr, "", LstdFlags)
@@ -107,10 +106,10 @@ func itoa(buf *[]byte, i int, wid int) {
 }
 
 // formatHeader writes log header to buf in following order:
-//   * l.prefix (if it's not blank and Lmsgprefix is unset),
-//   * date and/or time (if corresponding flags are provided),
-//   * file and line number (if corresponding flags are provided),
-//   * l.prefix (if it's not blank and Lmsgprefix is set).
+//   - l.prefix (if it's not blank and Lmsgprefix is unset),
+//   - date and/or time (if corresponding flags are provided),
+//   - file and line number (if corresponding flags are provided),
+//   - l.prefix (if it's not blank and Lmsgprefix is set).
 func (l *Logger) formatHeader(buf *[]byte, t time.Time, file string, line int) {
 	if l.flag&Lmsgprefix == 0 {
 		*buf = append(*buf, l.prefix...)
@@ -199,7 +198,7 @@ func (l *Logger) Output(calldepth int, s string) error {
 // Printf calls l.Output to print to the logger.
 // Arguments are handled in the manner of fmt.Printf.
 func (l *Logger) Printf(format string, v ...any) {
-	if atomic.LoadInt32(&l.isDiscard) != 0 {
+	if l.isDiscard.Load() {
 		return
 	}
 	l.Output(2, fmt.Sprintf(format, v...))
@@ -208,7 +207,7 @@ func (l *Logger) Printf(format string, v ...any) {
 // Print calls l.Output to print to the logger.
 // Arguments are handled in the manner of fmt.Print.
 func (l *Logger) Print(v ...any) {
-	if atomic.LoadInt32(&l.isDiscard) != 0 {
+	if l.isDiscard.Load() {
 		return
 	}
 	l.Output(2, fmt.Sprint(v...))
@@ -217,7 +216,7 @@ func (l *Logger) Print(v ...any) {
 // Println calls l.Output to print to the logger.
 // Arguments are handled in the manner of fmt.Println.
 func (l *Logger) Println(v ...any) {
-	if atomic.LoadInt32(&l.isDiscard) != 0 {
+	if l.isDiscard.Load() {
 		return
 	}
 	l.Output(2, fmt.Sprintln(v...))
@@ -336,7 +335,7 @@ func Writer() io.Writer {
 // Print calls Output to print to the standard logger.
 // Arguments are handled in the manner of fmt.Print.
 func Print(v ...any) {
-	if atomic.LoadInt32(&std.isDiscard) != 0 {
+	if std.isDiscard.Load() {
 		return
 	}
 	std.Output(2, fmt.Sprint(v...))
@@ -345,7 +344,7 @@ func Print(v ...any) {
 // Printf calls Output to print to the standard logger.
 // Arguments are handled in the manner of fmt.Printf.
 func Printf(format string, v ...any) {
-	if atomic.LoadInt32(&std.isDiscard) != 0 {
+	if std.isDiscard.Load() {
 		return
 	}
 	std.Output(2, fmt.Sprintf(format, v...))
@@ -354,7 +353,7 @@ func Printf(format string, v ...any) {
 // Println calls Output to print to the standard logger.
 // Arguments are handled in the manner of fmt.Println.
 func Println(v ...any) {
-	if atomic.LoadInt32(&std.isDiscard) != 0 {
+	if std.isDiscard.Load() {
 		return
 	}
 	std.Output(2, fmt.Sprintln(v...))

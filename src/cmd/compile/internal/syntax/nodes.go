@@ -132,6 +132,7 @@ func NewName(pos Pos, value string) *Name {
 type (
 	Expr interface {
 		Node
+		typeInfo
 		aExpr()
 	}
 
@@ -308,7 +309,10 @@ type (
 	}
 )
 
-type expr struct{ node }
+type expr struct {
+	node
+	typeAndValue // After typechecking, contains the results of typechecking this expression.
+}
 
 func (*expr) aExpr() {}
 
@@ -385,7 +389,7 @@ type (
 
 	CallStmt struct {
 		Tok  token // Go or Defer
-		Call *CallExpr
+		Call Expr
 		stmt
 	}
 
@@ -462,7 +466,7 @@ func (simpleStmt) aSimpleStmt() {}
 // Comments
 
 // TODO(gri) Consider renaming to CommentPos, CommentPlacement, etc.
-//           Kind = Above doesn't make much sense.
+// Kind = Above doesn't make much sense.
 type CommentKind uint
 
 const (

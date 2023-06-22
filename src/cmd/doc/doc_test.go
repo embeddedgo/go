@@ -7,6 +7,8 @@ package main
 import (
 	"bytes"
 	"flag"
+	"go/build"
+	"internal/testenv"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,6 +22,12 @@ func TestMain(m *testing.M) {
 	// Clear GOPATH so we don't access the user's own packages in the test.
 	buildCtx.GOPATH = ""
 	testGOPATH = true // force GOPATH mode; module test is in cmd/go/testdata/script/mod_doc.txt
+
+	// Set GOROOT in case runtime.GOROOT is wrong (for example, if the test was
+	// built with -trimpath). dirsInit would identify it using 'go env GOROOT',
+	// but we can't be sure that the 'go' in $PATH is the right one either.
+	buildCtx.GOROOT = testenv.GOROOT(nil)
+	build.Default.GOROOT = testenv.GOROOT(nil)
 
 	// Add $GOROOT/src/cmd/doc/testdata explicitly so we can access its contents in the test.
 	// Normally testdata directories are ignored, but sending it to dirs.scan directly is
@@ -874,7 +882,9 @@ func TestDoc(t *testing.T) {
 }
 
 // Test the code to try multiple packages. Our test case is
+//
 //	go doc rand.Float64
+//
 // This needs to find math/rand.Float64; however crypto/rand, which doesn't
 // have the symbol, usually appears first in the directory listing.
 func TestMultiplePackages(t *testing.T) {
@@ -931,11 +941,15 @@ func TestMultiplePackages(t *testing.T) {
 }
 
 // Test the code to look up packages when given two args. First test case is
+//
 //	go doc binary BigEndian
+//
 // This needs to find encoding/binary.BigEndian, which means
 // finding the package encoding/binary given only "binary".
 // Second case is
+//
 //	go doc rand Float64
+//
 // which again needs to find math/rand and not give up after crypto/rand,
 // which has no such function.
 func TestTwoArgLookup(t *testing.T) {
@@ -998,7 +1012,7 @@ func TestDotSlashLookup(t *testing.T) {
 	if err := os.Chdir(filepath.Join(buildCtx.GOROOT, "src", "text")); err != nil {
 		t.Fatal(err)
 	}
-	var b bytes.Buffer
+	var b strings.Builder
 	var flagSet flag.FlagSet
 	err = do(&b, &flagSet, []string{"./template"})
 	if err != nil {
@@ -1016,7 +1030,7 @@ func TestDotSlashLookup(t *testing.T) {
 // when there should be no output at all. Issue 37969.
 func TestNoPackageClauseWhenNoMatch(t *testing.T) {
 	maybeSkip(t)
-	var b bytes.Buffer
+	var b strings.Builder
 	var flagSet flag.FlagSet
 	err := do(&b, &flagSet, []string{"template.ZZZ"})
 	// Expect an error.

@@ -6,7 +6,7 @@ go version -m m$GOEXE
 stdout '^\tbuild\t-compiler=gc$'
 stdout '^\tbuild\tGOOS='
 stdout '^\tbuild\tGOARCH='
-[amd64] stdout '^\tbuild\tGOAMD64='
+[GOARCH:amd64] stdout '^\tbuild\tGOAMD64='
 ! stdout asmflags|gcflags|ldflags|gccgoflags
 
 # Toolchain flags are added if present.
@@ -22,6 +22,10 @@ stdout '^\tbuild\t-gcflags=example\.com/m=-N$'
 go build -ldflags=example.com/m=-w
 go version -m m$GOEXE
 stdout '^\tbuild\t-ldflags=example\.com/m=-w$'
+
+go build -trimpath
+go version -m m$GOEXE
+stdout '\tbuild\t-trimpath=true$'
 
 # gccgoflags are not added when gc is used, and vice versa.
 # TODO: test gccgo.
