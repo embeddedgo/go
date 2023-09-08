@@ -6,11 +6,13 @@ package rtos
 
 import "unsafe"
 
-
 const (
 	DCacheInval      = 0
-	DCacheClean      = 1
-	DCacheCleanInval = 2
+	DCacheFlush      = 1
+	DCacheFlushInval = 2
+
+	DCacheClean      = DCacheFlush      // deprecated
+	DCacheCleanInval = DCacheFlushInval // deprecated
 )
 
 // CacheMaint performs a cache maintenance operations specified by op.
