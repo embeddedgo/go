@@ -1743,6 +1743,7 @@ var cgoEnabled = map[string]bool{
 	"windows/arm64":   true,
 	"noos/thumb":      false,
 	"noos/riscv64":    false,
+	"noos/mips64":     false,
 }
 
 // List of platforms that are marked as broken ports.
