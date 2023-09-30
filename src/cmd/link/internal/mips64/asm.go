@@ -61,7 +61,39 @@ var (
 	gotSymIndex uint64
 )
 
+func lookupFuncSym(ldr *loader.Loader, name string) loader.Sym {
+	if s := ldr.Lookup(name, sym.SymVerABI0); s != 0 && ldr.SymType(s) == sym.STEXT {
+		return s
+	}
+	if s := ldr.Lookup(name, sym.SymVerABIInternal); s != 0 && ldr.SymType(s) == sym.STEXT {
+		return s
+	}
+	return 0
+}
+
+func gentext_noos(ctxt *ld.Link, ldr *loader.Loader) {
+	// TODO support interrupt vector table
+
+	entry := lookupFuncSym(ldr, *ld.FlagEntrySymbol)
+	if entry == 0 {
+		ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
+	}
+	for i, s := range ctxt.Textp {
+		if s == entry {
+			copy(ctxt.Textp[1:], ctxt.Textp[:i])
+			ctxt.Textp[0] = s
+			return
+		}
+	}
+	ldr.Errorf(entry, "cannot find symbol in ctxt.Textp")
+}
+
 func gentext(ctxt *ld.Link, ldr *loader.Loader) {
+	if ctxt.HeadType == objabi.Hnoos {
+		gentext_noos(ctxt, ldr)
+		return
+	}
+
 	if *ld.FlagD || ctxt.Target.IsExternal() {
 		return
 	}
