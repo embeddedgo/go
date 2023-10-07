@@ -4,7 +4,29 @@
 
 package runtime
 
+import (
+	"unsafe"
+)
+
 type mOS [1]uint32
+
+var bbplayer bool // TODO move to n64 board support package
+
+var (
+	cpu0  cpuctx
+	pcpu0 = &cpu0
+)
+
+//go:nowritebarrierrec
+//go:nosplit
+func taskerinit() {
+	*(*uintptr)(unsafe.Pointer(&cpu0.t)) = uintptr(unsafe.Pointer(&thetasker))
+	cpu0.exe.set(getg().m)
+	allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
+	*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(&pcpu0))
+	allcpu.len = 1
+	allcpu.cap = 1
+}
 
 // This functions is called to put the CPU to sleep. It is allowed it does
 // nothing.
@@ -70,11 +92,16 @@ func archnewm(m *m) {
 //
 //go:nosplit
 func curcpuSchedule() {
+	curcpu().schedule = true
 	// TODO implement
 }
 
 //go:nowritebarrierrec
 //go:nosplit
 func defaultWrite(fd int, p []byte) int {
-	return 0
+	return len(p)
 }
+
+// syscalls not used by runtime
+func syssetprivlevel(newlevel int) (oldlevel, errno int)       { return } // TODO
+func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) { return } // TODO
