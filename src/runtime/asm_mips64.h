@@ -113,6 +113,12 @@
 #define CAUSE_IP_MASK              (0xFF << 8)
 #define CAUSE_IP7                  (0x80 << 8)
 
+// Exception Context
+#define _LR        (0*8)
+#define _mcause    (1*8)
+#define _mepc      (2*8)
+#define excCtxSize (3*8)
+
 /* Standard (R4000) cache operations. Taken from "MIPS R4000
    Microprocessor User's Manual" 2nd edition: */
 
