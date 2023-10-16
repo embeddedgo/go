@@ -53,6 +53,13 @@ const (
 	CU  = 0x00f << 28 // coprocessor usability
 )
 
+// Cause register bits (p.171)
+const (
+	IP_SW    = 0x03 << 8
+	IP_EXT   = 0x7C << 8
+	IP_TIMER = 0x80 << 8
+)
+
 func (r CP0Reg) Load() uint32     { return mfc0(r) }
 func (r CP0Reg) Store(val uint32) { mtc0(r, val) }
 

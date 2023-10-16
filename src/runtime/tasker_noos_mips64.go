@@ -5,10 +5,23 @@
 package runtime
 
 import (
+	"internal/abi"
+	"internal/cpu/r4000/creg"
 	"unsafe"
 )
 
-type mOS [1]uint32
+// see saveGPRS and saveFPRS
+const (
+	numGPRS = 27
+	numFPRS = 33
+)
+
+type mOS struct {
+	gprs    [numGPRS]uintptr
+	fprs    [numFPRS]float64
+	sp, fp  uintptr // goroutine context
+	ra, epc uintptr // exception context
+}
 
 var bbplayer bool // TODO move to n64 board support package
 
@@ -42,7 +55,8 @@ func curcpuSleep() {}
 //
 //go:nosplit
 func (cpu *cpuctx) newwork() {
-	// for now only single CPU is supported
+	count := creg.COUNT.Load()
+	creg.COMPARE.Store(count + 2000)
 }
 
 //go:nosplit
@@ -77,7 +91,10 @@ func cpuid() int {
 //
 //go:nosplit
 func archnewm(m *m) {
-	// TODO implement
+	m.epc = abi.FuncPCABI0(mstart)
+	m.sp = m.g0.stack.hi
+	m.fp = uintptr(unsafe.Pointer(m.g0))
+	m.ra = 1 // smallCtx flag
 }
 
 // Run scheduler immediately or at syscall exit. It's called only just before
@@ -92,9 +109,17 @@ func archnewm(m *m) {
 //
 //go:nosplit
 func curcpuSchedule() {
+	// syscall still needs to duffcopy it's result back.  mark for schedule
+	// and call scheduler after duffcopy in ISR.
 	curcpu().schedule = true
-	// TODO implement
 }
+
+// only called from ISR, do not use
+func enterScheduler()
+func saveGPRs()
+func restoreGPRs()
+func saveFPRs()
+func restoreFPRs()
 
 //go:nowritebarrierrec
 //go:nosplit
