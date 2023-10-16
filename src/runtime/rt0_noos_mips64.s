@@ -251,6 +251,13 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	JAL	runtime·newproc(SB)
 	ADD	$16, sp	// pop args and LR
 
+	// enable interrupts
+	// TODO where to enable interupts correctly?
+	MOVW z0, M(C0_COMPARE)
+	MOVW M(C0_SR), t0
+	OR  $(SR_IE|INTR_SW|INTR_TIMER), t0
+	MOVW t0, M(C0_SR)
+
 	// start this M
 	JAL  runtime·mstart(SB)
 

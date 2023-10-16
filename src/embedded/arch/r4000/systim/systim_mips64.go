@@ -13,6 +13,8 @@ func Setup(clkhz int64) {
 	hz2ns = 2 * 1e9 / clkhz
 	creg.COMPARE.Store(0xffffffff)
 
+	creg.STATUS.SetBits(creg.IP_TIMER)
+	creg.CAUSE.ClearBits(creg.IP_TIMER)
 	rtos.SetSystemTimer(nanotime, setAlarm)
 }
 
