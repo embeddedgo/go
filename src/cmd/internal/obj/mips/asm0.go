@@ -254,7 +254,6 @@ var optab = []Optab{
 	{AMOVV, C_REG, C_NONE, C_LO, 21, 4, 0, sys.MIPS64, 0},
 
 	{AMUL, C_REG, C_REG, C_NONE, 22, 4, 0, 0, 0},
-	{AMUL, C_REG, C_REG, C_REG, 22, 4, 0, 0, 0},
 	{AMULV, C_REG, C_REG, C_NONE, 22, 4, 0, sys.MIPS64, 0},
 
 	{AADD, C_ADD0CON, C_REG, C_REG, 4, 4, 0, 0, 0},
@@ -1375,17 +1374,8 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
 		}
 		o1 = OP_RRR(a, REGZERO, p.From.Reg, REGZERO)
 
-	case 22: /* mul r1,r2 [r3]*/
-		if p.To.Reg != obj.REG_NONE {
-			r := p.Reg
-			if r == obj.REG_NONE {
-				r = p.To.Reg
-			}
-			a := SP(3, 4) | 2 /* mul */
-			o1 = OP_RRR(a, p.From.Reg, r, p.To.Reg)
-		} else {
-			o1 = OP_RRR(c.oprrr(p.As), p.From.Reg, p.Reg, REGZERO)
-		}
+	case 22: /* mul r1,r2 */
+		o1 = OP_RRR(c.oprrr(p.As), p.From.Reg, p.Reg, REGZERO)
 
 	case 23: /* add $lcon,r1,r2 ==> lu+or+add */
 		v := c.regoff(&p.From)
