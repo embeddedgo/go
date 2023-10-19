@@ -204,7 +204,9 @@ interrupt:
 	MOVV  R26, (m_mOS+mOS_fp)(R27)
 
 	// clear all IP (interrupt pending) bits
-	// TODO only timer supported at the moment
+	MOVV  M(C0_CAUSE), R26
+	AND   $~INTR_MASK, R26
+	MOVV  R26, M(C0_CAUSE)
 	MOVV  M(C0_COMPARE), R26
 	MOVV  R26, M(C0_COMPARE)
 
