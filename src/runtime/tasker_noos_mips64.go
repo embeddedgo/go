@@ -121,9 +121,22 @@ func restoreGPRs()
 func saveFPRs()
 func restoreFPRs()
 
+var lastlog [1024 * 16]byte
+var lastidx = 0
+
+// Just write into some ringbuffer for now, which can be inspected in a memory
+// dump.
+//
 //go:nowritebarrierrec
 //go:nosplit
 func defaultWrite(fd int, p []byte) int {
+	for i := 0; i < len(p); i++ {
+		lastlog[lastidx] = p[i]
+		lastidx += 1
+		if lastidx >= len(lastlog) {
+			lastidx = 0
+		}
+	}
 	return len(p)
 }
 
