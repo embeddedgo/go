@@ -55,8 +55,8 @@ func curcpuSleep() {}
 //
 //go:nosplit
 func (cpu *cpuctx) newwork() {
-	count := creg.COUNT.Load()
-	creg.COMPARE.Store(count + 2000)
+	// TODO use only one of the two interrupts
+	creg.CAUSE.SetBits(creg.IP_SW)
 }
 
 //go:nosplit
