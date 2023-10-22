@@ -71,7 +71,7 @@ fromHandler:
 
 	// mask interrupts
 	MOVV  M(C0_SR), R26
-	MOVV  $~(INTR_SW|INTR_TIMER), R27
+	MOVV  $~(INTR_SW|INTR_EXT|INTR_TIMER), R27
 	AND   R27, R26
 	MOVV  R26, M(C0_SR)
 
@@ -205,6 +205,11 @@ interrupt:
 
 	// clear all IP (interrupt pending) bits
 	MOVV  M(C0_CAUSE), R26
+	AND   $INTR_EXT, R26, R27
+	BNE   R27, R0, externalInterrupt
+
+	// must be a timer or software interrupt.  In both cases clear pending
+	// bits and enter the scheduler
 	AND   $~INTR_MASK, R26
 	MOVV  R26, M(C0_CAUSE)
 	MOVV  M(C0_COMPARE), R26
@@ -212,11 +217,51 @@ interrupt:
 
 	JMP   enterScheduler
 
+externalInterrupt:
+	// external interrupts are handled by the application.  We need to call
+	// one of the registered handlers
+	// TODO save gprs on stack? see tasker_noos_riscv64.s
+	SRL   $8, R27 // IP_EXT
+	MOVV  $1, R8
+
+loop:
+	// find and handle only the first pending interrupt.  If there are
+	// multiple interrupts pending, the interrupt handler will run again
+	AND   $1, R27, R9
+	BNE   R9, R0, callVector
+	ADD   $1, R8
+	SRL   $1, R27
+	JMP   loop
+
+callVector:
+	SLL   $3, R8, R9 // irq vector offset
+
+	// TODO allow nested interrupts? see tasker_noos_riscv64.s
+
+	// get interrupt vector
+	MOVV  $runtime·vectors(SB), R26
+	MOVV  (R26), R10
+	SUB   R8, R10
+	BLEZ  R10, noHandler
+	ADD   R9, R26
+	MOVV  (R26), R26
+
+	JAL   (R26)
+
+	// external interrupts can't be cleared by clearing the bits in cause
+	// register.  The user handler must have cleared the interrupt at this
+	// point in the external source, probably via mmio.
+
+	JMP   enterScheduler //TODO no?
+
+noHandler:
+	JMP  ·unhandledExternalInterrupt(SB)
+
 enterScheduler:
 	// pop everthing from stack
 	ADD   $excCtxSize, R29
 
-	// reenable interrupts
+	// reenable exceptions
 	MOVV  M(C0_SR), R26
 	AND   $~SR_EXL, R26
 	MOVV  R26, M(C0_SR)
@@ -247,7 +292,7 @@ enterScheduler:
 smallCtx:
 	// unmask interrupts
 	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_TIMER), R26
+	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
 	MOVV  R26, M(C0_SR)
 
 	MOVV  (m_mOS+mOS_sp)(R27), R29
@@ -273,7 +318,7 @@ restore:
 
 	// unmask interrupts
 	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_TIMER), R26
+	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
 	MOVV  R26, M(C0_SR)
 
 	BNE   R27, R0, return
@@ -289,6 +334,11 @@ fatal:
 	BREAK
 	JMP -1(PC)
 	
+// Required by the linker, runtime.vectors will be initialized with this.
+TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
+	BREAK
+	JMP  -1(PC)
+
 // stolen from runtime/preempt_mips64x.s
 // R26 must point to where gprs will be stored
 TEXT ·saveGPRs(SB),NOSPLIT|NOFRAME,$0
