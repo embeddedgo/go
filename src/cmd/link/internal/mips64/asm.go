@@ -72,8 +72,45 @@ func lookupFuncSym(ldr *loader.Loader, name string) loader.Sym {
 }
 
 func gentext_noos(ctxt *ld.Link, ldr *loader.Loader) {
-	// TODO support interrupt vector table
+	vectors := ldr.CreateSymForUpdate("runtime.vectors", sym.SymVerABI0)
+	vectors.SetType(sym.STEXT)
+	vectors.SetReachable(true)
+	vectors.SetAlign(8)
 
+	unhandledInterrupt := ldr.Lookup("runtime.unhandledExternalInterrupt", sym.SymVerABI0)
+	if unhandledInterrupt == 0 {
+		ld.Errorf(nil, "runtime.unhandledExternalInterrupt not defined")
+	}
+
+	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
+	// This code tries to keep runtime.vectors small, by cutting off all irq
+	// at the end that point to runtime.unhandledExternalInterrupt.
+	var irqHandlers [5]loader.Sym
+	irqNum := 1
+	for i := 1; i < len(irqHandlers); i++ {
+		s := lookupFuncSym(ldr, ld.InterruptHandler(i))
+		if s == 0 {
+			irqHandlers[i] = unhandledInterrupt
+		} else {
+			irqHandlers[i] = s
+			irqNum = i + 1
+		}
+	}
+
+	vectors.AddUint64(ctxt.Arch, uint64(irqNum))
+	relocs := vectors.AddRelocs(irqNum - 1)
+	for i, s := range irqHandlers[1:irqNum] {
+		ldr.MakeSymbolUpdater(s).SetReachable(true)
+		rel := relocs.At(i)
+		rel.SetSym(s)
+		rel.SetType(objabi.R_ADDR)
+		rel.SetSiz(8)
+		rel.SetOff(int32(vectors.AddUint64(ctxt.Arch, 0)))
+	}
+
+	ctxt.Textp = append(ctxt.Textp, vectors.Sym())
+
+	// move the entry symbol at the beggining of the text segment
 	entry := lookupFuncSym(ldr, *ld.FlagEntrySymbol)
 	if entry == 0 {
 		ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
