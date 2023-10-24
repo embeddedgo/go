@@ -40,6 +40,12 @@ TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 //
 // Called from handler:
 // same, but skip 1, 2, 4
+//
+// Other basic things I learned while writing this:
+// - If we want to support nested exceptions, save context must be on the stack.
+//   If we want to schedule, context must be in the m object.
+// - There are no callee save registers in go.  Assume all gprs clobbered after
+//   a function call.
 TEXT runtime·inthandler(SB),NOSPLIT|NOFRAME,$0
 start:
 	// determine caller stack
@@ -89,7 +95,7 @@ fromHandler:
 
 // System call is like oridnary function call so all registers are caller save
 // (Go ABI0).  Meaning we don't need to save GPRs and are free to use them.  The
-// tiny wrapper over SYSCALL instruction adds additional parameters in A3-A5
+// tiny wrapper over SYSCALL instruction adds additional parameters in R8-R10
 // registers:
 //
 // R8: syscall number
@@ -203,7 +209,6 @@ interrupt:
 	MOVV  (g_sched+gobuf_g)(g), R26
 	MOVV  R26, (m_mOS+mOS_fp)(R27)
 
-	// clear all IP (interrupt pending) bits
 	MOVV  M(C0_CAUSE), R26
 	AND   $INTR_EXT, R26, R27
 	BNE   R27, R0, externalInterrupt
@@ -220,7 +225,6 @@ interrupt:
 externalInterrupt:
 	// external interrupts are handled by the application.  We need to call
 	// one of the registered handlers
-	// TODO save gprs on stack? see tasker_noos_riscv64.s
 	SRL   $8, R27 // IP_EXT
 	MOVV  $1, R8
 
@@ -236,7 +240,9 @@ loop:
 callVector:
 	SLL   $3, R8, R9 // irq vector offset
 
-	// TODO allow nested interrupts? see tasker_noos_riscv64.s
+	// TODO allow nested interrupts. seems to be necessary for e.g.
+	// note.wakeup to work properly from an inthandler.  Make sure to put
+	// context on stack instead of mOS for nested interrupts.
 
 	// get interrupt vector
 	MOVV  $runtime·vectors(SB), R26
@@ -246,13 +252,26 @@ callVector:
 	ADD   R9, R26
 	MOVV  (R26), R26
 
+	// reenable exceptions
+	MOVV  M(C0_SR), R27
+	AND   $~SR_EXL, R27
+	MOVV  R27, M(C0_SR)
+
 	JAL   (R26)
+
+	// disable exceptions again
+	MOVV  M(C0_SR), R8
+	OR    $SR_EXL, R8
+	MOVV  R8, M(C0_SR)
 
 	// external interrupts can't be cleared by clearing the bits in cause
 	// register.  The user handler must have cleared the interrupt at this
 	// point in the external source, probably via mmio.
 
-	JMP   enterScheduler //TODO no?
+	// pop everthing from stack
+	ADD   $excCtxSize, R29
+
+	JMP   skipScheduler
 
 noHandler:
 	JMP  ·unhandledExternalInterrupt(SB)
@@ -280,6 +299,7 @@ enterScheduler:
 	// clear cpuctx.newexe
 	MOVB  R0, (cpuctx_newexe)(g)
 
+skipScheduler:
 	MOVV  (cpuctx_exe)(g), R27
 	MOVV  (m_mOS+mOS_ra)(R27), R9
 	AND   $~1, R9, R23 // remove smallCtx flag
