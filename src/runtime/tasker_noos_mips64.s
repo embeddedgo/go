@@ -184,7 +184,7 @@ duffcopy:
 	AND   $~SR_EXL, R26
 	MOVV  R26, M(C0_SR)
 
-	// reminder: don't use R23, R26 or R27 when interrupts enabled
+	// reminder: don't use R26 or R27 when interrupts enabled
 
 	// call the service routine
 	MOVV  $·syscalls(SB), R9
@@ -287,7 +287,7 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	AND   $~SR_EXL, R26
 	MOVV  R26, M(C0_SR)
 
-	// reminder: don't use R23, R26 or R27 when interrupts enabled
+	// reminder: don't use R26 or R27 when interrupts enabled
 
 	// enter scheduler
 	MOVB  R0, cpuctx_schedule(g)
@@ -304,6 +304,8 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (cpuctx_exe)(g), R27
 	MOVV  (m_mOS+mOS_ra)(R27), R9
 	AND   $~1, R9, R23 // remove smallCtx flag
+	SUB   $8, R29
+	MOVV  R23, 0(R29)
 	AND   $1, R9, R10  // smallCtx flag
 	BNE   R0, R10, smallCtx  // TODO should never happen
 
@@ -316,9 +318,11 @@ smallCtx:
 	OR    $(INTR_SW|INTR_EXT), R26
 	MOVV  R26, M(C0_SR)
 
+	MOVV  0(R29), R26
+	ADD   $8, R29
 	MOVV  (m_mOS+mOS_sp)(R27), R29
 	MOVV  (m_mOS+mOS_fp)(R27), g
-	MOVV  R23, R31
+	MOVV  R26, R31
 	MOVV  (m_mOS+mOS_epc)(R27), R26
 	MOVV  R26, M(C0_EPC)
 
@@ -335,7 +339,7 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  R29, R26
 	JAL   ·saveGPRs(SB)
 
-	// Context is saved.  Reenable exceptions.  Don't use R23, R26, R27.
+	// Context is saved.  Reenable exceptions.  Don't use R26, R27.
 	MOVV  M(C0_SR), R27
 	AND   $~SR_EXL, R27
 	MOVV  R27, M(C0_SR)
@@ -399,11 +403,15 @@ callVector:
 	ADD   $const_numGPRS*8, R29
 
 	MOVV  _LR(R29), R26
-	AND   $~1, R26, R31 // Remove smallCtx flag from RA
+	MOVV  $~1, R27
+	AND   R27, R26, R31 // Remove smallCtx flag from RA
 	MOVV  _mepc(R29), R26
-	AND   $1, R26, R27
-	AND   $~1, R26  // Remove fromHandler flag from EPC
-	MOVV  R26, M(C0_EPC)
+	MOVV  $~1, R27
+	AND   R26, R27  // Remove fromHandler flag from EPC
+	MOVV  R27, M(C0_EPC)
+
+	MOVV  $1, R27
+	AND   R26, R27
 
 	ADD   $excCtxSize, R29
 
@@ -428,6 +436,7 @@ TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
 
 
 // stolen from runtime/preempt_mips64x.s
+// TODO why was temp register (R23) not included in preempt_mips64x?
 // R26 must point to where gprs will be stored
 TEXT ·saveGPRs(SB),NOSPLIT|NOFRAME,$0
 	MOVV R1, 0(R26)
@@ -452,26 +461,29 @@ TEXT ·saveGPRs(SB),NOSPLIT|NOFRAME,$0
 	MOVV R20, 152(R26)
 	MOVV R21, 160(R26)
 	MOVV R22, 168(R26)
-	MOVV R24, 176(R26)
-	MOVV R25, 184(R26)
-	MOVV RSB, 192(R26)
+	MOVV R23, 176(R26)
+	MOVV R24, 184(R26)
+	MOVV R25, 192(R26)
+	MOVV RSB, 200(R26)
 	MOVV HI, R1
-	MOVV R1, 200(R26)
-	MOVV LO, R1
 	MOVV R1, 208(R26)
+	MOVV LO, R1
+	MOVV R1, 216(R26)
 	RET
 
 
 // stolen from runtime/preempt_mips64x.s
+// TODO why was temp register (R23) not included in preempt_mips64x?
 // R26 must point to stored gprs
 TEXT ·restoreGPRs(SB),NOSPLIT|NOFRAME,$0
-	MOVV 208(R26), R1
+	MOVV 216(R26), R1
 	MOVV R1, LO
-	MOVV 200(R26), R1
+	MOVV 208(R26), R1
 	MOVV R1, HI
-	MOVV 192(R26), RSB
-	MOVV 184(R26), R25
-	MOVV 176(R26), R24
+	MOVV 200(R26), RSB
+	MOVV 192(R26), R25
+	MOVV 184(R26), R24
+	MOVV 176(R26), R23
 	MOVV 168(R26), R22
 	MOVV 160(R26), R21
 	MOVV 152(R26), R20

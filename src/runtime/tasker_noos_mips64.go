@@ -12,7 +12,7 @@ import (
 
 // see saveGPRS and saveFPRS
 const (
-	numGPRS = 27
+	numGPRS = 28
 	numFPRS = 33
 )
 
