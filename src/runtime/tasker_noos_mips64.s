@@ -10,9 +10,10 @@
 #include "asm_mips64.h"
 
 #define sysMaxArgs (48+8)
+#define ERET WORD $0x42000018
 
 TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
-	JMP ·inthandler(SB)
+	JMP ·exceptionTrap(SB)
 
 // main exception handler
 //
@@ -41,13 +42,18 @@ TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 // Called from handler:
 // same, but skip 1, 2, 4
 //
+//                        --external-------ERET
+//                      /
+// exception---interrupt--SW----scheduler--ERET
+//          \                /
+//           --syscall------
+//
 // Other basic things I learned while writing this:
 // - If we want to support nested exceptions, save context must be on the stack.
 //   If we want to schedule, context must be in the m object.
 // - There are no callee save registers in go.  Assume all gprs clobbered after
 //   a function call.
-TEXT runtime·inthandler(SB),NOSPLIT|NOFRAME,$0
-start:
+TEXT runtime·exceptionTrap(SB),NOSPLIT|NOFRAME,$0
 	// determine caller stack
 	MOVV  $·cpu0(SB), R26
 	BNE   R26, g, fromThread
@@ -61,6 +67,7 @@ fromThread:
 	MOVV  R29, (g_sched+gobuf_sp)(R26)
 	MOVV  g, (g_sched+gobuf_g)(R26)
 	MOVV  (g_stack+stack_hi)(R26), R29
+
 	// switch to special ISR goroutine
 	MOVV  R26, g
 
@@ -86,12 +93,17 @@ fromHandler:
 	AND   $CAUSE_EXC_MASK, R26
 
 	MOVV  $CAUSE_EXC_SYSCALL, R27
-	BEQ   R26, R27, syscall
+	BNE   R26, R27, 2(PC)
+	JMP   ·syscallHandler(SB)
 
 	MOVV  $CAUSE_EXC_INTERRUPT, R27
-	BEQ   R26, R27, interrupt
+	BNE   R26, R27, 2(PC)
+	JMP   ·interruptHandler(SB)
 
-	JMP  fatal
+	// unhandled exception
+	BREAK
+	JMP -1(PC)
+
 
 // System call is like oridnary function call so all registers are caller save
 // (Go ABI0).  Meaning we don't need to save GPRs and are free to use them.  The
@@ -101,7 +113,7 @@ fromHandler:
 // R8: syscall number
 // R9: argument data size on the stack (+8 for caller return address)
 // R10: return data size on the stack
-syscall:
+TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
 	// if fromHandler skip saving thread context
 	MOVV  _mepc(R29), R27
 	ADD   $4, R27  // don't execute syscall instruction again
@@ -183,12 +195,39 @@ nothingToCopy:
 
 	// run the scheduler if the syscall wants it
 	MOVB  cpuctx_schedule(g), R8  // handlers will not set this
-	BEQ   R8, R0, restore
-	JMP   enterScheduler
+	BEQ   R8, R0, 2(PC)
+	JMP  ·enterScheduler(SB)
+
+// restore ctx of caller
+	MOVV  _LR(R29), R26
+	AND   $~1, R26, R31 // remove smallCtx flag from ra
+//	MOVV  _mcause(R29), R26
+//	MOVV  R26, M(C0_CAUSE)
+	MOVV  _mepc(R29), R26
+	AND   $1, R26, R27
+	AND   $~1, R26  // remove fromHandler flag from epc
+	MOVV  R26, M(C0_EPC)
+
+	ADD   $excCtxSize, R29
+
+	// unmask interrupts
+	MOVV  M(C0_SR), R26
+	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
+	MOVV  R26, M(C0_SR)
+
+	BNE   R27, R0, return
+
+	MOVV  $·cpu0(SB), R26
+	MOVV  (g_sched+gobuf_sp)(R26), R29
+	MOVV  (g_sched+gobuf_g)(R26), g
+
+return:
+	ERET
+
 
 // An interrupt was caused by timer, software or externally.  This can happen on
 // any instruction.  We need to save all GPRs in our context.
-interrupt:
+TEXT runtime·interruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (cpuctx_exe)(g), R26
 	MOVV  $(m_mOS+mOS_gprs)(R26), R26
 	JAL   ·saveGPRs(SB)
@@ -211,7 +250,8 @@ interrupt:
 
 	MOVV  M(C0_CAUSE), R26
 	AND   $INTR_EXT, R26, R27
-	BNE   R27, R0, externalInterrupt
+	BEQ   R27, R0, 2(PC)
+	JMP   ·externalInterrupt(SB)
 
 	// must be a timer or software interrupt.  In both cases clear pending
 	// bits and enter the scheduler
@@ -220,22 +260,72 @@ interrupt:
 	MOVV  M(C0_COMPARE), R26
 	MOVV  R26, M(C0_COMPARE)
 
-	JMP   enterScheduler
+	JMP  ·enterScheduler(SB)
 
-externalInterrupt:
+
+TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
+	// pop everthing from stack
+	ADD   $excCtxSize, R29
+
+	// reenable exceptions
+	MOVV  M(C0_SR), R26
+	AND   $~SR_EXL, R26
+	MOVV  R26, M(C0_SR)
+
+	// reminder: don't use R23, R26 or R27 when interrupts enabled
+
+	// enter scheduler
+	MOVB  R0, cpuctx_schedule(g)
+	JAL   ·curcpuRunScheduler(SB)
+
+	// disable exceptions again
+	MOVV  M(C0_SR), R8
+	OR    $SR_EXL, R8
+	MOVV  R8, M(C0_SR)
+
+	// clear cpuctx.newexe
+	MOVB  R0, (cpuctx_newexe)(g)
+
+	MOVV  (cpuctx_exe)(g), R27
+	MOVV  (m_mOS+mOS_ra)(R27), R9
+	AND   $~1, R9, R23 // remove smallCtx flag
+	AND   $1, R9, R10  // smallCtx flag
+	BNE   R0, R10, smallCtx
+
+	MOVV  $(m_mOS+mOS_gprs)(R27), R26
+	JAL   ·restoreGPRs(SB)
+
+smallCtx:
+	// unmask interrupts
+	MOVV  M(C0_SR), R26
+	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
+	MOVV  R26, M(C0_SR)
+
+	MOVV  (m_mOS+mOS_sp)(R27), R29
+	MOVV  (m_mOS+mOS_fp)(R27), g
+	MOVV  R23, R31
+	MOVV  (m_mOS+mOS_epc)(R27), R26
+	MOVV  R26, M(C0_EPC)
+
+	ERET
+
+
+TEXT runtime·externalInterrupt(SB),NOSPLIT|NOFRAME,$0
+	// TODO save ctx
+
 	// external interrupts are handled by the application.  We need to call
 	// one of the registered handlers
 	SRL   $8, R27 // IP_EXT
 	MOVV  $1, R8
 
-loop:
+findVector:
 	// find and handle only the first pending interrupt.  If there are
 	// multiple interrupts pending, the interrupt handler will run again
 	AND   $1, R27, R9
 	BNE   R9, R0, callVector
 	ADD   $1, R8
 	SRL   $1, R27
-	JMP   loop
+	JMP   findVector
 
 callVector:
 	SLL   $3, R8, R9 // irq vector offset
@@ -271,93 +361,17 @@ callVector:
 	// pop everthing from stack
 	ADD   $excCtxSize, R29
 
-	JMP   skipScheduler
+	// TODO restore ctx
 
 noHandler:
 	JMP  ·unhandledExternalInterrupt(SB)
 
-enterScheduler:
-	// pop everthing from stack
-	ADD   $excCtxSize, R29
 
-	// reenable exceptions
-	MOVV  M(C0_SR), R26
-	AND   $~SR_EXL, R26
-	MOVV  R26, M(C0_SR)
-
-	// reminder: don't use R23, R26 or R27 when interrupts enabled
-
-	// enter scheduler
-	MOVB  R0, cpuctx_schedule(g)
-	JAL   ·curcpuRunScheduler(SB)
-
-	// disable exceptions again
-	MOVV  M(C0_SR), R8
-	OR    $SR_EXL, R8
-	MOVV  R8, M(C0_SR)
-
-	// clear cpuctx.newexe
-	MOVB  R0, (cpuctx_newexe)(g)
-
-skipScheduler:
-	MOVV  (cpuctx_exe)(g), R27
-	MOVV  (m_mOS+mOS_ra)(R27), R9
-	AND   $~1, R9, R23 // remove smallCtx flag
-	AND   $1, R9, R10  // smallCtx flag
-	BNE   R0, R10, smallCtx
-
-	MOVV  $(m_mOS+mOS_gprs)(R27), R26
-	JAL   ·restoreGPRs(SB)
-
-smallCtx:
-	// unmask interrupts
-	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
-	MOVV  R26, M(C0_SR)
-
-	MOVV  (m_mOS+mOS_sp)(R27), R29
-	MOVV  (m_mOS+mOS_fp)(R27), g
-	MOVV  R23, R31
-	MOVV  (m_mOS+mOS_epc)(R27), R26
-	MOVV  R26, M(C0_EPC)
-
-	JMP return
-	
-// restore ctx of caller
-restore:
-	MOVV  _LR(R29), R26
-	AND   $~1, R26, R31 // remove smallCtx flag from ra
-//	MOVV  _mcause(R29), R26
-//	MOVV  R26, M(C0_CAUSE)
-	MOVV  _mepc(R29), R26
-	AND   $1, R26, R27
-	AND   $~1, R26  // remove fromHandler flag from epc
-	MOVV  R26, M(C0_EPC)
-
-	ADD   $excCtxSize, R29
-
-	// unmask interrupts
-	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
-	MOVV  R26, M(C0_SR)
-
-	BNE   R27, R0, return
-
-	MOVV  $·cpu0(SB), R26
-	MOVV  (g_sched+gobuf_sp)(R26), R29
-	MOVV  (g_sched+gobuf_g)(R26), g
-
-return:
-	WORD $0x42000018 // ERET
-
-fatal:
-	BREAK
-	JMP -1(PC)
-	
-// Required by the linker, runtime.vectors will be initialized with this.
+// Required by the linker, runtime.vectors will default to this.
 TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
 	BREAK
 	JMP  -1(PC)
+
 
 // stolen from runtime/preempt_mips64x.s
 // R26 must point to where gprs will be stored
@@ -392,6 +406,42 @@ TEXT ·saveGPRs(SB),NOSPLIT|NOFRAME,$0
 	MOVV LO, R1
 	MOVV R1, 208(R26)
 	RET
+
+
+// stolen from runtime/preempt_mips64x.s
+// R26 must point to stored gprs
+TEXT ·restoreGPRs(SB),NOSPLIT|NOFRAME,$0
+	MOVV 208(R26), R1
+	MOVV R1, LO
+	MOVV 200(R26), R1
+	MOVV R1, HI
+	MOVV 192(R26), RSB
+	MOVV 184(R26), R25
+	MOVV 176(R26), R24
+	MOVV 168(R26), R22
+	MOVV 160(R26), R21
+	MOVV 152(R26), R20
+	MOVV 144(R26), R19
+	MOVV 136(R26), R18
+	MOVV 128(R26), R17
+	MOVV 120(R26), R16
+	MOVV 112(R26), R15
+	MOVV 104(R26), R14
+	MOVV 96(R26), R13
+	MOVV 88(R26), R12
+	MOVV 80(R26), R11
+	MOVV 72(R26), R10
+	MOVV 64(R26), R9
+	MOVV 56(R26), R8
+	MOVV 48(R26), R7
+	MOVV 40(R26), R6
+	MOVV 32(R26), R5
+	MOVV 24(R26), R4
+	MOVV 16(R26), R3
+	MOVV 8(R26), R2
+	MOVV 0(R26), R1
+	RET
+
 
 // stolen from runtime/preempt_mips64x.s
 // might clobber some gprs!
@@ -478,46 +528,12 @@ TEXT ·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
 	#endif
 	RET
 
-// stolen from runtime/preempt_mips64x.s
-// R26 must point to stored gprs
-TEXT ·restoreGPRs(SB),NOSPLIT|NOFRAME,$0
-	MOVV 208(R26), R1
-	MOVV R1, LO
-	MOVV 200(R26), R1
-	MOVV R1, HI
-	MOVV 192(R26), RSB
-	MOVV 184(R26), R25
-	MOVV 176(R26), R24
-	MOVV 168(R26), R22
-	MOVV 160(R26), R21
-	MOVV 152(R26), R20
-	MOVV 144(R26), R19
-	MOVV 136(R26), R18
-	MOVV 128(R26), R17
-	MOVV 120(R26), R16
-	MOVV 112(R26), R15
-	MOVV 104(R26), R14
-	MOVV 96(R26), R13
-	MOVV 88(R26), R12
-	MOVV 80(R26), R11
-	MOVV 72(R26), R10
-	MOVV 64(R26), R9
-	MOVV 56(R26), R8
-	MOVV 48(R26), R7
-	MOVV 40(R26), R6
-	MOVV 32(R26), R5
-	MOVV 24(R26), R4
-	MOVV 16(R26), R3
-	MOVV 8(R26), R2
-	MOVV 0(R26), R1
-	RET
-
 
 // func sysreset(level int, addr unsafe.Pointer) bool
 TEXT ·sysreset(SB),NOSPLIT|NOFRAME,$0-12
 	NOP // TODO
 
+
 // func syscachemaint(op int, p unsafe.Pointer, size int)
 TEXT ·syscachemaint(SB),NOSPLIT,$0-12
 	NOP // TODO
-
