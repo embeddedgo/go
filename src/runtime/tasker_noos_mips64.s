@@ -12,6 +12,13 @@
 #define sysMaxArgs (48+8)
 #define ERET WORD $0x42000018
 
+// Exception Context
+#define _LR        (0*8)
+#define _mcause    (1*8)
+#define _mepc      (2*8)
+#define excCtxSize (3*8)
+
+
 TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 	JMP ·exceptionTrap(SB)
 
@@ -84,7 +91,7 @@ fromHandler:
 
 	// mask interrupts
 	MOVV  M(C0_SR), R26
-	MOVV  $~(INTR_SW|INTR_EXT|INTR_TIMER), R27
+	MOVV  $~(INTR_SW|INTR_EXT), R27
 	AND   R27, R26
 	MOVV  R26, M(C0_SR)
 
@@ -97,9 +104,20 @@ fromHandler:
 	JMP   ·syscallHandler(SB)
 
 	MOVV  $CAUSE_EXC_INTERRUPT, R27
-	BNE   R26, R27, 2(PC)
-	JMP   ·interruptHandler(SB)
+	BNE   R26, R27, fatal
 
+	MOVV  M(C0_CAUSE), R26
+	AND   $INTR_MASK, R26
+
+	AND   $INTR_EXT, R26, R27
+	BEQ   R27, R0, 2(PC)
+	JMP   ·externalInterruptHandler(SB)
+
+	AND   $INTR_SW, R26, R27
+	BEQ   R27, R0, 2(PC)
+	JMP   ·softwareInterruptHandler(SB)
+
+fatal:
 	// unhandled exception
 	BREAK
 	JMP -1(PC)
@@ -212,7 +230,7 @@ nothingToCopy:
 
 	// unmask interrupts
 	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
+	OR    $(INTR_SW|INTR_EXT), R26
 	MOVV  R26, M(C0_SR)
 
 	BNE   R27, R0, return
@@ -225,9 +243,10 @@ return:
 	ERET
 
 
-// An interrupt was caused by timer, software or externally.  This can happen on
+// An interrupt was caused by software.  This can happen on
 // any instruction.  We need to save all GPRs in our context.
-TEXT runtime·interruptHandler(SB),NOSPLIT|NOFRAME,$0
+// TODO do we really need to save full context?  SW_INT is only set in newwork()
+TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (cpuctx_exe)(g), R26
 	MOVV  $(m_mOS+mOS_gprs)(R26), R26
 	JAL   ·saveGPRs(SB)
@@ -248,17 +267,13 @@ TEXT runtime·interruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (g_sched+gobuf_g)(g), R26
 	MOVV  R26, (m_mOS+mOS_fp)(R27)
 
-	MOVV  M(C0_CAUSE), R26
-	AND   $INTR_EXT, R26, R27
-	BEQ   R27, R0, 2(PC)
-	JMP   ·externalInterrupt(SB)
-
 	// must be a timer or software interrupt.  In both cases clear pending
 	// bits and enter the scheduler
+	MOVV  M(C0_CAUSE), R26
 	AND   $~INTR_MASK, R26
 	MOVV  R26, M(C0_CAUSE)
-	MOVV  M(C0_COMPARE), R26
-	MOVV  R26, M(C0_COMPARE)
+//	MOVV  M(C0_COMPARE), R26
+//	MOVV  R26, M(C0_COMPARE)
 
 	JMP  ·enterScheduler(SB)
 
@@ -290,15 +305,15 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (m_mOS+mOS_ra)(R27), R9
 	AND   $~1, R9, R23 // remove smallCtx flag
 	AND   $1, R9, R10  // smallCtx flag
-	BNE   R0, R10, smallCtx
+	BNE   R0, R10, smallCtx  // TODO should never happen
 
 	MOVV  $(m_mOS+mOS_gprs)(R27), R26
-	JAL   ·restoreGPRs(SB)
+	JAL   ·restoreGPRs(SB) // TODO skip if we are coming from syscall
 
 smallCtx:
 	// unmask interrupts
 	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_EXT|INTR_TIMER), R26
+	OR    $(INTR_SW|INTR_EXT), R26
 	MOVV  R26, M(C0_SR)
 
 	MOVV  (m_mOS+mOS_sp)(R27), R29
@@ -310,60 +325,99 @@ smallCtx:
 	ERET
 
 
-TEXT runtime·externalInterrupt(SB),NOSPLIT|NOFRAME,$0
-	// TODO save ctx
+TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
+	// External interrupt can happen anytime, save full context.  Context
+	// will be saved on the stack, to allow nested interrupts be supported.
+	// TODO nested interrupts aren't enabled as of now.  Do we need them?
+	// Keep in mind that the scheduler must not be called if context is
+	// saved on the stack.
+	SUB   $const_numGPRS*8, R29
+	MOVV  R29, R26
+	JAL   ·saveGPRs(SB)
 
-	// external interrupts are handled by the application.  We need to call
-	// one of the registered handlers
-	SRL   $8, R27 // IP_EXT
-	MOVV  $1, R8
-
-findVector:
-	// find and handle only the first pending interrupt.  If there are
-	// multiple interrupts pending, the interrupt handler will run again
-	AND   $1, R27, R9
-	BNE   R9, R0, callVector
-	ADD   $1, R8
-	SRL   $1, R27
-	JMP   findVector
-
-callVector:
-	SLL   $3, R8, R9 // irq vector offset
-
-	// TODO allow nested interrupts. seems to be necessary for e.g.
-	// note.wakeup to work properly from an inthandler.  Make sure to put
-	// context on stack instead of mOS for nested interrupts.
-
-	// get interrupt vector
-	MOVV  $runtime·vectors(SB), R26
-	MOVV  (R26), R10
-	SUB   R8, R10
-	BLEZ  R10, noHandler
-	ADD   R9, R26
-	MOVV  (R26), R26
-
-	// reenable exceptions
+	// Context is saved.  Reenable exceptions.  Don't use R23, R26, R27.
 	MOVV  M(C0_SR), R27
 	AND   $~SR_EXL, R27
 	MOVV  R27, M(C0_SR)
 
-	JAL   (R26)
+	// External interrupts are handled by the application.  We need to call
+	// one of the registered handlers
+	MOVV  M(C0_CAUSE), R8
+	AND   $INTR_EXT, R8
 
-	// disable exceptions again
+	SRL   $8, R8 // INTR_EXT in lsb
+	MOVV  $1, R9
+
+findVector:
+	// find and handle only the first pending interrupt.  If there are
+	// multiple interrupts pending, the interrupt handler will run again
+	AND   $1, R8, R10
+	BNE   R10, R0, callVector
+	ADD   $1, R9
+	SRL   $1, R8
+	JMP   findVector
+
+callVector:
+	SLL   $3, R9, R8 // irq vector offset
+
+	// get interrupt vector
+	MOVV  $runtime·vectors(SB), R10
+	MOVV  (R10), R11
+	SUB   R9, R11
+	BLEZ  R11, fatal
+	ADD   R8, R10
+	MOVV  (R10), R10
+
+	// Allow nested interrupts
+//	MOVV  M(C0_SR), R8
+//	OR    $INTR_SW, R8
+//	MOVV  R8, M(C0_SR)
+
+	JAL   (R10)
+
+//	MOVV  M(C0_SR), R8
+//	AND   $~INTR_SW, R8
+//	MOVV  R8, M(C0_SR)
+
+	// External interrupts can't be cleared by clearing the bits in cause
+	// register.  The user handler must have cleared the interrupt at this
+	// point in the external source, probably via mmio.
+
+	// Disable exceptions again.  Restore Context.
 	MOVV  M(C0_SR), R8
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
 
-	// external interrupts can't be cleared by clearing the bits in cause
-	// register.  The user handler must have cleared the interrupt at this
-	// point in the external source, probably via mmio.
+	// Unmask interrupts
+	MOVV  M(C0_SR), R26
+	OR    $(INTR_SW|INTR_EXT), R26
+	MOVV  R26, M(C0_SR)
 
-	// pop everthing from stack
+	// Restore ctx of caller
+	MOVV  R29, R26
+	JAL   ·restoreGPRs(SB)
+	ADD   $const_numGPRS*8, R29
+
+	MOVV  _LR(R29), R26
+	AND   $~1, R26, R31 // Remove smallCtx flag from RA
+	MOVV  _mepc(R29), R26
+	AND   $1, R26, R27
+	AND   $~1, R26  // Remove fromHandler flag from EPC
+	MOVV  R26, M(C0_EPC)
+
 	ADD   $excCtxSize, R29
 
-	// TODO restore ctx
+	// Don't switch stacks yet if we were called from handler
+	BNE   R27, R0, return
 
-noHandler:
+	MOVV  $·cpu0(SB), R26
+	MOVV  (g_sched+gobuf_sp)(R26), R29
+	MOVV  (g_sched+gobuf_g)(R26), g
+
+return:
+	ERET
+
+fatal:
 	JMP  ·unhandledExternalInterrupt(SB)
 
 

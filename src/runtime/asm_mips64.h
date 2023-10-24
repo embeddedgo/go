@@ -116,12 +116,6 @@
 #define INTR_EXT                   (0x7C << 8)
 #define INTR_TIMER                 (0x80 << 8)
 
-// Exception Context
-#define _LR        (0*8)
-#define _mcause    (1*8)
-#define _mepc      (2*8)
-#define excCtxSize (3*8)
-
 /* Standard (R4000) cache operations. Taken from "MIPS R4000
    Microprocessor User's Manual" 2nd edition: */
 
