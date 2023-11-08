@@ -14,7 +14,7 @@
 
 // Exception Context
 #define _LR        (0*8)
-#define _mcause    (1*8)
+#define _mstatus   (1*8)
 #define _mepc      (2*8)
 #define excCtxSize (3*8)
 
@@ -83,8 +83,8 @@ fromHandler:
 	SUB   $excCtxSize, R29
 	OR    $1, R31, R26 // encode smallCtx flag in ra
 	MOVV  R26, _LR(R29)
-	MOVV  M(C0_CAUSE), R26
-	MOVV  R26, _mcause(R29)
+	MOVV  M(C0_SR), R26
+	MOVV  R26, _mstatus(R29)
 	MOVV  M(C0_EPC), R26
 	OR    R27, R26 // encode fromHandler flag in EPC
 	MOVV  R26, _mepc(R29)
@@ -132,10 +132,11 @@ fatal:
 // R9: argument data size on the stack (+8 for caller return address)
 // R10: return data size on the stack
 TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
-	// if fromHandler skip saving thread context
 	MOVV  _mepc(R29), R27
 	ADD   $4, R27  // don't execute syscall instruction again
 	MOVV  R27, _mepc(R29)
+
+	// if fromHandler skip saving thread context
 	AND   $1, R27  // fromHandler flag
 	BNE   R27, R0, currentStack
 
@@ -216,22 +217,17 @@ nothingToCopy:
 	BEQ   R8, R0, 2(PC)
 	JMP  ·enterScheduler(SB)
 
-// restore ctx of caller
+	// restore ctx of caller
 	MOVV  _LR(R29), R26
 	AND   $~1, R26, R31 // remove smallCtx flag from ra
-//	MOVV  _mcause(R29), R26
-//	MOVV  R26, M(C0_CAUSE)
+	MOVV  _mstatus(R29), R26
+	MOVV  R26, M(C0_SR)
 	MOVV  _mepc(R29), R26
 	AND   $1, R26, R27
 	AND   $~1, R26  // remove fromHandler flag from epc
 	MOVV  R26, M(C0_EPC)
 
 	ADD   $excCtxSize, R29
-
-	// unmask interrupts
-	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_EXT), R26
-	MOVV  R26, M(C0_SR)
 
 	BNE   R27, R0, return
 
@@ -279,9 +275,6 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 
 
 TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
-	// pop everthing from stack
-	ADD   $excCtxSize, R29
-
 	// reenable exceptions
 	MOVV  M(C0_SR), R26
 	AND   $~SR_EXL, R26
@@ -301,6 +294,11 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	// clear cpuctx.newexe
 	MOVB  R0, (cpuctx_newexe)(g)
 
+	// restore mstatus from exception context
+	MOVV  _mstatus(R29), R26
+	MOVV  R26, M(C0_SR)
+	ADD   $excCtxSize, R29
+
 	MOVV  (cpuctx_exe)(g), R27
 	MOVV  (m_mOS+mOS_ra)(R27), R9
 	AND   $~1, R9, R23 // remove smallCtx flag
@@ -313,11 +311,6 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	JAL   ·restoreGPRs(SB) // TODO skip if we are coming from syscall
 
 smallCtx:
-	// unmask interrupts
-	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_EXT), R26
-	MOVV  R26, M(C0_SR)
-
 	MOVV  0(R29), R26
 	ADD   $8, R29
 	MOVV  (m_mOS+mOS_sp)(R27), R29
@@ -392,16 +385,13 @@ callVector:
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
 
-	// Unmask interrupts
-	MOVV  M(C0_SR), R26
-	OR    $(INTR_SW|INTR_EXT), R26
-	MOVV  R26, M(C0_SR)
-
 	// Restore ctx of caller
 	MOVV  R29, R26
 	JAL   ·restoreGPRs(SB)
 	ADD   $const_numGPRS*8, R29
 
+	MOVV  _mstatus(R29), R26
+	MOVV  R26, M(C0_SR)
 	MOVV  _LR(R29), R26
 	MOVV  $~1, R27
 	AND   R27, R26, R31 // Remove smallCtx flag from RA

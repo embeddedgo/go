@@ -17,10 +17,10 @@ const (
 )
 
 type mOS struct {
-	gprs    [numGPRS]uintptr
-	fprs    [numFPRS]float64
-	sp, fp  uintptr // goroutine context
-	ra, epc uintptr // exception context
+	// thread context
+	gprs            [numGPRS]uintptr
+	fprs            [numFPRS]float64
+	sp, fp, ra, epc uintptr
 }
 
 var bbplayer bool // TODO move to n64 board support package
