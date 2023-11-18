@@ -67,7 +67,12 @@
 #define PHYS_TO_K1(a)   ((unsigned)(a) | K1BASE)
 
 /* Standard Co-Processor 0 registers */
+#define C0_INDEX        0               /* Index of TLB Entry */
+#define C0_ENTRYLO0     2               /* TLB entry's first PFN */
+#define C0_ENTRYLO1     3               /* TLB entry's second PFN */
+#define C0_PAGEMASK     5               /* Size of TLB Entries */
 #define C0_COUNT	9		/* Timer Count Register */
+#define C0_ENTRYHI      10              /* VPN and ASID of two TLB entry */
 #define C0_COMPARE	11		/* Timer Compare Register */
 #define C0_SR		12		/* Status Register */
 #define C0_CAUSE	13		/* last exception description */
