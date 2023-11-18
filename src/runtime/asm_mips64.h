@@ -71,6 +71,7 @@
 #define C0_ENTRYLO0     2               /* TLB entry's first PFN */
 #define C0_ENTRYLO1     3               /* TLB entry's second PFN */
 #define C0_PAGEMASK     5               /* Size of TLB Entries */
+#define C0_BADVADDR     8               /* Address that caused exception */
 #define C0_COUNT	9		/* Timer Count Register */
 #define C0_ENTRYHI      10              /* VPN and ASID of two TLB entry */
 #define C0_COMPARE	11		/* Timer Compare Register */

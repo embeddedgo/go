@@ -143,6 +143,8 @@ loadintvectorloop:
 	ADDU $-1, t2
 	BGTZ t2,loadintvectorloop
 
+	JAL ·initEverdrive64USB(SB) // get ready for logging
+
 	JMP runtime·rt0_go(SB)
 
 
