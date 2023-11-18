@@ -45,7 +45,14 @@ func taskerinit() {
 // nothing.
 //
 //go:nosplit
-func curcpuSleep() {}
+func curcpuSleep() {
+	// Check defensively for external interrupts here.  There were lockups
+	// when allowing the scheduler to be interrupted.
+	// TODO try again, this might have been my own fault by breaking
+	// atomic operations.
+	creg.STATUS.SetBits(creg.IP_EXT)
+	creg.STATUS.ClearBits(creg.IP_EXT)
+}
 
 // This function is used to inform the another CPU that there is a new thread
 // added to its runnable queue. It should wake up the sleeping CPU or preempt
