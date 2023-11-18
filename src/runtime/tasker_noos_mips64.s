@@ -236,6 +236,8 @@ nothingToCopy:
 	MOVV  (g_sched+gobuf_g)(R26), g
 
 return:
+	NOOP // avert CP0 hazards
+	NOOP
 	ERET
 
 
@@ -320,6 +322,8 @@ smallCtx:
 	MOVV  (m_mOS+mOS_epc)(R27), R26
 	MOVV  R26, M(C0_EPC)
 
+	NOOP // avert CP0 hazards
+	NOOP
 	ERET
 
 
@@ -414,6 +418,8 @@ callVector:
 	MOVV  (g_sched+gobuf_g)(R26), g
 
 return:
+	NOOP // avert CP0 hazards
+	NOOP
 	ERET
 
 fatal:
