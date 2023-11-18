@@ -278,6 +278,7 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	// reenable exceptions
 	MOVV  M(C0_SR), R26
 	AND   $~SR_EXL, R26
+//	OR    $INTR_EXT, R26 // allow external interrupts to preempt scheduler
 	MOVV  R26, M(C0_SR)
 
 	// reminder: don't use R26 or R27 when interrupts enabled
