@@ -10,11 +10,15 @@
 
 #define DEFAULT_C0_SR SR_CU1|SR_PE|SR_FR
 
+#define TLBWI WORD $0x42000002
+
 TEXT _rt0_mips64_noos(SB),NOSPLIT|NOFRAME,$0
 	// Watchpoints have been proven to persist across resets and even with
 	// the console being off. Zero it as early as possible, to avoid it
 	// triggering during boot. This should really be done at the start IPL3.
 	MOVW z0, M(C0_WATCHLO)
+
+	JAL  runtime·rt0_tlb(SB)
 
 	// Check whether we are running on iQue or N64. Use the MI version
 	// register which has LSB set to 0xB0 on iQue. We assume 0xBn was meant
@@ -40,8 +44,8 @@ TEXT _rt0_mips64_noos(SB),NOSPLIT|NOFRAME,$0
 	MOVW 0x7C0000, t0
 
 set_sp:
-	MOVW $0x7FFFFFF0, t1
-	ADDU t0,t1,sp // init stack pointer
+	MOVV $0x10, t1
+	SUBV t1, t0, sp // init stack pointer
 	MOVV $0, RSB // init data pointer
 	MOVW $8, v0
 	MOVW v0, (0xbfc007fc) // magic N64 hardware init
@@ -54,6 +58,7 @@ set_sp:
 	// Check if PI DMA transfer is required, knowing that IPL3 loads 1 MiB
 	// of ROM to RAM, and __libdragon_text_start is located right after the
 	// ROM header where this 1 MiB starts.
+	// TODO test again with TLB mappings configured
 	MOVW $_rt0_mips64_noos(SB), a0
 	MOVW $runtime·edata(SB), a1
 	MOVW $0x100000, t0 // stock IPL3 load size (1 MiB)
@@ -139,6 +144,61 @@ loadintvectorloop:
 	BGTZ t2,loadintvectorloop
 
 	JMP runtime·rt0_go(SB)
+
+
+// Maps KSEG0, KSEG1 and ROM to the beginning of the virtual address space.
+// This saves us from sign-extending pointers correctly, as we avoid pointers
+// upwards of 0x80000000.
+// The only problems encountered with falsely sign-extended pointers were symbol
+// addresses loaded from the ELF.  Otherwise running code in KSEG0 seems to be
+// no problem in general.
+// The correct way of doing this would probably involve defining a new 64-bit
+// architecture with PtrSize = 4, but I have ran into some issues that weren't
+// worth fixing at the moment.
+// TODO currently only 16 MiB of cartridge is mapped
+TEXT runtime·rt0_tlb(SB),NOSPLIT|NOFRAME,$0
+	MOVV $0, R8
+	MOVV R8, M(C0_INDEX)
+	MOVV $0xfff << 13, R8
+	MOVV R8, M(C0_PAGEMASK)
+	MOVV $(0x00000000 >> 6) | 0x7, R8
+	MOVV R8, M(C0_ENTRYLO0)
+	MOVV $(0x01000000 >> 6) | 0x7, R8
+	MOVV R8, M(C0_ENTRYLO1)
+	MOVV $0x00000000, R8
+	MOVV R8, M(C0_ENTRYHI)
+	NOOP // avert CP0 hazards
+	TLBWI
+
+	MOVV $1, R8
+	MOVV R8, M(C0_INDEX)
+	MOVV $0xfff << 13, R8
+	MOVV R8, M(C0_PAGEMASK)
+	MOVV $(0x10000000 >> 6) | (2<<3) |  0x3, R8
+	MOVV R8, M(C0_ENTRYLO0)
+	MOVV $(0x11000000 >> 6) | (2<<3) |  0x3, R8
+	MOVV R8, M(C0_ENTRYLO1)
+	MOVV $0x10000000, R8
+	MOVV R8, M(C0_ENTRYHI)
+	NOOP // avert CP0 hazards
+	TLBWI
+
+	MOVV $2, R8
+	MOVV R8, M(C0_INDEX)
+	MOVV $0xfff << 13, R8
+	MOVV R8, M(C0_PAGEMASK)
+	MOVV $(0x00000000 >> 6) | (2<<3) | 0x7, R8
+	MOVV R8, M(C0_ENTRYLO0)
+	MOVV $(0x01000000 >> 6) | (2<<3) | 0x7, R8
+	MOVV R8, M(C0_ENTRYLO1)
+	MOVV $0x20000000, R8
+	MOVV R8, M(C0_ENTRYHI)
+	NOOP // avert CP0 hazards
+	TLBWI
+
+	MOVV $0x7fffffff, R8
+	AND  R8, ra // return to the tlb mapped address
+	RET
 
 
 #define PALLOC_MIN 20*1024
