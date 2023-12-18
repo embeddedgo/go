@@ -2333,6 +2333,11 @@ func (ctxt *Link) buildinfo() {
 		// The version information is only available in executables.
 		return
 	}
+	if ctxt.HeadType == objabi.Hnoos {
+		// Save about 0.5 KB of Flash and RAM (RAM because buildinfo is placed
+		// in Segdata not Segrodata).
+		return
+	}
 
 	// Write the buildinfo symbol, which go version looks for.
 	// The code reading this data is in package debug/buildinfo.
@@ -2766,6 +2771,10 @@ func (ctxt *Link) address() []*sym.Segment {
 			noptrbss = s
 		case ".go.fuzzcntrs":
 			fuzzCounters = s
+		default:
+			if ctxt.HeadType == objabi.Hnoos {
+				Exitf("GOOS=noos doesn't support %s section", s.Name)
+			}
 		}
 	}
 
