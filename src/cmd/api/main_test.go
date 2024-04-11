@@ -1131,6 +1131,9 @@ func needApproval(filename string) bool {
 	if name == "go1.txt" {
 		return false
 	}
+	if name == "go1embedded.txt" {
+		return false
+	}
 	minor := strings.TrimSuffix(strings.TrimPrefix(name, "go1."), ".txt")
 	n, err := strconv.Atoi(minor)
 	if err != nil {

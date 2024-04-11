@@ -136,7 +136,7 @@ import (
 
 const (
 	_DebugGC      = 0
-	_FinBlockSize = 4 * 1024
+	_FinBlockSize = 4*1024*_OS + noosFinBlockSize
 
 	// concurrentSweep is a debug flag. Disabling this flag
 	// ensures all spans are swept while the world is stopped.
@@ -149,7 +149,7 @@ const (
 	// sweepMinHeapDistance is a lower bound on the heap distance
 	// (in bytes) reserved for concurrent sweeping between GC
 	// cycles.
-	sweepMinHeapDistance = 1024 * 1024
+	sweepMinHeapDistance = 1024*1024*_OS + noosSweepMinHeapDistance
 )
 
 // heapObjectsCanMove always returns false in the current garbage collector.
@@ -201,8 +201,10 @@ func gcenable() {
 	// Kick off sweeping and scavenging.
 	c := make(chan int, 2)
 	go bgsweep(c)
-	go bgscavenge(c)
-	<-c
+	if !noos {
+		go bgscavenge(c)
+		<-c
+	}
 	<-c
 	memstats.enablegc = true // now that runtime is initialized, GC is okay
 }
@@ -1177,12 +1179,21 @@ func gcMarkTermination(stw worldStop) {
 			}
 			print(string(fmtNSAsMS(sbuf[:], uint64(ns))))
 		}
-		print(" ms cpu, ",
-			work.heap0>>20, "->", work.heap1>>20, "->", work.heap2>>20, " MB, ",
-			gcController.lastHeapGoal>>20, " MB goal, ",
-			gcController.lastStackScan.Load()>>20, " MB stacks, ",
-			gcController.globalsScan.Load()>>20, " MB globals, ",
-			work.maxprocs, " P")
+		if noos {
+			print(" ms cpu, ",
+				work.heap0>>10, "->", work.heap1>>10, "->", work.heap2>>10, " KB, ",
+				gcController.lastHeapGoal>>10, " KB goal, ",
+				gcController.lastStackScan.Load()>>10, " KB stacks, ",
+				gcController.globalsScan.Load()>>10, " KB globals, ",
+				work.maxprocs, " P")
+		} else {
+			print(" ms cpu, ",
+				work.heap0>>20, "->", work.heap1>>20, "->", work.heap2>>20, " MB, ",
+				gcController.lastHeapGoal>>20, " MB goal, ",
+				gcController.lastStackScan.Load()>>20, " MB stacks, ",
+				gcController.globalsScan.Load()>>20, " MB globals, ",
+				work.maxprocs, " P")
+		}
 		if work.userForced {
 			print(" (forced)")
 		}
@@ -1200,7 +1211,7 @@ func gcMarkTermination(stw worldStop) {
 	}
 
 	// Enable huge pages on some metadata if we cross a heap threshold.
-	if gcController.heapGoal() > minHeapForMetadataHugePages {
+	if !noos && gcController.heapGoal() > minHeapForMetadataHugePages {
 		systemstack(func() {
 			mheap_.enableMetadataHugePages()
 		})

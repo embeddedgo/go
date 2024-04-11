@@ -148,25 +148,25 @@ func main() {
 		(len(range16)+len(except16)+len(except32))*2+
 			(len(range32))*4)
 
-	fmt.Fprintf(&buf, "var isPrint16 = []uint16{\n")
+	fmt.Fprintf(&buf, "var isPrint16 = [...]uint16{\n")
 	for i := 0; i < len(range16); i += 2 {
 		fmt.Fprintf(&buf, "\t%#04x, %#04x,\n", range16[i], range16[i+1])
 	}
 	fmt.Fprintf(&buf, "}\n\n")
 
-	fmt.Fprintf(&buf, "var isNotPrint16 = []uint16{\n")
+	fmt.Fprintf(&buf, "var isNotPrint16 = [...]uint16{\n")
 	for _, r := range except16 {
 		fmt.Fprintf(&buf, "\t%#04x,\n", r)
 	}
 	fmt.Fprintf(&buf, "}\n\n")
 
-	fmt.Fprintf(&buf, "var isPrint32 = []uint32{\n")
+	fmt.Fprintf(&buf, "var isPrint32 = [...]uint32{\n")
 	for i := 0; i < len(range32); i += 2 {
 		fmt.Fprintf(&buf, "\t%#06x, %#06x,\n", range32[i], range32[i+1])
 	}
 	fmt.Fprintf(&buf, "}\n\n")
 
-	fmt.Fprintf(&buf, "var isNotPrint32 = []uint16{ // add 0x10000 to each entry\n")
+	fmt.Fprintf(&buf, "var isNotPrint32 = [...]uint16{ // add 0x10000 to each entry\n")
 	for _, r := range except32 {
 		if r >= 0x20000 {
 			log.Fatalf("%U too big for isNotPrint32\n", r)
@@ -177,7 +177,7 @@ func main() {
 
 	// The list of graphic but not "printable" runes is short. Just make one easy table.
 	fmt.Fprintf(&buf, "// isGraphic lists the graphic runes not matched by IsPrint.\n")
-	fmt.Fprintf(&buf, "var isGraphic = []uint16{\n")
+	fmt.Fprintf(&buf, "var isGraphic = [...]uint16{\n")
 	for r := rune(0); r <= unicode.MaxRune; r++ {
 		if unicode.IsPrint(r) != unicode.IsGraphic(r) {
 			// Sanity check.

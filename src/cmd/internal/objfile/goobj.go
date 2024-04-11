@@ -53,8 +53,9 @@ L:
 				}
 			}
 			entries = append(entries, &Entry{
-				name: e.Name,
-				raw:  &goobjFile{e.Obj, r, f, arch},
+				name:   e.Name,
+				raw:    &goobjFile{e.Obj, r, f, arch},
+				gofile: true,
 			})
 			continue
 		case archive.EntryNativeObj:

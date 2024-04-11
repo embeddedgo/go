@@ -22,6 +22,7 @@ const (
 	PPC64
 	RISCV64
 	S390X
+	Thumb
 	Wasm
 )
 
@@ -254,6 +255,19 @@ var ArchS390X = &Arch{
 	FixedFrameSize: 8, // LR
 }
 
+var ArchThumb = &Arch{
+	Name:           "thumb",
+	Family:         Thumb,
+	ByteOrder:      binary.LittleEndian,
+	PtrSize:        4,
+	RegSize:        4,
+	MinLC:          2,
+	Alignment:      4, // unaligned access is supported by ARMv7-M but can be slow
+	CanMergeLoads:  false,
+	HasLR:          true,
+	FixedFrameSize: 4, // LR
+}
+
 var ArchWasm = &Arch{
 	Name:           "wasm",
 	Family:         Wasm,
@@ -281,5 +295,6 @@ var Archs = [...]*Arch{
 	ArchPPC64LE,
 	ArchRISCV64,
 	ArchS390X,
+	ArchThumb,
 	ArchWasm,
 }

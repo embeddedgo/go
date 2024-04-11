@@ -90,7 +90,7 @@ func (op Op) isLoweredGetClosurePtr() bool {
 	switch op {
 	case OpAMD64LoweredGetClosurePtr, OpPPC64LoweredGetClosurePtr, OpARMLoweredGetClosurePtr, OpARM64LoweredGetClosurePtr,
 		Op386LoweredGetClosurePtr, OpMIPS64LoweredGetClosurePtr, OpLOONG64LoweredGetClosurePtr, OpS390XLoweredGetClosurePtr, OpMIPSLoweredGetClosurePtr,
-		OpRISCV64LoweredGetClosurePtr, OpWasmLoweredGetClosurePtr:
+		OpRISCV64LoweredGetClosurePtr, OpThumbLoweredGetClosurePtr, OpWasmLoweredGetClosurePtr:
 		return true
 	}
 	return false

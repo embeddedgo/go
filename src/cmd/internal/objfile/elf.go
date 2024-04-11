@@ -117,6 +117,9 @@ func (f *elfFile) goarch() string {
 	case elf.EM_X86_64:
 		return "amd64"
 	case elf.EM_ARM:
+		if f.elf.Entry&1 != 0 {
+			return "thumb"
+		}
 		return "arm"
 	case elf.EM_AARCH64:
 		return "arm64"

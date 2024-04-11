@@ -408,7 +408,7 @@ var (
 	GOMODCACHE = envOr("GOMODCACHE", gopathDir("pkg/mod"))
 
 	// Used in envcmd.MkEnv and build ID computations.
-	GOARM    = envOr("GOARM", fmt.Sprint(buildcfg.GOARM))
+	GOARM    = envOr("GOARM", fmt.Sprintf("%x", buildcfg.GOARM))
 	GO386    = envOr("GO386", buildcfg.GO386)
 	GOAMD64  = envOr("GOAMD64", fmt.Sprintf("%s%d", "v", buildcfg.GOAMD64))
 	GOMIPS   = envOr("GOMIPS", buildcfg.GOMIPS)
@@ -433,7 +433,7 @@ var SumdbDir = gopathDir("pkg/sumdb")
 // GetArchEnv returns empty key and value.
 func GetArchEnv() (key, val string) {
 	switch Goarch {
-	case "arm":
+	case "arm", "thumb":
 		return "GOARM", GOARM
 	case "386":
 		return "GO386", GO386

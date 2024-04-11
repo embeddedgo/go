@@ -6,6 +6,8 @@
 #include "funcdata.h"
 #include "textflag.h"
 
+#ifndef GOOS_noos
+
 // func rt0_go()
 TEXT runtime·rt0_go(SB),NOSPLIT|TOPFRAME,$0
 	// X2 = stack; A0 = argc; A1 = argv
@@ -69,10 +71,6 @@ nocgo:
 	WORD $0 // crash if reached
 	RET
 
-TEXT runtime·mstart(SB),NOSPLIT|TOPFRAME,$0
-	CALL	runtime·mstart0(SB)
-	RET // not reached
-
 // void setg_gcc(G*); set g called from gcc with g in A0
 TEXT setg_gcc<>(SB),NOSPLIT,$0-0
 	MOV	A0, g
@@ -87,6 +85,12 @@ TEXT runtime·cputicks(SB),NOSPLIT,$0-8
 	RDTIME	A0
 	MOV	A0, ret+0(FP)
 	RET
+
+#endif
+
+TEXT runtime·mstart(SB),NOSPLIT|TOPFRAME,$0
+	CALL	runtime·mstart0(SB)
+	RET // not reached
 
 // systemstack_switch is a dummy routine that systemstack leaves at the bottom
 // of the G stack. We need to distinguish the routine that

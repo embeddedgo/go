@@ -8,7 +8,7 @@ package strconv
 
 // (424+133+112)*2 + (508)*4 = 3370 bytes
 
-var isPrint16 = []uint16{
+var isPrint16 = [...]uint16{
 	0x0020, 0x007e,
 	0x00a1, 0x0377,
 	0x037a, 0x037f,
@@ -223,7 +223,7 @@ var isPrint16 = []uint16{
 	0xfffc, 0xfffd,
 }
 
-var isNotPrint16 = []uint16{
+var isNotPrint16 = [...]uint16{
 	0x00ad,
 	0x038b,
 	0x038d,
@@ -359,7 +359,7 @@ var isNotPrint16 = []uint16{
 	0xffe7,
 }
 
-var isPrint32 = []uint32{
+var isPrint32 = [...]uint32{
 	0x010000, 0x01004d,
 	0x010050, 0x01005d,
 	0x010080, 0x0100fa,
@@ -616,7 +616,7 @@ var isPrint32 = []uint32{
 	0x0e0100, 0x0e01ef,
 }
 
-var isNotPrint32 = []uint16{ // add 0x10000 to each entry
+var isNotPrint32 = [...]uint16{ // add 0x10000 to each entry
 	0x000c,
 	0x0027,
 	0x003b,
@@ -732,7 +732,7 @@ var isNotPrint32 = []uint16{ // add 0x10000 to each entry
 }
 
 // isGraphic lists the graphic runes not matched by IsPrint.
-var isGraphic = []uint16{
+var isGraphic = [...]uint16{
 	0x00a0,
 	0x1680,
 	0x2000,

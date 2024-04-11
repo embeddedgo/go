@@ -9,6 +9,8 @@
 // The format of the dumped file is described at
 // https://golang.org/s/go15heapdump.
 
+// +build !noos
+
 package runtime
 
 import (

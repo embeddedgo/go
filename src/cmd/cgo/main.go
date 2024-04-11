@@ -195,6 +195,7 @@ var ptrSizeMap = map[string]int64{
 	"shbe":     4,
 	"sparc":    4,
 	"sparc64":  8,
+	"thumb":    4,
 }
 
 var intSizeMap = map[string]int64{
@@ -221,6 +222,7 @@ var intSizeMap = map[string]int64{
 	"shbe":     4,
 	"sparc":    4,
 	"sparc64":  8,
+	"thumb":    4,
 }
 
 var cPrefix string

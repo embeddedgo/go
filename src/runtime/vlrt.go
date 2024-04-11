@@ -23,7 +23,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:build arm || 386 || mips || mipsle
+//go:build arm || 386 || mips || mipsle || thumb
 
 package runtime
 
@@ -223,7 +223,7 @@ func _div64by32(a uint64, b uint32, r *uint32) (q uint32)
 
 //go:nosplit
 func dodiv(n, d uint64) (q, r uint64) {
-	if GOARCH == "arm" {
+	if GOARCH == "arm" || GOARCH == "thumb" {
 		// arm doesn't have a division instruction, so
 		// slowdodiv is the best that we can do.
 		return slowdodiv(n, d)

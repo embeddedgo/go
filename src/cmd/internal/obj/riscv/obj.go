@@ -429,6 +429,10 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 
 		prologue = ctxt.EndUnsafePoint(prologue, newprog, -1)
 
+		// On noos, if we are on handler stack the nested trap can clober LR
+		// saved before (required by async preemption). Save LR one more time
+		// after decrementing SP.
+		//
 		// On Linux, in a cgo binary we may get a SIGSETXID signal early on
 		// before the signal stack is set, as glibc doesn't allow us to block
 		// SIGSETXID. So a signal may land on the current stack and clobber

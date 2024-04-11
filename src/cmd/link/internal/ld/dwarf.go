@@ -1140,9 +1140,19 @@ func (d *dwctxt) importInfoSymbol(dsym loader.Sym) {
 	}
 }
 
-func expandFile(fname string) string {
+func expandFile(fname string, pcln bool) string {
 	fname = strings.TrimPrefix(fname, src.FileSymPrefix)
-	return expandGoroot(fname)
+	fname = expandGoroot(fname)
+	if pcln && *stripFuncNames > 0 {
+		if *stripFuncNames == 1 {
+			if i := strings.LastIndex(fname, "/"); i >= 0 {
+				fname = fname[i+1:]
+			}
+		} else {
+			fname = ""
+		}
+	}
+	return fname
 }
 
 // writeDirFileTables emits the portion of the DWARF line table
@@ -1163,7 +1173,7 @@ func (d *dwctxt) writeDirFileTables(unit *sym.CompilationUnit, lsu *loader.Symbo
 	// Preprocess files to collect directories. This assumes that the
 	// file table is already de-duped.
 	for i, name := range unit.FileTable {
-		name := expandFile(name)
+		name := expandFile(name, false)
 		if len(name) == 0 {
 			// Can't have empty filenames, and having a unique
 			// filename is quite useful for debugging.

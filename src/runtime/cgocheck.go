@@ -5,6 +5,8 @@
 // Code to check that pointer writes follow the cgo rules.
 // These functions are invoked when GOEXPERIMENT=cgocheck2 is enabled.
 
+//go:build !noos
+
 package runtime
 
 import (

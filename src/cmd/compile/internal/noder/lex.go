@@ -35,7 +35,8 @@ const (
 		ir.Systemstack |
 		ir.Nowritebarrier |
 		ir.Nowritebarrierrec |
-		ir.Yeswritebarrierrec
+		ir.Yeswritebarrierrec |
+		ir.Interrupthandler
 )
 
 func pragmaFlag(verb string) ir.PragmaFlag {
@@ -75,6 +76,8 @@ func pragmaFlag(verb string) ir.PragmaFlag {
 		return ir.UintptrEscapes | ir.UintptrKeepAlive // implies UintptrKeepAlive
 	case "go:registerparams": // TODO(register args) remove after register abi is working
 		return ir.RegisterParams
+	case "go:interrupthandler":
+		return ir.Interrupthandler
 	}
 	return 0
 }

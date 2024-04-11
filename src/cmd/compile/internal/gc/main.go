@@ -261,7 +261,7 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 	// checking. This must happen before transforming closures during Walk
 	// We'll do the final check after write barriers are
 	// inserted.
-	if base.Flag.CompilingRuntime {
+	if base.Flag.CompilingRuntime || base.Ctxt.Headtype == objabi.Hnoos {
 		ssagen.EnableNoWriteBarrierRecCheck()
 	}
 
@@ -324,7 +324,7 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 
 	base.Timer.AddEvent(int64(len(typecheck.Target.Funcs)), "funcs")
 
-	if base.Flag.CompilingRuntime {
+	if base.Flag.CompilingRuntime || base.Ctxt.Headtype == objabi.Hnoos {
 		// Write barriers are now known. Check the call graph.
 		ssagen.NoWriteBarrierRecCheck()
 	}

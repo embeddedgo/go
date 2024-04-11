@@ -146,7 +146,7 @@ func computeDeferReturn(ctxt *Link, deferReturnSym, s loader.Sym) uint32 {
 				switch target.Arch.Family {
 				case sys.AMD64, sys.I386:
 					deferreturn--
-				case sys.ARM, sys.ARM64, sys.Loong64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64:
+				case sys.ARM, sys.ARM64, sys.Loong64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.Thumb:
 					// no change
 				case sys.S390X:
 					deferreturn -= 2
@@ -393,7 +393,7 @@ func (state *pclntab) generateFilenameTabs(ctxt *Link, compUnits []*sym.Compilat
 		filename := cu.FileTable[i]
 		if _, ok := fileOffsets[filename]; !ok {
 			fileOffsets[filename] = uint32(fileSize)
-			fileSize += int64(len(expandFile(filename)) + 1) // NULL terminate
+			fileSize += int64(len(expandFile(filename, true)) + 1) // NULL terminate
 		}
 
 		// Find the maximum file index we've seen.
@@ -441,7 +441,7 @@ func (state *pclntab) generateFilenameTabs(ctxt *Link, compUnits []*sym.Compilat
 
 		// Write the strings.
 		for filename, loc := range fileOffsets {
-			sb.AddStringAt(int64(loc), expandFile(filename))
+			sb.AddStringAt(int64(loc), expandFile(filename, true))
 		}
 	}
 	state.nfiles = uint32(len(fileOffsets))

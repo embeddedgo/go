@@ -95,6 +95,7 @@ var (
 	asmArchPpc64LE  = asmArch{name: "ppc64le", bigEndian: false, stack: "R1", lr: true, retRegs: []string{"R3", "F1"}}
 	asmArchRISCV64  = asmArch{name: "riscv64", bigEndian: false, stack: "SP", lr: true, retRegs: []string{"X10", "F10"}}
 	asmArchS390X    = asmArch{name: "s390x", bigEndian: true, stack: "R15", lr: true}
+	asmArchThumb    = asmArch{name: "thumb", bigEndian: false, stack: "R13", lr: true}
 	asmArchWasm     = asmArch{name: "wasm", bigEndian: false, stack: "SP", lr: false}
 
 	arches = []*asmArch{
@@ -110,6 +111,7 @@ var (
 		&asmArchPpc64LE,
 		&asmArchRISCV64,
 		&asmArchS390X,
+		&asmArchThumb,
 		&asmArchWasm,
 	}
 )

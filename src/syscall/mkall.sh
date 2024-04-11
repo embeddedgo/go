@@ -189,7 +189,7 @@ linux_amd64)
 	mksysnum="./mksysnum_linux.pl $unistd_h"
 	mktypes="GOARCH=$GOARCH go tool cgo -godefs"
 	;;
-linux_arm)
+linux_arm|linux_thumb)
 	GOOSARCH_in="syscall_linux_arm.go syscall_linux_accept.go"
 	mkerrors="$mkerrors"
 	mksyscall="./mksyscall.pl -l32 -arm"

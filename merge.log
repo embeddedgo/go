@@ -1,0 +1,23 @@
+runtime.adjustframe
+
+Usunieto:  src/runtime/trace_noos.go
+
+src/cmd/asm/internal/asm/testdata/arm.s
+
+src/cmd/link/internal/ld/pcln.go:
+ func emitPcln(ctxt *Link, s loader.Sym, container loader.Bitmap) bool {
++	if ctxt.Target.IsRISCV64() {
++		// Avoid adding local symbols to the pcln table - RISC-V
++		// linking generates a very large number of these, particular
+
+1. Sprawdzić czy runtime.enableMetadataHugePages istnieje przy kompilacji dla nnos.
+
+2. Spróbować usunąć memmove_noos_riscv64.s bo poprawili sprawdzanie wyrownania w memmove_noos_riscv64.s
+
+
+find . -name '*.orig'
+
+Edit s/^\+//g
+
+
+

@@ -20,7 +20,70 @@ import (
 // fakeLabelName matches the RISCV_FAKE_LABEL_NAME from binutils.
 const fakeLabelName = ".L0 "
 
-func gentext(ctxt *ld.Link, ldr *loader.Loader) {}
+func lookupFuncSym(ldr *loader.Loader, name string) loader.Sym {
+	if s := ldr.Lookup(name, sym.SymVerABI0); s != 0 && ldr.SymType(s) == sym.STEXT {
+		return s
+	}
+	if s := ldr.Lookup(name, sym.SymVerABIInternal); s != 0 && ldr.SymType(s) == sym.STEXT {
+		return s
+	}
+	return 0
+}
+
+func gentext(ctxt *ld.Link, ldr *loader.Loader) {
+	if ctxt.HeadType != objabi.Hnoos {
+		return
+	}
+	vectors := ldr.CreateSymForUpdate("runtime.vectors", sym.SymVerABI0)
+	vectors.SetType(sym.STEXT)
+	vectors.SetReachable(true)
+	vectors.SetAlign(8)
+
+	unhandledInterrupt := ldr.Lookup("runtime.unhandledExternalInterrupt", sym.SymVerABI0)
+	if unhandledInterrupt == 0 {
+		ld.Errorf(nil, "runtime.unhandledExternalInterrupt not defined")
+	}
+
+	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
+	var irqHandlers [1024]loader.Sym // BUG: 1024 is PLIC specific
+	irqNum := 1
+	for i := 1; i < len(irqHandlers); i++ {
+		s := lookupFuncSym(ldr, ld.InterruptHandler(i))
+		if s == 0 {
+			irqHandlers[i] = unhandledInterrupt
+		} else {
+			irqHandlers[i] = s
+			irqNum = i + 1
+		}
+	}
+
+	vectors.AddUint64(ctxt.Arch, uint64(irqNum))
+	relocs := vectors.AddRelocs(irqNum - 1)
+	for i, s := range irqHandlers[1:irqNum] {
+		ldr.MakeSymbolUpdater(s).SetReachable(true)
+		rel := relocs.At(i)
+		rel.SetSym(s)
+		rel.SetType(objabi.R_ADDR)
+		rel.SetSiz(8)
+		rel.SetOff(int32(vectors.AddUint64(ctxt.Arch, 0)))
+	}
+
+	ctxt.Textp = append(ctxt.Textp, vectors.Sym())
+
+	// move the entry symbol at the beggining of the text segment
+	entry := lookupFuncSym(ldr, *ld.FlagEntrySymbol)
+	if entry == 0 {
+		ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
+	}
+	for i, s := range ctxt.Textp {
+		if s == entry {
+			copy(ctxt.Textp[1:], ctxt.Textp[:i])
+			ctxt.Textp[0] = s
+			return
+		}
+	}
+	ldr.Errorf(entry, "cannot find symbol in ctxt.Textp")
+}
 
 func findHI20Reloc(ldr *loader.Loader, s loader.Sym, val int64) *loader.Reloc {
 	outer := ldr.OuterSym(s)

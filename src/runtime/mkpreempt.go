@@ -86,6 +86,7 @@ var arches = map[string]func(){
 	"ppc64x":  genPPC64,
 	"riscv64": genRISCV64,
 	"s390x":   genS390X,
+	"thumb":   genThumb,
 	"wasm":    genWasm,
 }
 var beLe = map[string]bool{"mips64x": true, "mipsx": true, "ppc64x": true}
@@ -617,6 +618,50 @@ func genS390X() {
 	p("TMLH R10, $(3<<12)")            // restore flags
 	p("MOVD -%d(R15), R10", l.stack+8) // load PC to REGTMP
 	p("JMP (R10)")
+}
+
+func genThumb() {
+	// Add integer registers R0-R12.
+	// R13 (SP), R14 (LR), R15 (PC) are special and not saved here.
+	var l = layout{sp: "R13", stack: 4} // add LR slot
+	for i := 0; i <= 12; i++ {
+		reg := fmt.Sprintf("R%d", i)
+		if i == 10 {
+			continue // R10 is g register, no need to save/restore
+		}
+		l.add("MOVW", reg, 4)
+	}
+	// Add flag register.
+	l.addSpecial(
+		"MOVW APSR, R0\nMOVW R0, %d(R13)",
+		"MOVW %d(R13), R0\nMOVW R0, APSR",
+		4)
+
+	// Add floating point registers F0-F15 and flag register.
+	var lfp = layout{stack: l.stack, sp: "R13"}
+	lfp.addSpecial(
+		"MOVW FPSCR, R0\nMOVW R0, %d(R13)",
+		"MOVW %d(R13), R0\nMOVW R0, FPSCR",
+		4)
+	for i := 0; i <= 15; i++ {
+		reg := fmt.Sprintf("F%d", i)
+		lfp.add("MOVD", reg, 8)
+	}
+
+	p("MOVW.W R14, -%d(R13)", lfp.stack) // allocate frame, save LR
+	l.save()
+	p("MOVB ·goarmsoftfp(SB), R0\nCMP $0, R0\nBNE nofp") // test goarmsoftfp, and skip FP registers if goarmsoftfp!=0.
+	lfp.save()
+	label("nofp:")
+	p("CALL ·asyncPreempt2(SB)")
+	p("MOVB ·goarmsoftfp(SB), R0\nCMP $0, R0\nBNE nofp2") // test goarmsoftfp, and skip FP registers if goarmsoftfp!=0.
+	lfp.restore()
+	label("nofp2:")
+	l.restore()
+
+	p("MOVW %d(R13), R14", lfp.stack)     // sigctxt.pushCall pushes LR on stack, restore it
+	p("MOVW.P %d(R13), R15", lfp.stack+4) // load PC, pop frame (including the space pushed by sigctxt.pushCall)
+	p("UNDEF")                            // shouldn't get here
 }
 
 func genWasm() {

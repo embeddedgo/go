@@ -668,7 +668,7 @@ func (s *regAllocState) init(f *Func) {
 			// available for global load/stores. See _gen/386.rules (search for Flag_shared).
 		case "amd64":
 			s.allocatable &^= 1 << 15 // R15
-		case "arm":
+		case "arm", "thumb":
 			s.allocatable &^= 1 << 9 // R9
 		case "arm64":
 			// nothing to do

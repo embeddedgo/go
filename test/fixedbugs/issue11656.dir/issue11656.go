@@ -63,11 +63,15 @@ func f(n int) {
 		ill = append(ill, 0xe3, 0x00, 0x00, 0x00, 0x00, 0x24) // MOVD R0, (R0)
 	case "riscv64":
 		binary.LittleEndian.PutUint32(ill, 0x00003023) // MOV X0, (X0)
+	case "thumb":
+		binary.LittleEndian.PutUint16(ill[0:2], 0x2000) // MOVW $0, R0
+		binary.LittleEndian.PutUint16(ill[2:4], 0x6000) // MOVW R0, (R0)
+		f.x = 1
 	default:
 		// Just leave it as 0 and hope for the best.
 	}
 
-	f.x = uintptr(unsafe.Pointer(&ill[0]))
+	f.x += uintptr(unsafe.Pointer(&ill[0]))
 	p := &f
 	fn := *(*func())(unsafe.Pointer(&p))
 	syncIcache(f.x)

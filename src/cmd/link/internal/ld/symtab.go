@@ -128,6 +128,9 @@ func putelfsym(ctxt *Link, x loader.Sym, typ elf.SymType, curbind elf.SymBind) {
 	if ctxt.LinkMode == LinkExternal && elfshnum != elf.SHN_UNDEF {
 		addr -= int64(xosect.Vaddr)
 	}
+	if ctxt.IsThumb() && typ == elf.STT_FUNC {
+		addr += 1
+	}
 	other := int(elf.STV_DEFAULT)
 	if ldr.AttrVisibilityHidden(x) {
 		// TODO(mwhudson): We only set AttrVisibilityHidden in ldelf, i.e. when
@@ -435,7 +438,7 @@ func (ctxt *Link) symtab(pcln *pclntab) []sym.SymKind {
 	if !ctxt.IsAIX() {
 		switch ctxt.BuildMode {
 		case BuildModeCArchive, BuildModeCShared:
-			s := ldr.Lookup(*flagEntrySymbol, sym.SymVerABI0)
+			s := ldr.Lookup(*FlagEntrySymbol, sym.SymVerABI0)
 			if s != 0 {
 				addinitarrdata(ctxt, ldr, s)
 			}

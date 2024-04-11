@@ -11,6 +11,7 @@ import (
 	"cmd/internal/obj/ppc64"
 	"cmd/internal/obj/riscv"
 	"cmd/internal/obj/s390x"
+	"cmd/internal/obj/thumb"
 	"cmd/internal/obj/wasm"
 	"cmd/internal/obj/x86"
 )
@@ -154,6 +155,21 @@ const (
 	BlockS390XCGIJ
 	BlockS390XCLIJ
 	BlockS390XCLGIJ
+
+	BlockThumbEQ
+	BlockThumbNE
+	BlockThumbLT
+	BlockThumbLE
+	BlockThumbGT
+	BlockThumbGE
+	BlockThumbULT
+	BlockThumbULE
+	BlockThumbUGT
+	BlockThumbUGE
+	BlockThumbLTnoov
+	BlockThumbLEnoov
+	BlockThumbGTnoov
+	BlockThumbGEnoov
 
 	BlockPlain
 	BlockIf
@@ -304,6 +320,21 @@ var blockString = [...]string{
 	BlockS390XCGIJ:  "CGIJ",
 	BlockS390XCLIJ:  "CLIJ",
 	BlockS390XCLGIJ: "CLGIJ",
+
+	BlockThumbEQ:     "EQ",
+	BlockThumbNE:     "NE",
+	BlockThumbLT:     "LT",
+	BlockThumbLE:     "LE",
+	BlockThumbGT:     "GT",
+	BlockThumbGE:     "GE",
+	BlockThumbULT:    "ULT",
+	BlockThumbULE:    "ULE",
+	BlockThumbUGT:    "UGT",
+	BlockThumbUGE:    "UGE",
+	BlockThumbLTnoov: "LTnoov",
+	BlockThumbLEnoov: "LEnoov",
+	BlockThumbGTnoov: "GTnoov",
+	BlockThumbGEnoov: "GEnoov",
 
 	BlockPlain:     "Plain",
 	BlockIf:        "If",
@@ -2730,6 +2761,244 @@ const (
 	OpS390XLoweredMove
 	OpS390XLoweredZero
 
+	OpThumbADD
+	OpThumbADDconst
+	OpThumbSUB
+	OpThumbSUBconst
+	OpThumbRSB
+	OpThumbRSBconst
+	OpThumbMUL
+	OpThumbHMUL
+	OpThumbHMULU
+	OpThumbDIV
+	OpThumbDIVU
+	OpThumbADDS
+	OpThumbADDSconst
+	OpThumbADC
+	OpThumbADCconst
+	OpThumbSUBS
+	OpThumbSUBSconst
+	OpThumbRSBSconst
+	OpThumbSBC
+	OpThumbSBCconst
+	OpThumbMULLU
+	OpThumbMULA
+	OpThumbMULS
+	OpThumbADDF
+	OpThumbADDD
+	OpThumbSUBF
+	OpThumbSUBD
+	OpThumbMULF
+	OpThumbMULD
+	OpThumbNMULF
+	OpThumbNMULD
+	OpThumbDIVF
+	OpThumbDIVD
+	OpThumbMULAF
+	OpThumbMULAD
+	OpThumbMULSF
+	OpThumbMULSD
+	OpThumbFMULAD
+	OpThumbAND
+	OpThumbANDconst
+	OpThumbOR
+	OpThumbORconst
+	OpThumbORN
+	OpThumbORNconst
+	OpThumbXOR
+	OpThumbXORconst
+	OpThumbBIC
+	OpThumbBICconst
+	OpThumbBFX
+	OpThumbBFXU
+	OpThumbMVN
+	OpThumbNEGF
+	OpThumbNEGD
+	OpThumbSQRTD
+	OpThumbSQRTF
+	OpThumbABSD
+	OpThumbCLZ
+	OpThumbREV
+	OpThumbREV16
+	OpThumbRBIT
+	OpThumbSLL
+	OpThumbSLLconst
+	OpThumbSRL
+	OpThumbSRLconst
+	OpThumbSRA
+	OpThumbSRAconst
+	OpThumbSRR
+	OpThumbSRRconst
+	OpThumbADDshiftLL
+	OpThumbADDshiftRL
+	OpThumbADDshiftRA
+	OpThumbSUBshiftLL
+	OpThumbSUBshiftRL
+	OpThumbSUBshiftRA
+	OpThumbRSBshiftLL
+	OpThumbRSBshiftRL
+	OpThumbRSBshiftRA
+	OpThumbANDshiftLL
+	OpThumbANDshiftRL
+	OpThumbANDshiftRA
+	OpThumbORshiftLL
+	OpThumbORshiftRL
+	OpThumbORshiftRA
+	OpThumbORNshiftLL
+	OpThumbORNshiftRL
+	OpThumbORNshiftRA
+	OpThumbXORshiftLL
+	OpThumbXORshiftRL
+	OpThumbXORshiftRA
+	OpThumbXORshiftRR
+	OpThumbBICshiftLL
+	OpThumbBICshiftRL
+	OpThumbBICshiftRA
+	OpThumbMVNshiftLL
+	OpThumbMVNshiftRL
+	OpThumbMVNshiftRA
+	OpThumbADCshiftLL
+	OpThumbADCshiftRL
+	OpThumbADCshiftRA
+	OpThumbSBCshiftLL
+	OpThumbSBCshiftRL
+	OpThumbSBCshiftRA
+	OpThumbADDSshiftLL
+	OpThumbADDSshiftRL
+	OpThumbADDSshiftRA
+	OpThumbSUBSshiftLL
+	OpThumbSUBSshiftRL
+	OpThumbSUBSshiftRA
+	OpThumbRSBSshiftLL
+	OpThumbRSBSshiftRL
+	OpThumbRSBSshiftRA
+	OpThumbCMP
+	OpThumbCMPconst
+	OpThumbCMN
+	OpThumbCMNconst
+	OpThumbTST
+	OpThumbTSTconst
+	OpThumbTEQ
+	OpThumbTEQconst
+	OpThumbCMPF
+	OpThumbCMPD
+	OpThumbCMPshiftLL
+	OpThumbCMPshiftRL
+	OpThumbCMPshiftRA
+	OpThumbCMNshiftLL
+	OpThumbCMNshiftRL
+	OpThumbCMNshiftRA
+	OpThumbTSTshiftLL
+	OpThumbTSTshiftRL
+	OpThumbTSTshiftRA
+	OpThumbTEQshiftLL
+	OpThumbTEQshiftRL
+	OpThumbTEQshiftRA
+	OpThumbCMPF0
+	OpThumbCMPD0
+	OpThumbMOVWconst
+	OpThumbMOVFconst
+	OpThumbMOVDconst
+	OpThumbMOVWaddr
+	OpThumbMOVBload
+	OpThumbMOVBUload
+	OpThumbMOVHload
+	OpThumbMOVHUload
+	OpThumbMOVWload
+	OpThumbMOVFload
+	OpThumbMOVDload
+	OpThumbMOVBstore
+	OpThumbMOVHstore
+	OpThumbMOVWstore
+	OpThumbMOVFstore
+	OpThumbMOVDstore
+	OpThumbMOVWloadidx
+	OpThumbMOVHloadidx
+	OpThumbMOVHUloadidx
+	OpThumbMOVBloadidx
+	OpThumbMOVBUloadidx
+	OpThumbMOVWloadshiftLL
+	OpThumbMOVHloadshiftLL
+	OpThumbMOVHUloadshiftLL
+	OpThumbMOVBloadshiftLL
+	OpThumbMOVBUloadshiftLL
+	OpThumbMOVWstoreidx
+	OpThumbMOVBstoreidx
+	OpThumbMOVHstoreidx
+	OpThumbMOVWstoreshiftLL
+	OpThumbMOVHstoreshiftLL
+	OpThumbMOVBstoreshiftLL
+	OpThumbMOVBreg
+	OpThumbMOVBUreg
+	OpThumbMOVHreg
+	OpThumbMOVHUreg
+	OpThumbMOVWreg
+	OpThumbMOVWnop
+	OpThumbMOVWF
+	OpThumbMOVWD
+	OpThumbMOVWUF
+	OpThumbMOVWUD
+	OpThumbMOVFW
+	OpThumbMOVDW
+	OpThumbMOVFWU
+	OpThumbMOVDWU
+	OpThumbMOVFD
+	OpThumbMOVDF
+	OpThumbCMOVWHSconst
+	OpThumbCMOVWLSconst
+	OpThumbSRAcond
+	OpThumbCALLstatic
+	OpThumbCALLtail
+	OpThumbCALLclosure
+	OpThumbCALLinter
+	OpThumbLoadOnce8
+	OpThumbLoadOnce16
+	OpThumbLoadOnce32
+	OpThumbStoreOnce8
+	OpThumbStoreOnce16
+	OpThumbStoreOnce32
+	OpThumbLoadOnce8idx
+	OpThumbLoadOnce16idx
+	OpThumbLoadOnce32idx
+	OpThumbStoreOnce8idx
+	OpThumbStoreOnce16idx
+	OpThumbStoreOnce32idx
+	OpThumbLoadOnce8shiftLL
+	OpThumbLoadOnce16shiftLL
+	OpThumbLoadOnce32shiftLL
+	OpThumbStoreOnce8shiftLL
+	OpThumbStoreOnce16shiftLL
+	OpThumbStoreOnce32shiftLL
+	OpThumbDSB
+	OpThumbDMB_ST
+	OpThumbLoweredNilCheck
+	OpThumbEqual
+	OpThumbNotEqual
+	OpThumbLessThan
+	OpThumbLessEqual
+	OpThumbGreaterThan
+	OpThumbGreaterEqual
+	OpThumbLessThanU
+	OpThumbLessEqualU
+	OpThumbGreaterThanU
+	OpThumbGreaterEqualU
+	OpThumbDUFFZERO
+	OpThumbDUFFCOPY
+	OpThumbLoweredZero
+	OpThumbLoweredMove
+	OpThumbLoweredGetClosurePtr
+	OpThumbLoweredGetCallerSP
+	OpThumbLoweredGetCallerPC
+	OpThumbLoweredPanicBoundsA
+	OpThumbLoweredPanicBoundsB
+	OpThumbLoweredPanicBoundsC
+	OpThumbLoweredPanicExtendA
+	OpThumbLoweredPanicExtendB
+	OpThumbLoweredPanicExtendC
+	OpThumbFlagConstant
+	OpThumbInvertFlags
+	OpThumbLoweredWB
+
 	OpWasmLoweredStaticCall
 	OpWasmLoweredTailCall
 	OpWasmLoweredClosureCall
@@ -3223,6 +3492,13 @@ const (
 	OpAtomicOr8Variant
 	OpAtomicOr32Variant
 	OpPubBarrier
+	OpMMIOLoad32
+	OpMMIOLoad16
+	OpMMIOLoad8
+	OpMMIOStore32
+	OpMMIOStore16
+	OpMMIOStore8
+	OpMMIOMB
 	OpClobber
 	OpClobberReg
 	OpPrefetchCache
@@ -40468,6 +40744,48 @@ var opcodeTable = [...]opInfo{
 		generic:        true,
 	},
 	{
+		name:           "MMIOLoad32",
+		argLen:         2,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "MMIOLoad16",
+		argLen:         2,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "MMIOLoad8",
+		argLen:         2,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "MMIOStore32",
+		argLen:         3,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "MMIOStore16",
+		argLen:         3,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "MMIOStore8",
+		argLen:         3,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "MMIOMB",
+		argLen:         1,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
 		name:      "Clobber",
 		auxType:   auxSymOff,
 		argLen:    0,
@@ -41075,6 +41393,48 @@ var fpRegMaskS390X = regMask(4294901760)
 var specialRegMaskS390X = regMask(0)
 var framepointerRegS390X = int8(-1)
 var linkRegS390X = int8(14)
+var registersThumb = [...]Register{
+	{0, thumb.REG_R0, 0, "R0"},
+	{1, thumb.REG_R1, 1, "R1"},
+	{2, thumb.REG_R2, 2, "R2"},
+	{3, thumb.REG_R3, 3, "R3"},
+	{4, thumb.REG_R4, 4, "R4"},
+	{5, thumb.REG_R5, 5, "R5"},
+	{6, thumb.REG_R6, 6, "R6"},
+	{7, thumb.REG_R7, -1, "R7"},
+	{8, thumb.REG_R8, 7, "R8"},
+	{9, thumb.REG_R9, 8, "R9"},
+	{10, thumb.REGG, -1, "g"},
+	{11, thumb.REG_R11, 9, "R11"},
+	{12, thumb.REG_R12, 10, "R12"},
+	{13, thumb.REGSP, -1, "SP"},
+	{14, thumb.REG_R14, 11, "R14"},
+	{15, thumb.REG_R15, -1, "R15"},
+	{16, thumb.REG_F0, -1, "F0"},
+	{17, thumb.REG_F1, -1, "F1"},
+	{18, thumb.REG_F2, -1, "F2"},
+	{19, thumb.REG_F3, -1, "F3"},
+	{20, thumb.REG_F4, -1, "F4"},
+	{21, thumb.REG_F5, -1, "F5"},
+	{22, thumb.REG_F6, -1, "F6"},
+	{23, thumb.REG_F7, -1, "F7"},
+	{24, thumb.REG_F8, -1, "F8"},
+	{25, thumb.REG_F9, -1, "F9"},
+	{26, thumb.REG_F10, -1, "F10"},
+	{27, thumb.REG_F11, -1, "F11"},
+	{28, thumb.REG_F12, -1, "F12"},
+	{29, thumb.REG_F13, -1, "F13"},
+	{30, thumb.REG_F14, -1, "F14"},
+	{31, thumb.REG_F15, -1, "F15"},
+	{32, 0, -1, "SB"},
+}
+var paramIntRegThumb = []int8(nil)
+var paramFloatRegThumb = []int8(nil)
+var gpRegMaskThumb = regMask(23423)
+var fpRegMaskThumb = regMask(4294901760)
+var specialRegMaskThumb = regMask(0)
+var framepointerRegThumb = int8(-1)
+var linkRegThumb = int8(14)
 var registersWasm = [...]Register{
 	{0, wasm.REG_R0, 0, "R0"},
 	{1, wasm.REG_R1, 1, "R1"},

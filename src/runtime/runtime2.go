@@ -620,6 +620,9 @@ type m struct {
 	vdsoSP uintptr // SP for traceback while in VDSO call (0 if not in call)
 	vdsoPC uintptr // PC for traceback while in VDSO call
 
+	mOS
+	mqkey uintptr // to allow run mq tests, TODO: move to mOS
+
 	// preemptGen counts the number of completed preemption
 	// signals. This is used to detect when a preemption is
 	// requested, but fails.
@@ -632,8 +635,6 @@ type m struct {
 	pcvalueCache pcvalueCache
 
 	dlogPerM
-
-	mOS
 
 	chacha8   chacha8rand.State
 	cheaprand uint64
@@ -656,7 +657,7 @@ type p struct {
 	raceprocctx uintptr
 
 	deferpool    []*_defer // pool of available defer structs (see panic.go)
-	deferpoolbuf [32]*_defer
+	deferpoolbuf [32 / noosScaleDown]*_defer
 
 	// Cache of goroutine ids, amortizes accesses to runtime·sched.goidgen.
 	goidcache    uint64
@@ -665,7 +666,7 @@ type p struct {
 	// Queue of runnable goroutines. Accessed without lock.
 	runqhead uint32
 	runqtail uint32
-	runq     [256]guintptr
+	runq     [256 / noosScaleDown]guintptr
 	// runnext, if non-nil, is a runnable G that was ready'd by
 	// the current G and should be run next instead of what's in
 	// runq if there's time remaining in the running G's time
@@ -687,7 +688,7 @@ type p struct {
 	}
 
 	sudogcache []*sudog
-	sudogbuf   [128]*sudog
+	sudogbuf   [128 / noosScaleDown]*sudog
 
 	// Cache of mspan objects from the heap.
 	mspancache struct {
@@ -697,7 +698,7 @@ type p struct {
 		// slice updates is tricky, more so than just managing the length
 		// ourselves.
 		len int
-		buf [128]*mspan
+		buf [128 / noosScaleDown]*mspan
 	}
 
 	// Cache of a single pinner object to reduce allocations from repeated

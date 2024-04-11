@@ -54,8 +54,8 @@ const (
 	gcOverAssistWork = 64 << 10
 
 	// defaultHeapMinimum is the value of heapMinimum for GOGC==100.
-	defaultHeapMinimum = (goexperiment.HeapMinimum512KiBInt)*(512<<10) +
-		(1-goexperiment.HeapMinimum512KiBInt)*(4<<20)
+	defaultHeapMinimum = (goexperiment.HeapMinimum512KiBInt)*(512<<10)*_OS +
+		(1-goexperiment.HeapMinimum512KiBInt)*(4<<20)*_OS + noosDefaultHeapMinimum
 
 	// maxStackScanSlack is the bytes of stack space allocated or freed
 	// that can accumulate on a P before updating gcController.stackSize.
@@ -65,7 +65,7 @@ const (
 	// pacer gives to the heap goal when operating in the memory-limited regime.
 	// That is, it'll reduce the heap goal by this many extra bytes off of the
 	// base calculation, at minimum.
-	memoryLimitMinHeapGoalHeadroom = 1 << 20
+	memoryLimitMinHeapGoalHeadroom = (1<<20)*_OS + noosMemoryLimitHeapGoalHeadroom
 
 	// memoryLimitHeapGoalHeadroomPercent is how headroom the memory-limit-based
 	// heap goal should have as a percent of the maximum possible heap goal allowed
@@ -1275,6 +1275,9 @@ func setGCPercent(in int32) (out int32) {
 }
 
 func readGOGC() int32 {
+	if noos {
+		return noosGOGC
+	}
 	p := gogetenv("GOGC")
 	if p == "off" {
 		return -1
@@ -1321,6 +1324,10 @@ func setMemoryLimit(in int64) (out int64) {
 }
 
 func readGOMEMLIMIT() int64 {
+	if noos {
+		_, _, n := noosMemory()
+		return int64(n)
+	}
 	p := gogetenv("GOMEMLIMIT")
 	if p == "" || p == "off" {
 		return maxInt64

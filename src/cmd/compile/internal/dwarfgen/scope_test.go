@@ -436,7 +436,11 @@ func entryToVar(e *dwarf.Entry, kind string, typ dwarf.Type) variable {
 func (scope *lexblock) markLines(pcln objfile.Liner, lines map[line][]*lexblock) {
 	for _, r := range scope.ranges {
 		for pc := r[0]; pc < r[1]; pc++ {
-			file, lineno, _ := pcln.PCToLine(pc)
+			pc1 := pc
+			if runtime.GOARCH == "thumb" {
+				pc1++
+			}
+			file, lineno, _ := pcln.PCToLine(pc1)
 			l := line{file, lineno}
 			if len(lines[l]) == 0 || lines[l][len(lines[l])-1] != scope {
 				lines[l] = append(lines[l], scope)

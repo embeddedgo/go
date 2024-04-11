@@ -24,6 +24,7 @@ var knownOS = map[string]bool{
 	"linux":     true,
 	"nacl":      true,
 	"netbsd":    true,
+	"noos":      true,
 	"openbsd":   true,
 	"plan9":     true,
 	"solaris":   true,
@@ -77,5 +78,6 @@ var knownArch = map[string]bool{
 	"s390x":       true,
 	"sparc":       true,
 	"sparc64":     true,
+	"thumb":       true,
 	"wasm":        true,
 }

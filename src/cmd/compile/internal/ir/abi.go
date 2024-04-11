@@ -53,6 +53,9 @@ func setupTextLSym(f *Func, flag int) {
 	if f.IsPackageInit() {
 		flag |= obj.PKGINIT
 	}
+	if f.Pragma&Interrupthandler != 0 {
+		flag |= obj.ISR
+	}
 
 	// Clumsy but important.
 	// For functions that could be on the path of invoking a deferred

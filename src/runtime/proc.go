@@ -153,7 +153,9 @@ func main() {
 	// Max stack size is 1 GB on 64-bit, 250 MB on 32-bit.
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
-	if goarch.PtrSize == 8 {
+	if noos {
+		maxstacksize = 256000 / noosScaleDown
+	} else if goarch.PtrSize == 8 {
 		maxstacksize = 1000000000
 	} else {
 		maxstacksize = 250000000
@@ -1775,7 +1777,7 @@ func mPark() {
 func mexit(osStack bool) {
 	mp := getg().m
 
-	if mp == &m0 {
+	if !noos && mp == &m0 {
 		// This is the main thread. Just wedge it.
 		//
 		// On Linux, exiting the main thread puts the process
@@ -2099,7 +2101,15 @@ func allocm(pp *p, fn func(), id int64) *m {
 					stackfree(freem.g0.stack)
 				})
 			}
+			cleanm := freem
 			freem = freem.freelink
+			if cleanm == &m0 {
+				// ensure nothing will hang on m0
+				cleanm.g0 = nil
+				cleanm.curg = nil
+				cleanm.freelink = nil
+				// TODO: can we zero allink? any other pointer fields?
+			}
 		}
 		sched.freem = newList
 		unlock(&sched.lock)
@@ -2113,6 +2123,8 @@ func allocm(pp *p, fn func(), id int64) *m {
 	// Windows and Plan 9 will layout sched stack on OS stack.
 	if iscgo || mStackIsSystemAllocated() {
 		mp.g0 = malg(-1)
+	} else if noos {
+		mp.g0 = malg(2 * _StackMin)
 	} else {
 		mp.g0 = malg(16384 * sys.StackGuardMultiplier)
 	}
@@ -4263,6 +4275,9 @@ func save(pc, sp uintptr) {
 		throw("save on system g not allowed")
 	}
 
+	if GOARCH == "thumb" {
+		pc |= 1
+	}
 	gp.sched.pc = pc
 	gp.sched.sp = sp
 	gp.sched.lr = 0
@@ -5043,13 +5058,13 @@ func gfput(pp *p, gp *g) {
 
 	pp.gFree.push(gp)
 	pp.gFree.n++
-	if pp.gFree.n >= 64 {
+	if pp.gFree.n >= 64*_OS+5*16/noosScaleDown {
 		var (
 			inc      int32
 			stackQ   gQueue
 			noStackQ gQueue
 		)
-		for pp.gFree.n >= 32 {
+		for pp.gFree.n >= 32*_OS+3*16/noosScaleDown {
 			gp := pp.gFree.pop()
 			pp.gFree.n--
 			if gp.stack.lo == 0 {
@@ -5074,7 +5089,7 @@ retry:
 	if pp.gFree.empty() && (!sched.gFree.stack.empty() || !sched.gFree.noStack.empty()) {
 		lock(&sched.gFree.lock)
 		// Move a batch of free Gs to the P.
-		for pp.gFree.n < 32 {
+		for pp.gFree.n < 32*_OS+3*16/noosScaleDown {
 			// Prefer Gs with stacks.
 			gp := sched.gFree.stack.pop()
 			if gp == nil {
@@ -5317,7 +5332,7 @@ func sigprof(pc, sp, lr uintptr, gp *g, mp *m) {
 	// As a workaround, create a counter of SIGPROFs while in critical section
 	// to store the count, and pass it to sigprof.add() later when SIGPROF is
 	// received from somewhere else (with _LostSIGPROFDuringAtomic64 as pc).
-	if GOARCH == "mips" || GOARCH == "mipsle" || GOARCH == "arm" {
+	if GOARCH == "mips" || GOARCH == "mipsle" || GOARCH == "arm" || GOARCH == "thumb" {
 		if f := findfunc(pc); f.valid() {
 			if hasPrefix(funcname(f), "runtime/internal/atomic") {
 				cpuprof.lostAtomic++
@@ -6062,7 +6077,7 @@ func sysmon() {
 				startm(nil, false, false)
 			}
 		}
-		if scavenger.sysmonWake.Load() != 0 {
+		if !noos && scavenger.sysmonWake.Load() != 0 {
 			// Kick the scavenger awake if someone requested it.
 			scavenger.wake()
 		}
@@ -6810,7 +6825,7 @@ retry:
 // Batch is a ring buffer starting at batchHead.
 // Returns number of grabbed goroutines.
 // Can be executed by any P.
-func runqgrab(pp *p, batch *[256]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
+func runqgrab(pp *p, batch *[256 / noosScaleDown]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
 	for {
 		h := atomic.LoadAcq(&pp.runqhead) // load-acquire, synchronize with other consumers
 		t := atomic.LoadAcq(&pp.runqtail) // load-acquire, synchronize with the producer

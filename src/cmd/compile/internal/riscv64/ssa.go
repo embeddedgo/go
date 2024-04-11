@@ -13,6 +13,7 @@ import (
 	"cmd/compile/internal/types"
 	"cmd/internal/obj"
 	"cmd/internal/obj/riscv"
+	"internal/buildcfg"
 )
 
 // ssaRegToReg maps ssa register numbers to obj register numbers.
@@ -651,6 +652,10 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p5.To.SetTarget(p)
 
 	case ssa.OpRISCV64LoweredNilCheck:
+		if buildcfg.GOOS == "noos" {
+			// BUG: avoid nil check because of MMIO
+			break
+		}
 		// Issue a load which will fault if arg is nil.
 		// TODO: optimizations. See arm and amd64 LoweredNilCheck.
 		p := s.Prog(riscv.AMOVB)

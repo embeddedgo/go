@@ -52,8 +52,8 @@ type spanSet struct {
 }
 
 const (
-	spanSetBlockEntries = 512 // 4KB on 64-bit
-	spanSetInitSpineCap = 256 // Enough for 1GB heap on 64-bit
+	spanSetBlockEntries = 512 / noosScaleDown // 4KB on 64-bit
+	spanSetInitSpineCap = 256 / noosScaleDown // Enough for 1GB heap on 64-bit
 )
 
 type spanSetBlock struct {

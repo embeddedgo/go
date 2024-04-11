@@ -1,6 +1,6 @@
 // run
 
-//go:build linux && !ppc64 && gc && cgo
+//go:build linux && !ppc64 && !thumb && gc && cgo
 
 // Copyright 2015 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
