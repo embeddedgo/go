@@ -114,12 +114,6 @@ func goarm() (g goarmFeatures) {
 		g.Version = 6
 	case "7":
 		g.Version = 7
-	case "7f", "7F":
-		g.Version = 0x7f
-		g.SoftFloat = true
-	case "7d", "7D":
-		g.Version = 0x7d
-		g.SoftFloat = false
 	default:
 		Error = fmt.Errorf("invalid GOARM: must start with 5, 6, or 7, and may optionally end in either %q or %q", hardFloatOpt, softFloatOpt)
 		g.Version = int(def[0] - '0')

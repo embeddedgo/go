@@ -371,7 +371,7 @@ func init() {
 
 		// function calls
 		{name: "CALLstatic", argLength: 1, reg: regInfo{clobbers: callerSave}, aux: "CallOff", clobberFlags: true, call: true},                                               // call static function aux.(*obj.LSym).  arg0=mem, auxint=argsize, returns mem
-		{name: "CALLtail", argLength: 1, reg: regInfo{clobbers: callerSave}, aux: "CallOff", clobberFlags: true, call: true, tailCall: true},                                // tail call static function aux.(*obj.LSym).  arg0=mem, auxint=argsize, returns mem
+		{name: "CALLtail", argLength: 1, reg: regInfo{clobbers: callerSave}, aux: "CallOff", clobberFlags: true, call: true, tailCall: true},                                 // tail call static function aux.(*obj.LSym).  arg0=mem, auxint=argsize, returns mem
 		{name: "CALLclosure", argLength: 3, reg: regInfo{inputs: []regMask{gpsp, buildReg("R11"), 0}, clobbers: callerSave}, aux: "CallOff", clobberFlags: true, call: true}, // call function via closure.  arg0=codeptr, arg1=closure, arg2=mem, auxint=argsize, returns mem
 		{name: "CALLinter", argLength: 2, reg: regInfo{inputs: []regMask{gp}, clobbers: callerSave}, aux: "CallOff", clobberFlags: true, call: true},                         // call fn by pointer.  arg0=codeptr, arg1=mem, auxint=argsize, returns mem
 
@@ -526,11 +526,10 @@ func init() {
 		{name: "InvertFlags", argLength: 1}, // reverse direction of arg0
 
 		// LoweredWB invokes runtime.gcWriteBarrier. arg0=mem, auxint=# of buffer entries needed
- 		// It saves all GP registers if necessary,
- 		// but clobbers R14 (LR) because it's a call, and R12 which is linker trampoline scratch register.
+		// It saves all GP registers if necessary,
+		// but clobbers R14 (LR) because it's a call, and R12 which is linker trampoline scratch register.
 		// Returns a pointer to a write barrier buffer in R8.
 		{name: "LoweredWB", argLength: 1, reg: regInfo{clobbers: (callerSave &^ gpg) | buildReg("R12 R14"), outputs: []regMask{buildReg("R8")}}, clobberFlags: true, aux: "Int64"}}
-	}
 
 	blocks := []blockData{
 		{name: "EQ", controls: 1},

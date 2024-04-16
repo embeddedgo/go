@@ -650,11 +650,11 @@ func genThumb() {
 
 	p("MOVW.W R14, -%d(R13)", lfp.stack) // allocate frame, save LR
 	l.save()
-	p("MOVB ·goarmsoftfp(SB), R0\nCMP $0, R0\nBNE nofp") // test goarmsoftfp, and skip FP registers if goarmsoftfp!=0.
+	p("MOVB ·goarmsoftfp(SB), R0\nCBNZ R0, nofp") // test goarmsoftfp, and skip FP registers if goarmsoftfp!=0.
 	lfp.save()
 	label("nofp:")
 	p("CALL ·asyncPreempt2(SB)")
-	p("MOVB ·goarmsoftfp(SB), R0\nCMP $0, R0\nBNE nofp2") // test goarmsoftfp, and skip FP registers if goarmsoftfp!=0.
+	p("MOVB ·goarmsoftfp(SB), R0\nCBNZ R0, nofp2") // test goarmsoftfp, and skip FP registers if goarmsoftfp!=0.
 	lfp.restore()
 	label("nofp2:")
 	l.restore()

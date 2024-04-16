@@ -1,5 +1,7 @@
 runtime.adjustframe
 
+runtime.goarmsoftfp
+
 Usunieto:  src/runtime/trace_noos.go
 
 src/cmd/asm/internal/asm/testdata/arm.s

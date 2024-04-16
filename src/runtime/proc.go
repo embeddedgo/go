@@ -2124,7 +2124,7 @@ func allocm(pp *p, fn func(), id int64) *m {
 	if iscgo || mStackIsSystemAllocated() {
 		mp.g0 = malg(-1)
 	} else if noos {
-		mp.g0 = malg(2 * _StackMin)
+		mp.g0 = malg(2 * stackMin)
 	} else {
 		mp.g0 = malg(16384 * sys.StackGuardMultiplier)
 	}

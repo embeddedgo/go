@@ -54,7 +54,7 @@ func Init() (*sys.Arch, ld.Arch) {
 		ELF: ld.ELFArch{
 			Reloc1:    elfreloc1,
 			RelocSize: 8,
-		}
+		},
 	}
 	return arch, theArch
 }

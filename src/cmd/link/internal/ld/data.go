@@ -2838,7 +2838,7 @@ func (ctxt *Link) address() []*sym.Segment {
 	va = uint64(Rnd(int64(va), *FlagRound))
 	la := va
 	switch ctxt.HeadType {
-	case ctxt.HeadType == objabi.Haix:
+	case objabi.Haix:
 		if len(Segrelrodata.Sections) == 0 {
 		// Data sections are moved to an unreachable segment
 		// to ensure that they are position-independent.
@@ -2935,7 +2935,7 @@ func (ctxt *Link) address() []*sym.Segment {
 		Segxdata.Length = va - Segxdata.Vaddr
 	}
 
-	va = uint64(Rnd(int64(la), *FlagRound)))
+	va = uint64(Rnd(int64(la), *FlagRound))
 	order = append(order, &Segdwarf)
 	Segdwarf.Rwx = 06
 	Segdwarf.Vaddr = va

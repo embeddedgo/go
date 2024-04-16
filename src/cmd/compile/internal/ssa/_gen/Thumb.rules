@@ -217,10 +217,10 @@
 
 // loads
 (Load <t> ptr mem) && t.IsBoolean() => (MOVBUload ptr mem)
-(Load <t> ptr mem) && (is8BitInt(t)  &&  t.IsSigned() => (MOVBload ptr mem)
-(Load <t> ptr mem) && (is8BitInt(t)  && !t.IsSigned() => (MOVBUload ptr mem)
-(Load <t> ptr mem) && (is16BitInt(t) &&  t.IsSigned() => (MOVHload ptr mem)
-(Load <t> ptr mem) && (is16BitInt(t) && !t.IsSigned() => (MOVHUload ptr mem)
+(Load <t> ptr mem) && (is8BitInt(t)  &&  t.IsSigned()) => (MOVBload ptr mem)
+(Load <t> ptr mem) && (is8BitInt(t)  && !t.IsSigned()) => (MOVBUload ptr mem)
+(Load <t> ptr mem) && (is16BitInt(t) &&  t.IsSigned()) => (MOVHload ptr mem)
+(Load <t> ptr mem) && (is16BitInt(t) && !t.IsSigned()) => (MOVHUload ptr mem)
 (Load <t> ptr mem) && (is32BitInt(t) || isPtr(t)) => (MOVWload ptr mem)
 (Load <t> ptr mem) && is32BitFloat(t) => (MOVFload ptr mem)
 (Load <t> ptr mem) && is64BitFloat(t) => (MOVDload ptr mem)

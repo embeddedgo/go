@@ -23,7 +23,7 @@ func checkgoarm() {
 	}
 	if cpu.HWCap&_HWCAP_VFPv3 == 0 && goarmsoftfp == 0 {
 		print("runtime: this CPU has no VFPv3 floating point hardware, so it cannot run\n")
-		print("a binary compiled for VFPv3 hard floating point. Recompile adding ,softfloat\n"to GOARM\n")
+		print("a binary compiled for VFPv3 hard floating point. Recompile adding ,softfloat\nto GOARM\n")
 		exit(1)
 	}
 }

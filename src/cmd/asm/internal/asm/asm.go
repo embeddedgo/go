@@ -847,7 +847,7 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 			if arch.IsThumbBFX(op) {
 				// a[0] and a[1] must be constants, a[2] and a[3] must be registers
 				prog.From = a[0]
-				prog.SetFrom3(a[1])
+				prog.AddRestSource(a[1])
 				prog.Reg = p.getRegister(prog, op, &a[2])
 				prog.To = a[3]
 				break
