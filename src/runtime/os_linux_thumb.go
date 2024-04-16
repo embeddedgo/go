@@ -4,7 +4,10 @@
 
 package runtime
 
-import "internal/cpu"
+import (
+	"internal/cpu"
+	"unsafe"
+)
 
 const (
 	_HWCAP_VFPv3 = 1 << 13 // introduced in 2.6.30
@@ -18,8 +21,9 @@ func checkgoarm() {
 		print("runtime: hardware division not supported, cannot run GOARCH=thumb binary")
 		exit(1)
 	}
-	if goarm&0xF >= 0xD && cpu.HWCap&_HWCAP_VFPv3 == 0 {
-		print("runtime: VFPv3 not supported, cannot run GOARM=7F/7D binary\n")
+	if cpu.HWCap&_HWCAP_VFPv3 == 0 && goarmsoftfp == 0 {
+		print("runtime: this CPU has no VFPv3 floating point hardware, so it cannot run\n")
+		print("a binary compiled for VFPv3 hard floating point. Recompile adding ,softfloat\nto GOARM\n")
 		exit(1)
 	}
 }
@@ -30,6 +34,8 @@ func archauxv(tag, val uintptr) {
 		cpu.HWCap = uint(val)
 	case _AT_HWCAP2:
 		cpu.HWCap2 = uint(val)
+	case _AT_PLATFORM:
+		cpu.Platform = gostringnocopy((*byte)(unsafe.Pointer(val)))
 	}
 }
 
@@ -37,7 +43,6 @@ func osArchInit() {}
 
 //go:nosplit
 func cputicks() int64 {
-	// Currently cputicks() is used in blocking profiler and to seed fastrand().
 	// nanotime() is a poor approximation of CPU ticks that is enough for the profiler.
 	return nanotime()
 }

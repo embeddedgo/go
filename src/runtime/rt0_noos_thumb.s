@@ -68,11 +68,9 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  $runtime·vectors(SB), R0
 	MOVW  R0, SCB_VTOR(R1)
 
-	// enable FPU if GOARM is xF or xD
-	MOVB  runtime·goarm(SB), R0
-	AND   $0xD, R0
-	CMP   $0xD, R0
-	BNE   skipFPU
+	// enable FPU
+	MOVB  ·goarmsoftfp(SB), R0
+	CBNZ  R0, skipFPU
 	MOVW  $0xF<<20, R0       // full access to CP10 and CP11 instructions
 	MOVW  R0, SCB_CPACR(R1)
 	SLL   $10, R0

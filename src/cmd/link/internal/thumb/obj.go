@@ -49,9 +49,12 @@ func Init() (*sys.Arch, ld.Arch) {
 		Archreloc:        archreloc,
 		Archrelocvariant: archrelocvariant,
 		Trampoline:       trampoline,
-		Elfreloc1:        elfreloc1,
-		ElfrelocSize:     8,
 		Gentext:          gentext,
+
+		ELF: ld.ELFArch{
+			Reloc1:    elfreloc1,
+			RelocSize: 8,
+		},
 	}
 	return arch, theArch
 }
@@ -65,11 +68,11 @@ func archinit(ctxt *ld.Link) {
 		*ld.FlagD = true // force static linking
 		ld.Elfinit(ctxt)
 		ld.HEADR = ld.ELFRESERVE
-		if *ld.FlagTextAddr == -1 {
-			*ld.FlagTextAddr = 0x10000 + int64(ld.HEADR)
-		}
 		if *ld.FlagRound == -1 {
 			*ld.FlagRound = 0x10000
+		}
+		if *ld.FlagTextAddr == -1 {
+			*ld.FlagTextAddr = ld.Rnd(0x10000, *ld.FlagRound) + int64(ld.HEADR)
 		}
 
 	case objabi.Hnoos:

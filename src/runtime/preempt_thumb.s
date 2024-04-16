@@ -19,9 +19,8 @@ TEXT ·asyncPreempt(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW R12, 48(R13)
 	MOVW APSR, R0
 	MOVW R0, 52(R13)
-	MOVB ·goarm(SB), R0
-	CMP $0x10, R0
-	BLT nofp
+	MOVB ·goarmsoftfp(SB), R0
+	CBNZ R0, nofp
 	MOVW FPSCR, R0
 	MOVW R0, 56(R13)
 	MOVD F0, 60(R13)
@@ -42,9 +41,8 @@ TEXT ·asyncPreempt(SB),NOSPLIT|NOFRAME,$0-0
 	MOVD F15, 180(R13)
 nofp:
 	CALL ·asyncPreempt2(SB)
-	MOVB ·goarm(SB), R0
-	CMP $0x10, R0
-	BLT nofp2
+	MOVB ·goarmsoftfp(SB), R0
+	CBNZ R0, nofp2
 	MOVD 180(R13), F15
 	MOVD 172(R13), F14
 	MOVD 164(R13), F13

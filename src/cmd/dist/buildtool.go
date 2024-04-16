@@ -113,6 +113,8 @@ var ignoreSuffixes = []string{
 	// with PGO. And as it is not a text file the import path
 	// rewrite will break it.
 	".pgo",
+	"_thumb.s",
+	"_thumb.go",
 }
 
 var tryDirs = []string{

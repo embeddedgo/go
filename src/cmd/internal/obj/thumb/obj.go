@@ -21,8 +21,8 @@ package thumb
 
 import (
 	"cmd/internal/obj"
-	"cmd/internal/objabi"
 	"cmd/internal/sys"
+	"internal/abi"
 	"log"
 )
 

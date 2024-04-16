@@ -40321,7 +40321,7 @@ var opcodeTable = [...]opInfo{
 	},
 	{
 		name:              "LoweredGetCallerSP",
-		argLen:            0,
+		argLen:            1,
 		rematerializeable: true,
 		reg: regInfo{
 			outputs: []outputInfo{
@@ -40427,16 +40427,14 @@ var opcodeTable = [...]opInfo{
 	},
 	{
 		name:         "LoweredWB",
-		auxType:      auxSym,
-		argLen:       3,
+		auxType:      auxInt64,
+		argLen:       1,
 		clobberFlags: true,
-		symEffect:    SymNone,
 		reg: regInfo{
-			inputs: []inputInfo{
-				{0, 4}, // R2
-				{1, 8}, // R3
-			},
 			clobbers: 4294922240, // R12 R14 F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15
+			outputs: []outputInfo{
+				{0, 256}, // R8
+			},
 		},
 	},
 

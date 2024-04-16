@@ -408,7 +408,7 @@ var (
 	GOMODCACHE = envOr("GOMODCACHE", gopathDir("pkg/mod"))
 
 	// Used in envcmd.MkEnv and build ID computations.
-	GOARM    = envOr("GOARM", fmt.Sprintf("%x", buildcfg.GOARM))
+	GOARM    = envOr("GOARM", fmt.Sprint(buildcfg.GOARM))
 	GO386    = envOr("GO386", buildcfg.GO386)
 	GOAMD64  = envOr("GOAMD64", fmt.Sprintf("%s%d", "v", buildcfg.GOAMD64))
 	GOMIPS   = envOr("GOMIPS", buildcfg.GOMIPS)
