@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"os"
 )
 
 type elfFile struct {
@@ -117,7 +118,14 @@ func (f *elfFile) goarch() string {
 	case elf.EM_X86_64:
 		return "amd64"
 	case elf.EM_ARM:
-		if f.elf.Entry&1 != 0 {
+		if os.Getenv("GOARCH") == "thumb" {
+			// In fact any function in the ARM binary can use Thumb or ARM
+			// instructions so the selection should be done on the function
+			// level. The previous way to select thumb was to looking at the
+			// 0-th bit in the ELF Entry field but this doesn't work in case of
+			// the PIE or the external linking because the entry function is
+			// external. We use this hack to give the user some way to select
+			// the thumb disassebler.
 			return "thumb"
 		}
 		return "arm"
