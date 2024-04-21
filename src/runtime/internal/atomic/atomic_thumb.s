@@ -80,30 +80,32 @@ loop:
 	MOVW   R0, ret+8(FP)
 	RET
 
-TEXT ·Or(SB),NOSPLIT|NOFRAME,$0-8
+TEXT ·Or32(SB),NOSPLIT|NOFRAME,$0-12
 	MOVW  addr+0(FP), R1
 	MOVW  v+4(FP), R2
 loop:
 	LDREX  (R1), R0
 	DMB    MB_ISHST
-	ORR    R2, R0
-	STREX  R0, (R1), R3
+	ORR    R2, R0, R4
+	STREX  R4, (R1), R3
 	CMP    $0, R3
 	BNE    loop
 	DMB    MB_ISH
+	MOVW   R0, old+8(FP)
 	RET
 
-TEXT ·And(SB),NOSPLIT|NOFRAME,$0-8
+TEXT ·And32(SB),NOSPLIT|NOFRAME,$0-12
 	MOVW  addr+0(FP), R1
 	MOVW  v+4(FP), R2
 loop:
 	LDREX  (R1), R0
 	DMB    MB_ISHST
-	AND    R2, R0
-	STREX  R0, (R1), R3
+	AND    R2, R0, R4
+	STREX  R4, (R1), R3
 	CMP    $0, R3
 	BNE    loop
 	DMB    MB_ISH
+	MOVW   R0, old+8(FP)
 	RET
 
 // stubs
@@ -121,6 +123,7 @@ TEXT ·Casint32(SB),NOSPLIT,$0-13
 	B	·Cas(SB)
 
 TEXT ·Casint64(SB),NOSPLIT,$-4-21
+	NO_LOCAL_POINTERS
 	B	·Cas64(SB)
 
 TEXT ·Casuintptr(SB),NOSPLIT,$0-13
@@ -136,6 +139,7 @@ TEXT ·Loadint32(SB),NOSPLIT,$0-8
 	B	·Load(SB)
 
 TEXT ·Loadint64(SB),NOSPLIT,$-4-12
+	NO_LOCAL_POINTERS
 	B	·Load64(SB)
 
 TEXT ·Loaduintptr(SB),NOSPLIT,$0-8
@@ -166,6 +170,7 @@ TEXT ·Xaddint32(SB),NOSPLIT,$0-12
 	B	·Xadd(SB)
 
 TEXT ·Xaddint64(SB),NOSPLIT,$-4-20
+	NO_LOCAL_POINTERS
 	B	·Xadd64(SB)
 
 TEXT ·Xadduintptr(SB),NOSPLIT,$0-12
@@ -175,6 +180,7 @@ TEXT ·Xchgint32(SB),NOSPLIT,$0-12
 	B	·Xchg(SB)
 
 TEXT ·Xchgint64(SB),NOSPLIT,$-4-20
+	NO_LOCAL_POINTERS
 	B	·Xchg64(SB)
 
 TEXT ·Cas64(SB),NOSPLIT,$0-21

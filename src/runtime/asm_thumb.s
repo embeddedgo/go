@@ -333,7 +333,7 @@ TEXT ·reflectcall(SB),NOSPLIT|NOFRAME,$0-28
 #define CALLFN(NAME,MAXSIZE) \
 TEXT NAME(SB), WRAPPER, $MAXSIZE-28; \
 	NO_LOCAL_POINTERS;  \
-/*                  copy arguments to stack */ \
+	/* copy arguments to stack */ \
 	MOVW     stackArgs+8(FP), R0; \
 	MOVW     stackArgsSize+12(FP), R2; \
 	ADD      $4, R13, R1; \
@@ -343,12 +343,12 @@ TEXT NAME(SB), WRAPPER, $MAXSIZE-28; \
 	MOVB.P   R5, 1(R1); \
 	SUB      $1, R2, R2; \
 	B        -5(PC); \
-/*                  call function */ \
+	/* call function */ \
 	MOVW    f+4(FP), REGCTXT; \
 	MOVW    (REGCTXT), R0; \
 	PCDATA  $PCDATA_StackMapIndex, $0; \
 	BL      (R0); \
-/*                  copy return values back */ \
+	/* copy return values back */ \
 	MOVW  stackArgsType+0(FP), R4; \
 	MOVW  stackArgs+8(FP), R0; \
 	MOVW  stackArgsSize+12(FP), R2; \
@@ -536,7 +536,7 @@ TEXT ·checkASM(SB),NOSPLIT,$0-1
 // It does not clobber any other general-purpose registers,
 // but may clobber others (e.g., floating point registers).
 // The act of CALLing gcWriteBarrier will clobber R14 (LR).
-TEXT runtime·gcWriteBarrier(SB),NOSPLIT|NOFRAME,$0
+TEXT gcWriteBarrier<>(SB),NOSPLIT|NOFRAME,$0
 	// Save the registers clobbered by the fast path.
 	MOVM.DB.W	[R0,R1], (R13)
 retry:
@@ -569,14 +569,13 @@ flush:
 	MOVM.DB.W	[R2-R6,R8-R9,R11-R12], (R13)
 	// Save R14 (LR) because the fast path above doesn't save it,
 	// but needs it to RET.
-	MOVM.DB.W	[R14], (R13)
+	MOVW.W	R14, -4(R13)
 
 	CALL	runtime·wbBufFlush(SB)
 
-	MOVM.IA.W	(R13), [R14]
+	MOVW.P	4(R13), R14
 	MOVM.IA.W	(R13), [R2-R6,R8-R9,R11-R12]
 	JMP	retry
-	JMP        ret
 
 TEXT runtime·gcWriteBarrier1<ABIInternal>(SB),NOSPLIT,$0
 	MOVW	$4, R8
