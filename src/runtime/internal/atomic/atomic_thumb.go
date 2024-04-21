@@ -143,11 +143,11 @@ func And8(addr *uint8, v uint8) {
 	}
 }
 
-//go:nosplit
-func Or(addr *uint32, v uint32)
+//go:noescape
+func Or32(addr *uint32, v uint32) (old uint32)
 
-//go:nosplit
-func And(addr *uint32, v uint32)
+//go:noescape
+func And32(addr *uint32, v uint32) (old uint32)
 
 //go:noescape
 func Load(addr *uint32) uint32
@@ -209,4 +209,44 @@ func Xchg(addr *uint32, v uint32) uint32
 //go:nosplit
 func Xchguintptr(addr *uintptr, v uintptr) uintptr {
 	return uintptr(Xchg((*uint32)(unsafe.Pointer(addr)), uint32(v)))
+}
+
+//go:nosplit
+func And(addr *uint32, v uint32) {
+	And32(addr, v)
+}
+
+//go:nosplit
+func Anduintptr(ptr *uintptr, v uintptr) uintptr {
+	return uintptr(And32((*uint32)(unsafe.Pointer(ptr)), uint32(v)))
+}
+
+//go:nosplit
+func Or(addr *uint32, v uint32) {
+	Or32(addr, v)
+}
+
+//go:nosplit
+func Oruintptr(ptr *uintptr, v uintptr) uintptr {
+	return uintptr(Or32((*uint32)(unsafe.Pointer(ptr)), uint32(v)))
+}
+
+//go:nosplit
+func And64(ptr *uint64, val uint64) uint64 {
+	for {
+		old := *ptr
+		if Cas64(ptr, old, old&val) {
+			return old
+		}
+	}
+}
+
+//go:nosplit
+func Or64(ptr *uint64, val uint64) uint64 {
+	for {
+		old := *ptr
+		if Cas64(ptr, old, old|val) {
+			return old
+		}
+	}
 }

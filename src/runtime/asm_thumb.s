@@ -37,7 +37,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  $(-64*1024+104)(R13), R0
 	MOVW  R0, (g_stack+stack_lo)(g)
 	MOVW  R13, (g_stack+stack_hi)(g)
-	ADD   $const__StackGuard, R0
+	ADD   $const_stackGuard, R0
 	MOVW  R0, g_stackguard0(g)
 	MOVW  R0, g_stackguard1(g)
 
@@ -89,13 +89,13 @@ TEXT runtime·breakpoint(SB),NOSPLIT,$0-0
 	RET
 
 TEXT runtime·asminit(SB),NOSPLIT,$0-0
-	// disable runfast (flush-to-zero) mode of vfp if runtime.goarm > 5
-	// MOVB	runtime·goarm(SB), REGTMP
-	// CMP	$5, REGTMP
-	// BLE	4(PC)
-	// WORD	$0xeef1ba10	// vmrs REGTMP, fpscr
-	// BIC	$(1<<24), REGTMP
-	// WORD	$0xeee1ba10	// vmsr fpscr, REGTMP
+	// disable runfast (flush-to-zero) mode of vfp if runtime.goarmsoftfp == 0
+	//MOVB	runtime·goarmsoftfp(SB), R11
+	//CMP	$0, R11
+	//BNE	4(PC)
+	//WORD	$0xeef1ba10	// vmrs r11, fpscr
+	//BIC	$(1<<24), R11
+	//WORD	$0xeee1ba10	// vmsr fpscr, r11
 	RET
 
 TEXT runtime·mstart(SB),NOSPLIT|TOPFRAME,$0
@@ -333,7 +333,7 @@ TEXT ·reflectcall(SB),NOSPLIT|NOFRAME,$0-28
 #define CALLFN(NAME,MAXSIZE) \
 TEXT NAME(SB), WRAPPER, $MAXSIZE-28; \
 	NO_LOCAL_POINTERS;  \
-/*                  copy arguments to stack */ \
+	/* copy arguments to stack */ \
 	MOVW     stackArgs+8(FP), R0; \
 	MOVW     stackArgsSize+12(FP), R2; \
 	ADD      $4, R13, R1; \
@@ -343,12 +343,12 @@ TEXT NAME(SB), WRAPPER, $MAXSIZE-28; \
 	MOVB.P   R5, 1(R1); \
 	SUB      $1, R2, R2; \
 	B        -5(PC); \
-/*                  call function */ \
+	/* call function */ \
 	MOVW    f+4(FP), REGCTXT; \
 	MOVW    (REGCTXT), R0; \
 	PCDATA  $PCDATA_StackMapIndex, $0; \
 	BL      (R0); \
-/*                  copy return values back */ \
+	/* copy return values back */ \
 	MOVW  stackArgsType+0(FP), R4; \
 	MOVW  stackArgs+8(FP), R0; \
 	MOVW  stackArgsSize+12(FP), R2; \
@@ -527,61 +527,81 @@ TEXT ·checkASM(SB),NOSPLIT,$0-1
 	MOVB  R3, ret+0(FP)
 	RET
 
-// gcWriteBarrier performs a heap pointer write and informs the GC.
-
-// gcWriteBarrier does NOT follow the Go ABI. It takes two arguments:
-// - R2 is the destination of the write
-// - R3 is the value being written at R2
+// gcWriteBarrier informs the GC about heap pointer writes.
+//
+// gcWriteBarrier does NOT follow the Go ABI. It accepts the
+// number of bytes of buffer needed in R8, and returns a pointer
+// to the buffer space in R8.
 // It clobbers condition codes.
 // It does not clobber any other general-purpose registers,
 // but may clobber others (e.g., floating point registers).
 // The act of CALLing gcWriteBarrier will clobber R14 (LR).
-TEXT runtime·gcWriteBarrier(SB),NOSPLIT|NOFRAME,$0
+TEXT gcWriteBarrier<>(SB),NOSPLIT|NOFRAME,$0
 	// Save the registers clobbered by the fast path.
-	MOVM.DB.W  [R0,R1], (R13)
-	MOVW       g_m(g), R0
-	MOVW       m_p(R0), R0
-	MOVW       (p_wbBuf+wbBuf_next)(R0), R1
+	MOVM.DB.W	[R0,R1], (R13)
+retry:
+	MOVW	g_m(g), R0
+	MOVW	m_p(R0), R0
+	MOVW	(p_wbBuf+wbBuf_next)(R0), R1
+	MOVW	(p_wbBuf+wbBuf_end)(R0), REGTMP
 	// Increment wbBuf.next position.
-	ADD   $8, R1
-	MOVW  R1, (p_wbBuf+wbBuf_next)(R0)
-	MOVW  (p_wbBuf+wbBuf_end)(R0), R0
-	CMP   R1, R0
-	// Record the write.
-	MOVW  R3, -8(R1)  // Record value
-	MOVW  (R2), R0    // TODO: This turns bad writes into bad reads.
-	MOVW  R0, -4(R1)  // Record *slot
-	// Is the buffer full? (flags set in CMP above)
-	B.EQ  flush
-ret:
-	MOVM.IA.W  (R13), [R0,R1]
-	// Do the write.
-	MOVW  R3, (R2)
+	ADD	R8, R1
+	// Is the buffer full?
+	CMP	REGTMP, R1
+	BHI	flush
+	// Commit to the larger buffer.
+	MOVW	R1, (p_wbBuf+wbBuf_next)(R0)
+	// Make return value (the original next position)
+	SUB	R8, R1, R8
+	// Restore registers.
+	MOVM.IA.W	(R13), [R0,R1]
 	RET
 
 flush:
 	// Save all general purpose registers since these could be
 	// clobbered by wbBufFlush and were not saved by the caller.
-
+	//
 	// R0 and R1 were saved at entry.
-	// R7 is linker temp, so no need to save.
 	// R10 is g, so preserved.
+	// R7 is linker temp, so no need to save.
 	// R13 is stack pointer.
 	// R15 is PC.
-
-	// This also sets up R2 and R3 as the arguments to wbBufFlush.
-	MOVM.DB.W  [R2-R6,R8-R9,R11-R12], (R13)
+	MOVM.DB.W	[R2-R6,R8-R9,R11-R12], (R13)
 	// Save R14 (LR) because the fast path above doesn't save it,
-	// but needs it to RET. This is after the MOVM so it appears below
-	// the arguments in the stack frame.
-	MOVW.W  LR, -4(R13)
+	// but needs it to RET.
+	MOVW.W	R14, -4(R13)
 
-	// This takes arguments R2 and R3.
-	CALL  runtime·wbBufFlush(SB)
+	CALL	runtime·wbBufFlush(SB)
 
-	MOVW.P     4(R13), LR
-	MOVM.IA.W  (R13), [R2-R6,R8-R9,R11-R12]
-	JMP        ret
+	MOVW.P	4(R13), R14
+	MOVM.IA.W	(R13), [R2-R6,R8-R9,R11-R12]
+	JMP	retry
+
+TEXT runtime·gcWriteBarrier1<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$4, R8
+	JMP	gcWriteBarrier<>(SB)
+TEXT runtime·gcWriteBarrier2<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$8, R8
+	JMP	gcWriteBarrier<>(SB)
+TEXT runtime·gcWriteBarrier3<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$12, R8
+	JMP	gcWriteBarrier<>(SB)
+TEXT runtime·gcWriteBarrier4<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$16, R8
+	JMP	gcWriteBarrier<>(SB)
+TEXT runtime·gcWriteBarrier5<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$20, R8
+	JMP	gcWriteBarrier<>(SB)
+TEXT runtime·gcWriteBarrier6<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$24, R8
+	JMP	gcWriteBarrier<>(SB)
+TEXT runtime·gcWriteBarrier7<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$28, R8
+	JMP	gcWriteBarrier<>(SB)
+TEXT runtime·gcWriteBarrier8<ABIInternal>(SB),NOSPLIT,$0
+	MOVW	$32, R8
+	JMP	gcWriteBarrier<>(SB)
+
 
 // Note: these functions use a special calling convention to save generated code space.
 // Arguments are passed in registers, but the space for those arguments are allocated
