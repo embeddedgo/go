@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 #include "textflag.h"
+#include "funcdata.h"
 
 TEXT ·Load(SB),NOSPLIT,$0-8
 	MOVW  addr+0(FP), R0
