@@ -412,6 +412,7 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p.From.Offset = v.AuxInt
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
+		p.Scond = thumb.C_PBIT
 	case ssa.OpThumbMOVFconst,
 		ssa.OpThumbMOVDconst:
 		p := s.Prog(v.Op.Asm())
