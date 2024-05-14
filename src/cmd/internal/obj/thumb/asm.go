@@ -516,7 +516,11 @@ func (c *Ctx) oplook(p *obj.Prog) (ret *Optab) {
 	}
 	a1 := Aclass(p.From.Class)
 	if a1 == 0 {
-		a1 = c.aclass(&p.From, &p.As) + 1
+		a1 = c.aclass(&p.From, &p.As)
+		//if a1 == C_LCON && p.As == AMOVW && p.From.Type == obj.TYPE_CONST {
+		//	p.Scond &^= C_PBIT // clear P bit if `MOVW.P const, Reg` converted to `MOVW literal(PC), Reg`
+		//}
+		a1++
 		p.From.Class = int8(a1)
 	}
 	a1--
@@ -626,11 +630,11 @@ again:
 		}
 	}
 	spuw := p.Scond &^ 0xF
-	var spxor uint8
+	var psclr uint8 // for 16-bit data processing opcodes that sets flags outside IT block
 	if spuw&(C_SBIT|C_PBIT) == 0 {
-		spxor = C_SBIT
+		psclr = C_SBIT
 	} else if c.it != nil {
-		spxor = C_SBIT | C_PBIT
+		psclr = C_SBIT | C_PBIT
 	}
 	ops := oprange[p.As&obj.AMask]
 	for k := range ops {
@@ -641,9 +645,12 @@ again:
 		rscond := op.rscond
 		oscond := op.oscond
 		if rscond&C_SBIT != 0 {
-			// 16-bit data processing instruction that sets flags outside IT block
-			rscond ^= spxor
-			oscond ^= spxor
+			// 16-bit data processing opcode that sets flags outside IT block
+			// TODO: better describe the logic here or simplify it.
+			// It seems that this code allows select opcodes that require S flag even if spuw
+			// has no P,S flags or makes all opcodes no accepting P,S flags in the IT block.
+			rscond ^= psclr
+			oscond ^= psclr
 		}
 		if spuw&rscond == rscond && spuw&oscond == spuw &&
 			(op.a2 == a2 || op.a2 == C_REG && (C_RLO <= a2 && a2 < C_REG)) &&

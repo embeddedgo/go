@@ -39099,11 +39099,11 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
-		name:         "MOVWconst",
-		auxType:      auxInt32,
-		argLen:       0,
-		clobberFlags: true,
-		asm:          thumb.AMOVW,
+		name:              "MOVWconst",
+		auxType:           auxInt32,
+		argLen:            0,
+		rematerializeable: true,
+		asm:               thumb.AMOVW,
 		reg: regInfo{
 			outputs: []outputInfo{
 				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14

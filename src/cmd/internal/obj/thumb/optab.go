@@ -64,6 +64,9 @@ const pcoff = 4 // in Thumb mode PC points 4 bytes forward
 // returns the first matched description so the order matters. Current order ensures ISA
 // requirements and prefers 16-bit variants.
 //
+// rscond contains required flags (currently used to mark 16-bit data processing instructions),
+// oscond contains optional/allowed flags.
+//
 // optab is manual translation of instr_group.txt - please keep them in sync.
 // TODO: automatic translation of instr_group.txt.
 var optab = [...]Optab{
