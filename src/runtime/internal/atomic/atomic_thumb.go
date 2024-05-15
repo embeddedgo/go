@@ -152,59 +152,81 @@ func And32(addr *uint32, v uint32) (old uint32)
 //go:noescape
 func Load(addr *uint32) uint32
 
-// NO go:noescape annotation; *addr escapes if result escapes (#31525)
-func Loadp(addr unsafe.Pointer) unsafe.Pointer
-
-//go:noescape
-func Load64(addr *uint64) uint64
-
 //go:noescape
 func Load8(addr *uint8) uint8
 
-//go:noescape
-func LoadAcq(addr *uint32) uint32
-
-//go:noescape
-func LoadAcquintptr(ptr *uintptr) uintptr
-
-// Not noescape -- it installs a pointer to addr.
-func StorepNoWB(addr unsafe.Pointer, v unsafe.Pointer)
+// NO go:noescape annotation; *addr escapes if result escapes (#31525)
+func Loadp(addr unsafe.Pointer) unsafe.Pointer
 
 //go:noescape
 func Store(addr *uint32, v uint32)
 
 //go:noescape
-func StoreRel(addr *uint32, v uint32)
-
-//go:noescape
-func StoreReluintptr(addr *uintptr, v uintptr)
-
-//go:noescape
-func Store64(addr *uint64, v uint64)
-
-//go:noescape
 func Store8(addr *uint8, v uint8)
 
-//go:noescape
-func Cas64(addr *uint64, old, new uint64) bool
-
-//go:noescape
-func CasRel(addr *uint32, old, new uint32) bool
+// Not noescape -- it installs a pointer to addr.
+func StorepNoWB(addr unsafe.Pointer, v unsafe.Pointer)
 
 //go:noescape
 func Xadd(val *uint32, delta int32) uint32
 
 //go:noescape
-func Xadd64(addr *uint64, delta int64) uint64
-
-//go:noescape
-func Xchg64(addr *uint64, v uint64) uint64
-
-//go:noescape
-func Xadduintptr(val *uintptr, delta uintptr) uintptr
-
-//go:noescape
 func Xchg(addr *uint32, v uint32) uint32
+
+//go:nosplit
+func Load64(addr *uint64) uint64 {
+	return goLoad64(addr)
+}
+
+//go:nosplit
+func LoadAcq(addr *uint32) uint32 {
+	return Load(addr)
+}
+
+//go:nosplit
+func LoadAcquintptr(ptr *uintptr) uintptr {
+	return (uintptr)(Load((*uint32)(unsafe.Pointer(ptr))))
+}
+
+//go:nosplit
+func StoreRel(addr *uint32, v uint32) {
+	Store(addr, v)
+}
+
+//go:nosplit
+func StoreReluintptr(addr *uintptr, v uintptr) {
+	Store((*uint32)(unsafe.Pointer(addr)), uint32(v))
+}
+
+//go:nosplit
+func Store64(addr *uint64, v uint64) {
+	goStore64(addr, v)
+}
+
+//go:nosplit
+func CasRel(addr *uint32, old, new uint32) bool {
+	return Cas(addr, old, new)
+}
+
+//go:nosplit
+func Xadd64(addr *uint64, delta int64) uint64 {
+	return goXadd64(addr, delta)
+}
+
+//go:nosplit
+func Xchg64(addr *uint64, v uint64) uint64 {
+	return goXchg64(addr, v)
+}
+
+//go:nosplit
+func Cas64(addr *uint64, old, new uint64) bool {
+	return goCas64(addr, old, new)
+}
+
+//go:nosplit
+func Xadduintptr(val *uintptr, delta uintptr) uintptr {
+	return uintptr(Xadd((*uint32)(unsafe.Pointer(val)), int32(delta)))
+}
 
 //go:nosplit
 func Xchguintptr(addr *uintptr, v uintptr) uintptr {
