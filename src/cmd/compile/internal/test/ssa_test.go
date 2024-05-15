@@ -150,7 +150,7 @@ func TestCode(t *testing.T) {
 	}
 
 	flags := []string{""}
-	if runtime.GOARCH == "arm" || runtime.GOARCH == "mips" || runtime.GOARCH == "mips64" || runtime.GOARCH == "386" {
+	if runtime.GOARCH == "arm" || runtime.GOARCH == "thumb" || runtime.GOARCH == "mips" || runtime.GOARCH == "mips64" || runtime.GOARCH == "386" {
 		flags = append(flags, ",softfloat")
 	}
 	for _, flag := range flags {

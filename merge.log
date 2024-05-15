@@ -3,11 +3,8 @@ runtime.adjustframe
 runtime.goarmsoftfp
 
 Zamienić wywołania w ASM podobnych funkcji na Go: runtime/internal/atomic
-Sprawdzić dziwne instrukcje, których nie ma w arm, które zapisują na stos coś na początku funkcji.
 
 Usunieto:  src/runtime/trace_noos.go
-
-src/cmd/asm/internal/asm/testdata/arm.s
 
 src/cmd/link/internal/ld/pcln.go:
  func emitPcln(ctxt *Link, s loader.Sym, container loader.Bitmap) bool {
@@ -19,18 +16,3 @@ src/cmd/link/internal/ld/pcln.go:
 
 2. Spróbować usunąć memmove_noos_riscv64.s bo poprawili sprawdzanie wyrownania w memmove_noos_riscv64.s
 
-
-find . -name '*.orig'
-
-Edit s/^\+//g
-
-GOSSADIR=/tmp/debug_lines_test1919602409
-
-go build -o foo.o '-gcflags=-d=ssa/genssa/dump=sayhi -N -l' /home/michal/backup/go/src/cmd/compile/internal/ssa/testdata/sayhi.go )
-Saw stmt# 9 for submatch '9' on dump line #7 = ' v20    00005 (+9)      MOVW    $2, R2'
-Saw stmt# 9 for submatch '9' on dump line #9 = ' v157   00007 (+9)      MOVW    $0, R0'
-Saw stmt# 10 for submatch '10' on dump line #65 = ' v164        00063 (+10)     MOVW    $0, R0'
-Saw stmt# 11 for submatch '11' on dump line #121 = ' v125       00119 (+11)     MOVW    command-line-arguments.wg+4(R13), R0'
-    debug_lines_test.go:266: wanted stmts [9 10 11] but got [9 9 10 11]
---- FAIL: TestDebugLinesSayHi (22.69s)
-FAIL

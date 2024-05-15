@@ -114,12 +114,6 @@ loop:
 TEXT ·Loadp(SB),NOSPLIT|NOFRAME,$0-8
 	B   ·Load(SB)
 
-TEXT ·LoadAcq(SB),NOSPLIT|NOFRAME,$0-8
-	B   ·Load(SB)
-
-TEXT ·LoadAcquintptr(SB),NOSPLIT|NOFRAME,$0-8
-	B 	·Load(SB)
-
 TEXT ·Casint32(SB),NOSPLIT,$0-13
 	B	·Cas(SB)
 
@@ -131,9 +125,6 @@ TEXT ·Casuintptr(SB),NOSPLIT,$0-13
 	B	·Cas(SB)
 
 TEXT ·Casp1(SB),NOSPLIT,$0-13
-	B   ·Cas(SB)
-
-TEXT ·CasRel(SB),NOSPLIT,$0-13
 	B   ·Cas(SB)
 
 TEXT ·Loadint32(SB),NOSPLIT,$0-8
@@ -161,12 +152,6 @@ TEXT ·Storeuintptr(SB),NOSPLIT,$0-8
 TEXT ·StorepNoWB(SB),NOSPLIT,$0-8
 	B   ·Store(SB)
 
-TEXT ·StoreRel(SB),NOSPLIT,$0-8
-	B   ·Store(SB)
-
-TEXT ·StoreReluintptr(SB),NOSPLIT,$0-8
-	B	·Store(SB)
-
 TEXT ·Xaddint32(SB),NOSPLIT,$0-12
 	B	·Xadd(SB)
 
@@ -174,27 +159,9 @@ TEXT ·Xaddint64(SB),NOSPLIT,$-4-20
 	NO_LOCAL_POINTERS
 	B	·Xadd64(SB)
 
-TEXT ·Xadduintptr(SB),NOSPLIT,$0-12
-	B	·Xadd(SB)
-
 TEXT ·Xchgint32(SB),NOSPLIT,$0-12
 	B	·Xchg(SB)
 
 TEXT ·Xchgint64(SB),NOSPLIT,$-4-20
 	NO_LOCAL_POINTERS
 	B	·Xchg64(SB)
-
-TEXT ·Cas64(SB),NOSPLIT,$0-21
-	B   ·goCas64(SB)
-
-TEXT ·Xadd64(SB),NOSPLIT,$0-20
-	B   ·goXadd64(SB)
-
-TEXT ·Xchg64(SB),NOSPLIT,$0-20
-	B   ·goXchg64(SB)
-
-TEXT ·Load64(SB),NOSPLIT,$0-12
-	B   ·goLoad64(SB)
-
-TEXT ·Store64(SB),NOSPLIT,$0-12
-	B   ·goStore64(SB)

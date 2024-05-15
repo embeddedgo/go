@@ -27,7 +27,6 @@ func set16(x8 int8, u8 *uint8, y8 int8, z8 uint8) {
 	// Truncate not needed, load does sign/zero extend
 
 	// ppc64x:-"MOVBZ\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val16[0] = uint16(*u8)
 
 	// AND not needed due to size
@@ -35,22 +34,18 @@ func set16(x8 int8, u8 *uint8, y8 int8, z8 uint8) {
 	sval16[1] = 255 & int16(x8+y8)
 
 	// ppc64x:-"ANDCC"
-	// thumb:-"AND"
 	val16[1] = 255 & uint16(*u8+z8)
 
 }
 func shiftidx(u8 *uint8, x16 *int16, u16 *uint16) {
 
 	// ppc64x:-"MOVBZ\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val16[0] = uint16(sval16[*u8>>2])
 
 	// ppc64x:-"MOVH\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVH\tR\\d+,\\sR\\d+"
 	sval16[1] = int16(val16[*x16>>1])
 
 	// ppc64x:-"MOVHZ\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVHU\tR\\d+,\\sR\\d+"
 	val16[1] = uint16(sval16[*u16>>2])
 
 }
@@ -58,7 +53,6 @@ func shiftidx(u8 *uint8, x16 *int16, u16 *uint16) {
 func setnox(x8 int8, u8 *uint8, y8 *int8, z8 *uint8, x16 *int16, u16 *uint16, x32 *int32, u32 *uint32) {
 
 	// ppc64x:-"MOVBZ\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val16[0] = uint16(*u8)
 
 	// AND not needed due to size
@@ -66,19 +60,15 @@ func setnox(x8 int8, u8 *uint8, y8 *int8, z8 *uint8, x16 *int16, u16 *uint16, x3
 	sval16[1] = 255 & int16(x8+*y8)
 
 	// ppc64x:-"ANDCC"
-	// thumb:-"AND"
 	val16[1] = 255 & uint16(*u8+*z8)
 
 	// ppc64x:-"MOVH\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVH\tR\\d+,\\sR\\d+"
 	sval32[1] = int32(*x16)
 
 	// ppc64x:-"MOVBZ\tR\\d+,\\sR\\d+"
-	//thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val32[0] = uint32(*u8)
 
 	// ppc64x:-"MOVHZ\tR\\d+,\\sR\\d+"
-	// thumb:-"MOVHU\tR\\d+,\\sR\\d+"
 	val32[1] = uint32(*u16)
 
 	// ppc64x:-"MOVH\tR\\d+,\\sR\\d+"
