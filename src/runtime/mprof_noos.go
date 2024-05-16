@@ -4,7 +4,10 @@
 
 package runtime
 
-import "unsafe"
+import (
+	"runtime/internal/atomic"
+	"unsafe"
+)
 
 const (
 	blockprofilerate = 0
@@ -47,17 +50,20 @@ func mProf_Flush()                                          {}
 func tracegc()                                              {}
 func tracefree(p unsafe.Pointer, size uintptr)              {}
 func mProf_Free(b *bucket, size uintptr)                    {}
-func mutexevent(cycles int64, skip int)                     {}
 func tryRecordGoroutineProfileWB(gp1 *g)                    {}
 func tryRecordGoroutineProfile(gp1 *g, yield func())        {}
+
+//go:linkname mutexevent sync.event
+func mutexevent(cycles int64, skip int) {}
 
 // Stack formats a stack trace of the calling goroutine into buf
 // and returns the number of bytes written to buf.
 // If all is true, Stack formats stack traces of all other goroutines
 // into buf after the trace for the current goroutine.
 func Stack(buf []byte, all bool) int {
+	var stw worldStop
 	if all {
-		stopTheWorld("stack trace")
+		stw = stopTheWorld(stwAllGoroutinesStack)
 	}
 
 	n := 0
@@ -84,7 +90,20 @@ func Stack(buf []byte, all bool) int {
 	}
 
 	if all {
-		startTheWorld()
+		startTheWorld(stw)
 	}
 	return n
 }
+
+type lockTimer struct {
+	lock *mutex
+}
+
+func (lt *lockTimer) begin() {}
+func (lt *lockTimer) end()   {}
+
+type mLockProfile struct {
+	waitTime atomic.Int64
+}
+
+func (prof *mLockProfile) recordUnlock(l *mutex) {}

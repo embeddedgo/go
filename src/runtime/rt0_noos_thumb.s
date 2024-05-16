@@ -122,7 +122,7 @@ skipFPU:
 
 	SUB        $4, R13
 	MOVW       $0, R0
-	MOVW       $(2*const__StackMin), R1
+	MOVW       $(2*const_stackMin), R1
 	MOVM.DB.W  [R0-R1], (R13)
 	BL         runtime·malg(SB)
 	MOVW       8(R13), R0  // newg in R0

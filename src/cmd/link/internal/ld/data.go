@@ -2890,6 +2890,8 @@ func (ctxt *Link) address() []*sym.Segment {
 			noptrbss = s
 		case ".go.fuzzcntrs":
 			fuzzCounters = s
+		case ".go.buildinfo":
+			// nothing
 		default:
 			if ctxt.HeadType == objabi.Hnoos {
 				Exitf("GOOS=noos doesn't support %s section", s.Name)
