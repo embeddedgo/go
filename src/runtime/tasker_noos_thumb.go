@@ -331,3 +331,15 @@ const (
 )
 
 type mOS [7]uint32
+
+// Exceptions handled in runtime
+func svcallHandler()
+func pendsvHandler()
+func reservedHandler()
+func nmiHandler()
+func hardfaultHandler()
+func memmanageHandler()
+func busfaultHandler()
+func usagefaultHandler()
+func securefaultHandler()
+func debugmonHandler()
