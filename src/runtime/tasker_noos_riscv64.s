@@ -24,35 +24,35 @@ TEXT ·cpuid(SB),NOSPLIT|NOFRAME,$0
 #define timeInt 4
 #define exteInt 8
 
-DATA runtime·interruptHandlers+(softInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(softInt+supePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(softInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(softInt+machPriv)*8(SB)/8, $·enterScheduler(SB)
-DATA runtime·interruptHandlers+(timeInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(timeInt+supePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(timeInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(timeInt+machPriv)*8(SB)/8, $·enterScheduler(SB)
-DATA runtime·interruptHandlers+(exteInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(exteInt+supePriv)*8(SB)/8, $·externalInterruptHandler(SB)
-DATA runtime·interruptHandlers+(exteInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
-DATA runtime·interruptHandlers+(exteInt+machPriv)*8(SB)/8, $·externalInterruptHandler(SB)
+DATA ·interruptHandlers+(softInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(softInt+supePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(softInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(softInt+machPriv)*8(SB)/8, $·enterScheduler(SB)
+DATA ·interruptHandlers+(timeInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(timeInt+supePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(timeInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(timeInt+machPriv)*8(SB)/8, $·enterScheduler(SB)
+DATA ·interruptHandlers+(exteInt+userPriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(exteInt+supePriv)*8(SB)/8, $·externalInterruptHandler(SB)
+DATA ·interruptHandlers+(exteInt+resePriv)*8(SB)/8, $·defaultInterruptHandler(SB)
+DATA ·interruptHandlers+(exteInt+machPriv)*8(SB)/8, $·externalInterruptHandler(SB)
 #define interruptHandlersSize ((1+exteInt+machPriv)*8)
-GLOBL runtime·interruptHandlers(SB), RODATA, $interruptHandlersSize
+GLOBL ·interruptHandlers(SB), RODATA, $interruptHandlersSize
 
-DATA runtime·exceptionHandlers+(0*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(1*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(2*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(3*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(4*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(5*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(6*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(7*8)(SB)/8, $·defaultExceptionHandler(SB)
-DATA runtime·exceptionHandlers+(8*8)(SB)/8, $·environmentCallHandler(SB)
-DATA runtime·exceptionHandlers+(9*8)(SB)/8, $·environmentCallHandler(SB)
-DATA runtime·exceptionHandlers+(10*8)(SB)/8, $·environmentCallHandler(SB)
-DATA runtime·exceptionHandlers+(11*8)(SB)/8, $·environmentCallHandler(SB)
+DATA ·exceptionHandlers+(0*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(1*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(2*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(3*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(4*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(5*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(6*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(7*8)(SB)/8, $·defaultExceptionHandler(SB)
+DATA ·exceptionHandlers+(8*8)(SB)/8, $·environmentCallHandler(SB)
+DATA ·exceptionHandlers+(9*8)(SB)/8, $·environmentCallHandler(SB)
+DATA ·exceptionHandlers+(10*8)(SB)/8, $·environmentCallHandler(SB)
+DATA ·exceptionHandlers+(11*8)(SB)/8, $·environmentCallHandler(SB)
 #define exceptionHandlersSize (12*8)
-GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
+GLOBL ·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 
 
 #define sysMaxArgs (48+8)
@@ -80,7 +80,7 @@ GLOBL runtime·exceptionHandlers(SB), RODATA, $exceptionHandlersSize
 // We don't support supervisor or user mode interrupts. The platform-specific
 // interrupts with id >= 16 (local interrupts) are probably supported (with
 // higher priority than MEI) but not tested.
-TEXT runtime·trapHandler(SB),NOSPLIT|NOFRAME,$0
+TEXT ·trapHandler(SB),NOSPLIT|NOFRAME,$0
 	// At this point the interrupts are globaly disabled (mstatus.MIE=0).
 	// We want to enable higher priority interrupts as soon as possible.
 	// Be carefult to don't clobber T6 (TMP) and A3-A5 (syscall args).
@@ -152,7 +152,7 @@ unsupported:
 
 
 // enterScheduler is caled by timer interrupt or environment call trap
-TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
+TEXT ·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 
 	// if cpuctx.schedule then context saved by environmentCallHandler
 	MOVB  (cpuctx_schedule)(g), A0
@@ -241,7 +241,7 @@ smallCtx:
 	MRET
 
 
-TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
+TEXT ·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	ADD        $-(const_numGPRS-4+const_numFPRS+3)*8, X2
 	SAVE_GPRS  (X2, 3*8)
 	SAVE_FPRS  (X2, (const_numGPRS-4+3)*8)
@@ -276,7 +276,7 @@ loop:
 	CSRS  (s1, mie)
 
 	// get interrupt vector
-	MOV  $runtime·vectors(SB), A0
+	MOV  $·vectors(SB), A0
 	MOV  (A0), S1
 	BGE  S0, S1, noHandler
 	SLL  $3, S0
@@ -337,7 +337,7 @@ noHandler:
 // A3: syscall number
 // A4: argument data size on the stack (+8 for caller return address)
 // A5: return data size on the stack
-TEXT runtime·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
+TEXT ·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 
 	// check the syscall number
 	MOV   $SYS_NUM, A0
@@ -445,12 +445,12 @@ slowSyscallFromHandler:
 	JMP     -1(PC)
 
 
-TEXT runtime·defaultInterruptHandler(SB),NOSPLIT|NOFRAME,$0
+TEXT ·defaultInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	EBREAK
 	JMP  -1(PC)
 
 
-TEXT runtime·defaultExceptionHandler(SB),NOSPLIT|NOFRAME,$0
+TEXT ·defaultExceptionHandler(SB),NOSPLIT|NOFRAME,$0
 	ADD  $-16, X2
 	SRA  $3, A0
 	MOV  A0, (X2)
@@ -464,7 +464,7 @@ TEXT runtime·defaultExceptionHandler(SB),NOSPLIT|NOFRAME,$0
 	JMP  ·fatalException(SB)
 
 
-TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
+TEXT ·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
 	EBREAK
 	JMP  -1(PC)
 

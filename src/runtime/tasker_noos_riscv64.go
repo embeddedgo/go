@@ -215,6 +215,13 @@ func fatalException(rs [numGPRS - 4]uintptr, mcause int, sp, lr, a0, mstatus, me
 		printReg("tmp", rs[26], "\n\n")
 	*/
 
-	traceback1(mepc, sp, lr, g, _TraceTrap)
+	traceback1(mepc, sp, lr, g, unwindTrap)
 	crash()
 }
+
+// Exceptions and interrupts handled in runtime
+func defaultExceptionHandler()
+func defaultInterruptHandler()
+func enterScheduler()
+func externalInterruptHandler()
+func unhandledExternalInterrupt()
