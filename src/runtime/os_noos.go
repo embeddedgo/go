@@ -91,9 +91,10 @@ func usleep_no_g(usec uint32) {
 }
 
 //go:nosplit
-func readRandom(r []byte) {
+func readRandom(r []byte) int {
 	// BUG: true random data required
-	extendRandom(r, 0)
+	readTimeRandom(r)
+	return len(r) // should inline well into randinit
 }
 
 //go:nosplit

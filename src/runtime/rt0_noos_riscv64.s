@@ -228,7 +228,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOVW  ZERO, (A0)
 
 	// allocate g0 for m0
-	MOV   $(2*const__StackMin), A0
+	MOV   $(2*const_stackMin), A0
 	CALL  runtime·malg<ABIInternal>(SB)
 
 	// stackguard check during newproc requires valid stackguard1 but malg

@@ -89,14 +89,16 @@ func sysAllocOS(size uintptr) unsafe.Pointer {
 	return p
 }
 
-func sysFreeOS(v unsafe.Pointer, n uintptr)     {}
-func sysMapOS(v unsafe.Pointer, n uintptr)      {}
-func sysUnusedOS(v unsafe.Pointer, n uintptr)   {}
-func sysUsedOS(v unsafe.Pointer, n uintptr)     {}
-func sysFaultOS(v unsafe.Pointer, n uintptr)    {}
-func sysHugePageOS(v unsafe.Pointer, n uintptr) {}
+func sysFreeOS(v unsafe.Pointer, n uintptr)             {}
+func sysMapOS(v unsafe.Pointer, n uintptr)              {}
+func sysUnusedOS(v unsafe.Pointer, n uintptr)           {}
+func sysUsedOS(v unsafe.Pointer, n uintptr)             {}
+func sysFaultOS(v unsafe.Pointer, n uintptr)            {}
+func sysHugePageOS(v unsafe.Pointer, n uintptr)         {}
+func sysNoHugePageOS(v unsafe.Pointer, n uintptr)       {}
+func sysHugePageCollapseOS(v unsafe.Pointer, n uintptr) {}
 
-//  TODO: consider replace this function by direct initialization of mheap_.arena.
+// TODO: consider replace this function by direct initialization of mheap_.arena.
 //
 //go:nosplit
 func noosMemory() (heapBase, heapSize, limit uintptr) {
