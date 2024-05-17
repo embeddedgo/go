@@ -20,7 +20,7 @@
 
 // identcurcpu indetifies the current CPU and returns a pointer to its cpuctx in
 // R0. It can clobber R0-R4,LR registers (other registers must be preserved).
-TEXT identcurcpu<>(SB),NOSPLIT|NOFRAME,$0-0
+TEXT ·identcurcpu(SB),NOSPLIT|NOFRAME,$0-0
 	// for now only single CPU is supported (see also cpuid, osinit)
 	MOVW  $·cpu0(SB), R0
 	RET
@@ -184,7 +184,7 @@ TEXT ·svcallHandler(SB),NOSPLIT|NOFRAME,$0-0
 	MOVM.IA.W  [R1,R2,R6], (R0)
 
 	// current CPU context to R0
-	BL  identcurcpu<>(SB)
+	BL  ·identcurcpu(SB)
 
 	// check for fast syscall (unfortunately it lets through the calls by
 	// higher priority exceptions that are disallowed to use syscalls at all)
@@ -239,7 +239,7 @@ badHandlerCall:
 TEXT ·pendsvHandler(SB),NOSPLIT|NOFRAME,$0-0
 	// load cpuctx
 	MOVW  LR, R12
-	BL    identcurcpu<>(SB)  // current CPU context to R0
+	BL    ·identcurcpu(SB)  // current CPU context to R0
 
 	// if cpuctx.schedule then context saved by syscall
 	MOVBU  (cpuctx_schedule)(R0), R3
