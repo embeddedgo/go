@@ -262,8 +262,6 @@ func Symlink(oldname, newname string) error {
 	return &LinkError{"symlink", oldname, newname, syscall.ENOTSUP}
 }
 
-// Readlink returns the destination of the named symbolic link.
-// If there is an error, it will be of type *PathError.
-func Readlink(name string) (string, error) {
+func readlink(name string) (string, error) {
 	return "", &PathError{Op: "readlink", Path: name, Err: syscall.ENOTSUP}
 }
