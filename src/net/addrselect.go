@@ -4,6 +4,8 @@
 
 // Minimal RFC 6724 address selection.
 
+//go:build !noos
+
 package net
 
 import (

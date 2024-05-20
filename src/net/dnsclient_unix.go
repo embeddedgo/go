@@ -10,6 +10,8 @@
 //	Random UDP source port (net.Dial should do that for us).
 //	Random request IDs.
 
+//go:build !noos
+
 package net
 
 import (

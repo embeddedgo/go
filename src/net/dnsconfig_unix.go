@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !windows
+//go:build !windows && !noos
+
 
 // Read system DNS config from /etc/resolv.conf
 
