@@ -63,7 +63,7 @@ const (
 	// bucket containing values of 2^47-1 nanoseconds or approx. 1 day or more.
 	// This range is more than enough to handle durations produced by the runtime.
 	timeHistMinBucketBits = 9
-	timeHistMaxBucketBits = 48 // Note that this is exclusive; 1 higher than the actual range.
+	timeHistMaxBucketBits = 48*_OS + noosTimeHistMaxBucketBits // Note that this is exclusive; 1 higher than the actual range.
 	timeHistSubBucketBits = 2
 	timeHistNumSubBuckets = 1 << timeHistSubBucketBits
 	timeHistNumBuckets    = timeHistMaxBucketBits - timeHistMinBucketBits + 1

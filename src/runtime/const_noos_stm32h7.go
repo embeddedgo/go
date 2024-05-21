@@ -32,4 +32,5 @@ const (
 	noosGCBitsChunkBytes            = 2 * 1024
 	noosSemTabSize                  = 31
 	noosGOGC                        = 30
+	noosTimeHistMaxBucketBits       = 46
 )
