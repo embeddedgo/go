@@ -30,4 +30,5 @@ const (
 	noosGCBitsChunkBytes            = 0
 	noosSemTabSize                  = 0
 	noosGOGC                        = 0
+	noosTimeHistMaxBucketBits       = 0
 )
