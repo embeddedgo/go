@@ -120,7 +120,7 @@ wait_dma_end:
 	BGTZ t1, wait_dma_end
 
 	// Store the bbplayer flag now that BSS has been cleared
-	MOVW t7, runtime·bbplayer(SB)
+	MOVB t7, runtime·bbplayer(SB)
 
 	// load interrupt vector
 	MOVW $·intvector(SB), t0
