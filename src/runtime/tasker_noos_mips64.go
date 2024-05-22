@@ -147,6 +147,8 @@ func defaultWrite(fd int, p []byte) int {
 	return len(p)
 }
 
+func unhandledExternalInterrupt()
+
 // syscalls not used by runtime
 func syssetprivlevel(newlevel int) (oldlevel, errno int)       { return } // TODO
 func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) { return } // TODO
