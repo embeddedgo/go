@@ -1601,7 +1601,7 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 	ldr := ctxt.loader
 
 	if ctxt.HeadType == objabi.Hnoos {
-		// leave some read-only variables in Flash (hack to save RAM)
+		// Keep some read-only variables in Flash (hack to save RAM)
 		for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
 			if t := state.symType(s); t != sym.SDATA && t != sym.SNOPTRDATA {
 				continue
@@ -1614,8 +1614,17 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 					continue
 				}
 			}
+			if len(name) == 14 && (name[:13] == "crypto/aes.te" || name[:13] == "crypto/aes.td") {
+				state.setSymType(s, sym.SRODATA)
+				continue
+			}
 			switch name {
 			case "embedded/rtos.errorsByNumber",
+				"crypto/aes.sbox0", "crypto/aes.sbox1",
+				"crypto/des.sBoxes", "crypto/des.permutationFunction",
+				"crypto/des.permutedChoice1", "crypto/des.permutedChoice2",
+				"crypto/des.initialPermutation", "crypto/des.finalPermutation",
+				"crypto/des.ksRotations", "crypto/des.expansionFunction",
 				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
 				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
 				"math._lgamV", "math._lgamW", "math._sin", "math._cos",
@@ -1633,7 +1642,8 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 				"runtime.waitReasonStrings", "runtime.boundsErrorFmts",
 				"runtime.boundsNegErrorFmts", "runtime.finalizer1",
 				"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
-				"runtime.emptymspan", "runtime.levelBits", "runtime.levelShift",
+				"runtime.emptymspan", "runtime.levelBits",
+				"runtime.levelShift", "runtime.stwReasonStrings",
 				"runtime.levelLogPages", "runtime.consec8tab",
 				"runtime/internal/sys.len8tab", "runtime/internal/sys.ntz8tab",
 				"runtime/internal/sys.deBruijn64tab",
@@ -1651,7 +1661,24 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 				"time.shortMonthNames", "time.longMonthNames", "time.",
 				"time.daysBefore", "time.utcLoc",
 				"unicode.properties", "unicode.asciiFold", "unicode.caseOrbit",
-				"unicode/utf8.first", "unicode/utf8.acceptRanges":
+				"unicode/utf8.first", "unicode/utf8.acceptRanges",
+				"vendor/golang.org/x/net/http/httpguts.validHostByte",
+				"vendor/golang.org/x/net/http/httpguts.isTokenTable",
+				"vendor/golang.org/x/net/http2/hpack.huffmanCodeLen",
+				"vendor/golang.org/x/net/http2/hpack.huffmanCodes",
+				"vendor/golang.org/x/net/idna.idnaIndex",
+				"vendor/golang.org/x/net/idna.idnaSparseValues",
+				"vendor/golang.org/x/net/idna.idnaValues",
+				"vendor/golang.org/x/text/unicode/bidi.bidiIndex",
+				"vendor/golang.org/x/text/unicode/bidi.bidiValues",
+				"vendor/golang.org/x/text/unicode/bidi.controlByteToClass",
+				"vendor/golang.org/x/text/unicode/norm.nfcIndex",
+				"vendor/golang.org/x/text/unicode/norm.nfkcIndex",
+				"vendor/golang.org/x/text/unicode/norm.nfcSparseValues",
+				"vendor/golang.org/x/text/unicode/norm.nfkcSparseValues",
+				"vendor/golang.org/x/text/unicode/norm.nfcValues",
+				"vendor/golang.org/x/text/unicode/norm.nfkcValues",
+				"vendor/golang.org/x/text/unicode/norm.decomps":
 
 				state.setSymType(s, sym.SRODATA)
 			}
@@ -2424,7 +2451,11 @@ func (ctxt *Link) buildinfo() {
 	// The code reading this data is in package debug/buildinfo.
 	ldr := ctxt.loader
 	s := ldr.CreateSymForUpdate("go:buildinfo", 0)
-	s.SetType(sym.SBUILDINFO)
+	if ctxt.HeadType == objabi.Hnoos {
+		s.SetType(sym.SRODATA)
+	} else {
+		s.SetType(sym.SBUILDINFO)
+	}
 	s.SetAlign(16)
 	// The \xff is invalid UTF-8, meant to make it less likely
 	// to find one of these accidentally.
@@ -2840,11 +2871,11 @@ func (ctxt *Link) address() []*sym.Segment {
 	switch ctxt.HeadType {
 	case objabi.Haix:
 		if len(Segrelrodata.Sections) == 0 {
-		// Data sections are moved to an unreachable segment
-		// to ensure that they are position-independent.
-		// Already done if relro sections exist.
-		va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
-		la = va
+			// Data sections are moved to an unreachable segment
+			// to ensure that they are position-independent.
+			// Already done if relro sections exist.
+			va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
+			la = va
 		}
 	case objabi.Hnoos:
 		switch ctxt.Arch {
@@ -2854,7 +2885,7 @@ func (ctxt *Link) address() []*sym.Segment {
 			// (see ../thumb/asm.go:/Laddr = /) BUG: Assumes single-core system.
 			va = uint64(RAM.Base) + Segdata.Laddr
 		}
- 	}
+	}
 
 	order = append(order, &Segdata)
 	Segdata.Rwx = 06
