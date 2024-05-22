@@ -394,8 +394,6 @@ const (
 	AROTRV
 	ASC
 	ASCV
-	ASEB
-	ASEH
 	ASGT
 	ASGTU
 	ASLL
