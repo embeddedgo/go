@@ -4,6 +4,8 @@
 
 package abi
 
+import "internal/goarch"
+
 // Map constants common to several packages
 // runtime/runtime-gdb.py:MapTypePrinter contains its own copy
 const (
@@ -14,4 +16,4 @@ const (
 )
 
 // ZeroValSize is the size in bytes of runtime.zeroVal.
-const ZeroValSize = 1024
+const ZeroValSize = 512 << (goarch.PtrSize / 64) // Embedded Go: 512 on 32-bit, 1024 on 64-bit architectures
