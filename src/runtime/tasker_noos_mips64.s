@@ -427,7 +427,7 @@ fatal:
 
 
 // Required by the linker, runtime.vectors will default to this.
-TEXT runtime·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
+TEXT ·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
 	BREAK
 	JMP  -1(PC)
 
