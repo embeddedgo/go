@@ -14,6 +14,8 @@ package io
 
 import (
 	"errors"
+	"internal/goarch"
+	"internal/goos"
 	"sync"
 )
 
@@ -416,6 +418,9 @@ func copyBuffer(dst Writer, src Reader, buf []byte) (written int64, err error) {
 	}
 	if buf == nil {
 		size := 32 * 1024
+		if goos.IsNoos != 0 {
+			size = 8 * 1024 << (goarch.PtrSize / 64)
+		}
 		if l, ok := src.(*LimitedReader); ok && int64(size) > l.N {
 			if l.N < 1 {
 				size = 1
