@@ -59,11 +59,13 @@ func taskerinit() {
 	allcpu.cap = maxHarts
 	curcpu().exe.set(getg().m)
 
-	// reset PLIC to known state
-	// BUG: tries to reset all possible interrupts and all possible contexts,
-	// can raise Store Access Fault exception
+	// Reset PLIC to known state
+
+	// BUG: Tries to reset all possible interrupts in the first 8 contexts (qemu
+	// VIRT_CPUS_MAX * 2). Can raise Store Access Fault exception when less
+	// interrupts or contexts are supported or may not reset the whole PLIC.
 	PLIC := plic.PLIC()
-	for ctxid := range PLIC.EN {
+	for ctxid := range 8 {
 		for i := range PLIC.EN[ctxid] {
 			PLIC.EN[ctxid][i].Store(0)
 		}
@@ -161,6 +163,7 @@ func printReg(name string, u uintptr, end string) {
 }
 
 // keep lr, a0, mstatus, mepc, mie and rs order in sync with asm_riscv64.h
+//
 //go:nosplit
 func fatalException(rs [numGPRS - 4]uintptr, mcause int, sp, lr, a0, mstatus, mepc, mie uintptr) {
 	mode := "handler"
