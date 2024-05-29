@@ -5,7 +5,7 @@
 // Malloc profiling.
 // Patterned after tcmalloc's algorithms; shorter code.
 
-// +build !noos
+//go:build !noos
 
 package runtime
 
