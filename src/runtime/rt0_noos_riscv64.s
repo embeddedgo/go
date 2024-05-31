@@ -27,17 +27,17 @@
 DATA runtime·waitInit+0(SB)/4, $-1
 GLOBL runtime·waitInit(SB), NOPTR, $4
 
-// _rt0_riscv64_noos initializs all running cores
+// _rt0_riscv64_noos initializes all running cores
 TEXT _rt0_riscv64_noos(SB),NOSPLIT|NOFRAME,$0
 	// Disable interrupts globally, enable FPU (Kendryte K210 supports only
 	// FS=0(off)/3(dirty), this is a weakness of the Rocket Chip Generator used
 	// to generate K210 cores).
 	MOV   $0x7FFF, S0
 	CSRC  (s0, mstatus)
-	MOV   $(1<<FSn), S0  // set FS to init
+	MOV   $(1<<FSn|1<<MPIEn), S0  // set FS to init, set MPIE
 	CSRS  (s0, mstatus)
 
-	// enable interrupts locally
+	// enable selected interrupts in mie (still all blocked in mstatus)
 	MOV   $intEnabled, S0
 	CSRW  (s0, mie)
 
@@ -150,7 +150,6 @@ runScheduler:
 	// prepare trap context (only mstatus and mie are required on the stack)
 	ADD   $-trapCtxSize, X2
 	CSRR  (mstatus, s0)
-	OR    $(1<<MPIEn), S0
 	MOV   S0, _mstatus(X2)
 	MOV   $intEnabled, S0
 	MOV   S0, _mie(X2)
@@ -253,8 +252,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	CSRW  (a1, mscratch)
 
 	// switch to the user mode
-	MOV    $(1<<MPIEn), S0
-	CSRS   (s0, mstatus)
 	AUIPC  $0, A0
 	ADD    $16, A0  // A0 must point just after MRET
 	CSRW   (a0, mepc)

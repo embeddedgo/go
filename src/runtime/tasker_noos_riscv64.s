@@ -99,11 +99,15 @@ nestedTrap:
 	// save trap context, free another register (LR)
 	ADD     $-trapCtxSize, X2
 	MOV     LR, _LR(X2)
+
+	MOV $runtime·end(SB), LR
+	BLT  X2, LR, -1(PC)
+
 	SLTU    A0, ZERO, LR       // calculate fromThread flag
 	CSRRWI  (0, mscratch, a0)  // set mscratch=0
 	MOV     A0, _A0(X2)        // save original A0 content
 	CSRR    (mstatus, a0)
-	OR      $(1<<MPIEn), A0  // fix RISC-V <1.10 behavior if trap from user mode
+	//OR      $(1<<MPIEn), A0  // fix RISC-V <1.10 behavior if trap from user mode
 	MOV     A0, _mstatus(X2)
 	CSRR    (mepc, a0)
 	OR      LR, A0
