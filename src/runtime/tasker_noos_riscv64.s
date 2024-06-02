@@ -89,20 +89,16 @@ TEXT ·trapHandler(SB),NOSPLIT|NOFRAME,$0
 	CSRRW  (a0, mscratch, a0)  // swap A0 with cpuctx in mscratch
 
 	// setup g and SP for handler mode, save thread ones to the cpuctx.gh.sched
-	BEQ  ZERO, A0, nestedTrap
+	BEQ  ZERO, A0, trapFromHandlerMode
 	MOV  X2, (g_sched+gobuf_sp)(A0)
 	MOV  g, (g_sched+gobuf_g)(A0)
 	MOV  (g_stack+stack_hi)(A0), X2
 	MOV  A0, g
-nestedTrap:
+trapFromHandlerMode:
 
 	// save trap context, free another register (LR)
 	ADD     $-trapCtxSize, X2
 	MOV     LR, _LR(X2)
-
-	MOV $runtime·end(SB), LR
-	BLT  X2, LR, -1(PC)
-
 	SLTU    A0, ZERO, LR       // calculate fromThread flag
 	CSRRWI  (0, mscratch, a0)  // set mscratch=0
 	MOV     A0, _A0(X2)        // save original A0 content
@@ -233,6 +229,7 @@ smallCtx:
 	CSRS  (G, mstatus)  // set priority field
 	MOV   (m_tls+const_mepc*8)(A0), g
 	CSRW  (G, mepc)
+	CSRCI (1, mepc) // MRET ignores bit 0, required because of the QEMU 8.2 bug
 	MOV   _mie(X2), g
 	CSRW  (G, mie)
 
@@ -315,6 +312,7 @@ done:
 	CSRW  (a0, mie)
 	MOV   _mepc(X2), A0
 	CSRW  (a0, mepc)
+	CSRCI (1, mepc) // MRET ignores bit 0, required because of the QEMU 8.2 bug
 	AND   $1, A0
 	BEQ   ZERO, A0, returnToHandler
 
@@ -427,6 +425,7 @@ nothingToCopy:
 	// disable interrupts and restore trap context
 	CSRW  (a0, mstatus)
 	CSRW  (a1, mepc)
+	CSRCI (1, mepc) // MRET ignores bit 0, required because of the QEMU 8.2 bug
 	CSRW  (a2, mie)
 
 	AND  $1, A1  // fromThread flag
