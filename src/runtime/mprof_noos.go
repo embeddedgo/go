@@ -27,7 +27,6 @@ var (
 	profMemActiveLock      mutex
 	profMemFutureLock      [len(memRecord{}.future)]mutex
 	goroutineProfile       struct{ active bool }
-	MemProfileRate         int
 )
 
 type bucket struct{}
@@ -107,3 +106,34 @@ type mLockProfile struct {
 }
 
 func (prof *mLockProfile) recordUnlock(l *mutex) {}
+
+type BlockProfileRecord struct {
+	Count  int64
+	Cycles int64
+	StackRecord
+}
+
+type StackRecord struct {
+	Stack0 [0]uintptr
+}
+
+func (r *StackRecord) Stack() []uintptr { return nil }
+
+type MemProfileRecord struct {
+	AllocBytes, FreeBytes     int64
+	AllocObjects, FreeObjects int64
+	Stack0                    [0]uintptr
+}
+
+func (r *MemProfileRecord) InUseBytes() int64   { return 0 }
+func (r *MemProfileRecord) InUseObjects() int64 { return 0 }
+func (r *MemProfileRecord) Stack() []uintptr    { return nil }
+
+var MemProfileRate int
+
+func ThreadCreateProfile(p []StackRecord) (n int, ok bool)             { return 0, true }
+func MemProfile(p []MemProfileRecord, inuseZero bool) (n int, ok bool) { return 0, true }
+func SetBlockProfileRate(rate int)                                     {}
+func SetMutexProfileFraction(rate int) int                             { return 0 }
+func BlockProfile(p []BlockProfileRecord) (n int, ok bool)             { return 0, true }
+func MutexProfile(p []BlockProfileRecord) (n int, ok bool)             { return 0, true }
