@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var Interrupt, Kill Signal
+
 type ProcessState struct{}
 
 func findProcess(pid int) (p *Process, err error) {
@@ -30,5 +32,8 @@ func (p *ProcessState) exited() bool              { return false }
 func (p *ProcessState) success() bool             { return false }
 func (p *ProcessState) sys() interface{}          { return nil }
 func (p *ProcessState) sysUsage() interface{}     { return nil }
+
+func (p *ProcessState) String() string { return "" }
+func (p *ProcessState) ExitCode() int  { return -1 }
 
 func executable() (string, error) { return "", ErrNotExist }
