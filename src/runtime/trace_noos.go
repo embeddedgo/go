@@ -98,3 +98,7 @@ func traceReader() *g { return nil }
 
 //go:systemstack
 func traceProcFree(pp *p) {}
+
+func StartTrace() error { return nil }
+func ReadTrace() []byte { return nil }
+func StopTrace()        {}
