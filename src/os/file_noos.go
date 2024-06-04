@@ -265,3 +265,24 @@ func Symlink(oldname, newname string) error {
 func readlink(name string) (string, error) {
 	return "", &PathError{Op: "readlink", Path: name, Err: syscall.ENOTSUP}
 }
+
+const DevNull = ""
+
+// Pipe is unsupported on noos.
+func Pipe() (r *File, w *File, err error) { return nil, nil, syscall.ENOTSUP }
+
+// Truncate changes the size of the file.
+// It does not change the I/O offset.
+// If there is an error, it will be of type *PathError.
+func (f *File) Truncate(size int64) (err error) {
+	err = syscall.ENOTSUP
+	if ff, ok := f.f.(interface {
+		Truncate(size int64) error
+	}); ok {
+		err = ff.Truncate(size)
+		if err == nil {
+			return nil
+		}
+	}
+	return f.wrapErr("truncate", err)
+}
