@@ -147,8 +147,11 @@ TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-8
 
 // func exit(r int32)
 TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-4
-	BKPT
-	B   -1(PC)
+	// Graceful exit in case of semihosting or hang on the breakpoint.
+	MOVW  $0x18, R0
+	MOVW  $0x20026, R1
+	BKPT  $0xab
+	B     -1(PC)
 
 // utils
 

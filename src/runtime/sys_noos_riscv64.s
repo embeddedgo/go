@@ -152,6 +152,15 @@ TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-16
 // unsupported syscalls
 
 // func exit(r int32)
-TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-8
+TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-4
+	// Graceful exit in case of semihosting or hang on the breakpoint.
+	MOVW  r+0(FP), A0
+	SUB   $16, X2
+	MOV   ZERO, 0(X2)
+	MOV   A0, 8(X2)
+	MOV   $0x18, A0
+	MOV   X2, A1
+	SLLI  $0x1f, ZERO, ZERO
 	EBREAK
-	JMP  -1(PC)
+	SRAI  $0x7, ZERO, ZERO
+	JMP   -2(PC)
