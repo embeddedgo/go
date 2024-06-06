@@ -137,3 +137,8 @@ func SetBlockProfileRate(rate int)                                     {}
 func SetMutexProfileFraction(rate int) int                             { return 0 }
 func BlockProfile(p []BlockProfileRecord) (n int, ok bool)             { return 0, true }
 func MutexProfile(p []BlockProfileRecord) (n int, ok bool)             { return 0, true }
+
+//go:linkname runtime_goroutineProfileWithLabels runtime/pprof.runtime_goroutineProfileWithLabels
+func runtime_goroutineProfileWithLabels(p []StackRecord, labels []unsafe.Pointer) (n int, ok bool) {
+	return 0, true
+}
