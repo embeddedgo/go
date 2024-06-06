@@ -73,6 +73,10 @@ func goargs() {
 	if GOOS == "windows" {
 		return
 	}
+	if GOOS == "noos" {
+		argslice = []string{"noos"} // TODO: path or mod from modinfo?
+		return
+	}
 	argslice = make([]string, argc)
 	for i := int32(0); i < argc; i++ {
 		argslice[i] = gostringnocopy(argv_index(argv, i))
