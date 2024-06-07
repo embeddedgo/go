@@ -143,15 +143,25 @@ TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-8
 	SWI
 	RET
 
-// unsupported syscalls
-
 // func exit(r int32)
 TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-4
 	// Graceful exit in case of semihosting or hang on the breakpoint.
-	MOVW  $0x18, R0
-	MOVW  $0x20026, R1
-	BKPT  $0xab
-	B     -1(PC)
+	// https://github.com/ARM-software/abi-aa/blob/main/semihosting/semihosting.rst
+
+	// Use SYS_EXIT_EXTENDED (0x20) to support a return value.
+	MOVW       $0x20026, R0
+	MOVW       r+0(FP), R1
+	MOVM.DB.W  [R0,R1], (R13)
+	MOVW       $0x20, R0
+	MOVW       R13, R1
+	BKPT       $0xab
+	B          -1(PC)
+
+	// SYS_EXIT (0x18) has no support for a return value.
+	//MOVW  $0x18, R0
+	//MOVW  $0x20026, R1
+	//BKPT  $0xab
+	//B     -1(PC)
 
 // utils
 
