@@ -293,6 +293,11 @@ func Listen(network, address string) (Listener, error) {
 	return nil, syscall.ENOTSUP
 }
 
+// Pipe is not supported on GOOS=noos
+func Pipe() (Conn, Conn) {
+	return nil, nil
+}
+
 // JoinHostPort combines host and port into a network address of the
 // form "host:port". If host contains a colon, as found in literal
 // IPv6 addresses, then JoinHostPort returns "[host]:port".
@@ -309,8 +314,8 @@ func JoinHostPort(host, port string) string {
 
 // Dialer is not supported on GOOS=noos.
 type Dialer struct {
-	Timeout  time.Duration
-	Deadline time.Time
+	Timeout   time.Duration
+	Deadline  time.Time
 	KeepAlive time.Duration
 }
 
