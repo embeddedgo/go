@@ -8,6 +8,7 @@ package semihostfs
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
 	"syscall"
 	"unsafe"
@@ -60,4 +61,11 @@ func remove(fsys *FS, name string) error {
 
 func rename(fsys *FS, oldname, newname string) error {
 	return syscall.ENOTSUP // really?
+}
+
+func init() {
+	if len(os.Args) != 1 || os.Args[0] != "" {
+		return
+	}
+	// TODO: use argc (9), arglen (10), argn (11) calls to obtain arguments.
 }
