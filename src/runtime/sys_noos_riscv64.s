@@ -149,15 +149,15 @@ TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-16
 	ECALL
 	RET
 
-// unsupported syscalls
-
 // func exit(r int32)
 TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-4
 	// Graceful exit in case of semihosting or hang on the breakpoint.
-	MOVW  r+0(FP), A0
+	// https://github.com/riscv-non-isa/riscv-semihosting/blob/main/riscv-semihosting.adoc
+	MOVW  r+0(FP), A1
 	SUB   $16, X2
-	MOV   ZERO, 0(X2)
-	MOV   A0, 8(X2)
+	MOV   $0x20026, A0
+	MOV   A0, 0(X2)
+	MOV   A1, 8(X2)
 	MOV   $0x18, A0
 	MOV   X2, A1
 	SLLI  $0x1f, ZERO, ZERO
