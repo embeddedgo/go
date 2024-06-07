@@ -8,7 +8,9 @@ package semihostfs
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -124,4 +126,19 @@ func rename(fsys *FS, oldname, newname string) error {
 		return &fs.PathError{Op: "rename", Path: oldname, Err: &Error{errno}}
 	}
 	return nil
+}
+
+func init() {
+	if len(os.Args) != 1 || os.Args[0] != "" {
+		return
+	}
+	var buf [256]byte
+	args := buf[:]
+	ptr := unsafe.Pointer(&args)
+	mt.Lock()
+	e := hostCall(0x15, uintptr(ptr), ptr)
+	mt.Unlock()
+	if e == 0 {
+		os.Args = strings.Fields(string(args))
+	}
 }

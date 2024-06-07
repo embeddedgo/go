@@ -74,7 +74,7 @@ func goargs() {
 		return
 	}
 	if GOOS == "noos" {
-		argslice = []string{"noos"} // TODO: path or mod from modinfo?
+		argslice = []string{""}
 		return
 	}
 	argslice = make([]string, argc)
