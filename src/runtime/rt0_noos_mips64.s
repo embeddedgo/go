@@ -233,7 +233,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	SUB   t0, t1, t5  // size of available memory (DMA capable)
 
 	// estimate the space need for non-heap allocations
-	SRL   $(const__PageShift+1), t5, t4
+	SRL   $(const__PageShift), t5, t4
 	MOVV  $mspan__size, t2
 	MUL   t2, t4
 	MOVV  LO, t4
