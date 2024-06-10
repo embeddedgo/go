@@ -13,6 +13,9 @@ func load8(addr *uint8) uint8
 func store8(addr *uint8, v uint8)
 
 // An U8 represents 8-bit memory mapped register.
+//
+// Deprecated: Use R8[uint8] instead.
+//
 //BUG: go:notinheap broken in go 1.18
 type U8 struct {
 	r uint8

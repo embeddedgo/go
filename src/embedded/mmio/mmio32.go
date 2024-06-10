@@ -13,6 +13,9 @@ func load32(addr *uint32) uint32
 func store32(addr *uint32, v uint32)
 
 // An U32 represents 32-bit memory mapped register.
+//
+// Deprecated: Use R32[uint32] instead.
+//
 //BUG: go:notinheap broken in go 1.18
 type U32 struct {
 	r uint32

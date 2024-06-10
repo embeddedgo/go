@@ -22,7 +22,7 @@ func (r *P64) Load() uintptr {
 	return uintptr(load64(&r.r))
 }
 
-// Store stores v in r.
+// Store stores p in r.
 func (r *P64) Store(p unsafe.Pointer) {
 	store64(&r.r, uint64(uintptr(p)))
 }

@@ -13,6 +13,9 @@ func load16(addr *uint16) uint16
 func store16(addr *uint16, v uint16)
 
 // An U16 represents 16-bit memory mapped register.
+//
+// Deprecated: Use R16[uint16] instead.
+//
 //BUG: go:notinheap broken in go 1.18
 type U16 struct {
 	r uint16
