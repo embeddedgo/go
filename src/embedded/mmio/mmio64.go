@@ -13,6 +13,9 @@ func load64(addr *uint64) uint64
 func store64(addr *uint64, v uint64)
 
 // An U64 represents 64-bit memory mapped register.
+//
+// Deprecated: Use R64[uint64] instead.
+//
 //BUG: go:notinheap broken in go 1.18
 type U64 struct {
 	r uint64
