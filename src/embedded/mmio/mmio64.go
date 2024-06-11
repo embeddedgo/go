@@ -16,12 +16,14 @@ func store64(addr *uint64, v uint64)
 //
 // Deprecated: Use R64[uint64] instead.
 //
-//BUG: go:notinheap broken in go 1.18
+// BUG: go:notinheap broken in go 1.18
 type U64 struct {
 	r uint64
 }
 
 // Addr returns the address of r as uintptr.
+//
+//go:nosplit
 func (r *U64) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
@@ -50,32 +52,44 @@ func (r *U64) Addr() uintptr {
 
 // Bits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
+//
+//go:nosplit
 func (r *U64) LoadBits(mask uint64) uint64 {
 	return load64(&r.r) & mask
 }
 
 // StoreBits stores bits in r selected by mask. It is convenient replacement for
 // r.Store(r.Load()&^mask | bits&mask). This is not an atomic operation.
+//
+//go:nosplit
 func (r *U64) StoreBits(mask, bits uint64) {
 	store64(&r.r, load64(&r.r)&^mask|bits&mask)
 }
 
 // SetBits sets bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U64) SetBits(mask uint64) {
 	store64(&r.r, load64(&r.r)|mask)
 }
 
 // ClearBits clears bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U64) ClearBits(mask uint64) {
 	store64(&r.r, load64(&r.r)&^mask)
 }
 
 // Load returns the value of r.
+//
+//go:nosplit
 func (r *U64) Load() uint64 {
 	return load64(&r.r)
 }
 
 // Store stores v in r.
+//
+//go:nosplit
 func (r *U64) Store(v uint64) {
 	store64(&r.r, v)
 }
@@ -94,15 +108,23 @@ type UM64 struct {
 }
 
 // Set sets all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM64) Set() { b.R.SetBits(b.Mask) }
 
 // Clear clears all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM64) Clear() { b.R.ClearBits(b.Mask) }
 
 // Load returns the value of b.
+//
+//go:nosplit
 func (b UM64) Load() uint64 { return b.R.LoadBits(b.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM64) Store(bits uint64) { b.R.StoreBits(b.Mask, bits) }
 
 //func (b UM64) LoadVal() int   { return b.R.Field(uint64(b.Mask)) }

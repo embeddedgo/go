@@ -16,12 +16,14 @@ func store32(addr *uint32, v uint32)
 //
 // Deprecated: Use R32[uint32] instead.
 //
-//BUG: go:notinheap broken in go 1.18
+// BUG: go:notinheap broken in go 1.18
 type U32 struct {
 	r uint32
 }
 
 // Addr returns the address of r as uintptr.
+//
+//go:nosplit
 func (r *U32) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
@@ -50,32 +52,44 @@ func (r *U32) Addr() uintptr {
 
 // Bits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
+//
+//go:nosplit
 func (r *U32) LoadBits(mask uint32) uint32 {
 	return load32(&r.r) & mask
 }
 
 // StoreBits stores bits in r selected by mask. It is convenient replacement for
 // r.Store(r.Load()&^mask | bits&mask). This is not an atomic operation.
+//
+//go:nosplit
 func (r *U32) StoreBits(mask, bits uint32) {
 	store32(&r.r, load32(&r.r)&^mask|bits&mask)
 }
 
 // SetBits sets bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U32) SetBits(mask uint32) {
 	store32(&r.r, load32(&r.r)|mask)
 }
 
 // ClearBits clears bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U32) ClearBits(mask uint32) {
 	store32(&r.r, load32(&r.r)&^mask)
 }
 
 // Load returns the value of r.
+//
+//go:nosplit
 func (r *U32) Load() uint32 {
 	return load32(&r.r)
 }
 
 // Store stores v in r.
+//
+//go:nosplit
 func (r *U32) Store(v uint32) {
 	store32(&r.r, v)
 }
@@ -94,15 +108,23 @@ type UM32 struct {
 }
 
 // Set sets all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM32) Set() { b.R.SetBits(b.Mask) }
 
 // Clear clears all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM32) Clear() { b.R.ClearBits(b.Mask) }
 
 // Load returns the value of b.
+//
+//go:nosplit
 func (b UM32) Load() uint32 { return b.R.LoadBits(b.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM32) Store(bits uint32) { b.R.StoreBits(b.Mask, bits) }
 
 //func (b UM32) LoadVal() int   { return b.R.Field(uint32(b.Mask)) }

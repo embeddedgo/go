@@ -13,16 +13,22 @@ type P64 struct {
 }
 
 // Addr returns the address of r as uintptr.
+//
+//go:nosplit
 func (r *P64) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
 // Load returns the value of r.
+//
+//go:nosplit
 func (r *P64) Load() uintptr {
 	return uintptr(load64(&r.r))
 }
 
 // Store stores p in r.
+//
+//go:nosplit
 func (r *P64) Store(p unsafe.Pointer) {
 	store64(&r.r, uint64(uintptr(p)))
 }

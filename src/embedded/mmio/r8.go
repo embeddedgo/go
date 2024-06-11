@@ -15,38 +15,52 @@ type R8[T T8] struct {
 }
 
 // Addr returns the address of r as uintptr.
+//
+//go:nosplit
 func (r *R8[_]) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
 // LoadBits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
+//
+//go:nosplit
 func (r *R8[T]) LoadBits(mask T) T {
 	return T(load8(&r.r)) & mask
 }
 
 // StoreBits stores bits in r selected by mask. It is convenient replacement for
 // r.Store(r.Load()&^mask | bits&mask). This is not an atomic operation.
+//
+//go:nosplit
 func (r *R8[T]) StoreBits(mask, bits T) {
 	store8(&r.r, load8(&r.r)&^uint8(mask)|uint8(bits&mask))
 }
 
 // SetBits sets bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *R8[T]) SetBits(mask T) {
 	store8(&r.r, load8(&r.r)|uint8(mask))
 }
 
 // ClearBits clears bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *R8[T]) ClearBits(mask T) {
 	store8(&r.r, load8(&r.r)&^uint8(mask))
 }
 
 // Load returns the value of r.
+//
+//go:nosplit
 func (r *R8[T]) Load() T {
 	return T(load8(&r.r))
 }
 
 // Store stores v in r.
+//
+//go:nosplit
 func (r *R8[T]) Store(v T) {
 	store8(&r.r, uint8(v))
 }
@@ -58,15 +72,23 @@ type RM8[T T8] struct {
 }
 
 // Set sets all bits in rm. This is not an atomic operation.
+//
+//go:nosplit
 func (rm RM8[T]) Set() { rm.R.SetBits(rm.Mask) }
 
 // Clear clears all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (rm RM8[T]) Clear() { rm.R.ClearBits(rm.Mask) }
 
 // Load returns the value of b.
+//
+//go:nosplit
 func (rm RM8[T]) Load() T { return rm.R.LoadBits(rm.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (rm RM8[T]) Store(bits T) { rm.R.StoreBits(rm.Mask, bits) }
 
 // U8 is an alias for the R8[uint8] type kept for backward compatibility.

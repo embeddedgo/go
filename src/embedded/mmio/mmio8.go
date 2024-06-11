@@ -16,12 +16,14 @@ func store8(addr *uint8, v uint8)
 //
 // Deprecated: Use R8[uint8] instead.
 //
-//BUG: go:notinheap broken in go 1.18
+// BUG: go:notinheap broken in go 1.18
 type U8 struct {
 	r uint8
 }
 
 // Addr returns the address of r as uintptr.
+//
+//go:nosplit
 func (r *U8) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
@@ -50,32 +52,44 @@ func (r *U8) Addr() uintptr {
 
 // Bits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
+//
+//go:nosplit
 func (r *U8) LoadBits(mask uint8) uint8 {
 	return load8(&r.r) & mask
 }
 
 // StoreBits stores bits in r selected by mask. It is convenient replacement for
 // r.Store(r.Load()&^mask | bits&mask). This is not an atomic operation.
+//
+//go:nosplit
 func (r *U8) StoreBits(mask, bits uint8) {
 	store8(&r.r, load8(&r.r)&^mask|bits&mask)
 }
 
 // SetBits sets bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U8) SetBits(mask uint8) {
 	store8(&r.r, load8(&r.r)|mask)
 }
 
 // ClearBits clears bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U8) ClearBits(mask uint8) {
 	store8(&r.r, load8(&r.r)&^mask)
 }
 
 // Load returns the value of r.
+//
+//go:nosplit
 func (r *U8) Load() uint8 {
 	return load8(&r.r)
 }
 
 // Store stores v in r.
+//
+//go:nosplit
 func (r *U8) Store(v uint8) {
 	store8(&r.r, v)
 }
@@ -94,15 +108,23 @@ type UM8 struct {
 }
 
 // Set sets all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM8) Set() { b.R.SetBits(b.Mask) }
 
 // Clear clears all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM8) Clear() { b.R.ClearBits(b.Mask) }
 
 // Load returns the value of b.
+//
+//go:nosplit
 func (b UM8) Load() uint8 { return b.R.LoadBits(b.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM8) Store(bits uint8) { b.R.StoreBits(b.Mask, bits) }
 
 //func (b UM8) LoadVal() int   { return b.R.Field(uint8(b.Mask)) }
