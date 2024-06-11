@@ -13,16 +13,22 @@ type P32 struct {
 }
 
 // Addr returns the address of r as uintptr.
+//
+//go:nosplit
 func (r *P32) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
 
 // Load returns the value of r.
+//
+//go:nosplit
 func (r *P32) Load() uintptr {
 	return uintptr(load32(&r.r))
 }
 
 // Store stores p in r.
+//
+//go:nosplit
 func (r *P32) Store(p unsafe.Pointer) {
 	store32(&r.r, uint32(uintptr(p)))
 }

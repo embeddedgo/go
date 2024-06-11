@@ -16,12 +16,14 @@ func store16(addr *uint16, v uint16)
 //
 // Deprecated: Use R16[uint16] instead.
 //
-//BUG: go:notinheap broken in go 1.18
+// BUG: go:notinheap broken in go 1.18
 type U16 struct {
 	r uint16
 }
 
 // Addr returns the address of r as uintptr.
+//
+//go:nosplit
 func (r *U16) Addr() uintptr {
 	return uintptr(unsafe.Pointer(r))
 }
@@ -50,32 +52,44 @@ func (r *U16) Addr() uintptr {
 
 // Bits returns the value od r logicaly anded with mask. It is a convenient
 // replacement for r.Load()&mask.
+//
+//go:nosplit
 func (r *U16) LoadBits(mask uint16) uint16 {
 	return load16(&r.r) & mask
 }
 
 // StoreBits stores bits in r selected by mask. It is convenient replacement for
 // r.Store(r.Load()&^mask | bits&mask). This is not an atomic operation.
+//
+//go:nosplit
 func (r *U16) StoreBits(mask, bits uint16) {
 	store16(&r.r, load16(&r.r)&^mask|bits&mask)
 }
 
 // SetBits sets bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U16) SetBits(mask uint16) {
 	store16(&r.r, load16(&r.r)|mask)
 }
 
 // ClearBits clears bits in r selected by mask. This is not an atomic operation.
+//
+//go:nosplit
 func (r *U16) ClearBits(mask uint16) {
 	store16(&r.r, load16(&r.r)&^mask)
 }
 
 // Load returns the value of r.
+//
+//go:nosplit
 func (r *U16) Load() uint16 {
 	return load16(&r.r)
 }
 
 // Store stores v in r.
+//
+//go:nosplit
 func (r *U16) Store(v uint16) {
 	store16(&r.r, v)
 }
@@ -94,15 +108,23 @@ type UM16 struct {
 }
 
 // Set sets all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM16) Set() { b.R.SetBits(b.Mask) }
 
 // Clear clears all bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM16) Clear() { b.R.ClearBits(b.Mask) }
 
 // Load returns the value of b.
+//
+//go:nosplit
 func (b UM16) Load() uint16 { return b.R.LoadBits(b.Mask) }
 
 // Store stores bits in b. This is not an atomic operation.
+//
+//go:nosplit
 func (b UM16) Store(bits uint16) { b.R.StoreBits(b.Mask, bits) }
 
 //func (b UM16) LoadVal() int   { return b.R.Field(uint16(b.Mask)) }
