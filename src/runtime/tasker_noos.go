@@ -75,7 +75,9 @@ import (
 // Tasker code does not use FPU so the architecture specific context switch
 // code can avoid saving/restoring FPU context if not need.
 
-func dummyNanotime() int64   { return 1 }
+var dummyNanoseconds int64
+
+func dummyNanotime() int64   { dummyNanoseconds += 100; return dummyNanoseconds }
 func dummySetalarm(ns int64) {}
 
 var thetasker = tasker{
@@ -128,6 +130,7 @@ func (t *tasker) fbucketbyaddr(addr uintptr) *mcl {
 // gh is the first field of the cpuctx so we can benefit from the getg which is
 // intrinsic function, often compiled to 0 or 1 instruction. Don't call in
 // thread mode (valid only in handler mode).
+//
 //go:nosplit
 func curcpu() *cpuctx { return (*cpuctx)(unsafe.Pointer(getg())) }
 
@@ -352,6 +355,7 @@ type notelist struct {
 }
 
 // insert inserts n at the beginning of l. You must acquire n before insert it.
+//
 //go:nosplit
 func (l *notelist) insert(n *notel) {
 	if n.link != 1 {
@@ -369,6 +373,7 @@ func (l *notelist) insert(n *notel) {
 }
 
 // removeall removes and returns the whole content of l.
+//
 //go:nosplit
 func (l *notelist) removeall() *notel {
 	for {
