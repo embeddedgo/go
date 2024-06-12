@@ -8,43 +8,40 @@
 #include "textflag.h"
 #include "asm_mips64.h"
 
+// BREAK is overloaded CACHE opcode. Register number specifies the cache op.
+#define CACHE BREAK
+
 TEXT _rt0_mips64_noos(SB),NOSPLIT|NOFRAME,$0
 	JMP ·rt0_target(SB)
 
 TEXT runtime·_rt0_mips64_noos1(SB),NOSPLIT|NOFRAME,$0
-	// fill .bss with 0s
+	// Clear .bss, .noptrbss and unallocated memory.
 	SUBU $16, R29
+
 	MOVW $runtime·bss(SB), R4
-	OR   $0x20000000, R4 // convert address to KSEG1 (uncached)
 	MOVW $runtime·ebss(SB), R5
-	OR   $0x20000000, R5
 	SUB  R4, R5
 	MOVV R4, 8(R29)
 	MOVV R5, 16(R29)
-	JAL  runtime·memclrNoHeapPointers(SB)  // clear BSS
+	JAL  runtime·memclrNoHeapPointers(SB)
 
-	// fill .noptrbss with 0s
 	MOVW $runtime·noptrbss(SB), R4
-	OR   $0x20000000, R4 // convert address to KSEG1 (uncached)
 	MOVW $runtime·enoptrbss(SB), R5
-	OR   $0x20000000, R5
 	SUB  R4, R5
 	MOVV R4, 8(R29)
 	MOVV R5, 16(R29)
-	JAL  runtime·memclrNoHeapPointers(SB)  // clear noptrBSS
+	JAL  runtime·memclrNoHeapPointers(SB)
 
-	// clear unallocated memory
 	MOVW $runtime·end(SB), R4
-	OR   $0x20000000, R4 // convert address to KSEG1 (uncached)
 	MOVW $runtime·ramend(SB), R5
-	OR   $0x20000000, R5
 	SUB  R4, R5
 	MOVV R4, 8(R29)
 	MOVV R5, 16(R29)
-	JAL  runtime·memclrNoHeapPointers(SB)  // clear unallocated memory
+	JAL  runtime·memclrNoHeapPointers(SB)
+
 	ADDU $16, R29
 
-	// load interrupt vector
+	// Load interrupt vector
 	MOVW $runtime·intvector(SB), R8
 	MOVW $0xa0000000, R9
 	MOVW $4, R10
@@ -54,11 +51,10 @@ loop:
 	MOVW R11, 0x80(R9)
 	MOVW R11, 0x100(R9)
 	MOVW R11, 0x180(R9)
-	// sync - BREAK is overloaded CACHE opcode
-	BREAK R16, 0(R9)
-	BREAK R16, 0x80(R9)
-	BREAK R16, 0x100(R9)
-	BREAK R16, 0x180(R9)
+	CACHE R16, 0(R9)
+	CACHE R16, 0x80(R9)
+	CACHE R16, 0x100(R9)
+	CACHE R16, 0x180(R9)
 	ADD $4, R8
 	ADD $4, R9
 	ADDU $-1, R10
