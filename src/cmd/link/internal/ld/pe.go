@@ -521,7 +521,7 @@ func (f *peFile) addInitArray(ctxt *Link) *peSection {
 	ctxt.Out.SeekSet(int64(sect.pointerToRawData))
 	sect.checkOffset(ctxt.Out.Offset())
 
-	init_entry := ctxt.loader.Lookup(*flagEntrySymbol, 0)
+	init_entry := ctxt.loader.Lookup(*FlagEntrySymbol, 0)
 	addr := uint64(ctxt.loader.SymValue(init_entry)) - ctxt.loader.SymSect(init_entry).Vaddr
 	switch buildcfg.GOARCH {
 	case "386", "arm":

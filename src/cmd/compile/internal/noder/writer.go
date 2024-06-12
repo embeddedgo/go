@@ -6,7 +6,9 @@ package noder
 
 import (
 	"fmt"
+	"internal/buildcfg"
 	"internal/pkgbits"
+	"path/filepath"
 
 	"cmd/compile/internal/base"
 	"cmd/compile/internal/ir"
@@ -2445,6 +2447,9 @@ func (pw *pkgWriter) collectDecls(noders []*noder) {
 				}
 
 			default:
+				if buildcfg.GOOS == "noos" && filepath.Base(l.pos.RelFilename()) == "zisrnames.go" {
+					break
+				}
 				if types.AllowsGoVersion(1, 18) {
 					pw.errorf(l.pos, "//go:linkname must refer to declared function or variable")
 				}

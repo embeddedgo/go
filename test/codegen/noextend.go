@@ -26,6 +26,7 @@ func set16(x8 int8, u8 *uint8, y8 int8, z8 uint8) {
 
 	// ppc64:-"MOVBZ\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVBZ\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val16[0] = uint16(*u8)
 
 	// AND not needed due to size
@@ -35,6 +36,7 @@ func set16(x8 int8, u8 *uint8, y8 int8, z8 uint8) {
 
 	// ppc64:-"ANDCC"
 	// ppc64le:-"ANDCC"
+	// thumb:-"AND"
 	val16[1] = 255 & uint16(*u8+z8)
 
 }
@@ -42,14 +44,17 @@ func shiftidx(u8 *uint8, x16 *int16, u16 *uint16) {
 
 	// ppc64:-"MOVBZ\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVBZ\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val16[0] = uint16(sval16[*u8>>2])
 
 	// ppc64:-"MOVH\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVH\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVH\tR\\d+,\\sR\\d+"
 	sval16[1] = int16(val16[*x16>>1])
 
 	// ppc64:-"MOVHZ\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVHZ\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVHU\tR\\d+,\\sR\\d+"
 	val16[1] = uint16(sval16[*u16>>2])
 
 }
@@ -58,6 +63,7 @@ func setnox(x8 int8, u8 *uint8, y8 *int8, z8 *uint8, x16 *int16, u16 *uint16, x3
 
 	// ppc64:-"MOVBZ\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVBZ\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val16[0] = uint16(*u8)
 
 	// AND not needed due to size
@@ -67,18 +73,22 @@ func setnox(x8 int8, u8 *uint8, y8 *int8, z8 *uint8, x16 *int16, u16 *uint16, x3
 
 	// ppc64:-"ANDCC"
 	// ppc64le:-"ANDCC"
+	// thumb:-"AND"
 	val16[1] = 255 & uint16(*u8+*z8)
 
 	// ppc64:-"MOVH\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVH\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVH\tR\\d+,\\sR\\d+"
 	sval32[1] = int32(*x16)
 
 	//ppc64:-"MOVBZ\tR\\d+,\\sR\\d+"
 	//ppc64le:-"MOVBZ\tR\\d+,\\sR\\d+"
+	//thumb:-"MOVBU\tR\\d+,\\sR\\d+"
 	val32[0] = uint32(*u8)
 
 	// ppc64:-"MOVHZ\tR\\d+,\\sR\\d+"
 	// ppc64le:-"MOVHZ\tR\\d+,\\sR\\d+"
+	// thumb:-"MOVHU\tR\\d+,\\sR\\d+"
 	val32[1] = uint32(*u16)
 
 	// ppc64:-"MOVH\tR\\d+,\\sR\\d+"

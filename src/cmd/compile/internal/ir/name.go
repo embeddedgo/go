@@ -36,7 +36,7 @@ type Name struct {
 	miniExpr
 	BuiltinOp Op         // uint8
 	Class     Class      // uint8
-	pragma    PragmaFlag // int16
+	pragma    PragmaFlag // uint32, EmbeddedGo: changed from uint16
 	flags     bitset16
 	DictIndex uint16 // index of the dictionary entry describing the type of this variable declaration plus 1
 	sym       *types.Sym

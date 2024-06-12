@@ -47,6 +47,10 @@ func ldpkg(ctxt *Link, f *bio.Reader, lib *sym.Library, length int64, filename s
 	}
 	data := string(bdata)
 
+	if data == "" {
+		lib.Main = true
+	}
+
 	// process header lines
 	for data != "" {
 		var line string

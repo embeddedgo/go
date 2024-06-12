@@ -1,0 +1,12 @@
+[short] skip 'skipping cross-compile in short mode'
+
+env GOARCH=thumb
+env GOOS=linux
+
+go build hello.go
+! stderr 'unable to find math.a'
+
+-- hello.go --
+package main
+
+func main() {}

@@ -11,7 +11,7 @@ import (
 	"unsafe"
 )
 
-const itabInitSize = 512
+const itabInitSize = 512 * _OS // avoid wasting of no GC memory on noos
 
 var (
 	itabLock      mutex                               // lock for accessing itab table
@@ -246,6 +246,12 @@ imethods:
 func itabsinit() {
 	lockInit(&itabLock, lockRankItab)
 	lock(&itabLock)
+	if noos {
+		// allocate starter table
+		const n = 512 / noosScaleDown // always a power of 2
+		itabTable = (*itabTableType)(mallocgc((2+n)*goarch.PtrSize, nil, true))
+		itabTable.size = n
+	}
 	for _, md := range activeModules() {
 		for _, i := range md.itablinks {
 			itabAdd(i)

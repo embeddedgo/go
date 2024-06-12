@@ -7638,7 +7638,7 @@ var asciiFold = [MaxASCII + 1]uint16{
 	0x007F,
 }
 
-var caseOrbit = []foldPair{
+var caseOrbit = [...]foldPair{
 	{0x004B, 0x006B},
 	{0x0053, 0x0073},
 	{0x006B, 0x212A},

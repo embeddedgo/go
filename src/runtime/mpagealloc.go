@@ -56,7 +56,7 @@ const (
 	// in the bitmap at once.
 	pallocChunkPages    = 1 << logPallocChunkPages
 	pallocChunkBytes    = pallocChunkPages * pageSize
-	logPallocChunkPages = 9
+	logPallocChunkPages = 9*_OS + (logHeapArenaBytes-pageShift)*(1-_OS)
 	logPallocChunkBytes = logPallocChunkPages + pageShift
 
 	// The number of radix bits for each level.
@@ -218,6 +218,7 @@ type pageAlloc struct {
 	// 32           | 0       | 10      | 128 KiB
 	// 33 (iOS)     | 0       | 11      | 256 KiB
 	// 48           | 13      | 13      | 1 MiB
+	// 20 (MCU)     | 0       | 6       | 512 B
 	//
 	// There's no reason to use the L1 part of chunks on 32-bit, the
 	// address space is small so the L2 is small. For platforms with a

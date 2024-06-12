@@ -55,4 +55,7 @@ const (
 
 	// Function is an ABI wrapper.
 	ABIWRAPPER = 4096
+
+	// Generate interrupt handler prologue / epilogue.
+	ISR = 8192
 )

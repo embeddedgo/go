@@ -50,6 +50,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"unicode"
 )
 
 // isRuntimeDepPkg reports whether pkg is the runtime package or its dependency.
@@ -183,7 +184,7 @@ func FoldSubSymbolOffset(ldr *loader.Loader, s loader.Sym) (loader.Sym, int64) {
 //
 // This is a performance-critical function for the linker; be careful
 // to avoid introducing unnecessary allocations in the main loop.
-func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
+func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 	ldr := st.ldr
 	relocs := ldr.Relocs(s)
 	if relocs.Count() == 0 {
@@ -395,6 +396,13 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 			}
 
 			o = ldr.SymValue(rs) + r.Add()
+
+			if !dwarf && target.IsThumb() && (ldr.SymType(r.Sym()) == sym.STEXT) {
+				if o&1 != 0 {
+					panic("relocsym: thumb bit already set")
+				}
+				o |= 1
+			}
 
 			// On amd64, 4-byte offsets will be sign-extended, so it is impossible to
 			// access more than 2GB of static data; fail at link time is better than
@@ -956,15 +964,15 @@ const blockSize = 1 << 20 // 1MB chunks written at a time.
 // blocks, waiting on the writes to complete. Note that we use the sem parameter
 // to limit the number of concurrent writes taking place.
 func writeBlocks(ctxt *Link, out *OutBuf, sem chan int, ldr *loader.Loader, syms []loader.Sym, addr, size int64, pad []byte) {
-	for i, s := range syms {
-		if ldr.SymValue(s) >= addr && !ldr.AttrSubSymbol(s) {
-			syms = syms[i:]
-			break
-		}
-	}
-
 	var wg sync.WaitGroup
 	max, lastAddr, written := int64(blockSize), addr+size, int64(0)
+	syms1 := make([]loader.Sym, 0, len(syms))
+	for _, s := range syms {
+		if a := ldr.SymValue(s); addr <= a && a < lastAddr && !ldr.AttrSubSymbol(s) {
+			syms1 = append(syms1, s)
+		}
+	}
+	syms = syms1
 	for addr < lastAddr {
 		// Find the last symbol we'd write.
 		idx := -1
@@ -1064,7 +1072,7 @@ func writeBlock(ctxt *Link, out *OutBuf, ldr *loader.Loader, syms []loader.Sym, 
 			addr = val
 		}
 		P := out.WriteSym(ldr, s)
-		st.relocsym(s, P)
+		st.relocsym(s, P, false)
 		if f, ok := ctxt.generatorSyms[s]; ok {
 			f(ctxt, s)
 		}
@@ -1534,6 +1542,65 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 	// Collect data symbols by type into data.
 	state := dodataState{ctxt: ctxt, symGroupType: symGroupType}
 	ldr := ctxt.loader
+
+	if ctxt.HeadType == objabi.Hnoos {
+		// leave some read-only variables in Flash (hack to save RAM)
+		for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
+			if t := state.symType(s); t != sym.SDATA && t != sym.SNOPTRDATA {
+				continue
+			}
+			name := ldr.SymName(s)
+			if len(name) > 8 && strings.HasPrefix(name, "unicode.") {
+				uname := name[8:]
+				if unicode.IsUpper(rune(uname[0])) || strings.HasPrefix(uname, ".stmp_") || strings.HasPrefix(uname, "fold") {
+					state.setSymType(s, sym.SRODATA)
+					continue
+				}
+			}
+			switch name {
+			case "embedded/rtos.errorsByNumber",
+				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
+				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
+				"math._lgamV", "math._lgamW", "math._sin", "math._cos",
+				"math.pow10tab", "math.pow10postab32", "math.pow10negtab32",
+				"math.tanhP", "math.tanhQ", "math._gamP", "math._gamQ",
+				"math._gamS",
+				"math/big.pow5tab", "math/big._Accuracy_index",
+				"math/big._RoundingMode_index",
+				"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
+				"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
+				"runtime.staticuint64s", "runtime.oneptrmask",
+				"runtime.fastlog2Table", "runtime.class_to_size",
+				"runtime.class_to_allocnpages", "runtime.class_to_divmagic",
+				"runtime.size_to_class8", "runtime.size_to_class128",
+				"runtime.waitReasonStrings", "runtime.boundsErrorFmts",
+				"runtime.boundsNegErrorFmts", "runtime.finalizer1",
+				"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
+				"runtime.emptymspan", "runtime.levelBits", "runtime.levelShift",
+				"runtime.levelLogPages", "runtime.consec8tab",
+				"runtime/internal/sys.len8tab", "runtime/internal/sys.ntz8tab",
+				"runtime/internal/sys.deBruijn64tab",
+				"runtime/internal/sys.deBruijnIdx64ctz",
+				"runtime/internal/sys.deBruijnIdx32ctz",
+				"strconv.detailedPowersOfTen",
+				"strconv.uint64pow10", "strconv.leftcheats",
+				"strconv.isPrint32", "strconv.isPrint16",
+				"strconv.isNotPrint32", "strconv.isNotPrint16",
+				"strconv.isGraphic", "strconv.float64info",
+				"strconv.float32info",
+				"strings.asciiSpace",
+				"syscall.errors",
+				"time.std0x", "time.longDayNames", "time.shortDayNames",
+				"time.shortMonthNames", "time.longMonthNames", "time.",
+				"time.daysBefore", "time.utcLoc",
+				"unicode.properties", "unicode.asciiFold", "unicode.caseOrbit",
+				"unicode/utf8.first", "unicode/utf8.acceptRanges":
+
+				state.setSymType(s, sym.SRODATA)
+			}
+		}
+	}
+
 	for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
 		if !ldr.AttrReachable(s) || ldr.AttrSpecial(s) || ldr.AttrSubSymbol(s) ||
 			!ldr.TopLevelSym(s) {
@@ -1928,6 +1995,13 @@ func (state *dodataState) allocateDataSections(ctxt *Link) {
 	if !ctxt.UseRelro() {
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.types", 0), sect)
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.etypes", 0), sect)
+	}
+	if ctxt.HeadType == objabi.Hnoos {
+		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.ramstart", 0), sect)
+		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.ramend", 0), sect)
+		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.romdata", 0), sect)
+		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.nodmastart", 0), sect)
+		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.nodmaend", 0), sect)
 	}
 	for _, symn := range sym.ReadOnly {
 		symnStartValue := state.datsize
@@ -2548,9 +2622,11 @@ func (ctxt *Link) address() []*sym.Segment {
 	order = append(order, &Segtext)
 	Segtext.Rwx = 05
 	Segtext.Vaddr = va
+	Segtext.Laddr = va
 	for i, s := range Segtext.Sections {
 		va = uint64(Rnd(int64(va), int64(s.Align)))
 		s.Vaddr = va
+		s.Laddr = va
 		va += s.Length
 
 		if ctxt.IsWasm() && i == 0 && va < wasmMinDataAddr {
@@ -2579,9 +2655,11 @@ func (ctxt *Link) address() []*sym.Segment {
 		order = append(order, &Segrodata)
 		Segrodata.Rwx = 04
 		Segrodata.Vaddr = va
+		Segrodata.Laddr = va
 		for _, s := range Segrodata.Sections {
 			va = uint64(Rnd(int64(va), int64(s.Align)))
 			s.Vaddr = va
+			s.Laddr = va
 			va += s.Length
 		}
 
@@ -2599,9 +2677,11 @@ func (ctxt *Link) address() []*sym.Segment {
 		order = append(order, &Segrelrodata)
 		Segrelrodata.Rwx = 06
 		Segrelrodata.Vaddr = va
+		Segrelrodata.Laddr = va
 		for _, s := range Segrelrodata.Sections {
 			va = uint64(Rnd(int64(va), int64(s.Align)))
 			s.Vaddr = va
+			s.Laddr = va
 			va += s.Length
 		}
 
@@ -2609,15 +2689,29 @@ func (ctxt *Link) address() []*sym.Segment {
 	}
 
 	va = uint64(Rnd(int64(va), int64(*FlagRound)))
-	if ctxt.HeadType == objabi.Haix && len(Segrelrodata.Sections) == 0 {
-		// Data sections are moved to an unreachable segment
-		// to ensure that they are position-independent.
-		// Already done if relro sections exist.
-		va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
+	la := va
+	switch ctxt.HeadType {
+	case objabi.Haix:
+		if len(Segrelrodata.Sections) == 0 {
+			// Data sections are moved to an unreachable segment
+			// to ensure that they are position-independent.
+			// Already done if relro sections exist.
+			va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
+			la = va
+		}
+	case objabi.Hnoos:
+		switch ctxt.Arch {
+		case sys.ArchThumb:
+			// Main stack on the lowest addresses so overflows can be detected
+			// even without MPU. Segdata.Laddr is set to main stack size (see
+			// ../thumb/asm.go:/Laddr = /) BUG: Assumes single-core system.
+			va = uint64(RAM.Base) + Segdata.Laddr
+		}
 	}
 	order = append(order, &Segdata)
 	Segdata.Rwx = 06
 	Segdata.Vaddr = va
+	Segdata.Laddr = la
 	var data *sym.Section
 	var noptr *sym.Section
 	var bss *sym.Section
@@ -2632,13 +2726,16 @@ func (ctxt *Link) address() []*sym.Segment {
 			vlen = int64(Segdata.Sections[i+1].Vaddr - s.Vaddr)
 		}
 		s.Vaddr = va
+		s.Laddr = la
 		va += uint64(vlen)
 		Segdata.Length = va - Segdata.Vaddr
 		switch s.Name {
 		case ".data":
 			data = s
+			la += uint64(vlen)
 		case ".noptrdata":
 			noptr = s
+			la += uint64(vlen)
 		case ".bss":
 			bss = s
 		case ".noptrbss":
@@ -2648,20 +2745,26 @@ func (ctxt *Link) address() []*sym.Segment {
 		}
 	}
 
+	if MaxTextAddr != -1 && la > uint64(MaxTextAddr) {
+		Exitf("text segment to big by %d bytes", la-uint64(MaxTextAddr))
+	}
+
 	// Assign Segdata's Filelen omitting the BSS. We do this here
 	// simply because right now we know where the BSS starts.
 	Segdata.Filelen = bss.Vaddr - Segdata.Vaddr
 
-	va = uint64(Rnd(int64(va), int64(*FlagRound)))
+	va = uint64(Rnd(int64(la), int64(*FlagRound)))
 	order = append(order, &Segdwarf)
 	Segdwarf.Rwx = 06
 	Segdwarf.Vaddr = va
+	Segdwarf.Laddr = va
 	for i, s := range Segdwarf.Sections {
 		vlen := int64(s.Length)
 		if i+1 < len(Segdwarf.Sections) {
 			vlen = int64(Segdwarf.Sections[i+1].Vaddr - s.Vaddr)
 		}
 		s.Vaddr = va
+		s.Laddr = va
 		va += uint64(vlen)
 		if ctxt.HeadType == objabi.Hwindows {
 			va = uint64(Rnd(int64(va), PEFILEALIGN))
@@ -2806,6 +2909,23 @@ func (ctxt *Link) address() []*sym.Segment {
 		}
 	}
 
+	if ctxt.HeadType == objabi.Hnoos {
+		ramstart := int64(RAM.Base)
+		ramend := int64(RAM.Base + RAM.Size)
+		ctxt.xdefine("runtime.ramstart", sym.SRODATA, ramstart)
+		ctxt.xdefine("runtime.ramend", sym.SRODATA, ramend)
+		ctxt.xdefine("runtime.romdata", sym.SRODATA, int64(Segdata.Laddr))
+		nodmastart := int64(NoDMA.Base)
+		nodmaend := int64(NoDMA.Base + NoDMA.Size)
+		if nodmastart == 0 && nodmaend == 0 {
+			// avoid "relocation does not fit in 32-bits" kind of errors
+			nodmastart = ramstart
+			nodmaend = ramstart
+		}
+		ctxt.xdefine("runtime.nodmastart", sym.SRODATA, nodmastart)
+		ctxt.xdefine("runtime.nodmaend", sym.SRODATA, nodmaend)
+	}
+
 	return order
 }
 
@@ -2907,7 +3027,7 @@ func compressSyms(ctxt *Link, syms []loader.Sym) []byte {
 		if relocs.Count() != 0 {
 			relocbuf = append(relocbuf[:0], P...)
 			P = relocbuf
-			st.relocsym(s, P)
+			st.relocsym(s, P, true)
 		}
 		if _, err := z.Write(P); err != nil {
 			log.Fatalf("compression failed: %s", err)

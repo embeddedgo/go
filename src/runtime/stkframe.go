@@ -277,6 +277,11 @@ func stkobjinit() {
 			break
 		}
 	}
+	if noos && mod == nil {
+		// In case of GOOS=noos gofunc may be point to Flash but ptr always
+		// points to RAM so the above datap.gofunc <= ptr may be always false.
+		mod = &firstmoduledata
+	}
 	if mod == nil {
 		throw("methodValueCallFrameObjs is not in a module")
 	}

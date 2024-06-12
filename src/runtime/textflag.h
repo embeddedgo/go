@@ -37,3 +37,5 @@
 #define TOPFRAME 2048
 // Function is an ABI wrapper.
 #define ABIWRAPPER 4096
+// Generate interrupt handler prologue / epilogue.
+#define ISR 8192

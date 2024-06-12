@@ -1642,6 +1642,8 @@ func (p *Package) gccMachine() []string {
 		}
 	case "loong64":
 		return []string{"-mabi=lp64d"}
+	case "thumb":
+		return []string{"-mthumb"}
 	}
 	return nil
 }

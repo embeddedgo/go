@@ -62,6 +62,16 @@ func archinit(ctxt *ld.Link) {
 		if *ld.FlagRound == -1 {
 			*ld.FlagRound = 0x10000
 		}
+	case objabi.Hnoos:
+		*ld.FlagD = true
+		ld.Elfinit(ctxt)
+		ld.HEADR = ld.ELFRESERVE
+		if *ld.FlagTextAddr == -1 {
+			*ld.FlagTextAddr = int64(ld.RAM.Base)
+		}
+		if *ld.FlagRound == -1 {
+			*ld.FlagRound = 8
+		}
 	default:
 		ld.Exitf("unknown -H option: %v", ctxt.HeadType)
 	}

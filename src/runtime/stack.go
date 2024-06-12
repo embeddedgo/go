@@ -69,10 +69,10 @@ const (
 	// to each stack below the usual guard area for OS-specific
 	// purposes like signal handling. Used on Windows, Plan 9,
 	// and iOS because they do not use a separate stack.
-	_StackSystem = goos.IsWindows*512*goarch.PtrSize + goos.IsPlan9*512 + goos.IsIos*goarch.IsArm64*1024
+	_StackSystem = goos.IsWindows*512*goarch.PtrSize + goos.IsPlan9*512 + goos.IsIos*goarch.IsArm64*1024 + noosStackSystem
 
 	// The minimum size of stack used by Go code
-	_StackMin = 2048
+	_StackMin = 2048*_OS + noosStackMin
 
 	// The minimum stack size to allocate.
 	// The hackery here rounds FixedStack0 up to a power of 2.
@@ -99,7 +99,7 @@ const (
 	// a _StackLimit chain of NOSPLIT calls plus _StackSystem
 	// bytes for the OS.
 	// This arithmetic must match that in cmd/internal/objabi/stack.go:StackLimit.
-	_StackGuard = 928*sys.StackGuardMultiplier + _StackSystem
+	_StackGuard = (928*_OS+noosStackGuard)*sys.StackGuardMultiplier + _StackSystem
 
 	// After a stack split check the SP is allowed to be this
 	// many bytes below the stack guard. This saves an instruction
@@ -1178,7 +1178,7 @@ func shrinkstack(gp *g) {
 	// Check for self-shrinks while in a libcall. These may have
 	// pointers into the stack disguised as uintptrs, but these
 	// code paths should all be nosplit.
-	if gp == getg().m.curg && gp.m.libcallsp != 0 {
+	if !noos && gp == getg().m.curg && gp.m.libcallsp != 0 {
 		throw("shrinking stack in libcall")
 	}
 
@@ -1282,6 +1282,11 @@ func (r *stackObjectRecord) gcdata() *byte {
 			mod = datap
 			break
 		}
+	}
+	if noos && mod == nil {
+		// In case of GOOS=noos gofunc may be point to Flash but ptr always
+		// points to RAM so the above datap.gofunc <= ptr may be always false.
+		mod = &firstmoduledata
 	}
 	// If you get a panic here due to a nil mod,
 	// you may have made a copy of a stackObjectRecord.

@@ -13,6 +13,7 @@ var stdPkgs = []string{
 	"context",
 	"crypto",
 	"embed",
+	"embedded",
 	"encoding",
 	"errors",
 	"expvar",

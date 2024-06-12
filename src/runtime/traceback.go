@@ -732,7 +732,7 @@ func traceback(pc, sp, lr uintptr, gp *g) {
 // If gp.m.libcall{g,pc,sp} information is available, it uses that information in preference to
 // the pc/sp/lr passed in.
 func tracebacktrap(pc, sp, lr uintptr, gp *g) {
-	if gp.m.libcallsp != 0 {
+	if !noos && gp.m.libcallsp != 0 {
 		// We're in C code somewhere, traceback from the saved position.
 		traceback1(gp.m.libcallpc, gp.m.libcallsp, 0, gp.m.libcallg.ptr(), 0)
 		return

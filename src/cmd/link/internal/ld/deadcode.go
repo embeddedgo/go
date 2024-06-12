@@ -12,10 +12,35 @@ import (
 	"cmd/link/internal/sym"
 	"fmt"
 	"internal/buildcfg"
+	"strconv"
 	"unicode"
 )
 
 var _ = fmt.Print
+
+var cortexmSystemHandlers = [...]string{
+	"runtime.nmiHandler",
+	"runtime.hardfaultHandler",
+	"runtime.memmanageHandler",
+	"runtime.busfaultHandler",
+	"runtime.usagefaultHandler",
+	"runtime.securefaultHandler",
+	"runtime.reservedHandler",
+	"runtime.reservedHandler",
+	"runtime.reservedHandler",
+	"runtime.svcallHandler",
+	"runtime.debugmonHandler",
+	"runtime.reservedHandler",
+	"runtime.pendsvHandler",
+	"SysTick_Handler",
+}
+
+func InterruptHandler(irqn int) string {
+	if irqn < 0 {
+		return cortexmSystemHandlers[irqn+14]
+	}
+	return "IRQ" + strconv.Itoa(irqn) + "_Handler"
+}
 
 type deadcodePass struct {
 	ctxt *Link
@@ -53,6 +78,20 @@ func (d *deadcodePass) init() {
 
 	var names []string
 
+	if d.ctxt.HeadType == objabi.Hnoos {
+		// mark interrupt handlers
+		var first, last int
+		switch d.ctxt.Arch.Family {
+		case sys.Thumb:
+			first, last = -14, 479
+		case sys.RISCV64:
+			first, last = 1, 1023
+		}
+		for i := first; i <= last; i++ {
+			names = append(names, InterruptHandler(i))
+		}
+	}
+
 	// In a normal binary, start at main.main and the init
 	// functions and mark what is reachable from there.
 	if d.ctxt.linkShared && (d.ctxt.BuildMode == BuildModeExe || d.ctxt.BuildMode == BuildModePIE) {
@@ -61,12 +100,12 @@ func (d *deadcodePass) init() {
 		// The external linker refers main symbol directly.
 		if d.ctxt.LinkMode == LinkExternal && (d.ctxt.BuildMode == BuildModeExe || d.ctxt.BuildMode == BuildModePIE) {
 			if d.ctxt.HeadType == objabi.Hwindows && d.ctxt.Arch.Family == sys.I386 {
-				*flagEntrySymbol = "_main"
+				*FlagEntrySymbol = "_main"
 			} else {
-				*flagEntrySymbol = "main"
+				*FlagEntrySymbol = "main"
 			}
 		}
-		names = append(names, *flagEntrySymbol)
+		names = append(names, *FlagEntrySymbol)
 	}
 	// runtime.unreachableMethod is a function that will throw if called.
 	// We redirect unreachable methods to it.
@@ -298,7 +337,7 @@ func (d *deadcodePass) markMethod(m methodref) {
 // deadcode marks all reachable symbols.
 //
 // The basis of the dead code elimination is a flood fill of symbols,
-// following their relocations, beginning at *flagEntrySymbol.
+// following their relocations, beginning at *FlagEntrySymbol.
 //
 // This flood fill is wrapped in logic for pruning unused methods.
 // All methods are mentioned by relocations on their receiver's *rtype.

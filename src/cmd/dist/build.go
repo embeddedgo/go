@@ -74,6 +74,7 @@ var okgoarch = []string{
 	"ppc64le",
 	"riscv64",
 	"s390x",
+	"thumb",
 	"sparc64",
 	"wasm",
 }
@@ -95,6 +96,7 @@ var okgoos = []string{
 	"plan9",
 	"windows",
 	"aix",
+	"noos",
 }
 
 // find reports the first index of p in l[0:n], or else -1.
@@ -1191,7 +1193,7 @@ func cmdenv() {
 	xprintf(format, "GOROOT", goroot)
 	xprintf(format, "GOTMPDIR", os.Getenv("GOTMPDIR"))
 	xprintf(format, "GOTOOLDIR", tooldir)
-	if goarch == "arm" {
+	if goarch == "arm" || goarch == "thumb" {
 		xprintf(format, "GOARM", goarm)
 	}
 	if goarch == "386" {
@@ -1600,6 +1602,7 @@ var cgoEnabled = map[string]bool{
 	"linux/mips64le":  true,
 	"linux/riscv64":   true,
 	"linux/s390x":     true,
+	"linux/thumb":     false,
 	"linux/sparc64":   true,
 	"android/386":     true,
 	"android/amd64":   true,
@@ -1625,6 +1628,8 @@ var cgoEnabled = map[string]bool{
 	"windows/amd64":   true,
 	"windows/arm":     false,
 	"windows/arm64":   true,
+	"noos/thumb":      false,
+	"noos/riscv64":    false,
 }
 
 // List of platforms which are supported but not complete yet. These get

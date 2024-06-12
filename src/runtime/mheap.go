@@ -20,7 +20,7 @@ const (
 	// minPhysPageSize is a lower-bound on the physical page size. The
 	// true physical page size may be larger than this. In contrast,
 	// sys.PhysPageSize is an upper-bound on the physical page size.
-	minPhysPageSize = 4096
+	minPhysPageSize = 4096*_OS + noosMinPhysPageSize
 
 	// maxPhysPageSize is the maximum page size the runtime supports.
 	maxPhysPageSize = 512 << 10
@@ -43,8 +43,8 @@ const (
 	// roughly 100µs.
 	//
 	// Must be a multiple of the pageInUse bitmap element size and
-	// must also evenly divide pagesPerArena.
-	pagesPerReclaimerChunk = 512
+	// must also evenly divid pagesPerArena.
+	pagesPerReclaimerChunk = 512*_OS + pagesPerArena*(1-_OS)
 
 	// physPageAlignedStacks indicates whether stack allocations must be
 	// physical page aligned. This is a requirement for MAP_STACK on
@@ -530,7 +530,7 @@ func recordspan(vh unsafe.Pointer, p unsafe.Pointer) {
 	assertLockHeld(&h.lock)
 
 	if len(h.allspans) >= cap(h.allspans) {
-		n := 64 * 1024 / goarch.PtrSize
+		n := 8 * _PageSize / goarch.PtrSize
 		if n < cap(h.allspans)*3/2 {
 			n = cap(h.allspans) * 3 / 2
 		}
@@ -1270,36 +1270,38 @@ HaveSpan:
 	// pages not to get touched until we return. Simultaneously, it's important
 	// to do this before calling sysUsed because that may commit address space.
 	bytesToScavenge := uintptr(0)
-	if limit := gcController.memoryLimit.Load(); go119MemoryLimitSupport && !gcCPULimiter.limiting() {
-		// Assist with scavenging to maintain the memory limit by the amount
-		// that we expect to page in.
-		inuse := gcController.mappedReady.Load()
-		// Be careful about overflow, especially with uintptrs. Even on 32-bit platforms
-		// someone can set a really big memory limit that isn't maxInt64.
-		if uint64(scav)+inuse > uint64(limit) {
-			bytesToScavenge = uintptr(uint64(scav) + inuse - uint64(limit))
-		}
-	}
-	if goal := scavenge.gcPercentGoal.Load(); goal != ^uint64(0) && growth > 0 {
-		// We just caused a heap growth, so scavenge down what will soon be used.
-		// By scavenging inline we deal with the failure to allocate out of
-		// memory fragments by scavenging the memory fragments that are least
-		// likely to be re-used.
-		//
-		// Only bother with this because we're not using a memory limit. We don't
-		// care about heap growths as long as we're under the memory limit, and the
-		// previous check for scaving already handles that.
-		if retained := heapRetained(); retained+uint64(growth) > goal {
-			// The scavenging algorithm requires the heap lock to be dropped so it
-			// can acquire it only sparingly. This is a potentially expensive operation
-			// so it frees up other goroutines to allocate in the meanwhile. In fact,
-			// they can make use of the growth we just created.
-			todo := growth
-			if overage := uintptr(retained + uint64(growth) - goal); todo > overage {
-				todo = overage
+	if !noos {
+		if limit := gcController.memoryLimit.Load(); go119MemoryLimitSupport && !gcCPULimiter.limiting() {
+			// Assist with scavenging to maintain the memory limit by the amount
+			// that we expect to page in.
+			inuse := gcController.mappedReady.Load()
+			// Be careful about overflow, especially with uintptrs. Even on 32-bit platforms
+			// someone can set a really big memory limit that isn't maxInt64.
+			if uint64(scav)+inuse > uint64(limit) {
+				bytesToScavenge = uintptr(uint64(scav) + inuse - uint64(limit))
 			}
-			if todo > bytesToScavenge {
-				bytesToScavenge = todo
+		}
+		if goal := scavenge.gcPercentGoal.Load(); goal != ^uint64(0) && growth > 0 {
+			// We just caused a heap growth, so scavenge down what will soon be used.
+			// By scavenging inline we deal with the failure to allocate out of
+			// memory fragments by scavenging the memory fragments that are least
+			// likely to be re-used.
+			//
+			// Only bother with this because we're not using a memory limit. We don't
+			// care about heap growths as long as we're under the memory limit, and the
+			// previous check for scaving already handles that.
+			if retained := heapRetained(); retained+uint64(growth) > goal {
+				// The scavenging algorithm requires the heap lock to be dropped so it
+				// can acquire it only sparingly. This is a potentially expensive operation
+				// so it frees up other goroutines to allocate in the meanwhile. In fact,
+				// they can make use of the growth we just created.
+				todo := growth
+				if overage := uintptr(retained + uint64(growth) - goal); todo > overage {
+					todo = overage
+				}
+				if todo > bytesToScavenge {
+					bytesToScavenge = todo
+				}
 			}
 		}
 	}
@@ -1307,7 +1309,7 @@ HaveSpan:
 	// It's OK to simply skip scavenging in these cases. Something else will notice
 	// and pick up the tab.
 	var now int64
-	if pp != nil && bytesToScavenge > 0 {
+	if !noos && pp != nil && bytesToScavenge > 0 {
 		// Measure how long we spent scavenging and add that measurement to the assist
 		// time so we can track it for the GC CPU limiter.
 		//
@@ -1654,6 +1656,9 @@ func (h *mheap) scavengeAll() {
 //go:linkname runtime_debug_freeOSMemory runtime/debug.freeOSMemory
 func runtime_debug_freeOSMemory() {
 	GC()
+	if noos {
+		return
+	}
 	systemstack(func() { mheap_.scavengeAll() })
 }
 
@@ -2064,7 +2069,7 @@ func (b *gcBits) bitp(n uintptr) (bytep *uint8, mask uint8) {
 	return b.bytep(n / 8), 1 << (n % 8)
 }
 
-const gcBitsChunkBytes = uintptr(64 << 10)
+const gcBitsChunkBytes = uintptr(64<<10)*_OS + noosGCBitsChunkBytes
 const gcBitsHeaderBytes = unsafe.Sizeof(gcBitsHeader{})
 
 type gcBitsHeader struct {

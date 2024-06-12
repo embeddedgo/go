@@ -9,15 +9,24 @@ import "internal/buildcfg"
 // For the linkers. Must match Go definitions.
 
 const (
-	STACKSYSTEM = 0
-	StackSystem = STACKSYSTEM
-	StackBig    = 4096
-	StackSmall  = 128
+	StackBig   = 4096
+	StackSmall = 128
 )
+
+var StackSystem, rawGuard int
+
+func init() {
+	if buildcfg.GOOS == "noos" && buildcfg.GOARCH == "thumb" {
+		StackSystem = 27 * 4
+		rawGuard = 464
+	} else {
+		rawGuard = 928
+	}
+}
 
 func StackLimit(race bool) int {
 	// This arithmetic must match that in runtime/stack.go:{_StackGuard,_StackLimit}.
-	stackGuard := 928*stackGuardMultiplier(race) + StackSystem
+	stackGuard := rawGuard*stackGuardMultiplier(race) + StackSystem
 	stackLimit := stackGuard - StackSystem - StackSmall
 	return stackLimit
 }

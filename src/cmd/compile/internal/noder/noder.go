@@ -7,6 +7,7 @@ package noder
 import (
 	"errors"
 	"fmt"
+	"internal/buildcfg"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -132,6 +133,9 @@ func (p *noder) processPragmas() {
 		}
 		n := ir.AsNode(typecheck.Lookup(l.local).Def)
 		if n == nil || n.Op() != ir.ONAME {
+			if buildcfg.GOOS == "noos" && filepath.Base(l.pos.RelFilename()) == "zisrnames.go" {
+				continue
+			}
 			if types.AllowsGoVersion(1, 18) {
 				p.errorAt(l.pos, "//go:linkname must refer to declared function or variable")
 			}
@@ -337,11 +341,14 @@ func (p *noder) pragma(pos syntax.Pos, blankLine bool, text string, old syntax.P
 		}
 		flag := pragmaFlag(verb)
 		const runtimePragmas = ir.Systemstack | ir.Nowritebarrier | ir.Nowritebarrierrec | ir.Yeswritebarrierrec
-		if !base.Flag.CompilingRuntime && flag&runtimePragmas != 0 {
+		if base.Ctxt.Headtype != objabi.Hnoos && !base.Flag.CompilingRuntime && flag&runtimePragmas != 0 {
 			p.error(syntax.Error{Pos: pos, Msg: fmt.Sprintf("//%s only allowed in runtime", verb)})
 		}
 		if flag == ir.UintptrKeepAlive && !base.Flag.Std {
 			p.error(syntax.Error{Pos: pos, Msg: fmt.Sprintf("//%s is only allowed in the standard library", verb)})
+		}
+		if flag == ir.Interrupthandler {
+			flag |= ir.Nosplit | ir.Nowritebarrierrec | ir.Nowritebarrier
 		}
 		if flag == 0 && !allowedStdPragmas[verb] && base.Flag.Std {
 			p.error(syntax.Error{Pos: pos, Msg: fmt.Sprintf("//%s is not allowed in the standard library", verb)})

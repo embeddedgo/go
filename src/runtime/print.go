@@ -25,7 +25,7 @@ func bytes(s string) (ret []byte) {
 var (
 	// printBacklog is a circular buffer of messages written with the builtin
 	// print* functions, for use in postmortem analysis of core dumps.
-	printBacklog      [512]byte
+	printBacklog      [256 * (1 + _OS)]byte
 	printBacklogIndex int
 )
 
@@ -63,6 +63,9 @@ var debuglock mutex
 // For both these reasons, let a thread acquire the printlock 'recursively'.
 
 func printlock() {
+	if isr() {
+		return
+	}
 	mp := getg().m
 	mp.locks++ // do not reschedule between printlock++ and lock(&debuglock).
 	mp.printlock++
@@ -73,6 +76,9 @@ func printlock() {
 }
 
 func printunlock() {
+	if isr() {
+		return
+	}
 	mp := getg().m
 	mp.printlock--
 	if mp.printlock == 0 {
@@ -195,7 +201,7 @@ func printcomplex(c complex128) {
 }
 
 func printuint(v uint64) {
-	var buf [100]byte
+	var buf [24]byte
 	i := len(buf)
 	for i--; i > 0; i-- {
 		buf[i] = byte(v%10 + '0')
@@ -219,7 +225,7 @@ var minhexdigits = 0 // protected by printlock
 
 func printhex(v uint64) {
 	const dig = "0123456789abcdef"
-	var buf [100]byte
+	var buf [20]byte
 	i := len(buf)
 	for i--; i > 0; i-- {
 		buf[i] = dig[v%16]

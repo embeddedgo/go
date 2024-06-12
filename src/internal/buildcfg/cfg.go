@@ -81,6 +81,10 @@ func goarm() int {
 		return 6
 	case "7":
 		return 7
+	case "7f", "7F":
+		return 0x7F
+	case "7d", "7D":
+		return 0x7D
 	}
 	Error = fmt.Errorf("invalid GOARM: must be 5, 6, 7")
 	return int(def[0] - '0')

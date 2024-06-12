@@ -52,10 +52,29 @@ var depsRules = `
 	internal/goarch, unsafe
 	< internal/abi;
 
+	# MMIO used by noos runtime
+	unsafe
+	< embedded/mmio
+	< internal/cpu/cortexm,
+	  internal/cpu/cortexm/acc,
+	  internal/cpu/cortexm/bitband,
+	  internal/cpu/cortexm/cmt,
+	  internal/cpu/cortexm/debug/itm,
+	  internal/cpu/cortexm/fpu,
+	  internal/cpu/cortexm/mpu,
+	  internal/cpu/cortexm/nvic,
+	  internal/cpu/cortexm/pft,
+	  internal/cpu/cortexm/scb,
+	  internal/cpu/cortexm/scid,
+	  internal/cpu/cortexm/systick,
+	  internal/cpu/riscv/clint,
+	  internal/cpu/riscv/plic
+	< MMIO;
+
 	# RUNTIME is the core runtime group of packages, all of them very light-weight.
 	internal/abi, internal/cpu, internal/goarch,
 	internal/coverage/rtcov, internal/goexperiment,
-	internal/goos, unsafe
+	internal/goos, unsafe, MMIO
 	< internal/bytealg
 	< internal/itoa
 	< internal/unsafeheader
@@ -143,7 +162,7 @@ var depsRules = `
 	# OS does not include reflection.
 	io/fs
 	< internal/testlog
-	< internal/poll
+	< internal/poll, embedded/rtos
 	< internal/safefilepath
 	< os
 	< os/signal;
@@ -596,6 +615,14 @@ var depsRules = `
 	internal/coverage/encodecounter, internal/coverage/encodemeta,
 	internal/coverage/pods
 	< runtime/coverage;
+
+	# Embedded Go packages
+
+	embedded/rtos, internal/cpu/cortexm/scb, internal/cpu/cortexm/systick
+	< embedded/arch/cortexm/systim;
+
+	embedded/rtos, internal/cpu/riscv/clint
+	< embedded/arch/riscv/systim;
 `
 
 // listStdPkgs returns the same list of packages as "go list std".

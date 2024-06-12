@@ -1095,6 +1095,9 @@ func recovery(gp *g) {
 	// this time returning 1. The calling function will
 	// jump to the standard return epilogue.
 	gp.sched.sp = sp
+	if GOARCH == "thumb" {
+		pc |= 1
+	}
 	gp.sched.pc = pc
 	gp.sched.lr = 0
 	gp.sched.ret = 1

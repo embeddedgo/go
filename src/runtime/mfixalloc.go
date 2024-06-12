@@ -67,7 +67,17 @@ func (f *fixalloc) init(size uintptr, first func(arg, p unsafe.Pointer), arg uns
 	f.list = nil
 	f.chunk = 0
 	f.nchunk = 0
-	f.nalloc = uint32(_FixAllocChunk / size * size) // Round _FixAllocChunk down to an exact multiple of size to eliminate tail waste
+	if noos {
+		nalloc := size
+		if size == unsafe.Sizeof(mspan{}) {
+			nalloc *= 16 * (1 + _64bit) // more for mspan{} allocator
+		} else {
+			nalloc *= 2 * (1 + _64bit)
+		}
+		f.nalloc = uint32(nalloc)
+	} else {
+		f.nalloc = uint32(_FixAllocChunk / size * size) // Round _FixAllocChunk down to an exact multiple of size to eliminate tail waste
+	}
 	f.inuse = 0
 	f.stat = stat
 	f.zero = true

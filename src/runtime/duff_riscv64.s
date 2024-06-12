@@ -4,6 +4,7 @@
 
 #include "textflag.h"
 
+// dst: X25 (S9)
 TEXT runtime·duffzero<ABIInternal>(SB), NOSPLIT|NOFRAME, $0-0
 	MOV	ZERO, (X25)
 	ADD	$8, X25
@@ -263,6 +264,7 @@ TEXT runtime·duffzero<ABIInternal>(SB), NOSPLIT|NOFRAME, $0-0
 	ADD	$8, X25
 	RET
 
+// src: X24 (S8), dst: X25 (S9)
 TEXT runtime·duffcopy<ABIInternal>(SB), NOSPLIT|NOFRAME, $0-0
 	MOV	(X24), X31
 	ADD	$8, X24
