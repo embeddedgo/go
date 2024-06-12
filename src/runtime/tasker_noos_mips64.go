@@ -23,8 +23,6 @@ type mOS struct {
 	sp, fp, ra, epc uintptr
 }
 
-var bbplayer bool // TODO move to n64 board support package
-
 var (
 	cpu0  cpuctx
 	pcpu0 = &cpu0
@@ -121,32 +119,18 @@ func curcpuSchedule() {
 	curcpu().schedule = true
 }
 
+//go:nowritebarrierrec
+//go:nosplit
+func defaultWrite(fd int, p []byte) int {
+	return targetDefaultWrite(fd, p)
+}
+
 // only called from ISR, do not use
 func enterScheduler()
 func saveGPRs()
 func restoreGPRs()
 func saveFPRs()
 func restoreFPRs()
-
-var lastlog [1024 * 16]byte
-var lastidx = 0
-
-// Just write into some ringbuffer for now, which can be inspected in a memory
-// dump.
-//
-//go:nowritebarrierrec
-//go:nosplit
-func defaultWrite(fd int, p []byte) int {
-	for i := 0; i < len(p); i++ {
-		lastlog[lastidx] = p[i]
-		lastidx += 1
-		if lastidx >= len(lastlog) {
-			lastidx = 0
-		}
-	}
-	return len(p)
-}
-
 func unhandledExternalInterrupt()
 
 // syscalls not used by runtime
