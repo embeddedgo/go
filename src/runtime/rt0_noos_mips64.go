@@ -3,6 +3,7 @@ package runtime
 import "unsafe"
 
 const pallocMin = 20 * 1024
+const signalStackSize = 4096
 
 //go:nosplit
 func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd uintptr) {
