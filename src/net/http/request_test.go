@@ -766,18 +766,18 @@ func TestRequestWriteBufferedWriter(t *testing.T) {
 	}
 }
 
-func TestRequestBadHost(t *testing.T) {
+func TestRequestBadHostHeader(t *testing.T) {
 	got := []string{}
 	req, err := NewRequest("GET", "http://foo/after", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Host = "foo.com with spaces"
-	req.URL.Host = "foo.com with spaces"
+	req.Host = "foo.com\nnewline"
+	req.URL.Host = "foo.com\nnewline"
 	req.Write(logWrites{t, &got})
 	want := []string{
 		"GET /after HTTP/1.1\r\n",
-		"Host: foo.com\r\n",
+		"Host: \r\n",
 		"User-Agent: " + DefaultUserAgent + "\r\n",
 		"\r\n",
 	}
