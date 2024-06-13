@@ -570,6 +570,12 @@ func pipe2(flags int32) (r, w int32, errno int32) {
 }
 
 //go:nosplit
+func fcntl(fd, cmd, arg int32) (ret int32, errno int32) {
+	r1, err := sysvicall3Err(&libc_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg))
+	return int32(r1), int32(err)
+}
+
+//go:nosplit
 func closeonexec(fd int32) {
 	fcntl(fd, _F_SETFD, _FD_CLOEXEC)
 }

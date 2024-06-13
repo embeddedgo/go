@@ -11,6 +11,7 @@ import (
 	"internal/syscall/unix"
 	"runtime"
 	"syscall"
+	_ "unsafe" // for go:linkname
 )
 
 // fixLongPath is a noop on non-Windows platforms.
@@ -106,6 +107,22 @@ func NewFile(fd uintptr, name string) *File {
 	return newFile(fd, name, kind)
 }
 
+// net_newUnixFile is a hidden entry point called by net.conn.File.
+// This is used so that a nonblocking network connection will become
+// blocking if code calls the Fd method. We don't want that for direct
+// calls to NewFile: passing a nonblocking descriptor to NewFile should
+// remain nonblocking if you get it back using Fd. But for net.conn.File
+// the call to NewFile is hidden from the user. Historically in that case
+// the Fd method has returned a blocking descriptor, and we want to
+// retain that behavior because existing code expects it and depends on it.
+//
+//go:linkname net_newUnixFile net.newUnixFile
+func net_newUnixFile(fd uintptr, name string) *File {
+	f := newFile(fd, name, kindNonBlock)
+	f.nonblock = true // tell Fd to return blocking descriptor
+	return f
+}
+
 // newFileKind describes the kind of file to newFile.
 type newFileKind int
 
@@ -171,7 +188,9 @@ func newFile(fd uintptr, name string, kind newFileKind) *File {
 	clearNonBlock := false
 	if pollable {
 		if kind == kindNonBlock {
-			f.nonblock = true
+			// The descriptor is already in non-blocking mode.
+			// We only set f.nonblock if we put the file into
+			// non-blocking mode.
 		} else if err := syscall.SetNonblock(fdi, true); err == nil {
 			f.nonblock = true
 			clearNonBlock = true
@@ -247,7 +266,12 @@ func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
 		syscall.CloseOnExec(r)
 	}
 
-	return newFile(uintptr(r), name, kindOpenFile), nil
+	kind := kindOpenFile
+	if unix.HasNonblockFlag(flag) {
+		kind = kindNonBlock
+	}
+
+	return newFile(uintptr(r), name, kind), nil
 }
 
 func (file *file) close() error {

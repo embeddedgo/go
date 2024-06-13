@@ -31,6 +31,7 @@
 #define SYS___sysctl		202
 #define SYS_clock_gettime	232
 #define SYS_nanosleep		240
+#define SYS_issetugid		253
 #define SYS_sched_yield		331
 #define SYS_sigprocmask		340
 #define SYS_kqueue		362
@@ -451,6 +452,19 @@ TEXT runtime·kevent(SB),NOSPLIT,$0
 	MOVL	AX, ret+24(FP)
 	RET
 
+// func fcntl(fd, cmd, arg int32) (int32, int32)
+TEXT runtime·fcntl(SB),NOSPLIT,$-4
+	MOVL	$SYS_fcntl, AX
+	INT	$0x80
+	JAE	noerr
+	MOVL	$-1, ret+12(FP)
+	MOVL	AX, errno+16(FP)
+	RET
+noerr:
+	MOVL	AX, ret+12(FP)
+	MOVL	$0, errno+16(FP)
+	RET
+
 // int32 runtime·closeonexec(int32 fd);
 TEXT runtime·closeonexec(SB),NOSPLIT,$32
 	MOVL	$SYS_fcntl, AX
@@ -474,3 +488,10 @@ TEXT runtime·cpuset_getaffinity(SB), NOSPLIT, $0-28
 	RET
 
 GLOBL runtime·tlsoffset(SB),NOPTR,$4
+
+// func issetugid() int32
+TEXT runtime·issetugid(SB),NOSPLIT,$0
+	MOVL	$SYS_issetugid, AX
+	INT	$0x80
+	MOVL	AX, ret+0(FP)
+	RET

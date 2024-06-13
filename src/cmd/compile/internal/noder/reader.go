@@ -231,6 +231,16 @@ func (r *reader) pos() src.XPos {
 	return base.Ctxt.PosTable.XPos(r.pos0())
 }
 
+// origPos reads a position from the bitstream, and returns both the
+// original raw position and an inlining-adjusted position.
+func (r *reader) origPos() (origPos, inlPos src.XPos) {
+	r.suppressInlPos++
+	origPos = r.pos()
+	r.suppressInlPos--
+	inlPos = r.inlPos(origPos)
+	return
+}
+
 func (r *reader) pos0() src.Pos {
 	r.Sync(pkgbits.SyncPos)
 	if !r.Bool() {
@@ -517,13 +527,33 @@ func (r *reader) doTyp() *types.Type {
 }
 
 func (r *reader) unionType() *types.Type {
-	terms := make([]*types.Type, r.Len())
-	tildes := make([]bool, len(terms))
-	for i := range terms {
-		tildes[i] = r.Bool()
-		terms[i] = r.typ()
+	// In the types1 universe, we only need to handle value types.
+	// Impure interfaces (i.e., interfaces with non-trivial type sets
+	// like "int | string") can only appear as type parameter bounds,
+	// and this is enforced by the types2 type checker.
+	//
+	// However, type unions can still appear in pure interfaces if the
+	// type union is equivalent to "any". E.g., typeparam/issue52124.go
+	// declares variables with the type "interface { any | int }".
+	//
+	// To avoid needing to represent type unions in types1 (since we
+	// don't have any uses for that today anyway), we simply fold them
+	// to "any". As a consistency check, we still read the union terms
+	// to make sure this substitution is safe.
+
+	pure := false
+	for i, n := 0, r.Len(); i < n; i++ {
+		_ = r.Bool() // tilde
+		term := r.typ()
+		if term.IsEmptyInterface() {
+			pure = true
+		}
 	}
-	return types.NewUnion(terms, tildes)
+	if !pure {
+		base.Fatalf("impure type set used in value type")
+	}
+
+	return types.Types[types.TINTER]
 }
 
 func (r *reader) interfaceType() *types.Type {
@@ -2097,12 +2127,12 @@ func (r *reader) expr() (res ir.Node) {
 		return typecheck.Callee(r.obj())
 
 	case exprFuncInst:
-		pos := r.pos()
+		origPos, pos := r.origPos()
 		wrapperFn, baseFn, dictPtr := r.funcInst(pos)
 		if wrapperFn != nil {
 			return wrapperFn
 		}
-		return r.curry(pos, false, baseFn, dictPtr, nil)
+		return r.curry(origPos, false, baseFn, dictPtr, nil)
 
 	case exprConst:
 		pos := r.pos()
@@ -2132,7 +2162,7 @@ func (r *reader) expr() (res ir.Node) {
 
 	case exprMethodVal:
 		recv := r.expr()
-		pos := r.pos()
+		origPos, pos := r.origPos()
 		wrapperFn, baseFn, dictPtr := r.methodExpr()
 
 		// For simple wrapperFn values, the existing machinery for creating
@@ -2164,7 +2194,18 @@ func (r *reader) expr() (res ir.Node) {
 			}
 
 			n := typecheck.Expr(ir.NewSelectorExpr(pos, ir.OXDOT, recv, wrapperFn.Sel)).(*ir.SelectorExpr)
-			assert(n.Selection == wrapperFn.Selection)
+
+			// As a consistency check here, we make sure "n" selected the
+			// same method (represented by a types.Field) that wrapperFn
+			// selected. However, for anonymous receiver types, there can be
+			// multiple such types.Field instances (#58563). So we may need
+			// to fallback to making sure Sym and Type (including the
+			// receiver parameter's type) match.
+			if n.Selection != wrapperFn.Selection {
+				assert(n.Selection.Sym == wrapperFn.Selection.Sym)
+				assert(types.Identical(n.Selection.Type, wrapperFn.Selection.Type))
+				assert(types.Identical(n.Selection.Type.Recv().Type, wrapperFn.Selection.Type.Recv().Type))
+			}
 
 			wrapper := methodValueWrapper{
 				rcvr:   n.X.Type(),
@@ -2181,7 +2222,7 @@ func (r *reader) expr() (res ir.Node) {
 
 		// For more complicated method expressions, we construct a
 		// function literal wrapper.
-		return r.curry(pos, true, baseFn, recv, dictPtr)
+		return r.curry(origPos, true, baseFn, recv, dictPtr)
 
 	case exprMethodExpr:
 		recv := r.typ()
@@ -2197,7 +2238,7 @@ func (r *reader) expr() (res ir.Node) {
 			addr = true
 		}
 
-		pos := r.pos()
+		origPos, pos := r.origPos()
 		wrapperFn, baseFn, dictPtr := r.methodExpr()
 
 		// If we already have a wrapper and don't need to do anything with
@@ -2220,7 +2261,7 @@ func (r *reader) expr() (res ir.Node) {
 			return typecheck.Expr(ir.NewSelectorExpr(pos, ir.OXDOT, ir.TypeNode(recv), method.Sel)).(*ir.SelectorExpr)
 		}
 
-		return r.methodExprWrap(pos, recv, implicits, deref, addr, baseFn, dictPtr)
+		return r.methodExprWrap(origPos, recv, implicits, deref, addr, baseFn, dictPtr)
 
 	case exprIndex:
 		x := r.expr()
@@ -2550,7 +2591,7 @@ func (pr *pkgReader) objDictName(idx pkgbits.Index, implicits, explicits []*type
 // If nilCheck is true and arg0 is an interface value, then it's
 // checked to be non-nil as an initial step at the point of evaluating
 // the function literal itself.
-func (r *reader) curry(pos src.XPos, ifaceHack bool, fun ir.Node, arg0, arg1 ir.Node) ir.Node {
+func (r *reader) curry(origPos src.XPos, ifaceHack bool, fun ir.Node, arg0, arg1 ir.Node) ir.Node {
 	var captured ir.Nodes
 	captured.Append(fun, arg0)
 	if arg1 != nil {
@@ -2574,13 +2615,13 @@ func (r *reader) curry(pos src.XPos, ifaceHack bool, fun ir.Node, arg0, arg1 ir.
 		r.syntheticTailCall(pos, fun, args)
 	}
 
-	return r.syntheticClosure(pos, typ, ifaceHack, captured, addBody)
+	return r.syntheticClosure(origPos, typ, ifaceHack, captured, addBody)
 }
 
 // methodExprWrap returns a function literal that changes method's
 // first parameter's type to recv, and uses implicits/deref/addr to
 // select the appropriate receiver parameter to pass to method.
-func (r *reader) methodExprWrap(pos src.XPos, recv *types.Type, implicits []int, deref, addr bool, method, dictPtr ir.Node) ir.Node {
+func (r *reader) methodExprWrap(origPos src.XPos, recv *types.Type, implicits []int, deref, addr bool, method, dictPtr ir.Node) ir.Node {
 	var captured ir.Nodes
 	captured.Append(method)
 
@@ -2631,12 +2672,13 @@ func (r *reader) methodExprWrap(pos src.XPos, recv *types.Type, implicits []int,
 		r.syntheticTailCall(pos, fn, args)
 	}
 
-	return r.syntheticClosure(pos, typ, false, captured, addBody)
+	return r.syntheticClosure(origPos, typ, false, captured, addBody)
 }
 
 // syntheticClosure constructs a synthetic function literal for
-// currying dictionary arguments. pos is the position used for the
-// closure. typ is the function literal's signature type.
+// currying dictionary arguments. origPos is the position used for the
+// closure, which must be a non-inlined position. typ is the function
+// literal's signature type.
 //
 // captures is a list of expressions that need to be evaluated at the
 // point of function literal evaluation and captured by the function
@@ -2647,7 +2689,7 @@ func (r *reader) methodExprWrap(pos src.XPos, recv *types.Type, implicits []int,
 // list of captured values passed back has the captured variables for
 // use within the function literal, corresponding to the expressions
 // in captures.
-func (r *reader) syntheticClosure(pos src.XPos, typ *types.Type, ifaceHack bool, captures ir.Nodes, addBody func(pos src.XPos, r *reader, captured []ir.Node)) ir.Node {
+func (r *reader) syntheticClosure(origPos src.XPos, typ *types.Type, ifaceHack bool, captures ir.Nodes, addBody func(pos src.XPos, r *reader, captured []ir.Node)) ir.Node {
 	// isSafe reports whether n is an expression that we can safely
 	// defer to evaluating inside the closure instead, to avoid storing
 	// them into the closure.
@@ -2664,9 +2706,15 @@ func (r *reader) syntheticClosure(pos src.XPos, typ *types.Type, ifaceHack bool,
 		return false
 	}
 
-	fn := ir.NewClosureFunc(pos, r.curfn != nil)
+	// The ODCLFUNC and its body need to use the original position, but
+	// the OCLOSURE node and any Init statements should use the inlined
+	// position instead. See also the explanation in reader.funcLit.
+	inlPos := r.inlPos(origPos)
+
+	fn := ir.NewClosureFunc(origPos, r.curfn != nil)
 	fn.SetWrapper(true)
 	clo := fn.OClosure
+	clo.SetPos(inlPos)
 	ir.NameClosure(clo, r.curfn)
 
 	setType(fn.Nname, typ)
@@ -2679,13 +2727,13 @@ func (r *reader) syntheticClosure(pos src.XPos, typ *types.Type, ifaceHack bool,
 			continue // skip capture; can reference directly
 		}
 
-		tmp := r.tempCopy(pos, n, &init)
-		ir.NewClosureVar(pos, fn, tmp)
+		tmp := r.tempCopy(inlPos, n, &init)
+		ir.NewClosureVar(origPos, fn, tmp)
 
 		// We need to nil check interface receivers at the point of method
 		// value evaluation, ugh.
 		if ifaceHack && i == 1 && n.Type().IsInterface() {
-			check := ir.NewUnaryExpr(pos, ir.OCHECKNIL, ir.NewUnaryExpr(pos, ir.OITAB, tmp))
+			check := ir.NewUnaryExpr(inlPos, ir.OCHECKNIL, ir.NewUnaryExpr(inlPos, ir.OITAB, tmp))
 			init.Append(typecheck.Stmt(check))
 		}
 	}
@@ -2703,7 +2751,7 @@ func (r *reader) syntheticClosure(pos src.XPos, typ *types.Type, ifaceHack bool,
 		}
 		assert(next == len(r.closureVars))
 
-		addBody(pos, r, captured)
+		addBody(origPos, r, captured)
 	}}
 	bodyReader[fn] = pri
 	pri.funcBody(fn)
