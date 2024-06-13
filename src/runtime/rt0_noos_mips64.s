@@ -84,49 +84,23 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 
 	MOVV  R8, g  // set g to gh
 
-	JAL runtime·check(SB)
-	JAL runtime·osinit(SB)
+	JAL   runtime·check(SB)
+	JAL   runtime·osinit(SB)
 
 	// initialize noosMem
-
 	MOVV  $runtime·end(SB), R8
 	MOVV  $runtime·ramend(SB), R9
-	SUB   $4096, R9
-	SUB   R8, R9, R13  // size of available memory (DMA capable)
-
-	// estimate the space need for non-heap allocations
-	SRL   $(const__PageShift), R13, R12
-	MOVV  $mspan__size, R10
-	MUL   R10, R12
-	MOVV  LO, R12
-	ADD   $PALLOC_MIN, R12
-
 	MOVV  $runtime·nodmastart(SB), R10
 	MOVV  $runtime·nodmaend(SB), R11
-	SUB   R10, R11, R15  // size of non-DMA memory
-	ADD   R13, R15, R14  // size of the whole free memory
+	SUB   $4096, R9
 
-	// we prefer the non-DMA memory for non-heap objects to preserve as much as
-	// possible of the DMA capable memory for heap allocations
-	SUB   R15, R12
-
-	// reduce the arena by the remain of the non-heap space that did not fit in
-	// the non-DMA memory, properly align the arena
-	BLTZ  R12, 2(PC)
-	SUB   R12, R13
-	AND   $~(const_heapArenaBytes-1), R13
-	SUB   R13, R9
-	MOVV  R9, R12
-
-	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize,size}
-	MOVV  $runtime·noosMem(SB), R15
-	MOVV  R8, 0(R15)
-	MOVV  R9, 8(R15)
-	MOVV  R10, 16(R15)
-	MOVV  R11, 24(R15)
-	MOVV  R12, 32(R15)
-	MOVV  R13, 40(R15)
-	MOVV  R14, 48(R15)
+	SUB   $32, R29
+	MOVV  R8, 8(R29)
+	MOVV  R9, 16(R29)
+	MOVV  R10, 24(R29)
+	MOVV  R11, 32(R29)
+	JAL   runtime·meminit(SB)
+	ADD   $32, R29
 
 	// initialize noos tasker and Go scheduler
 	JAL  runtime·taskerinit(SB)
@@ -165,13 +139,13 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// TODO switch to the user mode?
 
 	// create a new goroutine to start program
-	SUB	$16, R29
-	MOVV	$runtime·mainPC(SB), R8
-	MOVV	R8, 8(R29)	// arg 1: fn
-	MOVV	$0, R8
-	MOVV	R8, 0(R29)	// dummy LR
-	JAL	runtime·newproc(SB)
-	ADD	$16, R29	// pop args and LR
+	SUB   $16, R29
+	MOVV  $runtime·mainPC(SB), R8
+	MOVV  R8, 8(R29)      // arg 1: fn
+	MOVV  $0, R8
+	MOVV  R8, 0(R29)      // dummy LR
+	JAL   runtime·newproc(SB)
+	ADD   $16, R29        // pop args and LR
 
 	// enable interrupts
 	// TODO where to enable interupts correctly?
