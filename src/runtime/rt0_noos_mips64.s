@@ -8,9 +8,6 @@
 #include "textflag.h"
 #include "asm_mips64.h"
 
-// BREAK is overloaded CACHE opcode. Register number specifies the cache op.
-#define CACHE BREAK
-
 TEXT _rt0_mips64_noos(SB),NOSPLIT|NOFRAME,$0
 	JMP ·rt0_target(SB)
 
@@ -51,10 +48,10 @@ loop:
 	MOVW R11, 0x80(R9)
 	MOVW R11, 0x100(R9)
 	MOVW R11, 0x180(R9)
-	CACHE R16, 0(R9)
-	CACHE R16, 0x80(R9)
-	CACHE R16, 0x100(R9)
-	CACHE R16, 0x180(R9)
+	CACHE HIT_INVALIDATE_I, 0(R9)
+	CACHE HIT_INVALIDATE_I, 0x80(R9)
+	CACHE HIT_INVALIDATE_I, 0x100(R9)
+	CACHE HIT_INVALIDATE_I, 0x180(R9)
 	ADD $4, R8
 	ADD $4, R9
 	ADDU $-1, R10
@@ -63,15 +60,13 @@ loop:
 	JMP runtime·rt0_go(SB)
 
 
-#define PALLOC_MIN 20*1024
-
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// setup main stack in cpu0.gh
 	MOVV  $runtime·cpu0(SB), R8  // gh is the first field of the cpuctx struct
 	MOVV  $runtime·ramend(SB), R29  // main stack starts at the end of memory
 	SUB   $16, R29
 	MOVV  R29, (g_stack+stack_hi)(R8)
-	SUB   $4096, R29, R9
+	SUB   $const_signalStackSize, R29, R9
 	MOVV  R9, (g_stack+stack_lo)(R8)
 	ADD   $const_stackGuard, R9
 	MOVV  R9, g_stackguard0(R8)
@@ -92,7 +87,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVV  $runtime·ramend(SB), R9
 	MOVV  $runtime·nodmastart(SB), R10
 	MOVV  $runtime·nodmaend(SB), R11
-	SUB   $4096, R9
+	SUB   $const_signalStackSize, R9
 
 	SUB   $32, R29
 	MOVV  R8, 8(R29)
@@ -103,8 +98,8 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	ADD   $32, R29
 
 	// initialize noos tasker and Go scheduler
-	JAL  runtime·taskerinit(SB)
-	JAL  runtime·schedinit(SB)
+	JAL   runtime·taskerinit(SB)
+	JAL   runtime·schedinit(SB)
 
 	// allocate g0 for m0 and leave gh
 	SUB   $16, R29
@@ -136,8 +131,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVV  R10, m_gsignal(R9)   // cpu0.mh.gsignal = cpu0.gh (to easily check for handler mode)
 	MOVV  R9, g_m(R10)         // cpu0.gh.m = cpu0.mh
 
-	// TODO switch to the user mode?
-
 	// create a new goroutine to start program
 	SUB   $16, R29
 	MOVV  $runtime·mainPC(SB), R8
@@ -145,13 +138,13 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVV  $0, R8
 	MOVV  R8, 0(R29)      // dummy LR
 	JAL   runtime·newproc(SB)
-	ADD   $16, R29        // pop args and LR
+	ADD   $16, R29
 
 	// enable interrupts
 	// TODO where to enable interupts correctly?
 	MOVW R0, M(C0_COMPARE)
 	MOVW M(C0_SR), R8
-	OR  $(SR_IE|INTR_SW|INTR_EXT), R8
+	OR   $(SR_IE|INTR_SW|INTR_EXT), R8
 	MOVW R8, M(C0_SR)
 
 	// start this M
