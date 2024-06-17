@@ -50,17 +50,17 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"unicode"
 )
 
 // isRuntimeDepPkg reports whether pkg is the runtime package or its dependency.
 func isRuntimeDepPkg(pkg string) bool {
 	switch pkg {
 	case "runtime",
-		"sync/atomic",      // runtime may call to sync/atomic, due to go:linkname
-		"internal/abi",     // used by reflectcall (and maybe more)
-		"internal/bytealg", // for IndexByte
-		"internal/cpu":     // for cpu features
+		"sync/atomic",          // runtime may call to sync/atomic, due to go:linkname
+		"internal/abi",         // used by reflectcall (and maybe more)
+		"internal/bytealg",     // for IndexByte
+		"internal/chacha8rand", // for rand
+		"internal/cpu":         // for cpu features
 		return true
 	}
 	return strings.HasPrefix(pkg, "runtime/internal/") && !strings.HasSuffix(pkg, "_test")
@@ -85,11 +85,15 @@ func maxSizeTrampolines(ctxt *Link, ldr *loader.Loader, s loader.Sym, isTramp bo
 		}
 	}
 
-	if ctxt.IsPPC64() {
-		return n * 16 // Trampolines in PPC64 are 4 instructions.
-	}
-	if ctxt.IsARM64() {
+	switch {
+	case ctxt.IsARM():
+		return n * 20 // Trampolines in ARM range from 3 to 5 instructions.
+	case ctxt.IsARM64():
 		return n * 12 // Trampolines in ARM64 are 3 instructions.
+	case ctxt.IsPPC64():
+		return n * 16 // Trampolines in PPC64 are 4 instructions.
+	case ctxt.IsRISCV64():
+		return n * 8 // Trampolines in RISCV64 are 2 instructions.
 	}
 	panic("unreachable")
 }
@@ -116,18 +120,21 @@ func trampoline(ctxt *Link, s loader.Sym) {
 			continue // something is wrong. skip it here and we'll emit a better error later
 		}
 
-		// RISC-V is only able to reach +/-1MiB via a JAL instruction,
-		// which we can readily exceed in the same package. As such, we
-		// need to generate trampolines when the address is unknown.
-		if ldr.SymValue(rs) == 0 && !ctxt.Target.IsRISCV64() && ldr.SymType(rs) != sym.SDYNIMPORT && ldr.SymType(rs) != sym.SUNDEFEXT {
+		if ldr.SymValue(rs) == 0 && ldr.SymType(rs) != sym.SDYNIMPORT && ldr.SymType(rs) != sym.SUNDEFEXT {
+			// Symbols in the same package are laid out together.
+			// Except that if SymPkg(s) == "", it is a host object symbol
+			// which may call an external symbol via PLT.
 			if ldr.SymPkg(s) != "" && ldr.SymPkg(rs) == ldr.SymPkg(s) {
-				// Symbols in the same package are laid out together.
-				// Except that if SymPkg(s) == "", it is a host object symbol
-				// which may call an external symbol via PLT.
-				continue
+				// RISC-V is only able to reach +/-1MiB via a JAL instruction.
+				// We need to generate a trampoline when an address is
+				// currently unknown.
+				if !ctxt.Target.IsRISCV64() {
+					continue
+				}
 			}
+			// Runtime packages are laid out together.
 			if isRuntimeDepPkg(ldr.SymPkg(s)) && isRuntimeDepPkg(ldr.SymPkg(rs)) {
-				continue // runtime packages are laid out together
+				continue
 			}
 		}
 		thearch.Trampoline(ctxt, ldr, ri, rs, s)
@@ -184,7 +191,7 @@ func FoldSubSymbolOffset(ldr *loader.Loader, s loader.Sym) (loader.Sym, int64) {
 //
 // This is a performance-critical function for the linker; be careful
 // to avoid introducing unnecessary allocations in the main loop.
-func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
+func (st *relocSymState) relocsym(s loader.Sym, P []byte) {
 	ldr := st.ldr
 	relocs := ldr.Relocs(s)
 	if relocs.Count() == 0 {
@@ -343,7 +350,7 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 			} else {
 				log.Fatalf("cannot handle R_TLS_IE (sym %s) when linking internally", ldr.SymName(s))
 			}
-		case objabi.R_ADDR:
+		case objabi.R_ADDR, objabi.R_PEIMAGEOFF:
 			if weak && !ldr.AttrReachable(rs) {
 				// Redirect it to runtime.unreachableMethod, which will throw if called.
 				rs = syms.unreachableMethod
@@ -366,7 +373,11 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 						o = 0
 					}
 				} else if target.IsDarwin() {
-					if ldr.SymType(rs) != sym.SHOSTOBJ {
+					if ldr.SymType(s).IsDWARF() {
+						// We generally use symbol-targeted relocations.
+						// DWARF tools seem to only handle section-targeted relocations,
+						// so generate section-targeted relocations in DWARF sections.
+						// See also machoreloc1.
 						o += ldr.SymValue(rs)
 					}
 				} else if target.IsWindows() {
@@ -396,12 +407,10 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 			}
 
 			o = ldr.SymValue(rs) + r.Add()
-
-			if !dwarf && target.IsThumb() && (ldr.SymType(r.Sym()) == sym.STEXT) {
-				if o&1 != 0 {
-					panic("relocsym: thumb bit already set")
-				}
-				o |= 1
+			if rt == objabi.R_PEIMAGEOFF {
+				// The R_PEIMAGEOFF offset is a RVA, so subtract
+				// the base address for the executable.
+				o -= PEBASE
 			}
 
 			// On amd64, 4-byte offsets will be sign-extended, so it is impossible to
@@ -449,14 +458,21 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 			if weak && !ldr.AttrReachable(rs) {
 				continue
 			}
-			if ldr.SymSect(rs) == nil {
-				st.err.Errorf(s, "unreachable sym in relocation: %s", ldr.SymName(rs))
+			sect := ldr.SymSect(rs)
+			if sect == nil {
+				if rst == sym.SDYNIMPORT {
+					st.err.Errorf(s, "cannot target DYNIMPORT sym in section-relative reloc: %s", ldr.SymName(rs))
+				} else if rst == sym.SUNDEFEXT {
+					st.err.Errorf(s, "undefined symbol in relocation: %s", ldr.SymName(rs))
+				} else {
+					st.err.Errorf(s, "missing section for relocation target %s", ldr.SymName(rs))
+				}
 				continue
 			}
 
 			// The method offset tables using this relocation expect the offset to be relative
 			// to the start of the first text section, even if there are multiple.
-			if ldr.SymSect(rs).Name == ".text" {
+			if sect.Name == ".text" {
 				o = ldr.SymValue(rs) - int64(Segtext.Sections[0].Vaddr) + r.Add()
 			} else {
 				o = ldr.SymValue(rs) - int64(ldr.SymSect(rs).Vaddr) + r.Add()
@@ -571,19 +587,17 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 		case 1:
 			P[off] = byte(int8(o))
 		case 2:
-			if o != int64(int16(o)) {
-				st.err.Errorf(s, "relocation address for %s is too big: %#x", ldr.SymName(rs), o)
+			if (rt == objabi.R_PCREL || rt == objabi.R_CALL) && o != int64(int16(o)) {
+				st.err.Errorf(s, "pc-relative relocation address for %s is too big: %#x", ldr.SymName(rs), o)
+			} else if o != int64(int16(o)) && o != int64(uint16(o)) {
+				st.err.Errorf(s, "non-pc-relative relocation address for %s is too big: %#x", ldr.SymName(rs), uint64(o))
 			}
 			target.Arch.ByteOrder.PutUint16(P[off:], uint16(o))
 		case 4:
-			if rt == objabi.R_PCREL || rt == objabi.R_CALL {
-				if o != int64(int32(o)) {
-					st.err.Errorf(s, "pc-relative relocation address for %s is too big: %#x", ldr.SymName(rs), o)
-				}
-			} else {
-				if o != int64(int32(o)) && o != int64(uint32(o)) {
-					st.err.Errorf(s, "non-pc-relative relocation address for %s is too big: %#x", ldr.SymName(rs), uint64(o))
-				}
+			if (rt == objabi.R_PCREL || rt == objabi.R_CALL) && o != int64(int32(o)) {
+				st.err.Errorf(s, "pc-relative relocation address for %s is too big: %#x", ldr.SymName(rs), o)
+			} else if o != int64(int32(o)) && o != int64(uint32(o)) {
+				st.err.Errorf(s, "non-pc-relative relocation address for %s is too big: %#x", ldr.SymName(rs), uint64(o))
 			}
 			target.Arch.ByteOrder.PutUint32(P[off:], uint32(o))
 		case 8:
@@ -637,7 +651,7 @@ func extreloc(ctxt *Link, ldr *loader.Loader, s loader.Sym, r loader.Reloc) (loa
 		}
 		return rr, false
 
-	case objabi.R_ADDR:
+	case objabi.R_ADDR, objabi.R_PEIMAGEOFF:
 		// set up addend for eventual relocation via outer symbol.
 		rs := r.Sym()
 		if r.Weak() && !ldr.AttrReachable(rs) {
@@ -964,15 +978,15 @@ const blockSize = 1 << 20 // 1MB chunks written at a time.
 // blocks, waiting on the writes to complete. Note that we use the sem parameter
 // to limit the number of concurrent writes taking place.
 func writeBlocks(ctxt *Link, out *OutBuf, sem chan int, ldr *loader.Loader, syms []loader.Sym, addr, size int64, pad []byte) {
-	var wg sync.WaitGroup
-	max, lastAddr, written := int64(blockSize), addr+size, int64(0)
-	syms1 := make([]loader.Sym, 0, len(syms))
-	for _, s := range syms {
-		if a := ldr.SymValue(s); addr <= a && a < lastAddr && !ldr.AttrSubSymbol(s) {
-			syms1 = append(syms1, s)
+	for i, s := range syms {
+		if ldr.SymValue(s) >= addr && !ldr.AttrSubSymbol(s) {
+			syms = syms[i:]
+			break
 		}
 	}
-	syms = syms1
+
+	var wg sync.WaitGroup
+	max, lastAddr, written := int64(blockSize), addr+size, int64(0)
 	for addr < lastAddr {
 		// Find the last symbol we'd write.
 		idx := -1
@@ -1064,7 +1078,7 @@ func writeBlock(ctxt *Link, out *OutBuf, ldr *loader.Loader, syms []loader.Sym, 
 			break
 		}
 		if val < addr {
-			ldr.Errorf(s, "phase error: addr=%#x but sym=%#x type=%v sect=%v", addr, val, ldr.SymType(s), ldr.SymSect(s).Name)
+			ldr.Errorf(s, "phase error: addr=%#x but val=%#x sym=%s type=%v sect=%v sect.addr=%#x", addr, val, ldr.SymName(s), ldr.SymType(s), ldr.SymSect(s).Name, ldr.SymSect(s).Vaddr)
 			errorexit()
 		}
 		if addr < val {
@@ -1072,8 +1086,9 @@ func writeBlock(ctxt *Link, out *OutBuf, ldr *loader.Loader, syms []loader.Sym, 
 			addr = val
 		}
 		P := out.WriteSym(ldr, s)
-		st.relocsym(s, P, false)
-		if f, ok := ctxt.generatorSyms[s]; ok {
+		st.relocsym(s, P)
+		if ldr.IsGeneratedSym(s) {
+			f := ctxt.generatorSyms[s]
 			f(ctxt, s)
 		}
 		addr += int64(len(P))
@@ -1144,6 +1159,14 @@ func dwarfblk(ctxt *Link, out *OutBuf, addr int64, size int64) {
 		syms = append(syms, dwarfp[i].syms...)
 	}
 	writeBlocks(ctxt, out, ctxt.outSem, ctxt.loader, syms, addr, size, zeros[:])
+}
+
+func pdatablk(ctxt *Link, out *OutBuf, addr int64, size int64) {
+	writeBlocks(ctxt, out, ctxt.outSem, ctxt.loader, sehp.pdata, addr, size, zeros[:])
+}
+
+func xdatablk(ctxt *Link, out *OutBuf, addr int64, size int64) {
+	writeBlocks(ctxt, out, ctxt.outSem, ctxt.loader, sehp.xdata, addr, size, zeros[:])
 }
 
 var covCounterDataStartOff, covCounterDataLen uint64
@@ -1341,9 +1364,19 @@ func (p *GCProg) AddSym(s loader.Sym) {
 // (see issue #9862).
 const cutoff = 2e9 // 2 GB (or so; looks better in errors than 2^31)
 
+// check accumulated size of data sections
 func (state *dodataState) checkdatsize(symn sym.SymKind) {
 	if state.datsize > cutoff {
-		Errorf(nil, "too much data in section %v (over %v bytes)", symn, cutoff)
+		Errorf(nil, "too much data, last section %v (%d, over %v bytes)", symn, state.datsize, cutoff)
+	}
+}
+
+func checkSectSize(sect *sym.Section) {
+	// TODO: consider using 4 GB size limit for DWARF sections, and
+	// make sure we generate unsigned offset in relocations and check
+	// for overflow.
+	if sect.Length > cutoff {
+		Errorf(nil, "too much data in section %s (%d, over %v bytes)", sect.Name, sect.Length, cutoff)
 	}
 }
 
@@ -1395,6 +1428,20 @@ func fixZeroSizedSymbols(ctxt *Link) {
 		// XCOFFTOC symbols are part of .data section.
 		edata.SetType(sym.SXCOFFTOC)
 	}
+
+	noptrbss := ldr.CreateSymForUpdate("runtime.noptrbss", 0)
+	noptrbss.SetSize(8)
+	ldr.SetAttrSpecial(noptrbss.Sym(), false)
+
+	enoptrbss := ldr.CreateSymForUpdate("runtime.enoptrbss", 0)
+	ldr.SetAttrSpecial(enoptrbss.Sym(), false)
+
+	noptrdata := ldr.CreateSymForUpdate("runtime.noptrdata", 0)
+	noptrdata.SetSize(8)
+	ldr.SetAttrSpecial(noptrdata.Sym(), false)
+
+	enoptrdata := ldr.CreateSymForUpdate("runtime.enoptrdata", 0)
+	ldr.SetAttrSpecial(enoptrdata.Sym(), false)
 
 	types := ldr.CreateSymForUpdate("runtime.types", 0)
 	types.SetType(sym.STYPE)
@@ -1542,65 +1589,6 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 	// Collect data symbols by type into data.
 	state := dodataState{ctxt: ctxt, symGroupType: symGroupType}
 	ldr := ctxt.loader
-
-	if ctxt.HeadType == objabi.Hnoos {
-		// leave some read-only variables in Flash (hack to save RAM)
-		for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
-			if t := state.symType(s); t != sym.SDATA && t != sym.SNOPTRDATA {
-				continue
-			}
-			name := ldr.SymName(s)
-			if len(name) > 8 && strings.HasPrefix(name, "unicode.") {
-				uname := name[8:]
-				if unicode.IsUpper(rune(uname[0])) || strings.HasPrefix(uname, ".stmp_") || strings.HasPrefix(uname, "fold") {
-					state.setSymType(s, sym.SRODATA)
-					continue
-				}
-			}
-			switch name {
-			case "embedded/rtos.errorsByNumber",
-				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
-				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
-				"math._lgamV", "math._lgamW", "math._sin", "math._cos",
-				"math.pow10tab", "math.pow10postab32", "math.pow10negtab32",
-				"math.tanhP", "math.tanhQ", "math._gamP", "math._gamQ",
-				"math._gamS",
-				"math/big.pow5tab", "math/big._Accuracy_index",
-				"math/big._RoundingMode_index",
-				"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
-				"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
-				"runtime.staticuint64s", "runtime.oneptrmask",
-				"runtime.fastlog2Table", "runtime.class_to_size",
-				"runtime.class_to_allocnpages", "runtime.class_to_divmagic",
-				"runtime.size_to_class8", "runtime.size_to_class128",
-				"runtime.waitReasonStrings", "runtime.boundsErrorFmts",
-				"runtime.boundsNegErrorFmts", "runtime.finalizer1",
-				"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
-				"runtime.emptymspan", "runtime.levelBits", "runtime.levelShift",
-				"runtime.levelLogPages", "runtime.consec8tab",
-				"runtime/internal/sys.len8tab", "runtime/internal/sys.ntz8tab",
-				"runtime/internal/sys.deBruijn64tab",
-				"runtime/internal/sys.deBruijnIdx64ctz",
-				"runtime/internal/sys.deBruijnIdx32ctz",
-				"strconv.detailedPowersOfTen",
-				"strconv.uint64pow10", "strconv.leftcheats",
-				"strconv.isPrint32", "strconv.isPrint16",
-				"strconv.isNotPrint32", "strconv.isNotPrint16",
-				"strconv.isGraphic", "strconv.float64info",
-				"strconv.float32info",
-				"strings.asciiSpace",
-				"syscall.errors",
-				"time.std0x", "time.longDayNames", "time.shortDayNames",
-				"time.shortMonthNames", "time.longMonthNames", "time.",
-				"time.daysBefore", "time.utcLoc",
-				"unicode.properties", "unicode.asciiFold", "unicode.caseOrbit",
-				"unicode/utf8.first", "unicode/utf8.acceptRanges":
-
-				state.setSymType(s, sym.SRODATA)
-			}
-		}
-	}
-
 	for s := loader.Sym(1); s < loader.Sym(ldr.NSym()); s++ {
 		if !ldr.AttrReachable(s) || ldr.AttrSpecial(s) || ldr.AttrSubSymbol(s) ||
 			!ldr.TopLevelSym(s) {
@@ -1700,6 +1688,8 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 	// data/rodata (and related) symbols.
 	state.allocateDataSections(ctxt)
 
+	state.allocateSEHSections(ctxt)
+
 	// Create *sym.Section objects and assign symbols to sections for
 	// DWARF symbols.
 	state.allocateDwarfSections(ctxt)
@@ -1727,15 +1717,26 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 		sect.Extnum = n
 		n++
 	}
+	for _, sect := range Segpdata.Sections {
+		sect.Extnum = n
+		n++
+	}
+	for _, sect := range Segxdata.Sections {
+		sect.Extnum = n
+		n++
+	}
 }
 
-// allocateDataSectionForSym creates a new sym.Section into which a a
+// allocateDataSectionForSym creates a new sym.Section into which a
 // single symbol will be placed. Here "seg" is the segment into which
 // the section will go, "s" is the symbol to be placed into the new
 // section, and "rwx" contains permissions for the section.
 func (state *dodataState) allocateDataSectionForSym(seg *sym.Segment, s loader.Sym, rwx int) *sym.Section {
 	ldr := state.ctxt.loader
 	sname := ldr.SymName(s)
+	if strings.HasPrefix(sname, "go:") {
+		sname = ".go." + sname[len("go:"):]
+	}
 	sect := addsection(ldr, state.ctxt.Arch, seg, sname, rwx)
 	sect.Align = symalign(ldr, s)
 	state.datsize = Rnd(state.datsize, int64(sect.Align))
@@ -1996,13 +1997,6 @@ func (state *dodataState) allocateDataSections(ctxt *Link) {
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.types", 0), sect)
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.etypes", 0), sect)
 	}
-	if ctxt.HeadType == objabi.Hnoos {
-		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.ramstart", 0), sect)
-		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.ramend", 0), sect)
-		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.romdata", 0), sect)
-		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.nodmastart", 0), sect)
-		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.nodmaend", 0), sect)
-	}
 	for _, symn := range sym.ReadOnly {
 		symnStartValue := state.datsize
 		if len(state.data[symn]) != 0 {
@@ -2199,7 +2193,22 @@ func (state *dodataState) allocateDwarfSections(ctxt *Link) {
 			}
 		}
 		sect.Length = uint64(state.datsize) - sect.Vaddr
-		state.checkdatsize(curType)
+		checkSectSize(sect)
+	}
+}
+
+// allocateSEHSections allocate a sym.Section object for SEH
+// symbols, and assigns symbols to sections.
+func (state *dodataState) allocateSEHSections(ctxt *Link) {
+	if len(sehp.pdata) > 0 {
+		sect := state.allocateNamedDataSection(&Segpdata, ".pdata", []sym.SymKind{}, 04)
+		state.assignDsymsToSection(sect, sehp.pdata, sym.SRODATA, aligndatsize)
+		state.checkdatsize(sym.SSEHSECT)
+	}
+	if len(sehp.xdata) > 0 {
+		sect := state.allocateNamedDataSection(&Segxdata, ".xdata", []sym.SymKind{}, 04)
+		state.assignDsymsToSection(sect, sehp.xdata, sym.SRODATA, aligndatsize)
+		state.checkdatsize(sym.SSEHSECT)
 	}
 }
 
@@ -2211,12 +2220,22 @@ type symNameSize struct {
 }
 
 func (state *dodataState) dodataSect(ctxt *Link, symn sym.SymKind, syms []loader.Sym) (result []loader.Sym, maxAlign int32) {
-	var head, tail loader.Sym
+	var head, tail, zerobase loader.Sym
 	ldr := ctxt.loader
 	sl := make([]symNameSize, len(syms))
+
+	// For ppc64, we want to interleave the .got and .toc sections
+	// from input files. Both are type sym.SELFGOT, so in that case
+	// we skip size comparison and do the name comparison instead
+	// (conveniently, .got sorts before .toc).
+	checkSize := symn != sym.SELFGOT
+
 	for k, s := range syms {
 		ss := ldr.SymSize(s)
-		sl[k] = symNameSize{name: ldr.SymName(s), sz: ss, sym: s}
+		sl[k] = symNameSize{sz: ss, sym: s}
+		if !checkSize {
+			sl[k].name = ldr.SymName(s)
+		}
 		ds := int64(len(ldr.Data(s)))
 		switch {
 		case ss < ds:
@@ -2232,43 +2251,46 @@ func (state *dodataState) dodataSect(ctxt *Link, symn sym.SymKind, syms []loader
 		// end of their section.
 		if (ctxt.DynlinkingGo() && ctxt.HeadType == objabi.Hdarwin) || (ctxt.HeadType == objabi.Haix && ctxt.LinkMode == LinkExternal) {
 			switch ldr.SymName(s) {
-			case "runtime.text", "runtime.bss", "runtime.data", "runtime.types", "runtime.rodata":
+			case "runtime.text", "runtime.bss", "runtime.data", "runtime.types", "runtime.rodata",
+				"runtime.noptrdata", "runtime.noptrbss":
 				head = s
 				continue
-			case "runtime.etext", "runtime.ebss", "runtime.edata", "runtime.etypes", "runtime.erodata":
+			case "runtime.etext", "runtime.ebss", "runtime.edata", "runtime.etypes", "runtime.erodata",
+				"runtime.enoptrdata", "runtime.enoptrbss":
 				tail = s
 				continue
 			}
 		}
 	}
-
-	// For ppc64, we want to interleave the .got and .toc sections
-	// from input files. Both are type sym.SELFGOT, so in that case
-	// we skip size comparison and fall through to the name
-	// comparison (conveniently, .got sorts before .toc).
-	checkSize := symn != sym.SELFGOT
+	zerobase = ldr.Lookup("runtime.zerobase", 0)
 
 	// Perform the sort.
 	if symn != sym.SPCLNTAB {
 		sort.Slice(sl, func(i, j int) bool {
 			si, sj := sl[i].sym, sl[j].sym
+			isz, jsz := sl[i].sz, sl[j].sz
 			switch {
 			case si == head, sj == tail:
 				return true
 			case sj == head, si == tail:
 				return false
+			// put zerobase right after all the zero-sized symbols,
+			// so zero-sized symbols have the same address as zerobase.
+			case si == zerobase:
+				return jsz != 0 // zerobase < nonzero-sized
+			case sj == zerobase:
+				return isz == 0 // 0-sized < zerobase
 			}
 			if checkSize {
-				isz := sl[i].sz
-				jsz := sl[j].sz
 				if isz != jsz {
 					return isz < jsz
 				}
-			}
-			iname := sl[i].name
-			jname := sl[j].name
-			if iname != jname {
-				return iname < jname
+			} else {
+				iname := sl[i].name
+				jname := sl[j].name
+				if iname != jname {
+					return iname < jname
+				}
 			}
 			return si < sj
 		})
@@ -2298,7 +2320,7 @@ func (state *dodataState) dodataSect(ctxt *Link, symn sym.SymKind, syms []loader
 // at the very beginning of the text segment.
 // This “header” is read by cmd/go.
 func (ctxt *Link) textbuildid() {
-	if ctxt.IsELF || ctxt.BuildMode == BuildModePlugin || *flagBuildid == "" {
+	if ctxt.IsELF || *flagBuildid == "" {
 		return
 	}
 
@@ -2317,23 +2339,10 @@ func (ctxt *Link) textbuildid() {
 }
 
 func (ctxt *Link) buildinfo() {
-	if ctxt.linkShared || ctxt.BuildMode == BuildModePlugin {
-		// -linkshared and -buildmode=plugin get confused
-		// about the relocations in go.buildinfo
-		// pointing at the other data sections.
-		// The version information is only available in executables.
-		return
-	}
-	if ctxt.HeadType == objabi.Hnoos {
-		// Save about 0.5 KB of Flash and RAM (RAM because buildinfo is placed
-		// in Segdata not Segrodata).
-		return
-	}
-
 	// Write the buildinfo symbol, which go version looks for.
 	// The code reading this data is in package debug/buildinfo.
 	ldr := ctxt.loader
-	s := ldr.CreateSymForUpdate(".go.buildinfo", 0)
+	s := ldr.CreateSymForUpdate("go:buildinfo", 0)
 	s.SetType(sym.SBUILDINFO)
 	s.SetAlign(16)
 	// The \xff is invalid UTF-8, meant to make it less likely
@@ -2355,6 +2364,14 @@ func (ctxt *Link) buildinfo() {
 	}
 	s.SetData(data)
 	s.SetSize(int64(len(data)))
+
+	// Add reference to go:buildinfo from the rodata section,
+	// so that external linking with -Wl,--gc-sections does not
+	// delete the build info.
+	sr := ldr.CreateSymForUpdate("go:buildinfo.ref", 0)
+	sr.SetType(sym.SRODATA)
+	sr.SetAlign(int32(ctxt.Arch.PtrSize))
+	sr.AddAddr(ctxt.Arch, s.Sym())
 }
 
 // appendString appends s to data, prefixed by its varint-encoded length.
@@ -2423,8 +2440,8 @@ func (ctxt *Link) textaddress() {
 		limit = 1
 	}
 
-	// First pass: assign addresses assuming the program is small and
-	// don't generate trampolines.
+	// First pass: assign addresses assuming the program is small and will
+	// not require trampoline generation.
 	big := false
 	for _, s := range ctxt.Textp {
 		sect, n, va = assignAddress(ctxt, sect, n, s, va, false, big)
@@ -2439,21 +2456,45 @@ func (ctxt *Link) textaddress() {
 	if big {
 		// reset addresses
 		for _, s := range ctxt.Textp {
-			if ldr.OuterSym(s) != 0 || s == text {
-				continue
-			}
-			oldv := ldr.SymValue(s)
-			for sub := s; sub != 0; sub = ldr.SubSym(sub) {
-				ldr.SetSymValue(sub, ldr.SymValue(sub)-oldv)
+			if s != text {
+				resetAddress(ctxt, s)
 			}
 		}
 		va = start
 
 		ntramps := 0
-		for _, s := range ctxt.Textp {
+		var curPkg string
+		for i, s := range ctxt.Textp {
+			// When we find the first symbol in a package, perform a
+			// single iteration that assigns temporary addresses to all
+			// of the text in the same package, using the maximum possible
+			// number of trampolines. This allows for better decisions to
+			// be made regarding reachability and the need for trampolines.
+			if symPkg := ldr.SymPkg(s); symPkg != "" && curPkg != symPkg {
+				curPkg = symPkg
+				vaTmp := va
+				for j := i; j < len(ctxt.Textp); j++ {
+					curSym := ctxt.Textp[j]
+					if symPkg := ldr.SymPkg(curSym); symPkg == "" || curPkg != symPkg {
+						break
+					}
+					// We do not pass big to assignAddress here, as this
+					// can result in side effects such as section splitting.
+					sect, n, vaTmp = assignAddress(ctxt, sect, n, curSym, vaTmp, false, false)
+					vaTmp += maxSizeTrampolines(ctxt, ldr, curSym, false)
+				}
+			}
+
+			// Reset address for current symbol.
+			if s != text {
+				resetAddress(ctxt, s)
+			}
+
+			// Assign actual address for current symbol.
 			sect, n, va = assignAddress(ctxt, sect, n, s, va, false, big)
 
-			trampoline(ctxt, s) // resolve jumps, may add trampolines if jump too far
+			// Resolve jumps, adding trampolines if they are needed.
+			trampoline(ctxt, s)
 
 			// lay down trampolines after each function
 			for ; ntramps < len(ctxt.tramps); ntramps++ {
@@ -2482,7 +2523,9 @@ func (ctxt *Link) textaddress() {
 		}
 	}
 
-	sect.Length = va - sect.Vaddr
+	// Add MinLC size after etext, so it won't collide with the next symbol
+	// (which may confuse some symbolizer).
+	sect.Length = va - sect.Vaddr + uint64(ctxt.Arch.MinLC)
 	ldr.SetSymSect(etext, sect)
 	if ldr.SymValue(etext) == 0 {
 		// Set the address of the start/end symbols, if not already
@@ -2599,17 +2642,35 @@ func assignAddress(ctxt *Link, sect *sym.Section, n int, s loader.Sym, va uint64
 	return sect, n, va
 }
 
+func resetAddress(ctxt *Link, s loader.Sym) {
+	ldr := ctxt.loader
+	if ldr.OuterSym(s) != 0 {
+		return
+	}
+	oldv := ldr.SymValue(s)
+	for sub := s; sub != 0; sub = ldr.SubSym(sub) {
+		ldr.SetSymValue(sub, ldr.SymValue(sub)-oldv)
+	}
+}
+
 // Return whether we may need to split text sections.
 //
-// On PPC64x whem external linking a text section should not be larger than 2^25 bytes
-// due to the size of call target offset field in the bl instruction.  Splitting into
-// smaller text sections smaller than this limit allows the system linker to modify the long
-// calls appropriately. The limit allows for the space needed for tables inserted by the
-// linker.
+// On PPC64x, when external linking, a text section should not be
+// larger than 2^25 bytes due to the size of call target offset field
+// in the 'bl' instruction. Splitting into smaller text sections
+// smaller than this limit allows the system linker to modify the long
+// calls appropriately. The limit allows for the space needed for
+// tables inserted by the linker.
 //
 // The same applies to Darwin/ARM64, with 2^27 byte threshold.
+//
+// Similarly for ARM, we split sections (at 2^25 bytes) to avoid
+// inconsistencies between the Go linker's reachability calculations
+// (e.g. will direct call from X to Y need a trampoline) and similar
+// machinery in the external linker; see #58425 for more on the
+// history here.
 func splitTextSections(ctxt *Link) bool {
-	return (ctxt.IsPPC64() || (ctxt.IsARM64() && ctxt.IsDarwin())) && ctxt.IsExternal()
+	return (ctxt.IsARM() || ctxt.IsPPC64() || (ctxt.IsARM64() && ctxt.IsDarwin())) && ctxt.IsExternal()
 }
 
 // On Wasm, we reserve 4096 bytes for zero page, then 8192 bytes for wasm_exec.js
@@ -2627,11 +2688,9 @@ func (ctxt *Link) address() []*sym.Segment {
 	order = append(order, &Segtext)
 	Segtext.Rwx = 05
 	Segtext.Vaddr = va
-	Segtext.Laddr = va
 	for i, s := range Segtext.Sections {
 		va = uint64(Rnd(int64(va), int64(s.Align)))
 		s.Vaddr = va
-		s.Laddr = va
 		va += s.Length
 
 		if ctxt.IsWasm() && i == 0 && va < wasmMinDataAddr {
@@ -2655,16 +2714,14 @@ func (ctxt *Link) address() []*sym.Segment {
 		//
 		// Ideally the last page of the text segment would not be
 		// writable even for this short period.
-		va = uint64(Rnd(int64(va), int64(*FlagRound)))
+		va = uint64(Rnd(int64(va), *FlagRound))
 
 		order = append(order, &Segrodata)
 		Segrodata.Rwx = 04
 		Segrodata.Vaddr = va
-		Segrodata.Laddr = va
 		for _, s := range Segrodata.Sections {
 			va = uint64(Rnd(int64(va), int64(s.Align)))
 			s.Vaddr = va
-			s.Laddr = va
 			va += s.Length
 		}
 
@@ -2673,7 +2730,7 @@ func (ctxt *Link) address() []*sym.Segment {
 	if len(Segrelrodata.Sections) > 0 {
 		// align to page boundary so as not to mix
 		// rodata, rel-ro data, and executable text.
-		va = uint64(Rnd(int64(va), int64(*FlagRound)))
+		va = uint64(Rnd(int64(va), *FlagRound))
 		if ctxt.HeadType == objabi.Haix {
 			// Relro data are inside data segment on AIX.
 			va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
@@ -2682,41 +2739,25 @@ func (ctxt *Link) address() []*sym.Segment {
 		order = append(order, &Segrelrodata)
 		Segrelrodata.Rwx = 06
 		Segrelrodata.Vaddr = va
-		Segrelrodata.Laddr = va
 		for _, s := range Segrelrodata.Sections {
 			va = uint64(Rnd(int64(va), int64(s.Align)))
 			s.Vaddr = va
-			s.Laddr = va
 			va += s.Length
 		}
 
 		Segrelrodata.Length = va - Segrelrodata.Vaddr
 	}
 
-	va = uint64(Rnd(int64(va), int64(*FlagRound)))
-	la := va
-	switch ctxt.HeadType {
-	case objabi.Haix:
-		if len(Segrelrodata.Sections) == 0 {
-			// Data sections are moved to an unreachable segment
-			// to ensure that they are position-independent.
-			// Already done if relro sections exist.
-			va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
-			la = va
-		}
-	case objabi.Hnoos:
-		switch ctxt.Arch {
-		case sys.ArchThumb:
-			// Main stack on the lowest addresses so overflows can be detected
-			// even without MPU. Segdata.Laddr is set to main stack size (see
-			// ../thumb/asm.go:/Laddr = /) BUG: Assumes single-core system.
-			va = uint64(RAM.Base) + Segdata.Laddr
-		}
+	va = uint64(Rnd(int64(va), *FlagRound))
+	if ctxt.HeadType == objabi.Haix && len(Segrelrodata.Sections) == 0 {
+		// Data sections are moved to an unreachable segment
+		// to ensure that they are position-independent.
+		// Already done if relro sections exist.
+		va += uint64(XCOFFDATABASE) - uint64(XCOFFTEXTBASE)
 	}
 	order = append(order, &Segdata)
 	Segdata.Rwx = 06
 	Segdata.Vaddr = va
-	Segdata.Laddr = la
 	var data *sym.Section
 	var noptr *sym.Section
 	var bss *sym.Section
@@ -2731,49 +2772,66 @@ func (ctxt *Link) address() []*sym.Segment {
 			vlen = int64(Segdata.Sections[i+1].Vaddr - s.Vaddr)
 		}
 		s.Vaddr = va
-		s.Laddr = la
 		va += uint64(vlen)
 		Segdata.Length = va - Segdata.Vaddr
 		switch s.Name {
 		case ".data":
 			data = s
-			la += uint64(vlen)
 		case ".noptrdata":
 			noptr = s
-			la += uint64(vlen)
 		case ".bss":
 			bss = s
 		case ".noptrbss":
 			noptrbss = s
 		case ".go.fuzzcntrs":
 			fuzzCounters = s
-		default:
-			if ctxt.HeadType == objabi.Hnoos {
-				Exitf("GOOS=noos doesn't support %s section", s.Name)
-			}
 		}
-	}
-
-	if MaxTextAddr != -1 && la > uint64(MaxTextAddr) {
-		Exitf("text segment to big by %d bytes", la-uint64(MaxTextAddr))
 	}
 
 	// Assign Segdata's Filelen omitting the BSS. We do this here
 	// simply because right now we know where the BSS starts.
 	Segdata.Filelen = bss.Vaddr - Segdata.Vaddr
 
-	va = uint64(Rnd(int64(la), int64(*FlagRound)))
+	if len(Segpdata.Sections) > 0 {
+		va = uint64(Rnd(int64(va), *FlagRound))
+		order = append(order, &Segpdata)
+		Segpdata.Rwx = 04
+		Segpdata.Vaddr = va
+		// Segpdata.Sections is intended to contain just one section.
+		// Loop through the slice anyway for consistency.
+		for _, s := range Segpdata.Sections {
+			va = uint64(Rnd(int64(va), int64(s.Align)))
+			s.Vaddr = va
+			va += s.Length
+		}
+		Segpdata.Length = va - Segpdata.Vaddr
+	}
+
+	if len(Segxdata.Sections) > 0 {
+		va = uint64(Rnd(int64(va), *FlagRound))
+		order = append(order, &Segxdata)
+		Segxdata.Rwx = 04
+		Segxdata.Vaddr = va
+		// Segxdata.Sections is intended to contain just one section.
+		// Loop through the slice anyway for consistency.
+		for _, s := range Segxdata.Sections {
+			va = uint64(Rnd(int64(va), int64(s.Align)))
+			s.Vaddr = va
+			va += s.Length
+		}
+		Segxdata.Length = va - Segxdata.Vaddr
+	}
+
+	va = uint64(Rnd(int64(va), *FlagRound))
 	order = append(order, &Segdwarf)
 	Segdwarf.Rwx = 06
 	Segdwarf.Vaddr = va
-	Segdwarf.Laddr = va
 	for i, s := range Segdwarf.Sections {
 		vlen := int64(s.Length)
 		if i+1 < len(Segdwarf.Sections) {
 			vlen = int64(Segdwarf.Sections[i+1].Vaddr - s.Vaddr)
 		}
 		s.Vaddr = va
-		s.Laddr = va
 		va += uint64(vlen)
 		if ctxt.HeadType == objabi.Hwindows {
 			va = uint64(Rnd(int64(va), PEFILEALIGN))
@@ -2812,6 +2870,17 @@ func (ctxt *Link) address() []*sym.Segment {
 			for ; sub != 0; sub = ldr.SubSym(sub) {
 				ldr.AddToSymValue(s, v)
 			}
+		}
+	}
+
+	for _, s := range sehp.pdata {
+		if sect := ldr.SymSect(s); sect != nil {
+			ldr.AddToSymValue(s, int64(sect.Vaddr))
+		}
+	}
+	for _, s := range sehp.xdata {
+		if sect := ldr.SymSect(s); sect != nil {
+			ldr.AddToSymValue(s, int64(sect.Vaddr))
 		}
 	}
 
@@ -2918,23 +2987,6 @@ func (ctxt *Link) address() []*sym.Segment {
 		}
 	}
 
-	if ctxt.HeadType == objabi.Hnoos {
-		ramstart := int64(RAM.Base)
-		ramend := int64(RAM.Base + RAM.Size)
-		ctxt.xdefine("runtime.ramstart", sym.SRODATA, ramstart)
-		ctxt.xdefine("runtime.ramend", sym.SRODATA, ramend)
-		ctxt.xdefine("runtime.romdata", sym.SRODATA, int64(Segdata.Laddr))
-		nodmastart := int64(NoDMA.Base)
-		nodmaend := int64(NoDMA.Base + NoDMA.Size)
-		if nodmastart == 0 && nodmaend == 0 {
-			// avoid "relocation does not fit in 32-bits" kind of errors
-			nodmastart = ramstart
-			nodmaend = ramstart
-		}
-		ctxt.xdefine("runtime.nodmastart", sym.SRODATA, nodmastart)
-		ctxt.xdefine("runtime.nodmaend", sym.SRODATA, nodmaend)
-	}
-
 	return order
 }
 
@@ -2952,7 +3004,7 @@ func (ctxt *Link) layout(order []*sym.Segment) uint64 {
 				// aligned, the following rounding
 				// should ensure that this segment's
 				// VA ≡ Fileoff mod FlagRound.
-				seg.Fileoff = uint64(Rnd(int64(prev.Fileoff+prev.Filelen), int64(*FlagRound)))
+				seg.Fileoff = uint64(Rnd(int64(prev.Fileoff+prev.Filelen), *FlagRound))
 				if seg.Vaddr%uint64(*FlagRound) != seg.Fileoff%uint64(*FlagRound) {
 					Exitf("bad segment rounding (Vaddr=%#x Fileoff=%#x FlagRound=%#x)", seg.Vaddr, seg.Fileoff, *FlagRound)
 				}
@@ -3036,7 +3088,7 @@ func compressSyms(ctxt *Link, syms []loader.Sym) []byte {
 		if relocs.Count() != 0 {
 			relocbuf = append(relocbuf[:0], P...)
 			P = relocbuf
-			st.relocsym(s, P, true)
+			st.relocsym(s, P)
 		}
 		if _, err := z.Write(P); err != nil {
 			log.Fatalf("compression failed: %s", err)

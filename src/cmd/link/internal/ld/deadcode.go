@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"internal/buildcfg"
 	"strconv"
+	"strings"
 	"unicode"
 )
 
@@ -54,6 +55,8 @@ type deadcodePass struct {
 	dynlink            bool
 
 	methodsigstmp []methodsig // scratch buffer for decoding method signatures
+	pkginits      []loader.Sym
+	mapinitnoop   loader.Sym
 }
 
 func (d *deadcodePass) init() {
@@ -73,6 +76,7 @@ func (d *deadcodePass) init() {
 			s := loader.Sym(i)
 			d.mark(s, 0)
 		}
+		d.mark(d.ctxt.mainInittasks, 0)
 		return
 	}
 
@@ -144,6 +148,14 @@ func (d *deadcodePass) init() {
 		}
 		d.mark(s, 0)
 	}
+
+	d.mapinitnoop = d.ldr.Lookup("runtime.mapinitnoop", abiInternalVer)
+	if d.mapinitnoop == 0 {
+		panic("could not look up runtime.mapinitnoop")
+	}
+	if d.ctxt.mainInittasks != 0 {
+		d.mark(d.ctxt.mainInittasks, 0)
+	}
 }
 
 func (d *deadcodePass) flood() {
@@ -151,6 +163,8 @@ func (d *deadcodePass) flood() {
 	for !d.wq.empty() {
 		symIdx := d.wq.pop()
 
+		// Methods may be called via reflection. Give up on static analysis,
+		// and mark all exported methods of all reachable types as reachable.
 		d.reflectSeen = d.reflectSeen || d.ldr.IsReflectMethod(symIdx)
 
 		isgotype := d.ldr.IsGoType(symIdx)
@@ -169,10 +183,26 @@ func (d *deadcodePass) flood() {
 		methods = methods[:0]
 		for i := 0; i < relocs.Count(); i++ {
 			r := relocs.At(i)
-			// When build with "-linkshared", we can't tell if the interface
-			// method in itab will be used or not. Ignore the weak attribute.
-			if r.Weak() && !(d.ctxt.linkShared && d.ldr.IsItab(symIdx)) {
-				continue
+			if r.Weak() {
+				convertWeakToStrong := false
+				// When build with "-linkshared", we can't tell if the
+				// interface method in itab will be used or not.
+				// Ignore the weak attribute.
+				if d.ctxt.linkShared && d.ldr.IsItab(symIdx) {
+					convertWeakToStrong = true
+				}
+				// If the program uses plugins, we can no longer treat
+				// relocs from pkg init functions to outlined map init
+				// fragments as weak, since doing so can cause package
+				// init clashes between the main program and the
+				// plugin. See #62430 for more details.
+				if d.ctxt.canUsePlugins && r.Type().IsDirectCall() {
+					convertWeakToStrong = true
+				}
+				if !convertWeakToStrong {
+					// skip this reloc
+					continue
+				}
 			}
 			t := r.Type()
 			switch t {
@@ -208,6 +238,14 @@ func (d *deadcodePass) flood() {
 				// converted to an interface, i.e. should have UsedInIface set. See the
 				// comment below for why we need to unset the Reachable bit and re-mark it.
 				rs := r.Sym()
+				if d.ldr.IsItab(rs) {
+					// This relocation can also point at an itab, in which case it
+					// means "the _type field of that itab".
+					rs = decodeItabType(d.ldr, d.ctxt.Arch, rs)
+				}
+				if !d.ldr.IsGoType(rs) && !d.ctxt.linkShared {
+					panic(fmt.Sprintf("R_USEIFACE in %s references %s which is not a type or itab", d.ldr.SymName(symIdx), d.ldr.SymName(rs)))
+				}
 				if !d.ldr.AttrUsedInIface(rs) {
 					d.ldr.SetAttrUsedInIface(rs, true)
 					if d.ldr.AttrReachable(rs) {
@@ -232,13 +270,18 @@ func (d *deadcodePass) flood() {
 				}
 				d.ifaceMethod[m] = true
 				continue
-			case objabi.R_USEGENERICIFACEMETHOD:
+			case objabi.R_USENAMEDMETHOD:
 				name := d.decodeGenericIfaceMethod(d.ldr, r.Sym())
 				if d.ctxt.Debugvlog > 1 {
 					d.ctxt.Logf("reached generic iface method: %s\n", name)
 				}
 				d.genericIfaceMethod[name] = true
 				continue // don't mark referenced symbol - it is not needed in the final binary.
+			case objabi.R_INITORDER:
+				// inittasks has already run, so any R_INITORDER links are now
+				// superfluous - the only live inittask records are those which are
+				// in a scheduled list somewhere (e.g. runtime.moduledata.inittasks).
+				continue
 			}
 			rs := r.Sym()
 			if isgotype && usedInIface && d.ldr.IsGoType(rs) && !d.ldr.AttrUsedInIface(rs) {
@@ -267,6 +310,12 @@ func (d *deadcodePass) flood() {
 				continue
 			}
 			d.mark(a.Sym(), symIdx)
+		}
+		// Record sym if package init func (here naux != 0 is a cheap way
+		// to check first if it is a function symbol).
+		if naux != 0 && d.ldr.IsPkgInit(symIdx) {
+
+			d.pkginits = append(d.pkginits, symIdx)
 		}
 		// Some host object symbols have an outer object, which acts like a
 		// "carrier" symbol, or it holds all the symbols for a particular
@@ -301,6 +350,37 @@ func (d *deadcodePass) flood() {
 	}
 }
 
+// mapinitcleanup walks all pkg init functions and looks for weak relocations
+// to mapinit symbols that are no longer reachable. It rewrites
+// the relocs to target a new no-op routine in the runtime.
+func (d *deadcodePass) mapinitcleanup() {
+	for _, idx := range d.pkginits {
+		relocs := d.ldr.Relocs(idx)
+		var su *loader.SymbolBuilder
+		for i := 0; i < relocs.Count(); i++ {
+			r := relocs.At(i)
+			rs := r.Sym()
+			if r.Weak() && r.Type().IsDirectCall() && !d.ldr.AttrReachable(rs) {
+				// double check to make sure target is indeed map.init
+				rsn := d.ldr.SymName(rs)
+				if !strings.Contains(rsn, "map.init") {
+					panic(fmt.Sprintf("internal error: expected map.init sym for weak call reloc, got %s -> %s", d.ldr.SymName(idx), rsn))
+				}
+				d.ldr.SetAttrReachable(d.mapinitnoop, true)
+				if d.ctxt.Debugvlog > 1 {
+					d.ctxt.Logf("deadcode: %s rewrite %s ref to %s\n",
+						d.ldr.SymName(idx), rsn,
+						d.ldr.SymName(d.mapinitnoop))
+				}
+				if su == nil {
+					su = d.ldr.MakeSymbolUpdater(idx)
+				}
+				su.SetRelocSym(i, d.mapinitnoop)
+			}
+		}
+	}
+}
+
 func (d *deadcodePass) mark(symIdx, parent loader.Sym) {
 	if symIdx != 0 && !d.ldr.AttrReachable(symIdx) {
 		d.wq.push(symIdx)
@@ -311,20 +391,30 @@ func (d *deadcodePass) mark(symIdx, parent loader.Sym) {
 		if *flagDumpDep {
 			to := d.ldr.SymName(symIdx)
 			if to != "" {
-				if d.ldr.AttrUsedInIface(symIdx) {
-					to += " <UsedInIface>"
-				}
+				to = d.dumpDepAddFlags(to, symIdx)
 				from := "_"
 				if parent != 0 {
 					from = d.ldr.SymName(parent)
-					if d.ldr.AttrUsedInIface(parent) {
-						from += " <UsedInIface>"
-					}
+					from = d.dumpDepAddFlags(from, parent)
 				}
 				fmt.Printf("%s -> %s\n", from, to)
 			}
 		}
 	}
+}
+
+func (d *deadcodePass) dumpDepAddFlags(name string, symIdx loader.Sym) string {
+	var flags strings.Builder
+	if d.ldr.AttrUsedInIface(symIdx) {
+		flags.WriteString("<UsedInIface>")
+	}
+	if d.ldr.IsReflectMethod(symIdx) {
+		flags.WriteString("<ReflectMethod>")
+	}
+	if flags.Len() > 0 {
+		return name + " " + flags.String()
+	}
+	return name
 }
 
 func (d *deadcodePass) markMethod(m methodref) {
@@ -359,13 +449,20 @@ func (d *deadcodePass) markMethod(m methodref) {
 // against the interface method signatures, if it matches it is marked
 // as reachable. This is extremely conservative, but easy and correct.
 //
-// The third case is handled by looking to see if any of:
-//   - reflect.Value.Method or MethodByName is reachable
-//   - reflect.Type.Method or MethodByName is called (through the
-//     REFLECTMETHOD attribute marked by the compiler).
+// The third case is handled by looking for functions that compiler flagged
+// as REFLECTMETHOD. REFLECTMETHOD on a function F means that F does a method
+// lookup with reflection, but the compiler was not able to statically determine
+// the method name.
 //
-// If any of these happen, all bets are off and all exported methods
-// of reachable types are marked reachable.
+// All functions that call reflect.Value.Method or reflect.Type.Method are REFLECTMETHODs.
+// Functions that call reflect.Value.MethodByName or reflect.Type.MethodByName with
+// a non-constant argument are REFLECTMETHODs, too. If we find a REFLECTMETHOD,
+// we give up on static analysis, and mark all exported methods of all reachable
+// types as reachable.
+//
+// If the argument to MethodByName is a compile-time constant, the compiler
+// emits a relocation with the method name. Matching methods are kept in all
+// reachable types.
 //
 // Any unreached text symbols are removed from ctxt.Textp.
 func deadcode(ctxt *Link) {
@@ -374,9 +471,6 @@ func deadcode(ctxt *Link) {
 	d.init()
 	d.flood()
 
-	methSym := ldr.Lookup("reflect.Value.Method", abiInternalVer)
-	methByNameSym := ldr.Lookup("reflect.Value.MethodByName", abiInternalVer)
-
 	if ctxt.DynlinkingGo() {
 		// Exported methods may satisfy interfaces we don't know
 		// about yet when dynamically linking.
@@ -384,11 +478,6 @@ func deadcode(ctxt *Link) {
 	}
 
 	for {
-		// Methods might be called via reflection. Give up on
-		// static analysis, mark all exported methods of
-		// all reachable types as reachable.
-		d.reflectSeen = d.reflectSeen || (methSym != 0 && ldr.AttrReachable(methSym)) || (methByNameSym != 0 && ldr.AttrReachable(methByNameSym))
-
 		// Mark all methods that could satisfy a discovered
 		// interface as reachable. We recheck old marked interfaces
 		// as new types (with new methods) may have been discovered
@@ -408,6 +497,9 @@ func deadcode(ctxt *Link) {
 			break
 		}
 		d.flood()
+	}
+	if *flagPruneWeakMap {
+		d.mapinitcleanup()
 	}
 }
 
@@ -470,7 +562,7 @@ func (d *deadcodePass) decodeIfaceMethod(ldr *loader.Loader, arch *sys.Arch, sym
 
 // Decode the method name stored in symbol symIdx. The symbol should contain just the bytes of a method name.
 func (d *deadcodePass) decodeGenericIfaceMethod(ldr *loader.Loader, symIdx loader.Sym) string {
-	return string(ldr.Data(symIdx))
+	return ldr.DataString(symIdx)
 }
 
 func (d *deadcodePass) decodetypeMethods(ldr *loader.Loader, arch *sys.Arch, symIdx loader.Sym, relocs *loader.Relocs) []methodsig {

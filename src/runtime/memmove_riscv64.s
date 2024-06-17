@@ -25,15 +25,16 @@ TEXT runtime·memmove<ABIInternal>(SB),NOSPLIT,$-0-24
 	BLT	X12, X9, f_loop4_check
 
 	// Check alignment - if alignment differs we have to do one byte at a time.
-	AND	$3, X10, X5
-	AND	$3, X11, X6
+	AND	$7, X10, X5
+	AND	$7, X11, X6
 	BNE	X5, X6, f_loop8_unaligned_check
 	BEQZ	X5, f_loop_check
 
 	// Move one byte at a time until we reach 8 byte alignment.
+	SUB	X5, X9, X5
 	SUB	X5, X12, X12
 f_align:
-	ADD	$-1, X5
+	SUB	$1, X5
 	MOVB	0(X11), X14
 	MOVB	X14, 0(X10)
 	ADD	$1, X10
@@ -66,7 +67,7 @@ f_loop64:
 	MOV	X21, 56(X10)
 	ADD	$64, X10
 	ADD	$64, X11
-	ADD	$-64, X12
+	SUB	$64, X12
 	BGE	X12, X9, f_loop64
 	BEQZ	X12, done
 
@@ -84,7 +85,7 @@ f_loop32:
 	MOV	X17, 24(X10)
 	ADD	$32, X10
 	ADD	$32, X11
-	ADD	$-32, X12
+	SUB	$32, X12
 	BGE	X12, X9, f_loop32
 	BEQZ	X12, done
 
@@ -98,7 +99,7 @@ f_loop16:
 	MOV	X15, 8(X10)
 	ADD	$16, X10
 	ADD	$16, X11
-	ADD	$-16, X12
+	SUB	$16, X12
 	BGE	X12, X9, f_loop16
 	BEQZ	X12, done
 
@@ -110,7 +111,7 @@ f_loop8:
 	MOV	X14, 0(X10)
 	ADD	$8, X10
 	ADD	$8, X11
-	ADD	$-8, X12
+	SUB	$8, X12
 	BGE	X12, X9, f_loop8
 	BEQZ	X12, done
 	JMP	f_loop4_check
@@ -137,7 +138,7 @@ f_loop8_unaligned:
 	MOVB	X21, 7(X10)
 	ADD	$8, X10
 	ADD	$8, X11
-	ADD	$-8, X12
+	SUB	$8, X12
 	BGE	X12, X9, f_loop8_unaligned
 
 f_loop4_check:
@@ -154,7 +155,7 @@ f_loop4:
 	MOVB	X17, 3(X10)
 	ADD	$4, X10
 	ADD	$4, X11
-	ADD	$-4, X12
+	SUB	$4, X12
 	BGE	X12, X9, f_loop4
 
 f_loop1:
@@ -163,7 +164,7 @@ f_loop1:
 	MOVB	X14, 0(X10)
 	ADD	$1, X10
 	ADD	$1, X11
-	ADD	$-1, X12
+	SUB	$1, X12
 	JMP	f_loop1
 
 backward:
@@ -175,17 +176,17 @@ backward:
 	BLT	X12, X9, b_loop4_check
 
 	// Check alignment - if alignment differs we have to do one byte at a time.
-	AND	$3, X10, X5
-	AND	$3, X11, X6
+	AND	$7, X10, X5
+	AND	$7, X11, X6
 	BNE	X5, X6, b_loop8_unaligned_check
 	BEQZ	X5, b_loop_check
 
 	// Move one byte at a time until we reach 8 byte alignment.
 	SUB	X5, X12, X12
 b_align:
-	ADD	$-1, X5
-	ADD	$-1, X10
-	ADD	$-1, X11
+	SUB	$1, X5
+	SUB	$1, X10
+	SUB	$1, X11
 	MOVB	0(X11), X14
 	MOVB	X14, 0(X10)
 	BNEZ	X5, b_align
@@ -198,8 +199,8 @@ b_loop_check:
 	MOV	$64, X9
 	BLT	X12, X9, b_loop32_check
 b_loop64:
-	ADD	$-64, X10
-	ADD	$-64, X11
+	SUB	$64, X10
+	SUB	$64, X11
 	MOV	0(X11), X14
 	MOV	8(X11), X15
 	MOV	16(X11), X16
@@ -216,7 +217,7 @@ b_loop64:
 	MOV	X19, 40(X10)
 	MOV	X20, 48(X10)
 	MOV	X21, 56(X10)
-	ADD	$-64, X12
+	SUB	$64, X12
 	BGE	X12, X9, b_loop64
 	BEQZ	X12, done
 
@@ -224,8 +225,8 @@ b_loop32_check:
 	MOV	$32, X9
 	BLT	X12, X9, b_loop16_check
 b_loop32:
-	ADD	$-32, X10
-	ADD	$-32, X11
+	SUB	$32, X10
+	SUB	$32, X11
 	MOV	0(X11), X14
 	MOV	8(X11), X15
 	MOV	16(X11), X16
@@ -234,7 +235,7 @@ b_loop32:
 	MOV	X15, 8(X10)
 	MOV	X16, 16(X10)
 	MOV	X17, 24(X10)
-	ADD	$-32, X12
+	SUB	$32, X12
 	BGE	X12, X9, b_loop32
 	BEQZ	X12, done
 
@@ -242,13 +243,13 @@ b_loop16_check:
 	MOV	$16, X9
 	BLT	X12, X9, b_loop8_check
 b_loop16:
-	ADD	$-16, X10
-	ADD	$-16, X11
+	SUB	$16, X10
+	SUB	$16, X11
 	MOV	0(X11), X14
 	MOV	8(X11), X15
 	MOV	X14, 0(X10)
 	MOV	X15, 8(X10)
-	ADD	$-16, X12
+	SUB	$16, X12
 	BGE	X12, X9, b_loop16
 	BEQZ	X12, done
 
@@ -256,11 +257,11 @@ b_loop8_check:
 	MOV	$8, X9
 	BLT	X12, X9, b_loop4_check
 b_loop8:
-	ADD	$-8, X10
-	ADD	$-8, X11
+	SUB	$8, X10
+	SUB	$8, X11
 	MOV	0(X11), X14
 	MOV	X14, 0(X10)
-	ADD	$-8, X12
+	SUB	$8, X12
 	BGE	X12, X9, b_loop8
 	BEQZ	X12, done
 	JMP	b_loop4_check
@@ -269,8 +270,8 @@ b_loop8_unaligned_check:
 	MOV	$8, X9
 	BLT	X12, X9, b_loop4_check
 b_loop8_unaligned:
-	ADD	$-8, X10
-	ADD	$-8, X11
+	SUB	$8, X10
+	SUB	$8, X11
 	MOVB	0(X11), X14
 	MOVB	1(X11), X15
 	MOVB	2(X11), X16
@@ -287,15 +288,15 @@ b_loop8_unaligned:
 	MOVB	X19, 5(X10)
 	MOVB	X20, 6(X10)
 	MOVB	X21, 7(X10)
-	ADD	$-8, X12
+	SUB	$8, X12
 	BGE	X12, X9, b_loop8_unaligned
 
 b_loop4_check:
 	MOV	$4, X9
 	BLT	X12, X9, b_loop1
 b_loop4:
-	ADD	$-4, X10
-	ADD	$-4, X11
+	SUB	$4, X10
+	SUB	$4, X11
 	MOVB	0(X11), X14
 	MOVB	1(X11), X15
 	MOVB	2(X11), X16
@@ -304,16 +305,16 @@ b_loop4:
 	MOVB	X15, 1(X10)
 	MOVB	X16, 2(X10)
 	MOVB	X17, 3(X10)
-	ADD	$-4, X12
+	SUB	$4, X12
 	BGE	X12, X9, b_loop4
 
 b_loop1:
 	BEQZ	X12, done
-	ADD	$-1, X10
-	ADD	$-1, X11
+	SUB	$1, X10
+	SUB	$1, X11
 	MOVB	0(X11), X14
 	MOVB	X14, 0(X10)
-	ADD	$-1, X12
+	SUB	$1, X12
 	JMP	b_loop1
 
 done:

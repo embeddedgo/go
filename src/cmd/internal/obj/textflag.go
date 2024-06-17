@@ -56,6 +56,9 @@ const (
 	// Function is an ABI wrapper.
 	ABIWRAPPER = 4096
 
+	// Function is a compiler-generated package init function.
+	PKGINIT = 8192
+
 	// Generate interrupt handler prologue / epilogue.
-	ISR = 8192
+	ISR = 16384
 )
