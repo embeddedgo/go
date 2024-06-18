@@ -1274,42 +1274,44 @@ HaveSpan:
 	// to do this before calling sysUsed because that may commit address space.
 	bytesToScavenge := uintptr(0)
 	forceScavenge := false
-	if !noos {
-		if limit := gcController.memoryLimit.Load(); !gcCPULimiter.limiting() {
-			// Assist with scavenging to maintain the memory limit by the amount
-			// that we expect to page in.
-			inuse := gcController.mappedReady.Load()
-			// Be careful about overflow, especially with uintptrs. Even on 32-bit platforms
-			// someone can set a really big memory limit that isn't maxInt64.
-			if uint64(scav)+inuse > uint64(limit) {
-				bytesToScavenge = uintptr(uint64(scav) + inuse - uint64(limit))
-				forceScavenge = true
-			}
+	if noos {
+		goto noosSkipScavenge
+	}
+	if limit := gcController.memoryLimit.Load(); !gcCPULimiter.limiting() {
+		// Assist with scavenging to maintain the memory limit by the amount
+		// that we expect to page in.
+		inuse := gcController.mappedReady.Load()
+		// Be careful about overflow, especially with uintptrs. Even on 32-bit platforms
+		// someone can set a really big memory limit that isn't maxInt64.
+		if uint64(scav)+inuse > uint64(limit) {
+			bytesToScavenge = uintptr(uint64(scav) + inuse - uint64(limit))
+			forceScavenge = true
 		}
-		if goal := scavenge.gcPercentGoal.Load(); goal != ^uint64(0) && growth > 0 {
-			// We just caused a heap growth, so scavenge down what will soon be used.
-			// By scavenging inline we deal with the failure to allocate out of
-			// memory fragments by scavenging the memory fragments that are least
-			// likely to be re-used.
-			//
-			// Only bother with this because we're not using a memory limit. We don't
-			// care about heap growths as long as we're under the memory limit, and the
-			// previous check for scaving already handles that.
-			if retained := heapRetained(); retained+uint64(growth) > goal {
-				// The scavenging algorithm requires the heap lock to be dropped so it
-				// can acquire it only sparingly. This is a potentially expensive operation
-				// so it frees up other goroutines to allocate in the meanwhile. In fact,
-				// they can make use of the growth we just created.
-				todo := growth
-				if overage := uintptr(retained + uint64(growth) - goal); todo > overage {
-					todo = overage
-				}
-				if todo > bytesToScavenge {
-					bytesToScavenge = todo
-				}
+	}
+	if goal := scavenge.gcPercentGoal.Load(); goal != ^uint64(0) && growth > 0 {
+		// We just caused a heap growth, so scavenge down what will soon be used.
+		// By scavenging inline we deal with the failure to allocate out of
+		// memory fragments by scavenging the memory fragments that are least
+		// likely to be re-used.
+		//
+		// Only bother with this because we're not using a memory limit. We don't
+		// care about heap growths as long as we're under the memory limit, and the
+		// previous check for scaving already handles that.
+		if retained := heapRetained(); retained+uint64(growth) > goal {
+			// The scavenging algorithm requires the heap lock to be dropped so it
+			// can acquire it only sparingly. This is a potentially expensive operation
+			// so it frees up other goroutines to allocate in the meanwhile. In fact,
+			// they can make use of the growth we just created.
+			todo := growth
+			if overage := uintptr(retained + uint64(growth) - goal); todo > overage {
+				todo = overage
+			}
+			if todo > bytesToScavenge {
+				bytesToScavenge = todo
 			}
 		}
 	}
+noosSkipScavenge:
 	// There are a few very limited circumstances where we won't have a P here.
 	// It's OK to simply skip scavenging in these cases. Something else will notice
 	// and pick up the tab.
