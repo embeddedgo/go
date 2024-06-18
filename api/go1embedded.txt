@@ -116,21 +116,29 @@ pkg embedded/mmio, method (UM8) Load() uint8
 pkg embedded/mmio, method (UM8) Set()
 pkg embedded/mmio, method (UM8) Store(uint8)
 pkg embedded/mmio, type U16 struct
+pkg embedded/mmio, type U16 //deprecated
 pkg embedded/mmio, type U32 struct
+pkg embedded/mmio, type U32 //deprecated
 pkg embedded/mmio, type U64 struct
+pkg embedded/mmio, type U64 //deprecated
 pkg embedded/mmio, type U8 struct
+pkg embedded/mmio, type U8 //deprecated
 pkg embedded/mmio, type UM16 struct
 pkg embedded/mmio, type UM16 struct, Mask uint16
 pkg embedded/mmio, type UM16 struct, R *U16
+pkg embedded/mmio, type UM16 //deprecated
 pkg embedded/mmio, type UM32 struct
 pkg embedded/mmio, type UM32 struct, Mask uint32
 pkg embedded/mmio, type UM32 struct, R *U32
+pkg embedded/mmio, type UM32 //deprecated
 pkg embedded/mmio, type UM64 struct
 pkg embedded/mmio, type UM64 struct, Mask uint64
 pkg embedded/mmio, type UM64 struct, R *U64
+pkg embedded/mmio, type UM64 //deprecated
 pkg embedded/mmio, type UM8 struct
 pkg embedded/mmio, type UM8 struct, Mask uint8
 pkg embedded/mmio, type UM8 struct, R *U8
+pkg embedded/mmio, type UM8 //deprecated
 pkg embedded/rtos, const DCacheClean = 1
 pkg embedded/rtos, const DCacheClean ideal-int
 pkg embedded/rtos, const DCacheCleanInval = 2
