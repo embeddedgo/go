@@ -615,6 +615,20 @@ var depsRules = `
 	internal/godebug, math/rand, encoding/hex, crypto/sha256
 	< internal/fuzz;
 
+	embedded/rtos, internal/cpu/cortexm/scb, internal/cpu/cortexm/systick
+	< embedded/arch/cortexm/systim;
+
+	embedded/rtos, internal/cpu/riscv/clint
+	< embedded/arch/riscv/systim;
+
+	FMT
+	< github.com/embeddedgo/fs/semihostfs;
+
+	FMT, embedded/arch/cortexm/systim, embedded/arch/riscv/systim,
+	github.com/embeddedgo/fs/semihostfs
+	< github.com/embeddedgo/noostest/init;
+
+	github.com/embeddedgo/noostest/init,
 	internal/fuzz, internal/testlog, runtime/pprof, regexp
 	< testing/internal/testdeps;
 
@@ -699,14 +713,6 @@ var depsRules = `
 	internal/coverage/encodecounter, internal/coverage/encodemeta,
 	internal/coverage/pods
 	< runtime/coverage;
-
-	# Embedded Go packages
-
-	embedded/rtos, internal/cpu/cortexm/scb, internal/cpu/cortexm/systick
-	< embedded/arch/cortexm/systim;
-
-	embedded/rtos, internal/cpu/riscv/clint
-	< embedded/arch/riscv/systim;
 `
 
 // listStdPkgs returns the same list of packages as "go list std".
@@ -782,7 +788,7 @@ var buildIgnore = []byte("\n//go:build ignore")
 
 func findImports(pkg string) ([]string, error) {
 	vpkg := pkg
-	if strings.HasPrefix(pkg, "golang.org") {
+	if strings.HasPrefix(pkg, "golang.org") || strings.HasPrefix(pkg, "github.com") {
 		vpkg = "vendor/" + pkg
 	}
 	dir := filepath.Join(Default.GOROOT, "src", vpkg)
