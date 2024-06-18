@@ -147,5 +147,5 @@ TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-16
 
 // func exit(r int32)
 TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-8
-	BREAK
+	NOOP
 	JMP  -1(PC)
