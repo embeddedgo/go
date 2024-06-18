@@ -102,6 +102,9 @@ func (r *U16) Store(v uint16) {
 //}
 
 // An UM16 represents a set of bits in R selected by Mask.
+//
+// Deprecated: Use RM16[uint16] instead.
+//
 type UM16 struct {
 	R    *U16
 	Mask uint16

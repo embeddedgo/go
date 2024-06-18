@@ -102,6 +102,9 @@ func (r *U64) Store(v uint64) {
 //}
 
 // An UM64 represents a set of bits in R selected by Mask.
+//
+// Deprecated: Use RM64[uint64] instead.
+//
 type UM64 struct {
 	R    *U64
 	Mask uint64

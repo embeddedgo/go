@@ -102,6 +102,9 @@ func (r *U8) Store(v uint8) {
 //}
 
 // An UM8 represents a set of bits in R selected by Mask.
+//
+// Deprecated: Use RM8[uint8] instead.
+//
 type UM8 struct {
 	R    *U8
 	Mask uint8
