@@ -117,9 +117,7 @@ fromHandler:
 	JMP   ·softwareInterruptHandler(SB)
 
 fatal:
-	// unhandled exception
-	BREAK
-	JMP -1(PC)
+	JMP   ·unhandledExcepton_target(SB)
 
 
 // System call is like oridnary function call so all registers are caller save
