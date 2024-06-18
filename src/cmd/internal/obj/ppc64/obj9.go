@@ -37,6 +37,7 @@ import (
 	"internal/abi"
 	"log"
 	"math/bits"
+	"strings"
 )
 
 // Test if this value can encoded as a mask for
@@ -70,6 +71,22 @@ func encodePPC64RLDCMask(mask int64) (mb, me int) {
 	}
 	// Note, me is inclusive.
 	return mb, me - 1
+}
+
+// Is this a symbol which should never have a TOC prologue generated?
+// These are special functions which should not have a TOC regeneration
+// prologue.
+func isNOTOCfunc(name string) bool {
+	switch {
+	case name == "runtime.duffzero":
+		return true
+	case name == "runtime.duffcopy":
+		return true
+	case strings.HasPrefix(name, "runtime.elf_"):
+		return true
+	default:
+		return false
+	}
 }
 
 func progedit(ctxt *obj.Link, p *obj.Prog, newprog obj.ProgAlloc) {
@@ -158,8 +175,8 @@ func progedit(ctxt *obj.Link, p *obj.Prog, newprog obj.ProgAlloc) {
 			// Is this a shifted 16b constant? If so, rewrite it to avoid a creating and loading a constant.
 			val := p.From.Offset
 			shift := bits.TrailingZeros64(uint64(val))
-			mask := 0xFFFF << shift
-			if val&int64(mask) == val || (val>>(shift+16) == -1 && (val>>shift)<<shift == val) {
+			mask := int64(0xFFFF) << shift
+			if val&mask == val || (val>>(shift+16) == -1 && (val>>shift)<<shift == val) {
 				// Rewrite this value into MOVD $const>>shift, Rto; SLD $shift, Rto
 				q := obj.Appendp(p, c.newprog)
 				q.As = ASLD
@@ -762,7 +779,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 
 			q = p
 
-			if NeedTOCpointer(c.ctxt) && c.cursym.Name != "runtime.duffzero" && c.cursym.Name != "runtime.duffcopy" {
+			if NeedTOCpointer(c.ctxt) && !isNOTOCfunc(c.cursym.Name) {
 				// When compiling Go into PIC, without PCrel support, all functions must start
 				// with instructions to load the TOC pointer into r2:
 				//

@@ -213,7 +213,7 @@ func TestTraceFutileWakeup(t *testing.T) {
 		// Check to make sure that no goroutine in the "special" trace region
 		// ends up blocking, unblocking, then immediately blocking again.
 		//
-		// The goroutines are careful to call runtime.GoSched in between blocking,
+		// The goroutines are careful to call runtime.Gosched in between blocking,
 		// so there should never be a clean block/unblock on the goroutine unless
 		// the runtime was generating extraneous events.
 		const (
@@ -519,6 +519,15 @@ func TestTraceStressStartStop(t *testing.T) {
 
 func TestTraceManyStartStop(t *testing.T) {
 	testTraceProg(t, "many-start-stop.go", nil)
+}
+
+func TestTraceWaitOnPipe(t *testing.T) {
+	switch runtime.GOOS {
+	case "dragonfly", "freebsd", "linux", "netbsd", "openbsd", "solaris":
+		testTraceProg(t, "wait-on-pipe.go", nil)
+		return
+	}
+	t.Skip("no applicable syscall.Pipe on " + runtime.GOOS)
 }
 
 func testTraceProg(t *testing.T, progName string, extra func(t *testing.T, trace, stderr []byte, stress bool)) {
