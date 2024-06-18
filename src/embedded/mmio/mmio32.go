@@ -102,6 +102,9 @@ func (r *U32) Store(v uint32) {
 //}
 
 // An UM32 represents a set of bits in R selected by Mask.
+//
+// Deprecated: Use RM32[uint32] instead.
+//
 type UM32 struct {
 	R    *U32
 	Mask uint32
