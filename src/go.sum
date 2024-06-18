@@ -1,3 +1,7 @@
+github.com/embeddedgo/fs v0.1.1 h1:tHBUdqdR+zZBOhlhkdOLD23G540sGNot4bTjC9zH4XI=
+github.com/embeddedgo/fs v0.1.1/go.mod h1:iQRMLUL0YeL5Ou2ILYTlspw32A0BeoXs7O2fuTZoS1M=
+github.com/embeddedgo/noostest v0.0.1 h1:Th5qmVgbS4/AUKQe8jEeod5KXdbW58/nOtbEs65qw/8=
+github.com/embeddedgo/noostest v0.0.1/go.mod h1:8aVGfwfSR/6F5qoJxb2YyiuGNRcsUCWuYCEJsweiNoA=
 golang.org/x/crypto v0.16.1-0.20231129163542-152cdb1503eb h1:1ceSY7sk6sJuiDREHpfyrqDnDljsLfEP2GuTClhBBfI=
 golang.org/x/crypto v0.16.1-0.20231129163542-152cdb1503eb/go.mod h1:gCAAfMLgwOJRpTjQ2zCCt2OcSfYMTeZVSRtQlPC7Nq4=
 golang.org/x/net v0.19.0 h1:zTwKpTd2XuCqf8huc7Fo2iSy+4RHPd10s4KzeTnVr1c=
