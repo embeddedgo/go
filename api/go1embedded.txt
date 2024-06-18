@@ -137,6 +137,10 @@ pkg embedded/rtos, const DCacheCleanInval = 2
 pkg embedded/rtos, const DCacheCleanInval ideal-int
 pkg embedded/rtos, const DCacheInval = 0
 pkg embedded/rtos, const DCacheInval ideal-int
+pkg embedded/rtos, const DCacheFlush = 1
+pkg embedded/rtos, const DCacheFlush ideal-int
+pkg embedded/rtos, const DCacheFlushInval = 2
+pkg embedded/rtos, const DCacheFlushInval ideal-int
 pkg embedded/rtos, const IntPrioCurrent = -1
 pkg embedded/rtos, const IntPrioCurrent ideal-int
 pkg embedded/rtos, const IntPrioHigh = 0
