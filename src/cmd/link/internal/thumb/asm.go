@@ -82,7 +82,7 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 	}
 
 	ld.Segdata.Laddr = 2048 // pass the main stack size to the Link.address()
-	if buildcfg.GOARM >= 0x10 {
+	if !buildcfg.GOARM.SoftFloat {
 		ld.Segdata.Laddr *= 2 // more space for floating-point registers
 	}
 	msp := uint32(uint64(ld.RAM.Base) + ld.Segdata.Laddr)

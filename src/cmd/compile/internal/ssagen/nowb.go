@@ -13,6 +13,7 @@ import (
 	"cmd/compile/internal/typecheck"
 	"cmd/compile/internal/types"
 	"cmd/internal/obj"
+	"cmd/internal/objabi"
 	"cmd/internal/src"
 )
 
@@ -75,14 +76,26 @@ func (c *nowritebarrierrecChecker) findExtraCalls(nn ir.Node) {
 		return
 	}
 	n := nn.(*ir.CallExpr)
-	if n.Fun == nil || n.Fun.Op() != ir.ONAME {
+	if n.Fun == nil {
 		return
 	}
-	fn := n.Fun.(*ir.Name)
+	var fn *ir.Name
+	switch n.Fun.Op() {
+	case ir.ONAME:
+		fn = n.Fun.(*ir.Name)
+	case ir.OMETHEXPR:
+		fn = n.Fun.(*ir.SelectorExpr).Selection.Nname.(*ir.Name)
+	default:
+		return
+	}
 	if fn.Class != ir.PFUNC || fn.Defn == nil {
 		return
 	}
 	if types.RuntimeSymName(fn.Sym()) != "systemstack" {
+		if base.Ctxt.Headtype == objabi.Hnoos {
+			callee := fn.Defn.(*ir.Func)
+			c.extraCalls[c.curfn] = append(c.extraCalls[c.curfn], nowritebarrierrecCall{callee, n.Pos()})
+		}
 		return
 	}
 

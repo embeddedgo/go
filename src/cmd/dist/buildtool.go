@@ -105,8 +105,6 @@ var ignorePrefixes = []string{
 // These must not be copied into the bootstrap build directory.
 // Also ignore test files.
 var ignoreSuffixes = []string{
-	"_thumb.s",
-	"_thumb.go",
 	"_test.s",
 	"_test.go",
 	// Skip PGO profile. No need to build toolchain1 compiler

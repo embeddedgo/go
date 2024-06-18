@@ -188,7 +188,6 @@ func (t *ternaryFlag) String() string {
 
 func (t *ternaryFlag) IsBoolFlag() bool { return true } // parse like a boolean flag
 
->>>>>>> 66d34c7d08d7c536c3165dc49ed318e73ea5acc2
 // Main is the main entry point for the linker code.
 func Main(arch *sys.Arch, theArch Arch) {
 	log.SetPrefix("link: ")
