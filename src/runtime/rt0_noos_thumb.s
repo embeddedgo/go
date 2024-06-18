@@ -49,7 +49,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of memory
 	MOVW  R1, (g_stack+stack_lo)(R0)
 	MOVW  R13, (g_stack+stack_hi)(R0)
-	ADD   $const__StackGuard, R1
+	ADD   $const_stackGuard, R1
 	MOVW  R1, g_stackguard0(R0)
 	MOVW  R1, g_stackguard1(R0)
 

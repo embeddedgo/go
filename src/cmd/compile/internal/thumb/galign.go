@@ -15,7 +15,7 @@ func Init(arch *ssagen.ArchInfo) {
 	arch.LinkArch = &thumb.Link
 	arch.REGSP = thumb.REGSP
 	arch.MAXWIDTH = (1 << 32) - 1
-	arch.SoftFloat = buildcfg.GOARM&0xF != 0xD // TODO: handle GOARM==0x7F (32-bit FPU)
+	arch.SoftFloat = buildcfg.GOARM.SoftFloat
 	arch.ZeroRange = zerorange
 	arch.Ginsnop = ginsnop      // used as inline mark
 

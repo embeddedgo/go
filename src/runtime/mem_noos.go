@@ -17,7 +17,7 @@ import "unsafe"
 // sysReserve allocates down from noosMem.end always returning _PageSize aligned
 // memory.
 //
-// noosPersistentAlloc is provides fast and memory efficient implementation of
+// noosPersistentAlloc provides fast and memory efficient implementation of
 // the persistentalloc1 function.
 
 var noosMem struct {

@@ -165,10 +165,7 @@ func (c *Ctx) offset(a *obj.Addr) int64 {
 }
 
 func (c *Ctx) chipzero(e float64) int {
-	switch buildcfg.GOARM {
-	case 0x7F, 0x7D: // ARMv7-M with floating point extension
-		break
-	default:
+	if buildcfg.GOARM.SoftFloat {
 		return -1
 	}
 	if math.Float64bits(e) == 0 {
@@ -178,10 +175,7 @@ func (c *Ctx) chipzero(e float64) int {
 }
 
 func (c *Ctx) chipfloat(e float64) int {
-	switch buildcfg.GOARM {
-	case 0x7F, 0x7D: // ARMv7-M with floating point extension
-		break
-	default:
+	if buildcfg.GOARM.SoftFloat {
 		return -1
 	}
 	ei := math.Float64bits(e)
@@ -1136,10 +1130,10 @@ func match(op, code Aclass) bool {
 var oprange [ALAST & obj.AMask][]Optab
 
 var (
-	symdiv      *obj.LSym
-	symdivu     *obj.LSym
-	symmod      *obj.LSym
-	symmodu     *obj.LSym
+	symdiv  *obj.LSym
+	symdivu *obj.LSym
+	symmod  *obj.LSym
+	symmodu *obj.LSym
 )
 
 func buildop(ctxt *obj.Link) {

@@ -41,7 +41,7 @@ var levelLogPages = [summaryLevels]uint{
 }
 
 // See mpagealloc_64bit.go for details.
-func (p *pageAlloc) sysInit() {
+func (p *pageAlloc) sysInit(test bool) {
 	// Calculate how much memory all our entries will take up.
 	//
 	// This should be around 12 KiB or less.
@@ -56,6 +56,7 @@ func (p *pageAlloc) sysInit() {
 	if reservation == nil {
 		throw("failed to reserve page summary memory")
 	}
+	p.summaryMappedReady += totalSize
 
 	// Iterate over the reservation and cut it up into slices.
 	//

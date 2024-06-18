@@ -602,8 +602,8 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 
 		if p.To.Type == obj.TYPE_REG && p.To.Reg == REGSP && p.Spadj == 0 {
 			f := c.cursym.Func()
-			if f.FuncFlag&objabi.FuncFlag_SPWRITE == 0 {
-				c.cursym.Func().FuncFlag |= objabi.FuncFlag_SPWRITE
+			if f.FuncFlag&abi.FuncFlagSPWrite == 0 {
+				c.cursym.Func().FuncFlag |= abi.FuncFlagSPWrite
 				if ctxt.Debugvlog || !ctxt.IsAsm {
 					ctxt.Logf("auto-SPWRITE: %s %v\n", c.cursym.Name, p)
 					if !ctxt.IsAsm {
@@ -692,7 +692,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 	// unnecessarily. See issue #35470.
 	p = c.ctxt.StartUnsafePoint(p, c.newprog)
 
-	if framesize <= objabi.StackSmall {
+	if framesize <= abi.StackSmall {
 		// small stack: SP < stackguard
 		//	CMP	stackguard, SP
 		p = obj.Appendp(p, c.newprog)
@@ -701,7 +701,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 		p.From.Type = obj.TYPE_REG
 		p.From.Reg = REG_R1
 		p.Reg = REGSP
-	} else if framesize <= objabi.StackBig {
+	} else if framesize <= abi.StackBig {
 		// large stack: SP-framesize < stackguard-StackSmall
 		//	ADD $-(framesize-StackSmall), SP, R2
 		//	CMP stackguard, R2
@@ -709,7 +709,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 
 		p.As = AADD
 		p.From.Type = obj.TYPE_CONST
-		p.From.Offset = -(int64(framesize) - objabi.StackSmall)
+		p.From.Offset = -(int64(framesize) - abi.StackSmall)
 		p.Reg = REGSP
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = REG_R2
@@ -721,7 +721,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 		p.Reg = REG_R2
 	} else {
 		// Such a large stack we need to protect against underflow.
-		// The runtime guarantees SP > objabi.StackBig, but
+		// The runtime guarantees SP > abi.StackBig, but
 		// framesize is large enough that SP-framesize may
 		// underflow, causing a direct comparison with the
 		// stack guard to incorrectly succeed. We explicitly
@@ -737,7 +737,7 @@ func (c *Ctx) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
 		p.As = ASUB
 		p.Scond = C_SBIT
 		p.From.Type = obj.TYPE_CONST
-		p.From.Offset = int64(framesize) - objabi.StackSmall
+		p.From.Offset = int64(framesize) - abi.StackSmall
 		p.Reg = REGSP
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = REG_R2
@@ -857,7 +857,15 @@ func progedit(ctxt *obj.Link, p *obj.Prog, newprog obj.ProgAlloc) {
 		if p.From.Type == obj.TYPE_REG {
 			p.From.Offset = int64(int(p.From.Reg)&15<<8 | typ<<5 | 1<<4 | Rn&15)
 		} else {
-			p.From.Offset = int64(int(p.From.Offset)<<7 | typ<<5 | Rn&15)
+			shift := int(p.From.Offset)
+			if shift == 0 && (typ == 1 || typ == 2) {
+				// Right shifts are weird - a shift that looks like "shift by
+				// constant 0" actually means "shift by constant 32". Use left
+				// shift in this situation instead.
+				// See issue 64715.
+				typ = 0
+			}
+			p.From.Offset = int64(shift&31<<7 | typ<<5 | Rn&15)
 		}
 		p.From.Type = obj.TYPE_SHIFT
 		p.From.Reg = 0

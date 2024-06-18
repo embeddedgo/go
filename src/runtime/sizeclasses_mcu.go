@@ -38,6 +38,7 @@ const (
 	largeSizeDiv    = 128
 	_NumSizeClasses = 19
 	_PageShift      = 8
+	maxObjsPerSpan  = 32
 )
 
 var class_to_size = [_NumSizeClasses]uint16{0, 8, 16, 32, 48, 64, 80, 96, 128, 144, 160, 192, 208, 256, 288, 320, 384, 416, 512}

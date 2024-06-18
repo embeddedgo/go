@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !goexperiment.exectracer2
+//go:build !goexperiment.exectracer2 && !noos
 
 // Go execution tracer.
 // The tracer captures a wide range of execution events like goroutine
@@ -11,8 +11,6 @@
 // in a compact form. A precise nanosecond-precision timestamp and a stack
 // trace is captured for most events.
 // See https://golang.org/s/go15trace for more info.
-
-//go:build !noos
 
 package runtime
 
