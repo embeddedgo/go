@@ -143,32 +143,37 @@ TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
 	ADD   $4, R2  // Don't execute syscall instruction again
 	MOVV  R2, _mepc(R29)
 
+	MOVV  $SYS_LAST_FAST, R4
+	SUB   R4, R8, R4 // R4 <= 0: fast syscall
+
 	// If fromHandler skip saving thread context
 	AND   $1, R2  // fromHandler flag
 	BNE   R2, R0, currentStack
 
+	MOVV  (g_sched+gobuf_sp)(g), R1 // duffcopy src thread
+	BLEZ  R4, duffcopy // fast syscall
+
 	// Save thread context in mOS
 	// Needs to be done before the syscall, cpuctx.exe might be nil
 	// afterwards (e.g. in nanosleep)
-	// TODO skip for fast syscall
 	MOVV  (cpuctx_exe)(g), R2
 
-	MOVV  _lr(R29), R1
-	MOVV  R1, (m_mOS+mOS_ra)(R2)
+	MOVV  _lr(R29), R3
+	MOVV  R3, (m_mOS+mOS_ra)(R2)
 
-	MOVV  _mepc(R29), R1
-	AND   $~1, R1  // Remove fromHandler flag from epc
-	MOVV  R1, (m_mOS+mOS_epc)(R2)
+	MOVV  _mepc(R29), R3
+	AND   $~1, R3  // Remove fromHandler flag from epc
+	MOVV  R3, (m_mOS+mOS_epc)(R2)
 
-	MOVV  (g_sched+gobuf_sp)(g), R1
-	MOVV  R1, (m_mOS+mOS_sp)(R2)
-	MOVV  (g_sched+gobuf_g)(g), R1
-	MOVV  R1, (m_mOS+mOS_fp)(R2)
+	MOVV  (g_sched+gobuf_sp)(g), R3
+	MOVV  R3, (m_mOS+mOS_sp)(R2)
+	MOVV  (g_sched+gobuf_g)(g), R3
+	MOVV  R3, (m_mOS+mOS_fp)(R2)
 
-	MOVV  (g_sched+gobuf_sp)(g), R1 // duffcopy src thread
 	JMP   duffcopy
 
 currentStack:
+	BGTZ  R4, badSyscall // slow syscall from handler
 	ADD   $excCtxSize, R29, R1 // duffcopy src handler
 
 duffcopy:
@@ -237,6 +242,9 @@ nothingToCopy:
 
 return:
 	ERET
+
+badSyscall:
+	BREAK
 
 
 // An interrupt was caused by software, particularly SW0.  This can happen on
