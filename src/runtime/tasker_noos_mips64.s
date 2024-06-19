@@ -12,7 +12,7 @@
 #define sysMaxArgs (48+8)
 
 // Exception Context
-#define _LR        (0*8)
+#define _lr        (0*8)
 #define _mstatus   (1*8)
 #define _mepc      (2*8)
 #define excCtxSize (3*8)
@@ -81,7 +81,7 @@ fromHandler:
 	// Save exception context on ISR stack
 	SUB   $excCtxSize, R29
 	OR    $1, R31, R26 // encode smallCtx flag in ra
-	MOVV  R26, _LR(R29)
+	MOVV  R26, _lr(R29)
 	MOVV  M(C0_SR), R26
 	MOVV  R26, _mstatus(R29)
 	MOVV  M(C0_EPC), R26
@@ -143,7 +143,7 @@ TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
 	// TODO skip for fast syscall
 	MOVV  (cpuctx_exe)(g), R27
 
-	MOVV  _LR(R29), R26
+	MOVV  _lr(R29), R26
 	MOVV  R26, (m_mOS+mOS_ra)(R27)
 
 	MOVV  _mepc(R29), R26
@@ -215,7 +215,7 @@ nothingToCopy:
 	JMP  ·enterScheduler(SB)
 
 	// Restore ctx of caller
-	MOVV  _LR(R29), R26
+	MOVV  _lr(R29), R26
 	AND   $~1, R26, R31 // Remove smallCtx flag from ra
 	MOVV  _mstatus(R29), R26
 	MOVV  R26, M(C0_SR)
@@ -247,7 +247,7 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	// Save thread context in mOS
 	MOVV  (cpuctx_exe)(g), R27
 
-	MOVV  _LR(R29), R26
+	MOVV  _lr(R29), R26
 	AND   $~1, R26  // Remove smallCtx flag from ra
 	MOVV  R26, (m_mOS+mOS_ra)(R27)
 
@@ -387,7 +387,7 @@ callVector:
 
 	MOVV  _mstatus(R29), R26
 	MOVV  R26, M(C0_SR)
-	MOVV  _LR(R29), R26
+	MOVV  _lr(R29), R26
 	MOVV  $~1, R27
 	AND   R27, R26, R31 // Remove smallCtx flag from RA
 	MOVV  _mepc(R29), R26
