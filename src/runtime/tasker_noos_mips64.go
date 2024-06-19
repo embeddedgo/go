@@ -45,14 +45,13 @@ func curcpuSleep() {
 	// when allowing the scheduler to be interrupted.
 	// TODO try again, this might have been my own fault by breaking
 	// atomic operations.
-	creg.STATUS.SetBits(creg.IP_EXT)
-	creg.STATUS.ClearBits(creg.IP_EXT)
+	creg.STATUS.SetBits(creg.IP_EXTMASK)
+	creg.STATUS.ClearBits(creg.IP_EXTMASK)
 }
 
 //go:nosplit
 func (cpu *cpuctx) newwork() {
-	// TODO use only one of the two interrupts
-	creg.CAUSE.SetBits(creg.IP_SW)
+	creg.CAUSE.SetBits(creg.IP_SW0)
 }
 
 //go:nosplit

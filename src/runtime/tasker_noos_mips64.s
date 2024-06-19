@@ -112,7 +112,7 @@ fromHandler:
 	BEQ   R27, R0, 2(PC)
 	JMP   ·externalInterruptHandler(SB)
 
-	AND   $INTR_SW, R26, R27
+	AND   $INTR_SW0, R26, R27
 	BEQ   R27, R0, 2(PC)
 	JMP   ·softwareInterruptHandler(SB)
 
@@ -236,8 +236,8 @@ return:
 	ERET
 
 
-// An interrupt was caused by software.  This can happen on any instruction.  We
-// need to save all GPRs in our context.
+// An interrupt was caused by software, particularly SW0.  This can happen on
+// any instruction.  We need to save all GPRs in our context.
 // TODO do we really need to save full context?  SW_INT is only set in newwork()
 TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (cpuctx_exe)(g), R26
@@ -260,13 +260,10 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (g_sched+gobuf_g)(g), R26
 	MOVV  R26, (m_mOS+mOS_fp)(R27)
 
-	// Must be a timer or software interrupt.  In both cases clear pending
-	// bits and enter the scheduler.
+	// Clear pending bit and enter the scheduler.
 	MOVV  M(C0_CAUSE), R26
-	AND   $~INTR_MASK, R26
+	AND   $~INTR_SW0, R26
 	MOVV  R26, M(C0_CAUSE)
-//	MOVV  M(C0_COMPARE), R26
-//	MOVV  R26, M(C0_COMPARE)
 
 	JMP  ·enterScheduler(SB)
 

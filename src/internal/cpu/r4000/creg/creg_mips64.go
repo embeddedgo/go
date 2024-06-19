@@ -55,9 +55,11 @@ const (
 
 // Cause register bits (p.171)
 const (
-	IP_SW    = 0x03 << 8
-	IP_EXT   = 0x7C << 8
-	IP_TIMER = 0x80 << 8
+	IP_SW0     = 0x01 << 8
+	IP_SW1     = 0x02 << 8
+	IP_SWMASK  = 0x03 << 8
+	IP_EXTMASK = 0x7C << 8
+	IP_TIMER   = 0x80 << 8
 )
 
 func (r CP0Reg) Load() uint32     { return mfc0(r) }
