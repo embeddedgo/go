@@ -10,7 +10,7 @@ import (
 	"unsafe"
 )
 
-// see saveGPRS and saveFPRS
+// See saveGPRS and saveFPRS
 const (
 	numGPRS = 28
 	numFPRS = 33
@@ -39,9 +39,6 @@ func taskerinit() {
 	allcpu.cap = 1
 }
 
-// This functions is called to put the CPU to sleep. It is allowed it does
-// nothing.
-//
 //go:nosplit
 func curcpuSleep() {
 	// Check defensively for external interrupts here.  There were lockups
@@ -52,12 +49,6 @@ func curcpuSleep() {
 	creg.STATUS.ClearBits(creg.IP_EXT)
 }
 
-// This function is used to inform the another CPU that there is a new thread
-// added to its runnable queue. It should wake up the sleeping CPU or preempt
-// the currently running thread to run the scheduler. The thread preemption can
-// be set as delayed to allow a running thread to run for a minimum period of
-// time.
-//
 //go:nosplit
 func (cpu *cpuctx) newwork() {
 	// TODO use only one of the two interrupts
@@ -69,17 +60,11 @@ func curcpuWakeup() {
 	// TODO implement
 }
 
-// This function is called to save the remaining context, not saved at syscall
-// entry (eg. it can save FPU state).
-//
 //go:nosplit
 func curcpuSavectxSched() {
 	// TODO implement
 }
 
-// This function is called to save the remaining context, not saved at syscall
-// entry (eg. it can save FPU state).
-//
 //go:nosplit
 func curcpuSavectxCall() {
 	// TODO implement
@@ -91,9 +76,6 @@ func cpuid() int {
 	return 0
 }
 
-// This function is called to create the inintial state of the new thread and
-// save it in provided m.
-//
 //go:nosplit
 func archnewm(m *m) {
 	m.epc = abi.FuncPCABI0(mstart)
@@ -102,16 +84,6 @@ func archnewm(m *m) {
 	m.ra = 1 // smallCtx flag
 }
 
-// Run scheduler immediately or at syscall exit. It's called only just before
-// syscall exit.
-//
-// The actual context switch is performed by architecture specific code at
-// curcpuRunScheduler exit. It should check the cpuctx.newexe variable and if
-// true switch the context to the new thread specified in cpuctx.exe.
-//
-// Tasker code does not use FPU so the architecture specific context switch
-// code can avoid saving/restoring FPU context if not need.
-//
 //go:nosplit
 func curcpuSchedule() {
 	// syscall still needs to duffcopy it's result back.  mark for schedule
@@ -133,6 +105,6 @@ func saveFPRs()
 func restoreFPRs()
 func unhandledExternalInterrupt()
 
-// syscalls not used by runtime
-func syssetprivlevel(newlevel int) (oldlevel, errno int)       { return } // TODO
-func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) { return } // TODO
+// syscalls unsupported by mips64
+func syssetprivlevel(newlevel int) (oldlevel, errno int)       { return }
+func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) { return }
