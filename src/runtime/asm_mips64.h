@@ -64,6 +64,8 @@
 
 // Masks for Status Registers IM bits and Cause Registers IP bits
 #define INTR_MASK   (0xFF << 8)
+#define INTR_SW0    (0x01 << 8)
+#define INTR_SW1    (0x02 << 8)
 #define INTR_SW     (0x03 << 8)
 #define INTR_EXT    (0x7C << 8)
 #define INTR_TIMER  (0x80 << 8)
