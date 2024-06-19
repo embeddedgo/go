@@ -19,7 +19,7 @@
 
 
 TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
-	JMP ·exceptionTrap(SB)
+	JMP ·exceptionHandler(SB)
 
 // Main exception handler.
 //
@@ -34,15 +34,15 @@ TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 // Called from thread:
 // 1. Save goroutine context in g.sched (sp, fp)
 // 2. Switch to ISR stack
-// 3. Save exception context on ISR stack (ra, epc, cause)
-// 4. Save thread context in m.mOS (sp, fp, ra, epc)
+// 3. Save exception context on ISR stack (lr, epc, cause)
+// 4. Save thread context in m.mOS (sp, fp, lr, epc)
 // 5. If interrupt goto 8, if syscall continue
 // 6. Do syscall
 //    - Copy args from caller thread stack to ISR stack
 //    - Call service routine in ISR context
 //    - Copy result from ISR stack to caller thread stack
 // 7. If the syscall called curcpuSchedule, make a call to curcpuRunScheduler
-// 8. If newexe, restore context from that thread (sp, fp, ra, epc)
+// 8. If newexe, restore context from that thread (sp, fp, lr, epc)
 // 9. Return execution at epc
 //
 // Called from handler:
@@ -59,7 +59,7 @@ TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 //   If we want to schedule, context must be in the m object.
 // - There are no callee save registers in go.  Assume all gprs clobbered after
 //   a function call.
-TEXT runtime·exceptionTrap(SB),NOSPLIT|NOFRAME,$0
+TEXT runtime·exceptionHandler(SB),NOSPLIT|NOFRAME,$0
 	// Determine caller stack
 	MOVV  $·cpu0(SB), R26
 	BNE   R26, g, fromThread
@@ -74,23 +74,27 @@ fromThread:
 	MOVV  g, (g_sched+gobuf_g)(R26)
 	MOVV  (g_stack+stack_hi)(R26), R29
 
-	// Switch to special ISR goroutine
+	// Switch to "signal" goroutine
 	MOVV  R26, g
 
 fromHandler:
 	// Save exception context on ISR stack
 	SUB   $excCtxSize, R29
-	OR    $1, R31, R26 // encode smallCtx flag in ra
-	MOVV  R26, _lr(R29)
+	OR    $1, R31, R26 // Encode smallCtx flag in lr
+	MOVV  R26, _lr(R29) // R29 is now free for use
 	MOVV  M(C0_SR), R26
 	MOVV  R26, _mstatus(R29)
 	MOVV  M(C0_EPC), R26
-	OR    R27, R26 // encode fromHandler flag in EPC
+	OR    R27, R26 // Encode fromHandler flag in EPC
 	MOVV  R26, _mepc(R29)
 
-	// Mask interrupts
-	MOVV  M(C0_SR), R26
-	MOVV  $~(INTR_SW|INTR_EXT), R27
+	// Mask pending interrupts.  Otherwise they will cause an exception loop
+	// as soon as we allow nested exceptions.
+	MOVV  M(C0_CAUSE), R26
+	MOVV  $INTR_MASK, R27
+	AND   R27, R26
+	NOR   R26, R26
+	MOVV  M(C0_SR), R27
 	AND   R27, R26
 	MOVV  R26, M(C0_SR)
 
@@ -129,31 +133,37 @@ fatal:
 // R9: argument data size on the stack (+8 for caller return address)
 // R10: return data size on the stack
 TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
-	MOVV  _mepc(R29), R27
-	ADD   $4, R27  // Don't execute syscall instruction again
-	MOVV  R27, _mepc(R29)
+	// Allow nested exceptions.  Reminder: Don't use R26 or R27 when
+	// exceptions are enabled.
+	MOVV  M(C0_SR), R26
+	AND   $~SR_EXL, R26
+	MOVV  R26, M(C0_SR)
+
+	MOVV  _mepc(R29), R2
+	ADD   $4, R2  // Don't execute syscall instruction again
+	MOVV  R2, _mepc(R29)
 
 	// If fromHandler skip saving thread context
-	AND   $1, R27  // fromHandler flag
-	BNE   R27, R0, currentStack
+	AND   $1, R2  // fromHandler flag
+	BNE   R2, R0, currentStack
 
 	// Save thread context in mOS
 	// Needs to be done before the syscall, cpuctx.exe might be nil
 	// afterwards (e.g. in nanosleep)
 	// TODO skip for fast syscall
-	MOVV  (cpuctx_exe)(g), R27
+	MOVV  (cpuctx_exe)(g), R2
 
-	MOVV  _lr(R29), R26
-	MOVV  R26, (m_mOS+mOS_ra)(R27)
+	MOVV  _lr(R29), R1
+	MOVV  R1, (m_mOS+mOS_ra)(R2)
 
-	MOVV  _mepc(R29), R26
-	AND   $~1, R26  // Remove fromHandler flag from epc
-	MOVV  R26, (m_mOS+mOS_epc)(R27)
+	MOVV  _mepc(R29), R1
+	AND   $~1, R1  // Remove fromHandler flag from epc
+	MOVV  R1, (m_mOS+mOS_epc)(R2)
 
-	MOVV  (g_sched+gobuf_sp)(g), R26
-	MOVV  R26, (m_mOS+mOS_sp)(R27)
-	MOVV  (g_sched+gobuf_g)(g), R26
-	MOVV  R26, (m_mOS+mOS_fp)(R27)
+	MOVV  (g_sched+gobuf_sp)(g), R1
+	MOVV  R1, (m_mOS+mOS_sp)(R2)
+	MOVV  (g_sched+gobuf_g)(g), R1
+	MOVV  R1, (m_mOS+mOS_fp)(R2)
 
 	MOVV  (g_sched+gobuf_sp)(g), R1 // duffcopy src thread
 	JMP   duffcopy
@@ -166,23 +176,16 @@ duffcopy:
 	SUB   $sysMaxArgs+3*8, R29
 
 	// Copy arguments from the caller's stack
-	MOVV   $·duffcopy<ABIInternal>+2048(SB), R26
+	MOVV   $·duffcopy<ABIInternal>+2048(SB), R3
 	SLL    $1, R9
-	SUB    R9, R26
+	SUB    R9, R3
 	MOVV   R29, R2 // duffcopy dst
-	JAL    (R26)
+	JAL    (R3)
 
 	// Save data needed to copy the return values back to the caller's stack
 	MOVV   R1, (sysMaxArgs+0*8)(R29)
 	MOVV   R2, (sysMaxArgs+1*8)(R29)
 	MOVV   R10, (sysMaxArgs+2*8)(R29)
-
-	// Reenable exceptions
-	MOVV  M(C0_SR), R26
-	AND   $~SR_EXL, R26
-	MOVV  R26, M(C0_SR)
-
-	// Reminder: Don't use R26 or R27 when interrupts enabled
 
 	// Call the service routine
 	MOVV  $·syscalls(SB), R9
@@ -191,20 +194,15 @@ duffcopy:
 	MOVV  (R9), R9
 	JAL   (R9)
 
-	// Disable exceptions again
-	MOVV  M(C0_SR), R8
-	OR    $SR_EXL, R8
-	MOVV  R8, M(C0_SR)
-
 	// Copy the return values back to the caller's stack
 	MOVV  (sysMaxArgs+2*8)(R29), R10
 	BEQ   R0, R10, nothingToCopy
 	MOVV  (sysMaxArgs+0*8)(R29), R2 // duffcopy dst
 	MOVV  (sysMaxArgs+1*8)(R29), R1 // duffcopy src
-	MOVV  $·duffcopy<ABIInternal>+2048(SB), R26
+	MOVV  $·duffcopy<ABIInternal>+2048(SB), R3
 	SLL   $1, R10
-	SUB   R10, R26
-	JAL   (R26)
+	SUB   R10, R3
+	JAL   (R3)
 
 nothingToCopy:
 	ADD $sysMaxArgs+3*8, R29
@@ -214,23 +212,28 @@ nothingToCopy:
 	BEQ   R8, R0, 2(PC)
 	JMP  ·enterScheduler(SB)
 
+	// Disable nested exceptions
+	MOVV  M(C0_SR), R8
+	OR    $SR_EXL, R8
+	MOVV  R8, M(C0_SR)
+
 	// Restore ctx of caller
-	MOVV  _lr(R29), R26
-	AND   $~1, R26, R31 // Remove smallCtx flag from ra
-	MOVV  _mstatus(R29), R26
-	MOVV  R26, M(C0_SR)
-	MOVV  _mepc(R29), R26
-	AND   $1, R26, R27
-	AND   $~1, R26  // Remove fromHandler flag from epc
-	MOVV  R26, M(C0_EPC)
+	MOVV  _lr(R29), R1
+	AND   $~1, R1, R31 // Remove smallCtx flag from lr
+	MOVV  _mstatus(R29), R1
+	MOVV  R1, M(C0_SR)
+	MOVV  _mepc(R29), R1
+	AND   $1, R1, R2
+	AND   $~1, R1  // Remove fromHandler flag from epc
+	MOVV  R1, M(C0_EPC)
 
 	ADD   $excCtxSize, R29
 
-	BNE   R27, R0, return
+	BNE   R2, R0, return
 
-	MOVV  $·cpu0(SB), R26
-	MOVV  (g_sched+gobuf_sp)(R26), R29
-	MOVV  (g_sched+gobuf_g)(R26), g
+	MOVV  $·cpu0(SB), R1
+	MOVV  (g_sched+gobuf_sp)(R1), R29
+	MOVV  (g_sched+gobuf_g)(R1), g
 
 return:
 	ERET
@@ -248,7 +251,7 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (cpuctx_exe)(g), R27
 
 	MOVV  _lr(R29), R26
-	AND   $~1, R26  // Remove smallCtx flag from ra
+	AND   $~1, R26  // Remove smallCtx flag from lr
 	MOVV  R26, (m_mOS+mOS_ra)(R27)
 
 	MOVV  _mepc(R29), R26
@@ -260,6 +263,11 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (g_sched+gobuf_g)(g), R26
 	MOVV  R26, (m_mOS+mOS_fp)(R27)
 
+	// Enable nested exceptions
+	MOVV  M(C0_SR), R26
+	AND   $~SR_EXL, R26
+	MOVV  R26, M(C0_SR)
+
 	// Clear pending bit and enter the scheduler.
 	MOVV  M(C0_CAUSE), R26
 	AND   $~INTR_SW0, R26
@@ -268,20 +276,14 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	JMP  ·enterScheduler(SB)
 
 
+// Reminder: At this point nested exceptions should always be enabled.
+// Don't use R26 or R27 when exceptions enabled.
 TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
-	// Reenable exceptions
-	MOVV  M(C0_SR), R26
-	AND   $~SR_EXL, R26
-//	OR    $INTR_EXT, R26 // allow external interrupts to preempt scheduler
-	MOVV  R26, M(C0_SR)
-
-	// Reminder: Don't use R26 or R27 when interrupts enabled
-
 	// Enter scheduler
 	MOVB  R0, cpuctx_schedule(g)
 	JAL   ·curcpuRunScheduler(SB)
 
-	// Disable exceptions again
+	// Disable nested exceptions
 	MOVV  M(C0_SR), R8
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
@@ -300,10 +302,10 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	SUB   $8, R29
 	MOVV  R23, 0(R29)
 	AND   $1, R9, R10  // smallCtx flag
-	BNE   R0, R10, smallCtx  // TODO Should never happen
+	BNE   R0, R10, smallCtx
 
 	MOVV  $(m_mOS+mOS_gprs)(R27), R26
-	JAL   ·restoreGPRs(SB) // TODO Skip if we are coming from syscall
+	JAL   ·restoreGPRs(SB)
 
 smallCtx:
 	MOVV  0(R29), R26
@@ -319,15 +321,17 @@ smallCtx:
 
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	// External interrupt can happen anytime, save full context.  Context
-	// will be saved on the stack, to allow nested interrupts be supported.
-	// TODO nested interrupts aren't enabled as of now.  Do we need them?
+	// will be saved on the ISR stack, to allow nested interrupts be
+	// supported.
+
 	// Keep in mind that the scheduler must not be called if context is
-	// saved on the stack.
+	// saved on the stack. TODO why?
+
 	SUB   $const_numGPRS*8, R29
 	MOVV  R29, R26
 	JAL   ·saveGPRs(SB)
 
-	// Context is saved.  Reenable exceptions.  Don't use R26, R27.
+	// Context is saved.  Enable nested exceptions.  Don't use R26, R27.
 	MOVV  M(C0_SR), R27
 	AND   $~SR_EXL, R27
 	MOVV  R27, M(C0_SR)
@@ -360,27 +364,18 @@ callVector:
 	ADD   R8, R10
 	MOVV  (R10), R10
 
-	// Allow nested interrupts
-//	MOVV  M(C0_SR), R8
-//	OR    $INTR_SW, R8
-//	MOVV  R8, M(C0_SR)
-
 	JAL   (R10)
-
-//	MOVV  M(C0_SR), R8
-//	AND   $~INTR_SW, R8
-//	MOVV  R8, M(C0_SR)
 
 	// External interrupts can't be cleared by clearing the bits in cause
 	// register.  The user handler must have cleared the interrupt at this
-	// point in the external source, probably via mmio.
+	// point in the external source.
 
-	// Disable exceptions again.  Restore Context.
+	// Disable nested exceptions again
 	MOVV  M(C0_SR), R8
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
 
-	// Restore ctx of caller
+	// Restore context of caller
 	MOVV  R29, R26
 	JAL   ·restoreGPRs(SB)
 	ADD   $const_numGPRS*8, R29
@@ -389,7 +384,7 @@ callVector:
 	MOVV  R26, M(C0_SR)
 	MOVV  _lr(R29), R26
 	MOVV  $~1, R27
-	AND   R27, R26, R31 // Remove smallCtx flag from RA
+	AND   R27, R26, R31 // Remove smallCtx flag from lr
 	MOVV  _mepc(R29), R26
 	MOVV  $~1, R27
 	AND   R26, R27  // Remove fromHandler flag from EPC
@@ -578,9 +573,9 @@ TEXT ·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
 
 // func sysreset(level int, addr unsafe.Pointer) bool
 TEXT ·sysreset(SB),NOSPLIT|NOFRAME,$0-12
-	NOP // TODO
+	NOP
 
 
 // func syscachemaint(op int, p unsafe.Pointer, size int)
 TEXT ·syscachemaint(SB),NOSPLIT,$0-12
-	NOP // TODO
+	NOP
