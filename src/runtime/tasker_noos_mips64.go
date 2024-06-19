@@ -40,14 +40,7 @@ func taskerinit() {
 }
 
 //go:nosplit
-func curcpuSleep() {
-	// Check defensively for external interrupts here.  There were lockups
-	// when allowing the scheduler to be interrupted.
-	// TODO try again, this might have been my own fault by breaking
-	// atomic operations.
-	creg.STATUS.SetBits(creg.IP_EXTMASK)
-	creg.STATUS.ClearBits(creg.IP_EXTMASK)
-}
+func curcpuSleep() {}
 
 //go:nosplit
 func (cpu *cpuctx) newwork() {
@@ -55,19 +48,13 @@ func (cpu *cpuctx) newwork() {
 }
 
 //go:nosplit
-func curcpuWakeup() {
-	// TODO implement
-}
+func curcpuWakeup() {}
 
 //go:nosplit
-func curcpuSavectxSched() {
-	// TODO implement
-}
+func curcpuSavectxSched() {}
 
 //go:nosplit
-func curcpuSavectxCall() {
-	// TODO implement
-}
+func curcpuSavectxCall() {}
 
 //go:nosplit
 func cpuid() int {
