@@ -143,8 +143,6 @@ TEXT ·reset(SB),NOSPLIT|NOFRAME,$0-16
 	SYSCALL
 	RET
 
-// unsupported syscalls
-
 // func exit(r int32)
 TEXT ·exit(SB),NOSPLIT|NOFRAME,$0-8
 	NOOP
