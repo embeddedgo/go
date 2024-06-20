@@ -234,11 +234,6 @@ nothingToCopy:
 	BEQ   R8, R0, 2(PC)
 	JMP  ·enterScheduler(SB)
 
-	// Disable nested interrupts
-	MOVV  M(C0_SR), R8
-	OR    $SR_EXL, R8
-	MOVV  R8, M(C0_SR)
-
 	// Restore ctx of caller
 	MOVV  _lr(R29), R1
 	AND   $~1, R1, R31 // Remove smallCtx flag from lr
@@ -310,39 +305,37 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	MOVB  R0, cpuctx_schedule(g)
 	JAL   ·curcpuRunScheduler(SB)
 
+	// Clear cpuctx.newexe
+	MOVB  R0, (cpuctx_newexe)(g)
+
+	// Restore mstatus from exception context
+	MOVV  _mstatus(R29), R1
+	MOVV  R1, M(C0_SR)
+	ADD   $excCtxSize, R29
+
 	// Disable nested interrupts
 	MOVV  M(C0_SR), R8
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
 
-	// Clear cpuctx.newexe
-	MOVB  R0, (cpuctx_newexe)(g)
-
-	// Restore mstatus from exception context
-	MOVV  _mstatus(R29), R26
-	MOVV  R26, M(C0_SR)
-	ADD   $excCtxSize, R29
-
 	MOVV  (cpuctx_exe)(g), R27
 	MOVV  (m_mOS+mOS_ra)(R27), R9
-	AND   $~1, R9, R23 // Remove smallCtx flag
-	SUB   $8, R29
-	MOVV  R23, 0(R29)
-	AND   $1, R9, R10  // smallCtx flag
-	BNE   R0, R10, smallCtx
+
+	AND   $1, R9 // smallCtx flag
+	BNE   R0, R9, smallCtx
 
 	MOVV  $(m_mOS+mOS_gprs)(R27), R26
 	JAL   ·restoreGPRs(SB)
 	// Only use R26, R27 from here
 
 smallCtx:
-	MOVV  0(R29), R26
-	ADD   $8, R29
 	MOVV  (m_mOS+mOS_sp)(R27), R29
 	MOVV  (m_mOS+mOS_fp)(R27), g
-	MOVV  R26, R31
+	MOVV  (m_mOS+mOS_ra)(R27), R31
 	MOVV  (m_mOS+mOS_epc)(R27), R26
 	MOVV  R26, M(C0_EPC)
+	MOVV  $~1, R27
+	AND   R27, R31 // Remove smallCtx flag
 
 	ERET
 
@@ -478,7 +471,9 @@ TEXT ·saveGPRs(SB),NOSPLIT|NOFRAME,$0
 	RET
 
 
-// R26 must point to stored gprs.  Only use R26, R27 after restoring.
+// R26 must point to stored gprs.  Only use R26, R27 after restoring.  Be
+// especially careful and look at the disassembly;  The assembler might decide
+// to use R16-R23 for you.
 TEXT ·restoreGPRs(SB),NOSPLIT|NOFRAME,$0
 	MOVV 216(R26), R1
 	MOVV R1, LO
