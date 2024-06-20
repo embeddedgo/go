@@ -90,6 +90,11 @@ func (d *deadcodePass) init() {
 			first, last = -14, 479
 		case sys.RISCV64:
 			first, last = 1, 1023
+		case sys.MIPS64:
+			first, last = 1, 5
+			// runtime.unhandledExternalInterrupt is also a handler.
+			// Must be called somewhere in the code, otherwise it
+			// gets removed without error and relocs point to 0x0.
 		}
 		for i := first; i <= last; i++ {
 			names = append(names, InterruptHandler(i))

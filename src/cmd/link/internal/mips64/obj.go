@@ -105,6 +105,17 @@ func archinit(ctxt *ld.Link) {
 		if *ld.FlagTextAddr == -1 {
 			*ld.FlagTextAddr = ld.Rnd(0x10000, *ld.FlagRound) + int64(ld.HEADR)
 		}
+
+	case objabi.Hnoos:
+		*ld.FlagD = true
+		ld.Elfinit(ctxt)
+		ld.HEADR = ld.ELFRESERVE
+		if *ld.FlagTextAddr == -1 {
+			*ld.FlagTextAddr = 0
+		}
+		if *ld.FlagRound == -1 {
+			*ld.FlagRound = 8
+		}
 	}
 
 	dynSymCount = 0

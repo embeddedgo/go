@@ -75,8 +75,10 @@ import (
 // Tasker code does not use FPU so the architecture specific context switch
 // code can avoid saving/restoring FPU context if not need.
 
+var dummyNanoseconds int64
+
 //go:nosplit
-func dummyNanotime() int64 { return 1 }
+func dummyNanotime() int64 { dummyNanoseconds += 100; return dummyNanoseconds }
 
 //go:nosplit
 func dummySetalarm(ns int64) {}

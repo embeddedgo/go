@@ -19,9 +19,9 @@ type Error struct{ s string }
 
 var (
 	ENOTSUP      = &Error{"operation not supported"}
-	EINVAL       = &Error{"operation not supported"}
-	ENOENT       = &Error{"invalid argument"}
-	EACCES       = &Error{"no such file or directory"}
+	EINVAL       = &Error{"invalid argument"}
+	ENOENT       = &Error{"no such file or directory"}
+	EACCES       = &Error{"permission denied"}
 	EPERM        = &Error{"operation not permitted"}
 	EEXIST       = &Error{"file exists"}
 	ENOTEMPTY    = &Error{"directory not empty"}
@@ -33,7 +33,7 @@ var (
 	ENOSPC       = &Error{"no space left on device"}
 	EBADF        = &Error{"bad file descriptor"}
 	ECANCELED    = &Error{"operation canceled"}
-	EINTR        = &Error{"interrupt"}              // for os package only
+	EINTR        = &Error{"interrupt"} // for os package only
 	//ENOPROTOOPT  = &Error{"protocol not available"} // for net package only
 )
 

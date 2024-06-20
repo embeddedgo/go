@@ -254,7 +254,6 @@ var optab = []Optab{
 	{AMOVV, C_REG, C_NONE, C_LO, 21, 4, 0, sys.MIPS64, 0},
 
 	{AMUL, C_REG, C_REG, C_NONE, 22, 4, 0, 0, 0},
-	{AMUL, C_REG, C_REG, C_REG, 22, 4, 0, 0, 0},
 	{AMULV, C_REG, C_REG, C_NONE, 22, 4, 0, sys.MIPS64, 0},
 
 	{AADD, C_ADD0CON, C_REG, C_REG, 4, 4, 0, 0, 0},
@@ -376,14 +375,6 @@ var optab = []Optab{
 	{ATEQ, C_SCON, C_REG, C_REG, 15, 4, 0, 0, 0},
 	{ATEQ, C_SCON, C_NONE, C_REG, 15, 4, 0, 0, 0},
 	{ACMOVT, C_REG, C_NONE, C_REG, 17, 4, 0, 0, 0},
-
-	{AVMOVB, C_SCON, C_NONE, C_WREG, 56, 4, 0, sys.MIPS64, 0},
-	{AVMOVB, C_ADDCON, C_NONE, C_WREG, 56, 4, 0, sys.MIPS64, 0},
-	{AVMOVB, C_SOREG, C_NONE, C_WREG, 57, 4, 0, sys.MIPS64, 0},
-	{AVMOVB, C_WREG, C_NONE, C_SOREG, 58, 4, 0, sys.MIPS64, 0},
-
-	{AWSBH, C_REG, C_NONE, C_REG, 59, 4, 0, 0, 0},
-	{ADSBH, C_REG, C_NONE, C_REG, 59, 4, 0, sys.MIPS64, 0},
 
 	{ABREAK, C_REG, C_NONE, C_SEXT, 7, 4, REGSB, sys.MIPS64, 0}, /* really CACHE instruction */
 	{ABREAK, C_REG, C_NONE, C_SAUTO, 7, 4, REGSP, sys.MIPS64, 0},
@@ -584,9 +575,6 @@ func (c *ctxt0) aclass(a *obj.Addr) int {
 		}
 		if REG_FCR0 <= a.Reg && a.Reg <= REG_FCR31 {
 			return C_FCREG
-		}
-		if REG_W0 <= a.Reg && a.Reg <= REG_W31 {
-			return C_WREG
 		}
 		if a.Reg == REG_LO {
 			return C_LO
@@ -1063,11 +1051,6 @@ func buildop(ctxt *obj.Link) {
 		case AMOVVL:
 			opset(AMOVVR, r0)
 
-		case AVMOVB:
-			opset(AVMOVH, r0)
-			opset(AVMOVW, r0)
-			opset(AVMOVD, r0)
-
 		case AMOVW,
 			AMOVD,
 			AMOVF,
@@ -1104,13 +1087,6 @@ func buildop(ctxt *obj.Link) {
 
 		case ATEQ:
 			opset(ATNE, r0)
-
-		case AWSBH:
-			opset(ASEB, r0)
-			opset(ASEH, r0)
-
-		case ADSBH:
-			opset(ADSHD, r0)
 		}
 	}
 }
@@ -1165,14 +1141,6 @@ func OP_FRRR(op uint32, r1 int16, r2 int16, r3 int16) uint32 {
 
 func OP_JMP(op uint32, i uint32) uint32 {
 	return op | i&0x3FFFFFF
-}
-
-func OP_VI10(op uint32, df uint32, s10 int32, wd uint32, minor uint32) uint32 {
-	return 0x1e<<26 | (op&7)<<23 | (df&3)<<21 | uint32(s10&0x3FF)<<11 | (wd&31)<<6 | minor&0x3F
-}
-
-func OP_VMI10(s10 int32, rs uint32, wd uint32, minor uint32, df uint32) uint32 {
-	return 0x1e<<26 | uint32(s10&0x3FF)<<16 | (rs&31)<<11 | (wd&31)<<6 | (minor&15)<<2 | df&3
 }
 
 func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
@@ -1406,17 +1374,8 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
 		}
 		o1 = OP_RRR(a, REGZERO, p.From.Reg, REGZERO)
 
-	case 22: /* mul r1,r2 [r3]*/
-		if p.To.Reg != obj.REG_NONE {
-			r := p.Reg
-			if r == obj.REG_NONE {
-				r = p.To.Reg
-			}
-			a := SP(3, 4) | 2 /* mul */
-			o1 = OP_RRR(a, p.From.Reg, r, p.To.Reg)
-		} else {
-			o1 = OP_RRR(c.oprrr(p.As), p.From.Reg, p.Reg, REGZERO)
-		}
+	case 22: /* mul r1,r2 */
+		o1 = OP_RRR(c.oprrr(p.As), p.From.Reg, p.Reg, REGZERO)
 
 	case 23: /* add $lcon,r1,r2 ==> lu+or+add */
 		v := c.regoff(&p.From)
@@ -1680,22 +1639,6 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
 		rel.Sym = p.From.Sym
 		rel.Add = p.From.Offset
 		rel.Type = objabi.R_ADDRMIPSTLS
-
-	case 56: /* vmov{b,h,w,d} $scon, wr */
-
-		v := c.regoff(&p.From)
-		o1 = OP_VI10(110, c.twobitdf(p.As), v, uint32(p.To.Reg), 7)
-
-	case 57: /* vld $soreg, wr */
-		v := c.lsoffset(p.As, c.regoff(&p.From))
-		o1 = OP_VMI10(v, uint32(p.From.Reg), uint32(p.To.Reg), 8, c.twobitdf(p.As))
-
-	case 58: /* vst wr, $soreg */
-		v := c.lsoffset(p.As, c.regoff(&p.To))
-		o1 = OP_VMI10(v, uint32(p.To.Reg), uint32(p.From.Reg), 9, c.twobitdf(p.As))
-
-	case 59:
-		o1 = OP_RRR(c.oprrr(p.As), p.From.Reg, REGZERO, p.To.Reg)
 	}
 
 	out[0] = o1
@@ -1896,16 +1839,6 @@ func (c *ctxt0) oprrr(a obj.As) uint32 {
 		return SP(3, 4) | OP(0, 0)
 	case AMSUB:
 		return SP(3, 4) | OP(0, 4)
-	case AWSBH:
-		return SP(3, 7) | OP(20, 0)
-	case ADSBH:
-		return SP(3, 7) | OP(20, 4)
-	case ADSHD:
-		return SP(3, 7) | OP(44, 4)
-	case ASEB:
-		return SP(3, 7) | OP(132, 0)
-	case ASEH:
-		return SP(3, 7) | OP(196, 0)
 	}
 
 	if a < 0 {
@@ -2096,44 +2029,4 @@ func vshift(a obj.As) bool {
 		return true
 	}
 	return false
-}
-
-// MSA Two-bit Data Format Field Encoding
-func (c *ctxt0) twobitdf(a obj.As) uint32 {
-	switch a {
-	case AVMOVB:
-		return 0
-	case AVMOVH:
-		return 1
-	case AVMOVW:
-		return 2
-	case AVMOVD:
-		return 3
-	default:
-		c.ctxt.Diag("unsupported data format %v", a)
-	}
-	return 0
-}
-
-// MSA Load/Store offset have to be multiple of size of data format
-func (c *ctxt0) lsoffset(a obj.As, o int32) int32 {
-	var mod int32
-	switch a {
-	case AVMOVB:
-		mod = 1
-	case AVMOVH:
-		mod = 2
-	case AVMOVW:
-		mod = 4
-	case AVMOVD:
-		mod = 8
-	default:
-		c.ctxt.Diag("unsupported instruction:%v", a)
-	}
-
-	if o%mod != 0 {
-		c.ctxt.Diag("invalid offset for %v: %d is not a multiple of %d", a, o, mod)
-	}
-
-	return o / mod
 }
