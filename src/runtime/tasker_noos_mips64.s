@@ -100,7 +100,7 @@ fromHandler:
 	// Mask pending interrupts.  Otherwise they will cause an exception loop
 	// as soon as we allow nested interrupts.
 	MOVV  M(C0_CAUSE), R26
-	MOVV  $INTR_MASK, R27
+	MOVV  $INTR_EXT, R27 // nesteding only allowed for external interrupts
 	AND   R27, R26
 	NOR   R26, R26
 	MOVV  M(C0_SR), R27
