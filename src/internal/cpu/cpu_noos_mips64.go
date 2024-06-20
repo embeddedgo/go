@@ -6,4 +6,10 @@ package cpu
 
 const CacheLinePadSize = 32
 
-func doinit() {}
+func doinit() {
+	// noos currently will always use MIPS-III ISA.  Once more mips64
+	// targets are supported, we should probe here for ISA extensions and
+	// enable them.
+
+	MIPS64X.HasMSA = false
+}
