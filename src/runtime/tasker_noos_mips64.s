@@ -2,6 +2,37 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Implementation of the exception handler for the tasker.
+//
+// There are different levels of context that we save on preemption:
+// - goroutine (sp, fp):  Needed to return to the preempted goroutine
+//   from the "signal" goroutine, if we didn't schedule.  Saved in g.sched.
+// - exception (lr, status, epc):  Registers changed by the exception, must be
+//   restored at the end of the exception.  Saved on "signal" stack, i.e. might
+//   be nested.
+// - thread (sp, fp, lr, epc):  Needed to schedule a goroutine.  If we are
+//   going to call the scheduler, the goroutine context is moved into the thread
+//   context.  Saved in m.mOS.
+// - full (gprs, fprs):  Full context saves all registers.  Needed on arbitrary
+//   preemption, i.e. interrupts.  These will be saved on the "signal" stack or
+//   in m.mOS.  External interrupts will choose the former, to allow nested
+//   interrupts.  Software interrupts will choose the latter, to allow
+//   scheduling.
+//
+// There are some conditions that affect how the exception is handled:
+// - fromHandler:  This flag is set when the exception preempted the "signal"
+//   goroutine, i.e. we are in a nested exception.  A nested exception must not
+//   enter the scheduler, but always return to the caller stack.  Therefore it's
+//   also only allowed to call fast syscalls, which are guaranteed to not call
+//   the scheduler.  This flag is encoded in bit 0 of the exception context's
+//   _mepc value.
+// - smallCtx:  This flag indicates that we didn't save the gprs/fprs.  We don't
+//   need to save them if preemption happened at function entry, i.e. syscalls.
+//   The caller won't care about these because of the Go ABI0.  This flag is
+//   encoded in bit 0 of the exception context's _lr value.
+// - fast syscall:  Fast syscalls are guaranteed to not enter the scheduler.  We
+//   need only to save the goroutine's and exception's context.
+
 #include "go_asm.h"
 #include "go_tls.h"
 #include "textflag.h"
@@ -18,10 +49,17 @@
 #define excCtxSize (3*8)
 
 
+// This will be copied into the processor's general exception vector.  Since the
+// general exception vector is limited in size, it just jumps to the actual
+// implementation.
 TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 	JMP ·exceptionHandler(SB)
 
-// Main exception handler.
+
+// Main exception handler.  If necessary saves goroutine context and switches
+// stach to "signal" goroutine.  Saves exceptions context.  Masks pending
+// interrupts in preparation for nested interrupts. Lastly evaluates the
+// exception cause and calls the appropriate function.
 //
 // R26 and R27 are free, see runtime/asm_mips64x.s
 //
@@ -30,35 +68,6 @@ TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 //
 // Only syscalls and interrupts are handled at the moment, all other exceptions
 // are fatal.
-//
-// Called from thread:
-// 1. Save goroutine context in g.sched (sp, fp)
-// 2. Switch to ISR stack
-// 3. Save exception context on ISR stack (lr, epc, cause)
-// 4. Save thread context in m.mOS (sp, fp, lr, epc)
-// 5. If interrupt goto 8, if syscall continue
-// 6. Do syscall
-//    - Copy args from caller thread stack to ISR stack
-//    - Call service routine in ISR context
-//    - Copy result from ISR stack to caller thread stack
-// 7. If the syscall called curcpuSchedule, make a call to curcpuRunScheduler
-// 8. If newexe, restore context from that thread (sp, fp, lr, epc)
-// 9. Return execution at epc
-//
-// Called from handler:
-// same, but skip 1, 2, 4
-//
-//                        --external-------ERET
-//                      /
-// exception---interrupt--SW----scheduler--ERET
-//          \                /
-//           --syscall------
-//
-// Other basic things I learned while writing this:
-// - If we want to support nested exceptions, save context must be on the stack.
-//   If we want to schedule, context must be in the m object.
-// - There are no callee save registers in go.  Assume all gprs clobbered after
-//   a function call.
 TEXT runtime·exceptionHandler(SB),NOSPLIT|NOFRAME,$0
 	// Determine caller stack
 	MOVV  $·cpu0(SB), R26
@@ -89,7 +98,7 @@ fromHandler:
 	MOVV  R26, _mepc(R29)
 
 	// Mask pending interrupts.  Otherwise they will cause an exception loop
-	// as soon as we allow nested exceptions.
+	// as soon as we allow nested interrupts.
 	MOVV  M(C0_CAUSE), R26
 	MOVV  $INTR_MASK, R27
 	AND   R27, R26
@@ -124,16 +133,24 @@ fatal:
 	JMP   ·unhandledExcepton_target(SB)
 
 
-// System call is like oridnary function call so all registers are caller save
-// (Go ABI0).  Meaning we don't need to save GPRs and are free to use them.  The
-// tiny wrapper over SYSCALL instruction adds additional parameters in R8-R10
-// registers:
+// Execute a system call.  First unsets exception level to allow nested
+// interrupts.  Forwards epc by one instruction, otherwise the syscall is
+// triggered again on ERET.  Saves thread context if we might schedule, i.e. not
+// a fast syscall and not nested exception.  Duffcopies the syscall arguments
+// from caller stack to "signal" stack.  Jump to syscall handler.  Duffcopy
+// results back.  It the syscall called curcpuSchedule, jump to enterScheduler.
+// Otherwise restore exception and goroutine context.
+//
+// System call is like an oridnary function call, so all registers are caller
+// save (Go ABI0).  Meaning we don't need to save GPRs and are free to use them.
+// The tiny wrapper over SYSCALL instruction adds additional parameters in
+// R8-R10 registers:
 //
 // R8: syscall number
 // R9: argument data size on the stack (+8 for caller return address)
 // R10: return data size on the stack
 TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
-	// Allow nested exceptions.  Reminder: Don't use R26 or R27 when
+	// Allow nested interrupts.  Reminder: Don't use R26 or R27 when
 	// exceptions are enabled.
 	MOVV  M(C0_SR), R26
 	AND   $~SR_EXL, R26
@@ -213,11 +230,11 @@ nothingToCopy:
 	ADD $sysMaxArgs+3*8, R29
 
 	// Run the scheduler if the syscall wants it
-	MOVB  cpuctx_schedule(g), R8  // Handlers will not set this
+	MOVB  cpuctx_schedule(g), R8  // Always false if nested or fast syscall
 	BEQ   R8, R0, 2(PC)
 	JMP  ·enterScheduler(SB)
 
-	// Disable nested exceptions
+	// Disable nested interrupts
 	MOVV  M(C0_SR), R8
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
@@ -248,7 +265,9 @@ badSyscall:
 
 
 // An interrupt was caused by software, particularly SW0.  This can happen on
-// any instruction.  We need to save all GPRs in our context.
+// any instruction.  Saves full context in the thread context, enables nested
+// interrupts and jumps to enterScheduler.
+//
 // TODO do we really need to save full context?  SW_INT is only set in newwork()
 TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (cpuctx_exe)(g), R26
@@ -271,7 +290,7 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (g_sched+gobuf_g)(g), R26
 	MOVV  R26, (m_mOS+mOS_fp)(R27)
 
-	// Enable nested exceptions
+	// Enable nested interrupts
 	MOVV  M(C0_SR), R26
 	AND   $~SR_EXL, R26
 	MOVV  R26, M(C0_SR)
@@ -284,14 +303,14 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	JMP  ·enterScheduler(SB)
 
 
-// Reminder: At this point nested exceptions should always be enabled.
-// Don't use R26 or R27 when exceptions enabled.
+// Calls the scheduler and switches to the newly scheduled goroutine.  Assumes
+// nested interrupts are enabled.
 TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 	// Enter scheduler
 	MOVB  R0, cpuctx_schedule(g)
 	JAL   ·curcpuRunScheduler(SB)
 
-	// Disable nested exceptions
+	// Disable nested interrupts
 	MOVV  M(C0_SR), R8
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
@@ -314,6 +333,7 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 
 	MOVV  $(m_mOS+mOS_gprs)(R27), R26
 	JAL   ·restoreGPRs(SB)
+	// Only use R26, R27 from here
 
 smallCtx:
 	MOVV  0(R29), R26
@@ -327,19 +347,18 @@ smallCtx:
 	ERET
 
 
+// Calls a user implementation for a pending external interrupt.  External
+// interrupt can happen anytime, saves full context.  Context will be saved on
+// the ISR stack, to allow nested interrupts be supported.  Calculates the
+// runtime.vector offset from the interrupt number and calls it.  Restores
+// context and returns.
+// TODO save fprs?
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
-	// External interrupt can happen anytime, save full context.  Context
-	// will be saved on the ISR stack, to allow nested interrupts be
-	// supported.
-
-	// Keep in mind that the scheduler must not be called if context is
-	// saved on the stack. TODO why?
-
 	SUB   $const_numGPRS*8, R29
 	MOVV  R29, R26
 	JAL   ·saveGPRs(SB)
 
-	// Context is saved.  Enable nested exceptions.  Don't use R26, R27.
+	// Context is saved.  Enable nested interrupts.  Don't use R26, R27.
 	MOVV  M(C0_SR), R27
 	AND   $~SR_EXL, R27
 	MOVV  R27, M(C0_SR)
@@ -364,7 +383,7 @@ findVector:
 callVector:
 	SLL   $3, R9, R8 // irq vector offset
 
-	// get interrupt vector
+	// Get interrupt vector
 	MOVV  $runtime·vectors(SB), R10
 	MOVV  (R10), R11
 	SUB   R9, R11
@@ -378,7 +397,7 @@ callVector:
 	// register.  The user handler must have cleared the interrupt at this
 	// point in the external source.
 
-	// Disable nested exceptions again
+	// Disable nested interrupts
 	MOVV  M(C0_SR), R8
 	OR    $SR_EXL, R8
 	MOVV  R8, M(C0_SR)
@@ -386,6 +405,7 @@ callVector:
 	// Restore context of caller
 	MOVV  R29, R26
 	JAL   ·restoreGPRs(SB)
+	// Only use R26, R27 from here
 	ADD   $const_numGPRS*8, R29
 
 	MOVV  _mstatus(R29), R26
@@ -458,7 +478,7 @@ TEXT ·saveGPRs(SB),NOSPLIT|NOFRAME,$0
 	RET
 
 
-// R26 must point to stored gprs.
+// R26 must point to stored gprs.  Only use R26, R27 after restoring.
 TEXT ·restoreGPRs(SB),NOSPLIT|NOFRAME,$0
 	MOVV 216(R26), R1
 	MOVV R1, LO
