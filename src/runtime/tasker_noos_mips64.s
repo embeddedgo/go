@@ -433,7 +433,6 @@ fatal:
 // Do not remove.  Required by the linker, runtime.vectors defaults to this.
 TEXT ·unhandledExternalInterrupt(SB),NOSPLIT|NOFRAME,$0
 	BREAK
-	JMP  -1(PC)
 
 
 // R26 must point to where gprs will be stored.
