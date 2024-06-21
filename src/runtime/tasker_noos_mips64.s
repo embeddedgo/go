@@ -262,8 +262,6 @@ badSyscall:
 // An interrupt was caused by software, particularly SW0.  This can happen on
 // any instruction.  Saves full context in the thread context, enables nested
 // interrupts and jumps to enterScheduler.
-//
-// TODO do we really need to save full context?  SW_INT is only set in newwork()
 TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  (cpuctx_exe)(g), R26
 	MOVV  $(m_mOS+mOS_gprs)(R26), R26
@@ -350,6 +348,9 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	SUB   $const_numGPRS*8, R29
 	MOVV  R29, R26
 	JAL   ·saveGPRs(SB)
+	SUB   $const_numFPRS*8, R29
+	MOVV  R29, R26
+	JAL   ·saveFPRs(SB)
 
 	// Context is saved.  Enable nested interrupts.  Don't use R26, R27.
 	MOVV  M(C0_SR), R27
@@ -396,6 +397,9 @@ callVector:
 	MOVV  R8, M(C0_SR)
 
 	// Restore context of caller
+	MOVV  R29, R26
+	JAL   ·restoreFPRs(SB)
+	ADD   $const_numFPRS*8, R29
 	MOVV  R29, R26
 	JAL   ·restoreGPRs(SB)
 	// Only use R26, R27 from here
