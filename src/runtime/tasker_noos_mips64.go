@@ -4,6 +4,16 @@
 
 package runtime
 
+// Implements tasker support for mips64.
+//
+// Relies on external implementations of the following target specific
+// functions, that must be provided by the target module via go:linkname pragma
+// or in assembly:
+//
+//     _rt0_mips64_noos()
+//     runtime.unhandledException()
+//     runtime.defaultWrite(fd int, p []byte) int
+
 import (
 	"internal/abi"
 	"internal/cpu/r4000/creg"
@@ -79,9 +89,7 @@ func curcpuSchedule() {
 
 //go:nowritebarrierrec
 //go:nosplit
-func defaultWrite(fd int, p []byte) int {
-	return targetDefaultWrite(fd, p)
-}
+func defaultWrite(fd int, p []byte) int
 
 // only called from ISR, do not use
 func enterScheduler()

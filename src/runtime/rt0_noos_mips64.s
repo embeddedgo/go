@@ -8,9 +8,6 @@
 #include "textflag.h"
 #include "asm_mips64.h"
 
-TEXT _rt0_mips64_noos(SB),NOSPLIT|NOFRAME,$0
-	JMP ·rt0_target(SB)
-
 TEXT runtime·_rt0_mips64_noos1(SB),NOSPLIT|NOFRAME,$0
 	// Clear .bss, .noptrbss and unallocated memory.
 	SUBU $16, R29

@@ -130,7 +130,7 @@ fromHandler:
 	JMP   ·softwareInterruptHandler(SB)
 
 fatal:
-	JMP   ·unhandledExcepton_target(SB)
+	JMP   ·unhandledException(SB)
 
 
 // Execute a system call.  First unsets exception level to allow nested
