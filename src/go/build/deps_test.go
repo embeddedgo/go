@@ -72,7 +72,8 @@ var depsRules = `
 	  internal/cpu/cortexm/scid,
 	  internal/cpu/cortexm/systick,
 	  internal/cpu/riscv/clint,
-	  internal/cpu/riscv/plic
+	  internal/cpu/riscv/plic,
+	  internal/cpu/r4000/creg
 	< MMIO;
 
 	# RUNTIME is the core runtime group of packages, all of them very light-weight.
@@ -620,6 +621,9 @@ var depsRules = `
 
 	embedded/rtos, internal/cpu/riscv/clint
 	< embedded/arch/riscv/systim;
+
+	embedded/rtos, internal/cpu/r4000/creg
+	< embedded/arch/r4000/systim;
 
 	FMT
 	< github.com/embeddedgo/fs/semihostfs;
