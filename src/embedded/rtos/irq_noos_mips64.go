@@ -1,12 +1,16 @@
 package rtos
 
+import "runtime"
+
 const (
-	intPrioHighest  = 0
-	intPrioHigh     = 0
-	intPrioSysTimer = 0
-	intPrioMid      = 0
-	intPrioSysCall  = 0
-	intPrioLow      = 0
-	intPrioLowest   = 0
-	intPrioCurrent  = -1
+	intPrioHighest = runtime.IntPrioHigh
+	intPrioHigh    = runtime.IntPrioHigh
+	intPrioMid     = runtime.IntPrioNormal
+	intPrioLow     = runtime.IntPrioNormal
+	intPrioLowest  = runtime.IntPrioNormal
+
+	intPrioSysTimer = runtime.IntPrioHigh + 1
+	intPrioSysCall  = runtime.IntPrioHigh + 1
+
+	intPrioCurrent = runtime.IntPrioCurrent
 )

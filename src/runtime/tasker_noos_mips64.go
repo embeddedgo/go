@@ -18,6 +18,7 @@ import (
 	"internal/abi"
 	"internal/cpu"
 	"internal/cpu/r4000/creg"
+	"runtime/internal/atomic"
 	"unsafe"
 )
 
@@ -116,9 +117,48 @@ func syscachemaint(op int, p unsafe.Pointer, size int) {
 	}
 }
 
+// TODO Move to something like internal/pic
+const (
+	IntPrioHigh    = 1
+	IntPrioNormal  = 0
+	IntPrioCurrent = -1
+)
+
+var highPrioIRQMask uint32 // TODO atomic
+
+func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
+	if uint(irq) > 8 { // TODO PIC dependent
+		errno = 4 // rtos.ErrBadIntNumber
+		return
+	}
+	if uint(ctxid) != 0 {
+		errno = 6 // rtos.ErrBadIntCtx
+	}
+
+	irqMask := uint32(1 << (irq + 7))
+	switch ctl {
+	case IntPrioHigh:
+		atomic.Or32(&highPrioIRQMask, irqMask)
+	case IntPrioNormal:
+		atomic.And32(&highPrioIRQMask, ^irqMask)
+	case -1: // IRQ.Enable()
+		creg.STATUS.SetBits(irqMask)
+	case -2: // IRQ.Disable()
+		creg.STATUS.ClearBits(irqMask)
+	case -3: // IRQ.Status()
+		if irqMask&atomic.Load(&highPrioIRQMask) != 0 {
+			prio = 1
+		}
+		if creg.STATUS.LoadBits(irqMask) != 0 {
+			enabled = 1
+		}
+	}
+
+	return
+}
+
 // syscalls unsupported by mips64
-func syssetprivlevel(newlevel int) (oldlevel, errno int)       { return }
-func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) { return }
+func syssetprivlevel(newlevel int) (oldlevel, errno int) { return }
 
 // only called from ISR, do not use
 func enterScheduler()

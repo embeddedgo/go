@@ -97,16 +97,6 @@ fromHandler:
 	OR    R27, R26 // Encode fromHandler flag in EPC
 	MOVV  R26, _mepc(R29)
 
-	// Mask pending interrupts.  Otherwise they will cause an exception loop
-	// as soon as we allow nested interrupts.
-	MOVV  M(C0_CAUSE), R26
-	MOVV  $INTR_EXT, R27 // nesteding only allowed for external interrupts
-	AND   R27, R26
-	NOR   R26, R26
-	MOVV  M(C0_SR), R27
-	AND   R27, R26
-	MOVV  R26, M(C0_SR)
-
 	// Branch depending on exception cause
 	MOVV  M(C0_CAUSE), R26
 	AND   $CAUSE_EXC_MASK, R26
@@ -352,15 +342,30 @@ TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	MOVV  R29, R26
 	JAL   ·saveFPRs(SB)
 
-	// Context is saved.  Enable nested interrupts.  Don't use R26, R27.
+	// Mask interrupts
+	MOVV  $~INTR_EXT, R10
+	MOVV  M(C0_CAUSE), R8 // read cause before enabling nested interrupts
+	SYNC
+	MOVW  ·highPrioIRQMask(SB), R9
+	SYNC
+	AND   R8, R9, R12
+	BNE   R12, R0, highPrioInterrupt
+
+	// low prio interrrupt: mask all except high priority interrupts
+	OR    R9, R10
+	MOVV  $~0, R9
+highPrioInterrupt: // mask all interrupts
 	MOVV  M(C0_SR), R27
+	AND   R10, R27
+
+	// Context is saved.  Enable nested interrupts.  Don't use R26, R27.
 	AND   $~SR_EXL, R27
 	MOVV  R27, M(C0_SR)
 
 	// External interrupts are handled by the application.  We need to call
 	// one of the registered handlers.
-	MOVV  M(C0_CAUSE), R8
 	AND   $INTR_EXT, R8
+	AND   R9, R8 // remove low prio interrupts if high prio is pending
 
 	SRL   $8, R8 // INTR_EXT in lsb
 	MOVV  $1, R9
