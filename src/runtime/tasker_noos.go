@@ -513,12 +513,6 @@ func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 {
 	return n
 }
 
-//go:noescape
-func syscachemaint(op int, p unsafe.Pointer, size int)
-
-//go:noescape
-func sysreset(level int, addr unsafe.Pointer) bool
-
 // m fields used
 
 //go:nosplit

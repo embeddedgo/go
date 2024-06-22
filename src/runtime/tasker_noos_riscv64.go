@@ -94,6 +94,12 @@ type mOS struct {
 	f    [numFPRS - 1]float64
 }
 
+//go:noescape
+func syscachemaint(op int, p unsafe.Pointer, size int)
+
+//go:noescape
+func sysreset(level int, addr unsafe.Pointer) bool
+
 func syssetprivlevel(newlevel int) (oldlevel, errno int)
 
 var plicmx cpumtx
