@@ -16,6 +16,7 @@ package runtime
 
 import (
 	"internal/abi"
+	"internal/cpu"
 	"internal/cpu/r4000/creg"
 	"unsafe"
 )
@@ -91,6 +92,34 @@ func curcpuSchedule() {
 //go:nosplit
 func defaultWrite(fd int, p []byte) int
 
+const cacheLineSize = cpu.CacheLineMinSize
+const cacheLineMask = ^(cacheLineSize - 1)
+
+//go:noescape
+func writeback(addr uintptr, length int)
+
+//go:noescape
+func invalidate(addr uintptr, length int)
+
+//go:noescape
+func writebackInvalidate(addr uintptr, length int)
+
+//go:nosplit
+func syscachemaint(op int, p unsafe.Pointer, size int) {
+	switch op {
+	case 0: // rtos.DCacheInval
+		invalidate(uintptr(p), size)
+	case 1: // rtos.DCacheFlush
+		writeback(uintptr(p), size)
+	case 2: // rtos.DCacheFlushInval
+		writebackInvalidate(uintptr(p), size)
+	}
+}
+
+// syscalls unsupported by mips64
+func syssetprivlevel(newlevel int) (oldlevel, errno int)       { return }
+func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) { return }
+
 // only called from ISR, do not use
 func enterScheduler()
 func saveGPRs()
@@ -98,7 +127,3 @@ func restoreGPRs()
 func saveFPRs()
 func restoreFPRs()
 func unhandledExternalInterrupt()
-
-// syscalls unsupported by mips64
-func syssetprivlevel(newlevel int) (oldlevel, errno int)       { return }
-func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) { return }

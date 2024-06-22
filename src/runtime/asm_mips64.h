@@ -76,16 +76,16 @@
 #define ERET   NOOP; NOOP; WORD $0x42000018
 
 // Individual cache operations
-#define INDEX_INVALIDATE_I             R00
-#define INDEX_WRITEBACK_INVALIDATE_D   R01
-#define INDEX_INVALIDATE_SI            R02
-#define INDEX_WRITEBACK_INVALIDATE_SD  R03
-#define INDEX_LOAD_TAG_I               R04
-#define INDEX_LOAD_TAG_D               R05
-#define INDEX_LOAD_TAG_SI              R06
-#define INDEX_LOAD_TAG_SD              R07
-#define INDEX_STORE_TAG_I              R08
-#define INDEX_STORE_TAG_D              R09
+#define INDEX_INVALIDATE_I             R0
+#define INDEX_WRITEBACK_INVALIDATE_D   R1
+#define INDEX_INVALIDATE_SI            R2
+#define INDEX_WRITEBACK_INVALIDATE_SD  R3
+#define INDEX_LOAD_TAG_I               R4
+#define INDEX_LOAD_TAG_D               R5
+#define INDEX_LOAD_TAG_SI              R6
+#define INDEX_LOAD_TAG_SD              R7
+#define INDEX_STORE_TAG_I              R8
+#define INDEX_STORE_TAG_D              R9
 #define INDEX_STORE_TAG_SI             R10
 #define INDEX_STORE_TAG_SD             R11
 #define CREATE_DIRTY_EXCLUSIVE_D       R13

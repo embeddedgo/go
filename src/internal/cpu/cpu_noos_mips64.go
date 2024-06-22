@@ -4,7 +4,8 @@
 
 package cpu
 
-const CacheLinePadSize = 32
+const CacheLinePadSize = 32 // Must be greatest of all supported CPUs
+const CacheLineMinSize = 16 // Must be smallest of all supported CPUs
 
 func doinit() {
 	// noos currently will always use MIPS-III ISA.  Once more mips64

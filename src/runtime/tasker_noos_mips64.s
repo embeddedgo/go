@@ -595,13 +595,62 @@ TEXT ·restoreFPRs(SB),NOSPLIT|NOFRAME,$0
 	RET
 
 
+// func writeback(addr uintptr, length int)
+TEXT ·writeback(SB),NOSPLIT|NOFRAME,$0-16
+	MOVV  addr+0(FP), R4
+	MOVV  length+8(FP), R5
+	ADDU  R5, R4, R8
+	AND   $const_cacheLineMask, R4
+
+loop:
+	SUB   R4, R8, R9
+	BLEZ  R9, done
+	CACHE HIT_WRITEBACK_D, 0(R4)
+	ADDU  $const_cacheLineSize, R4
+	JMP   loop
+
+done:
+	RET
+
+
+// func invalidate(addr uintptr, length int)
+TEXT ·invalidate(SB),NOSPLIT|NOFRAME,$0-16
+	MOVV  addr+0(FP), R4
+	MOVV  length+8(FP), R5
+	ADDU  R5, R4, R8
+	AND   $const_cacheLineMask, R4
+
+loop:
+	SUB   R4, R8, R9
+	BLEZ  R9, done
+	CACHE HIT_INVALIDATE_D, 0(R4)
+	ADDU  $const_cacheLineSize, R4
+	JMP   loop
+
+done:
+	RET
+
+
+// func writebackInvalidate(addr uintptr, length int)
+TEXT ·writebackInvalidate(SB),NOSPLIT|NOFRAME,$0-16
+	MOVV  addr+0(FP), R4
+	MOVV  length+8(FP), R5
+	ADDU  R5, R4, R8
+	AND   $const_cacheLineMask, R4
+
+loop:
+	SUB   R4, R8, R9
+	BLEZ  R9, done
+	CACHE HIT_WRITEBACK_INVALIDATE_D, 0(R4)
+	ADDU  $const_cacheLineSize, R4
+	JMP   loop
+
+done:
+	RET
+
+
 // syscalls not supported by mips64
 
 // func sysreset(level int, addr unsafe.Pointer) bool
 TEXT ·sysreset(SB),NOSPLIT|NOFRAME,$0-12
-	NOP
-
-
-// func syscachemaint(op int, p unsafe.Pointer, size int)
-TEXT ·syscachemaint(SB),NOSPLIT,$0-12
 	NOP
