@@ -8,6 +8,9 @@
 #include "textflag.h"
 #include "asm_mips64.h"
 
+
+#define SIGNAL_STACK_SIZE 4096
+
 TEXT runtime·_rt0_mips64_noos1(SB),NOSPLIT|NOFRAME,$0
 	// Clear .bss, .noptrbss and unallocated memory.
 	SUBU $16, R29
@@ -63,7 +66,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVV  $runtime·ramend(SB), R29  // main stack starts at the end of memory
 	SUB   $16, R29
 	MOVV  R29, (g_stack+stack_hi)(R8)
-	SUB   $const_signalStackSize, R29, R9
+	SUB   $SIGNAL_STACK_SIZE, R29, R9
 	MOVV  R9, (g_stack+stack_lo)(R8)
 	ADD   $const_stackGuard, R9
 	MOVV  R9, g_stackguard0(R8)
@@ -84,7 +87,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVV  $runtime·ramend(SB), R9
 	MOVV  $runtime·nodmastart(SB), R10
 	MOVV  $runtime·nodmaend(SB), R11
-	SUB   $const_signalStackSize, R9
+	SUB   $SIGNAL_STACK_SIZE, R9
 
 	SUB   $32, R29
 	MOVV  R8, 8(R29)

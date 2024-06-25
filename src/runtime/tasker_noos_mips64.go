@@ -117,14 +117,7 @@ func syscachemaint(op int, p unsafe.Pointer, size int) {
 	}
 }
 
-// TODO Move to something like internal/pic
-const (
-	IntPrioHigh    = 1
-	IntPrioNormal  = 0
-	IntPrioCurrent = -1
-)
-
-var highPrioIRQMask uint32 // TODO atomic
+var highPrioIRQMask uint32
 
 func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	if uint(irq) > 8 { // TODO PIC dependent
@@ -136,10 +129,10 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	}
 
 	irqMask := uint32(1 << (irq + 7))
-	switch ctl {
-	case IntPrioHigh:
+	switch ctl { // Values defined in embedded/rtos/irq_noos_mips64.go
+	case 1:
 		atomic.Or32(&highPrioIRQMask, irqMask)
-	case IntPrioNormal:
+	case 0:
 		atomic.And32(&highPrioIRQMask, ^irqMask)
 	case -1: // IRQ.Enable()
 		creg.STATUS.SetBits(irqMask)

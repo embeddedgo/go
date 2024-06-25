@@ -15,7 +15,7 @@ const (
 	noosScaleDown                   = 2 // must be power of 2
 	noosStackCacheSize              = 16 * 1024
 	noosNumStackOrders              = 3
-	noosHeapAddrBits                = 23 // enough for 8 MiB K210 SRAM
+	noosHeapAddrBits                = 23
 	noosLogHeapArenaBytes           = 17 // 128 KiB
 	noosArenaBaseOffset             = 0x0
 	noosMinPhysPageSize             = 256
