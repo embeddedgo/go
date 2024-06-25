@@ -1,7 +1,7 @@
-# github.com/embeddedgo/fs v0.1.1
+# github.com/embeddedgo/fs v0.1.2
 ## explicit; go 1.22
 github.com/embeddedgo/fs/semihostfs
-# github.com/embeddedgo/noostest v0.0.1
+# github.com/embeddedgo/noostest v0.0.4
 ## explicit; go 1.22
 github.com/embeddedgo/noostest/init
 # golang.org/x/crypto v0.16.1-0.20231129163542-152cdb1503eb

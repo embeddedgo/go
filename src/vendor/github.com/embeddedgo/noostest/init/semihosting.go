@@ -29,16 +29,16 @@ func debug(fd int, p []byte) int {
 
 func setupSemihosting() {
 	fsys := semihostfs.New("SH1", "")
-	rtos.Mount(fsys, "/host")
+	rtos.Mount(fsys, "/")
 
 	var err error
-	os.Stderr, err = os.Open("/host/:stderr")
+	os.Stderr, err = os.Open("/:stderr")
 	fatalErr(":stderr", err)
 	rtos.SetSystemWriter(debug)
 
-	os.Stdout, err = os.Open("/host/:stdout")
+	os.Stdout, err = os.Open("/:stdout")
 	fatalErr(":stdout", err)
 
-	os.Stdin, err = os.Open("/host/:stdin")
+	os.Stdin, err = os.Open("/:stdin")
 	fatalErr(":stdin", err)
 }

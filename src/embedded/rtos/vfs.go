@@ -32,7 +32,6 @@ import (
 //	Mkdir(name, perm fs.FileMode) error        // see os.Mkdir
 //	Remove(name string) error                  // see os.Remove
 //	Rename(oldname, newname string) error      // see os.Rename
-//
 type FS interface {
 	// OpenWithFinalizer works like the os.OpenFile function but has an
 	// additional parameter. The returned fs.File implementation is obliged to
@@ -153,34 +152,40 @@ func Mounts() []*MountPoint {
 
 func findMountPoint(name string) (mp *MountPoint, fsys FS, unrooted string) {
 	name = path.Clean(name)
-	nlen := len(name)
-	vdir := name == "/"
+	if name[0] == '/' || name == "." {
+		name = name[1:] // remove leading "/", replace "." or "/" to ""
+	}
+	// Search the latest mounted FS whose prefix matches the dir.
 	for i := len(mtab.mounts) - 1; i >= 0; i-- {
 		mp = mtab.mounts[i]
-		plen := len(mp.Prefix)
-		if nlen < plen {
-			if mp.Prefix[nlen] == '/' && mp.Prefix[:nlen] == name {
-				vdir = true
+		prefix := mp.Prefix[1:] // remove leading "/"
+		switch {
+		case len(name) < len(prefix):
+			if prefix[len(name)] == '/' && prefix[:len(name)] == name {
+				// Dir matches a part of prefix
+				return nil, nil, name // virtual directory
 			}
-			continue
+		case len(name) == len(prefix):
+			if name == prefix {
+				return mp, mp.FS, "."
+			}
+		default: // len(name) > len(prefix)
+			if name[len(prefix)] == '/' && name[:len(prefix)] == prefix {
+				name = name[len(prefix)+1:]
+				if name == "" {
+					name = "."
+				}
+			} else if prefix != "" {
+				break
+			}
+			return mp, mp.FS, name
 		}
-		if plen != nlen && name[plen] != '/' {
-			continue
-		}
-		if name[:plen] != mp.Prefix {
-			continue
-		}
-		if plen == nlen {
-			unrooted = "."
-		} else {
-			unrooted = name[plen+1:]
-		}
-		return mp, mp.FS, unrooted
 	}
-	if vdir {
-		unrooted = name
+	// Matching prefix not found.
+	if name == "" {
+		name = "/" // special case: "/" always exists, virtual directory
 	}
-	return nil, nil, unrooted
+	return nil, nil, name
 }
 
 func chmod(name string, mode fs.FileMode) error {

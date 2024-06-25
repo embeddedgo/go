@@ -132,7 +132,7 @@ func init() {
 	if len(os.Args) != 1 || os.Args[0] != "" {
 		return
 	}
-	var buf [256]byte
+	var buf [512]byte
 	args := buf[:]
 	ptr := unsafe.Pointer(&args)
 	mt.Lock()
