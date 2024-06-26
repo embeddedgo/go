@@ -154,7 +154,7 @@ func main() {
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
 	if noos {
-		maxstacksize = 256000 / noosScaleDown
+		maxstacksize = 512 * 1024 / noosScaleDown
 	} else if goarch.PtrSize == 8 {
 		maxstacksize = 1000000000
 	} else {
