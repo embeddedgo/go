@@ -7,8 +7,8 @@ const (
 	intPrioLow     = 0
 	intPrioLowest  = 0
 
-	intPrioSysTimer = IntPrioHighest + 1
-	intPrioSysCall  = IntPrioHighest + 1
+	intPrioSysTimer = intPrioHighest + 1
+	intPrioSysCall  = intPrioHighest + 1
 
 	intPrioCurrent = -1
 )

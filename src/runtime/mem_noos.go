@@ -43,12 +43,13 @@ func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd uintptr) {
 
 	// Reduce the arena by the remainder of the non-heap space that did not fit in
 	// the non-DMA memory, properly align the arena
-	arenaSize := freeSize - uintptr(pallocInFree)
-	arenaSize &= ^(uintptr(heapArenaBytes) - 1)
-	arenaStart := freeEnd - arenaSize
+	arenaStart := freeStart + uintptr(pallocInFree)
+	arenaAlign := uintptr(heapArenaBytes) - 1
+	arenaStart = (arenaStart + arenaAlign) &^ arenaAlign
+	arenaSize := freeEnd - arenaStart
 
 	noosMem.free.start = freeStart
-	noosMem.free.end = freeEnd
+	noosMem.free.end = arenaStart
 	noosMem.nodma.start = nodmaStart
 	noosMem.nodma.end = nodmaEnd
 	noosMem.arenaStart = arenaStart
