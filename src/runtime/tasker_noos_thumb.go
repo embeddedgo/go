@@ -66,6 +66,7 @@ const (
 )
 
 // archnewm setups m's stack
+//
 //go:nosplit
 func archnewm(m *m) {
 	sp := m.g0.stack.hi - unsafe.Sizeof(cortexm.StackFrame{})
@@ -229,6 +230,12 @@ func defaultWrite(fd int, p []byte) int {
 }
 
 // syscalls not used by runtime
+
+//go:noescape
+func syscachemaint(op int, p unsafe.Pointer, size int)
+
+//go:noescape
+func sysreset(level int, addr unsafe.Pointer) bool
 
 //go:nowritebarrierrec
 //go:nosplit

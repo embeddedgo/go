@@ -27,6 +27,36 @@ var noosMem struct {
 	mx                    mutex
 }
 
+//go:nosplit
+func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd uintptr) {
+	freeSize := freeEnd - freeStart
+	nodmaSize := nodmaEnd - nodmaStart
+	size := freeSize + nodmaSize
+
+	// Estimate the space needed for non-heap allocations
+	const pallocMin = 2 * noosDefaultHeapMinimum
+	palloc := int((freeSize>>(pageShift))*unsafe.Sizeof(emptymspan) + pallocMin)
+
+	// We prefer the non-DMA memory for non-heap objects to preserve as much
+	// as possible of the DMA capable memory for heap allocations
+	pallocInFree := max(palloc-int(nodmaSize), 0)
+
+	// Reduce the arena by the remainder of the non-heap space that did not fit in
+	// the non-DMA memory, properly align the arena
+	arenaStart := freeStart + uintptr(pallocInFree)
+	arenaAlign := uintptr(heapArenaBytes) - 1
+	arenaStart = (arenaStart + arenaAlign) &^ arenaAlign
+	arenaSize := freeEnd - arenaStart
+
+	noosMem.free.start = freeStart
+	noosMem.free.end = arenaStart
+	noosMem.nodma.start = nodmaStart
+	noosMem.nodma.end = nodmaEnd
+	noosMem.arenaStart = arenaStart
+	noosMem.arenaSize = arenaSize
+	noosMem.size = size
+}
+
 type pamem struct {
 	start, end uintptr
 }

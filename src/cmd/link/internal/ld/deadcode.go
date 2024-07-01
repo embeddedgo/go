@@ -90,6 +90,9 @@ func (d *deadcodePass) init() {
 			first, last = -14, 479
 		case sys.RISCV64:
 			first, last = 1, 1023
+		case sys.MIPS64:
+			first, last = 1, 5
+			names = append(names, "runtime.unhandledExternalInterrupt")
 		}
 		for i := first; i <= last; i++ {
 			names = append(names, InterruptHandler(i))
