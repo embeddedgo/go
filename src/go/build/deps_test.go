@@ -59,13 +59,13 @@ var depsRules = `
 	# MMIO used by noos runtime
 	unsafe
 	< embedded/mmio
-	< internal/cpu/cortexm,
+	< embedded/arch/cortexm/mpu,
+	  internal/cpu/cortexm,
 	  internal/cpu/cortexm/acc,
 	  internal/cpu/cortexm/bitband,
 	  internal/cpu/cortexm/cmt,
 	  internal/cpu/cortexm/debug/itm,
 	  internal/cpu/cortexm/fpu,
-	  internal/cpu/cortexm/mpu,
 	  internal/cpu/cortexm/nvic,
 	  internal/cpu/cortexm/pft,
 	  internal/cpu/cortexm/scb,
