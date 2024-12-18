@@ -119,6 +119,9 @@ fromHandler:
 	BEQ   R27, R0, 2(PC)
 	JMP   ·softwareInterruptHandler(SB)
 
+	// no interrupt is pending, just return
+	JMP  ·exceptionReturn(SB)
+
 fatal:
 	JMP   ·unhandledException(SB)
 
@@ -224,26 +227,12 @@ nothingToCopy:
 	BEQ   R8, R0, 2(PC)
 	JMP  ·enterScheduler(SB)
 
-	// Restore ctx of caller
-	MOVV  _lr(R29), R1
-	AND   $~1, R1, R31 // Remove smallCtx flag from lr
-	MOVV  _mstatus(R29), R1
-	MOVV  R1, M(C0_SR)
-	MOVV  _mepc(R29), R1
-	AND   $1, R1, R2
-	AND   $~1, R1  // Remove fromHandler flag from epc
-	MOVV  R1, M(C0_EPC)
+	// Disable nested interrupts
+	MOVV  M(C0_SR), R8
+	OR    $SR_EXL, R8
+	MOVV  R8, M(C0_SR)
 
-	ADD   $excCtxSize, R29
-
-	BNE   R2, R0, return
-
-	MOVV  $·cpu0(SB), R1
-	MOVV  (g_sched+gobuf_sp)(R1), R29
-	MOVV  (g_sched+gobuf_g)(R1), g
-
-return:
-	ERET
+	JMP  ·exceptionReturn(SB)
 
 badSyscall:
 	BREAK
@@ -333,7 +322,6 @@ smallCtx:
 // the ISR stack, to allow nested interrupts be supported.  Calculates the
 // runtime.vector offset from the interrupt number and calls it.  Restores
 // context and returns.
-// TODO save fprs?
 TEXT runtime·externalInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	SUB   $const_numGPRS*8, R29
 	MOVV  R29, R26
@@ -410,6 +398,13 @@ callVector:
 	// Only use R26, R27 from here
 	ADD   $const_numGPRS*8, R29
 
+	JMP  ·exceptionReturn(SB)
+
+fatal:
+	JMP  ·unhandledExternalInterrupt(SB)
+
+
+TEXT runtime·exceptionReturn(SB),NOSPLIT|NOFRAME,$0
 	MOVV  _mstatus(R29), R26
 	MOVV  R26, M(C0_SR)
 	MOVV  _lr(R29), R26
@@ -434,9 +429,6 @@ callVector:
 
 return:
 	ERET
-
-fatal:
-	JMP  ·unhandledExternalInterrupt(SB)
 
 
 // Do not remove.  Required by the linker, runtime.vectors defaults to this.
