@@ -53,6 +53,7 @@ var (
 	ownTmpDir      bool // set to true if tmp dir created by linker (e.g. no -tmpdir)
 	RAM            MemBlock
 	NoDMA          MemBlock
+	MinTextAddr    int64
 	MaxTextAddr    int64 = -1
 )
 
@@ -261,6 +262,7 @@ func Main(arch *sys.Arch, theArch Arch) {
 		if len(flagFlash) > 0 {
 			var flash MemBlock
 			flash.set(flagFlash)
+			MinTextAddr = flash.Base
 			MaxTextAddr = flash.Base + flash.Size
 			if *FlagTextAddr == -1 {
 				*FlagTextAddr = flash.Base

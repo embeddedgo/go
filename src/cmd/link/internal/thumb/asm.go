@@ -122,6 +122,19 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 	ctxt.Textp = append(ctxt.Textp, 0)
 	copy(ctxt.Textp[1:], ctxt.Textp)
 	ctxt.Textp[0] = vectors.Sym()
+
+	// Detect RP2350 using the Flash and RAM base adresses.
+	if ld.MinTextAddr == 0x1000_0000 && ld.RAM.Base == 0x2000_0000 {
+		// Add metadata required by the RP2350 bootloader.
+		meta := ldr.CreateSymForUpdate("picometa", sym.SymVerABI0)
+		meta.SetType(sym.STEXT)
+		meta.SetReachable(true)
+		meta.SetAlign(4)
+		meta.AddBytes(picoMeta())
+		ctxt.Textp = append(ctxt.Textp, 0)
+		copy(ctxt.Textp[2:], ctxt.Textp[1:])
+		ctxt.Textp[1] = meta.Sym()
+	}
 }
 
 func elfreloc1(ctxt *ld.Link, out *ld.OutBuf, ldr *loader.Loader, s loader.Sym, r loader.ExtReloc, ri int, sectoff int64) bool {
