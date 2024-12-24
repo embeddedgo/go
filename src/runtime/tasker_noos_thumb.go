@@ -5,7 +5,7 @@
 package runtime
 
 import (
-	"embedded/arch/cortexm/mpu"
+	"embedded/arch/cortexm/mpu7"
 	"embedded/mmio"
 	"internal/abi"
 	"internal/cpu/cortexm"
@@ -166,33 +166,33 @@ func taskerinit() {
 	}
 
 	// Use MPU if available to catch bad pointer dereferences.
-	if _, d, _ := mpu.Type(); d >= 4 && mpu.State()&mpu.ENABLE == 0 {
+	if _, d, _ := mpu7.Type(); d >= 4 && mpu7.State()&mpu7.ENABLE == 0 {
 		// Bellow there is the MPU configuration that corresponds to the
 		// default CPU behavior, without MPU enabled.
 		//
 		// The first 64 bytes of the memory are configured inaccessible in the
 		// user mode to catch bad pointer dereferences.
 		const (
-			noacc  = mpu.A____
-			code   = mpu.Arwrw | mpu.C                    // normal WT
-			ram    = mpu.Arwrw | mpu.TEX1 | mpu.C | mpu.B // normal WB+WA
-			periph = mpu.Arwrw | mpu.B | mpu.XN           // device
+			noacc  = mpu7.A____
+			code   = mpu7.Arwrw | mpu7.C                      // normal WT
+			ram    = mpu7.Arwrw | mpu7.TEX1 | mpu7.C | mpu7.B // normal WB+WA
+			periph = mpu7.Arwrw | mpu7.B | mpu7.XN            // device
 		)
 
 		// The peripheral region covers adresses not covered by other regions.
-		mpu.SetRegion(mpu.VALID|0, mpu.ENA|mpu.SIZE(32)|periph)
+		mpu7.SetRegion(mpu7.VALID|0, mpu7.ENA|mpu7.SIZE(32)|periph)
 
 		// The code region occupies the first 512 MiB.
-		mpu.SetRegion(mpu.VALID|1, mpu.ENA|mpu.SIZE(29)|code)
+		mpu7.SetRegion(mpu7.VALID|1, mpu7.ENA|mpu7.SIZE(29)|code)
 
 		// The first 64 bytes of the code region are inaccessible.
-		mpu.SetRegion(mpu.VALID|2, mpu.ENA|mpu.SIZE(6)|noacc)
+		mpu7.SetRegion(mpu7.VALID|2, mpu7.ENA|mpu7.SIZE(6)|noacc)
 
 		// RAM region occupies 512 MiB @ 0x2000_0000 and 1 GiB @ 0x6000_0000.
-		mpu.SetRegion(mpu.VALID|3, mpu.ENA|mpu.SIZE(32)|mpu.SRD(0b11100101)|ram)
+		mpu7.SetRegion(mpu7.VALID|3, mpu7.ENA|mpu7.SIZE(32)|mpu7.SRD(0b11100101)|ram)
 
 		mmio.MB()
-		mpu.Set(mpu.ENABLE | mpu.PRIVDEFENA)
+		mpu7.Set(mpu7.ENABLE | mpu7.PRIVDEFENA)
 		mmio.MB()
 	}
 }
