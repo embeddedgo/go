@@ -13,8 +13,8 @@ package systim
 
 import (
 	"embedded/rtos"
-	"internal/cpu/cortexm/scb"
-	"internal/cpu/cortexm/systick"
+	"internal/cpu/armm/scb"
+	"internal/cpu/armm/systick"
 	_ "unsafe"
 )
 
