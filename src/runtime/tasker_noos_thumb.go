@@ -5,16 +5,18 @@
 package runtime
 
 import (
-	"embedded/arch/cortexm/mpu7"
+	"embedded/arch/cortexm/mpu"
+	"embedded/arch/cortexm/mpu/mpu7"
+	"embedded/arch/cortexm/mpu/mpu8"
 	"embedded/mmio"
 	"internal/abi"
-	"internal/cpu/cortexm"
-	"internal/cpu/cortexm/cmt"
-	"internal/cpu/cortexm/debug/itm"
-	"internal/cpu/cortexm/nvic"
-	"internal/cpu/cortexm/pft"
-	"internal/cpu/cortexm/scb"
-	"internal/cpu/cortexm/scid"
+	"internal/cpu/armm"
+	"internal/cpu/armm/cmt"
+	"internal/cpu/armm/debug/itm"
+	"internal/cpu/armm/nvic"
+	"internal/cpu/armm/pft"
+	"internal/cpu/armm/scb"
+	"internal/cpu/armm/scid"
 	"unsafe"
 )
 
@@ -69,13 +71,12 @@ const (
 //
 //go:nosplit
 func archnewm(m *m) {
-	sp := m.g0.stack.hi - unsafe.Sizeof(cortexm.StackFrame{})
-	sf := (*cortexm.StackFrame)(unsafe.Pointer(sp))
-	sf.PSR = cortexm.T
+	sp := m.g0.stack.hi - unsafe.Sizeof(armm.StackFrame{})
+	sf := (*armm.StackFrame)(unsafe.Pointer(sp))
+	sf.PSR = armm.T
 	sf.PC = abi.FuncPCABI0(mstart)
 	m.tls[msp] = sp | thrSmallCtx // small ctx
-	m.tls[mer] = cortexm.ExcReturnBase | cortexm.ExcReturnNoFPU |
-		cortexm.ExcReturnPSP
+	m.tls[mer] = armm.ExcReturnBase | armm.ExcReturnNoFPU | armm.ExcReturnPSP
 	m.libcall.fn = uintptr(unsafe.Pointer(m.g0))
 }
 
@@ -165,13 +166,66 @@ func taskerinit() {
 		}
 	}
 
-	// Use MPU if available to catch bad pointer dereferences.
-	if _, d, _ := mpu7.Type(); d >= 4 && mpu7.State()&mpu7.ENABLE == 0 {
-		// Bellow there is the MPU configuration that corresponds to the
-		// default CPU behavior, without MPU enabled.
-		//
-		// The first 64 bytes of the memory are configured inaccessible in the
-		// user mode to catch bad pointer dereferences.
+	// Use MPU if available to catch the bad pointer dereferences. We configure
+	// the MPU to mimic the default CPU behavior, without the MPU enabled. The
+	// first 64 bytes of the memory are configured inaccessible in the user mode
+	// (or both modes for ARMv7-M) to catch the bad pointer dereferences.
+	partno := SCB.CPUID.LoadBits(scb.PartNo) >> scb.PartNon
+	_, dregn, _ := mpu.Type()
+	switch {
+	case mpu.State()&mpu.ENABLE != 0:
+		// enabled before
+		goto skipMPU
+	case partno&0xf00 == 0xd00: // ARMv8-M
+		if dregn < 6 {
+			goto skipMPU
+		}
+		const (
+			Periph   = 0
+			ExtDev   = 1
+			NormalWT = 2
+			NormalWB = 3
+		)
+		mpu8.SetAttr03(
+			mpu8.Device, mpu8.DnGnRE, // Periph
+			mpu8.Device, mpu8.DnGnRnE, // ExtDev
+			mpu8.NormalWT, mpu8.NormalWT, // NormalWT
+			mpu8.NormalWB, mpu8.NormalWB, // NormalWB
+		)
+
+		// The first 64 bytes of the memory are inaccessible in the user mode.
+		mpu.Select(0)
+		mpu8.SetBas(0x0000_0000, mpu8.Arw__)
+		mpu8.SetLim(0x0000_003f, NormalWT, true)
+
+		// The code region occupies the first 512 MiB.
+		mpu.Select(1)
+		mpu8.SetBas(0x0000_0040, mpu8.Arwrw)
+		mpu8.SetLim(0x1fff_ffff, NormalWT, true)
+
+		// First RAM region, 512 MiB.
+		mpu.Select(2)
+		mpu8.SetBas(0x2000_0000, mpu8.Arwrw)
+		mpu8.SetLim(0x3fff_ffff, NormalWB, true)
+
+		// Peripherals.
+		mpu.Select(3)
+		mpu8.SetBas(0x4000_0000, mpu8.Arwrw|mpu8.XN)
+		mpu8.SetLim(0x5fff_ffff, Periph, true)
+
+		// Second RAM region, 1 GiB.
+		mpu.Select(4)
+		mpu8.SetBas(0x6000_0000, mpu8.Arwrw)
+		mpu8.SetLim(0x9fff_ffff, NormalWB, true)
+
+		// External device region, 1 GiB
+		mpu.Select(5)
+		mpu8.SetBas(0xa000_0000, mpu8.Arwrw|mpu8.XN)
+		mpu8.SetLim(0xdfff_ffff, ExtDev, true)
+	default: // ARMv7-M
+		if dregn < 4 {
+			goto skipMPU
+		}
 		const (
 			noacc  = mpu7.A____
 			code   = mpu7.Arwrw | mpu7.C                      // normal WT
@@ -191,10 +245,11 @@ func taskerinit() {
 		// RAM region occupies 512 MiB @ 0x2000_0000 and 1 GiB @ 0x6000_0000.
 		mpu7.SetRegion(mpu7.VALID|3, mpu7.ENA|mpu7.SIZE(32)|mpu7.SRD(0b11100101)|ram)
 
-		mmio.MB()
-		mpu7.Set(mpu7.ENABLE | mpu7.PRIVDEFENA)
-		mmio.MB()
 	}
+	mmio.MB()
+	mpu.Set(mpu.ENABLE | mpu.PRIVDEFENA)
+	mmio.MB()
+skipMPU:
 }
 
 //go:nowritebarrierrec
