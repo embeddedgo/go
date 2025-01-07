@@ -26,12 +26,28 @@ const (
 // Exception number for the first external interrupt.
 const IRQ0 = 16
 
-// EXC_RETURN fields
+// EXC_RETURN fields for ARMv8-M with the Security Extension
 const (
-	ExcReturnBase    = 0xFFFFFFE0 // EXC_RETURN base value
-	ExcReturnMode    = 0xF        // Selects bits responsible for return mode:
-	ExcReturnHandler = 0x01       // - return to handler mode, use MSP
-	ExcReturnMSP     = 0x09       // - return to thread mode, use MSP
-	ExcReturnPSP     = 0x0D       // - return to thread mode, use PSP
-	ExcReturnNoFPU   = 0x10       // Basic frame on the stack (no FPU state)
+	ExcReturnPrefix  = 0xff << 24   // Indicates that this is EXC_RETURN value
+	ExcReturnRes23_7 = 0x1ffff << 7 // Reserved
+
+	// The least sginificant bits listed below indicate the required return
+	// stack, processor mode, security state, and stack frame. The descriptions
+	// refer to the state when the bit is set.
+
+	ExcReturnS     = 1 << 6 // Registers stacked to secure stack.
+	ExcReturnDCRS  = 1 << 5 // Default rules for stacking calle registers.
+	ExcReturnFType = 1 << 4 // No FPU context on the stack.
+	ExcReturnMode  = 1 << 3 // Return to thread mode.
+	ExcReturnSPSEL = 1 << 2 // Registers stacked to PSP, use PSP after return.
+	ExcReturnES    = 1 << 0 // Return to secure mode / ARMv7-M thumb mode bit.
+
+	ExcReturnBase            = ExcReturnPrefix | ExcReturnRes23_7
+	ExcReturnSecureThreadPSP = ExcReturnBase |
+		ExcReturnS |
+		ExcReturnDCRS |
+		ExcReturnFType |
+		ExcReturnMode |
+		ExcReturnSPSEL |
+		ExcReturnES
 )
