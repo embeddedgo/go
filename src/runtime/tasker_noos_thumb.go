@@ -75,7 +75,7 @@ func archnewm(m *m) {
 	sf := (*armm.StackFrame)(unsafe.Pointer(sp))
 	sf.PSR = armm.T
 	sf.PC = abi.FuncPCABI0(mstart)
-	m.tls[msp] = sp | thrSmallCtx // small ctx
+	m.tls[msp] = sp | thrSmallCtx | thrPrivLevel
 	m.tls[mer] = armm.ExcReturnSecureThreadPSP
 	m.libcall.fn = uintptr(unsafe.Pointer(m.g0))
 }
