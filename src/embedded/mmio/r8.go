@@ -9,7 +9,6 @@ import "unsafe"
 type T8 interface{ ~int8 | ~uint8 }
 
 // An R8 represents 8-bit memory mapped register of type T.
-// BUG: go:notinheap broken in go 1.18
 type R8[T T8] struct {
 	r uint8
 }

@@ -4,7 +4,9 @@
 
 package mmio
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 //go:noescape
 func load8(addr *uint8) uint8
@@ -12,11 +14,11 @@ func load8(addr *uint8) uint8
 //go:noescape
 func store8(addr *uint8, v uint8)
 
-// An U8 represents 8-bit memory mapped register.
+// An U8 represents a 8-bit memory mapped register.
 //
-// Deprecated: Use R8[uint8] instead.
-//
-// BUG: go:notinheap broken in go 1.18
+// Deprecated: This type will be an alias to R8[uint8] in the future, but for
+// now the Go optimizer seems to better inline the U8 methods than R8 ones so
+// U8 stays as a separate type to not affect the performance of existing code.
 type U8 struct {
 	r uint8
 }
@@ -104,7 +106,6 @@ func (r *U8) Store(v uint8) {
 // An UM8 represents a set of bits in R selected by Mask.
 //
 // Deprecated: Use RM8[uint8] instead.
-//
 type UM8 struct {
 	R    *U8
 	Mask uint8

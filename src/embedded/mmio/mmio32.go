@@ -4,7 +4,9 @@
 
 package mmio
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 //go:noescape
 func load32(addr *uint32) uint32
@@ -12,11 +14,11 @@ func load32(addr *uint32) uint32
 //go:noescape
 func store32(addr *uint32, v uint32)
 
-// An U32 represents 32-bit memory mapped register.
+// An U32 represents a 32-bit memory mapped register.
 //
-// Deprecated: Use R32[uint32] instead.
-//
-// BUG: go:notinheap broken in go 1.18
+// Deprecated: This type will be an alias to R32[uint32] in the future, but for
+// now the Go optimizer seems to better inline the U32 methods than R32 ones so
+// U32 stays as a separate type to not affect the performance of existing code.
 type U32 struct {
 	r uint32
 }
@@ -104,7 +106,6 @@ func (r *U32) Store(v uint32) {
 // An UM32 represents a set of bits in R selected by Mask.
 //
 // Deprecated: Use RM32[uint32] instead.
-//
 type UM32 struct {
 	R    *U32
 	Mask uint32

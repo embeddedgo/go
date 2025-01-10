@@ -9,7 +9,6 @@ import "unsafe"
 type T64 interface{ ~int64 | ~uint64 }
 
 // An R64 represents 64-bit memory mapped register of type T.
-// BUG: go:notinheap broken in go 1.18
 type R64[T T64] struct {
 	r uint64
 }

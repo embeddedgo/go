@@ -4,7 +4,9 @@
 
 package mmio
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 //go:noescape
 func load64(addr *uint64) uint64
@@ -12,11 +14,11 @@ func load64(addr *uint64) uint64
 //go:noescape
 func store64(addr *uint64, v uint64)
 
-// An U64 represents 64-bit memory mapped register.
+// An U64 represents a 64-bit memory mapped register.
 //
-// Deprecated: Use R64[uint64] instead.
-//
-// BUG: go:notinheap broken in go 1.18
+// Deprecated: This type will be an alias to R64[uint64] in the future, but for
+// now the Go optimizer seems to better inline the U64 methods than R64 ones so
+// U64 stays as a separate type to not affect the performance of existing code.
 type U64 struct {
 	r uint64
 }
@@ -104,7 +106,6 @@ func (r *U64) Store(v uint64) {
 // An UM64 represents a set of bits in R selected by Mask.
 //
 // Deprecated: Use RM64[uint64] instead.
-//
 type UM64 struct {
 	R    *U64
 	Mask uint64

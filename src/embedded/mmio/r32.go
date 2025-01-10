@@ -9,7 +9,6 @@ import "unsafe"
 type T32 interface{ ~int32 | ~uint32 }
 
 // An R32 represents 32-bit memory mapped register of type T.
-// BUG: go:notinheap broken in go 1.18
 type R32[T T32] struct {
 	r uint32
 }

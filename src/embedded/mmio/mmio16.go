@@ -4,7 +4,9 @@
 
 package mmio
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 //go:noescape
 func load16(addr *uint16) uint16
@@ -12,11 +14,11 @@ func load16(addr *uint16) uint16
 //go:noescape
 func store16(addr *uint16, v uint16)
 
-// An U16 represents 16-bit memory mapped register.
+// An U16 represents a 16-bit memory mapped register.
 //
-// Deprecated: Use R16[uint16] instead.
-//
-// BUG: go:notinheap broken in go 1.18
+// Deprecated: This type will be an alias to R16[uint16] in the future, but for
+// now the Go optimizer seems to better inline the U16 methods than R16 ones so
+// U16 stays as a separate type to not affect the performance of existing code.
 type U16 struct {
 	r uint16
 }
@@ -104,7 +106,6 @@ func (r *U16) Store(v uint16) {
 // An UM16 represents a set of bits in R selected by Mask.
 //
 // Deprecated: Use RM16[uint16] instead.
-//
 type UM16 struct {
 	R    *U16
 	Mask uint16

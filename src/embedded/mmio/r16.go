@@ -9,7 +9,6 @@ import "unsafe"
 type T16 interface{ ~int16 | ~uint16 }
 
 // An R16 represents 16-bit memory mapped register of type T.
-// BUG: go:notinheap broken in go 1.18
 type R16[T T16] struct {
 	r uint16
 }
