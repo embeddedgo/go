@@ -17,10 +17,10 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	MOVW       $runtime·romdata(SB), R1
 	MOVW       $runtime·bss(SB), R3
 	MOVW       $runtime·ramend(SB), R4
-	SUB        R0, R3, R2
-	SUB        R3, R4
-	MOVM.DB.W  [R0-R4], (R13)  // push: to,from,n for memmove, ptr,n for memclr
-	SUB        $4, R13
+	SUB        R0, R3, R2           // R2 = romDataSize = bssStart - isrStackEnd
+	SUB        R3, R4               // R4 = bssSize = ramEnd - bssStart
+	MOVM.DB.W  [R0-R4], (R13)       // push: to,from,n for memmove; ptr,n for memclr
+	SUB        $4, R13              // "push" fake return address on the stack
 	BL         runtime·memmove(SB)  // copy data to RAM
 	ADD        $12, R13
 	BL         runtime·memclrNoHeapPointers(SB)  // clear BSS and unallocated memory
@@ -30,23 +30,23 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	MOVW       R0, 4(R13)
 	MOVW       R1, 8(R13)
 	BL         runtime·memclrNoHeapPointers(SB)  // clear non-DMA memory
-	ADD        $12, R13
+	ADD        $12, R13                          // remove call frame
 
 	B   runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
 
 
 #define PALLOC_MIN 24*1024
 
-#define SCB_BASE  0xE000ED00
-#define SCB_VTOR  0x008
+#define SCB_BASE 0xE000ED00
+#define SCB_VTOR 0x008
 #define SCB_CPACR 0x088
 #define SCB_FPCCR 0x234
 
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 
-	// setup main stack in cpu0.gh
-	MOVW  $runtime·cpu0(SB), R0      // gh is the first field of the cpuctx struct
-	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of memory
+	// setup main stack in the cpus[0].gh
+	MOVW  $runtime·cpus(SB), R0      // gh is the first field of the cpuctx struct
+	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of RAM
 	MOVW  R1, (g_stack+stack_lo)(R0)
 	MOVW  R13, (g_stack+stack_hi)(R0)
 	ADD   $const_stackGuard, R1
@@ -61,21 +61,11 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  R0, g  // set g to gh
 
 	// Cortex-M settings
-
-	MOVW  $SCB_BASE, R1
-
-	// set VTOR (required mainly if the boot process is based on a bootloader)
-	MOVW  $runtime·vectors(SB), R0
-	MOVW  R0, SCB_VTOR(R1)
-
-	// enable FPU
-	MOVB  ·goarmsoftfp(SB), R0
-	CBNZ  R0, skipFPU
-	MOVW  $0xF<<20, R0       // full access to CP10 and CP11 instructions
-	MOVW  R0, SCB_CPACR(R1)
-	SLL   $10, R0
-	MOVW  R0, SCB_FPCCR(R1)  // set LSPEN and ASPEN (lazy auto save FP context)
-skipFPU:
+	MOVW  $0, R0                    // dummy RA
+	MOVW  $runtime·vectors(SB), R1  // arg
+	MOVM.DB.W  [R0-R1], (R13)
+	BL    runtime·initCPU(SB)
+	ADD   $8, R13
 
 	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
 	BL  runtime·check(SB)
@@ -120,9 +110,9 @@ skipFPU:
 
 	// allocate g0 for m0 and leave gh
 
-	SUB        $4, R13
-	MOVW       $0, R0
-	MOVW       $(2*const_stackMin), R1
+	SUB        $4, R13                  // space for return value
+	MOVW       $0, R0                   // dummy RA
+	MOVW       $(2*const_stackMin), R1  // arg
 	MOVM.DB.W  [R0-R1], (R13)
 	BL         runtime·malg(SB)
 	MOVW       8(R13), R0  // newg in R0
@@ -161,13 +151,13 @@ skipFPU:
 	ISB
 
 	// create a new goroutine to start program
-	SUB	$8, R13
-	MOVW	$runtime·mainPC(SB), R0
-	MOVW	R0, 4(R13)	// arg 1: fn
-	MOVW	$0, R0
-	MOVW	R0, 0(R13)	// dummy LR
-	BL	runtime·newproc(SB)
-	ADD	$8, R13	// pop args and LR
+	SUB   $8, R13
+	MOVW  $runtime·mainPC(SB), R0
+	MOVW  R0, 4(R13)  // arg 1: fn
+	MOVW  $0, R0
+	MOVW  R0, 0(R13)  // dummy RA sloot
+	BL    runtime·newproc(SB)
+	ADD   $8, R13  // pop args and LR
 
 	// start this M
 	BL  runtime·mstart(SB)

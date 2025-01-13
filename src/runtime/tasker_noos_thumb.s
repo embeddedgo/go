@@ -22,7 +22,7 @@
 // R0. It can clobber R0-R4,LR registers (other registers must be preserved).
 TEXT ·identcurcpu(SB),NOSPLIT|NOFRAME,$0-0
 	// for now only single CPU is supported (see also cpuid, osinit)
-	MOVW  $·cpu0(SB), R0
+	MOVW  $·cpus(SB), R0
 	RET
 
 // func sev()

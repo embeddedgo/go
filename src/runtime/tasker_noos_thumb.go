@@ -13,14 +13,13 @@ import (
 	"internal/cpu/armm"
 	"internal/cpu/armm/cmt"
 	"internal/cpu/armm/debug/itm"
+	"internal/cpu/armm/fpu"
 	"internal/cpu/armm/nvic"
 	"internal/cpu/armm/pft"
 	"internal/cpu/armm/scb"
 	"internal/cpu/armm/scid"
 	"unsafe"
 )
-
-// for now noos/thumb supports only single CPU
 
 func sev()
 func isb()
@@ -81,8 +80,8 @@ func archnewm(m *m) {
 }
 
 var (
-	cpu0  cpuctx
-	pcpu0 = &cpu0
+	cpus  [taskerNCPU]cpuctx
+	cpups [taskerNCPU]uintptr
 )
 
 //go:nosplit
@@ -100,28 +99,43 @@ const debugBusFault = false
 //go:nowritebarrierrec
 //go:nosplit
 func taskerinit() {
-	*(*uintptr)(unsafe.Pointer(&cpu0.t)) = uintptr(unsafe.Pointer(&thetasker))
-	cpu0.exe.set(getg().m)
+	for i := range cpus {
+		cpu := &cpus[i]
+		*(*uintptr)(unsafe.Pointer(&cpu.t)) = uintptr(unsafe.Pointer(&thetasker))
+		cpups[i] = uintptr(unsafe.Pointer(cpu))
+	}
 	allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
-	*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(&pcpu0))
-	allcpu.len = 1
-	allcpu.cap = 1
+	*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(&cpups))
+	allcpu.len = len(cpus)
+	allcpu.cap = len(cpus)
 
-	// setup exception priority levels
+	// taskerinit is called with g set to this CPU gh so curcpu works.
+	curcpu().exe.set(getg().m)
+}
 
+//go:nowritebarrierrec
+//go:nosplit
+func initCPU(vectors uintptr) {
 	SCB := scb.SCB()
 
-	// enable fault handlers
+	// Set VTOR (required mainly if the boot process is based on a bootloader)
+	SCB.VTOR.Store(scb.VTOR(vectors))
+	// Enable fault handlers
 	SCB.SHCSR.SetBits(scb.MEMFAULTENA | scb.BUSFAULTENA | scb.USGFAULTENA)
-
-	// division by zero will cause the UsageFault
+	// Division by zero will causes the UsageFault.
 	SCB.CCR.SetBits(scb.DIV_0_TRP)
-
 	// set PendSV and SVCall priorities according to description in rtos package
 	SCB.SHPR2.StoreBits(scb.PRI_SVCall, (4<<5)<<scb.PRI_SVCalln)
 	SCB.SHPR3.StoreBits(scb.PRI_PendSV, 255<<scb.PRI_PendSVn)
 
 	// All other exceptions/interrupts by default have the highest priority.
+
+	// Enable FPU.
+	if goarmsoftfp == 0 {
+		FPU := fpu.FPU()
+		FPU.CPACR.Store(fpu.CP10 | fpu.CP11)
+		FPU.FPCCR.Store(fpu.LSPEN | fpu.ASPEN)
+	}
 
 	if debugBusFault {
 		// Disable buffering to make bus faults synchronous.
@@ -170,6 +184,7 @@ func taskerinit() {
 	// the MPU to mimic the default CPU behavior, without the MPU enabled. The
 	// first 64 bytes of the memory are configured inaccessible in the user mode
 	// (or both modes for ARMv7-M) to catch the bad pointer dereferences.
+
 	partno := SCB.CPUID.LoadBits(scb.PartNo) >> scb.PartNon
 	_, dregn, _ := mpu.Type()
 	switch {
