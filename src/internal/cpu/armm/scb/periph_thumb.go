@@ -1,21 +1,24 @@
 // Instances:
-//  SCB  0xE000ED00  -  -  System Control Block
+//
+//	SCB  0xE000ED00  -  -  System Control Block
+//
 // Registers:
-//  0x00  32  CPUID  CPUID Base Register
-//  0x04  32  ICSR   Interrupt Control and State Register
-//  0x08  32  VTOR   Vector Table Offset Register
-//  0x0C  32  AIRCR  Application Interrupt and Reset Control Register
-//  0x10  32  SCR    System Control Register
-//  0x14  32  CCR    Configuration and Control Register
-//  0x18  32  SHPR1  System Handler Priority Register 1
-//  0x1C  32  SHPR2  System Handler Priority Register 2
-//  0x20  32  SHPR3  System Handler Priority Register 3
-//  0x24  32  SHCSR  System Handler Control and State Register
-//  0x28  32  CFSR   Configurable Fault Status Register
-//  0x2C  32  HFSR   HardFault Status Register
-//  0x34  32  MMFR   MemManage Fault Address Register
-//  0x38  32  BFAR   BusFault Address Register
-//  0x3C  32  AFSR   Auxiliary Fault Status Register
+//
+//	0x000  32  CPUID  CPUID Base Register
+//	0x004  32  ICSR   Interrupt Control and State Register
+//	0x008  32  VTOR   Vector Table Offset Register
+//	0x00C  32  AIRCR  Application Interrupt and Reset Control Register
+//	0x010  32  SCR    System Control Register
+//	0x014  32  CCR    Configuration and Control Register
+//	0x018  32  SHPR1  System Handler Priority Register 1
+//	0x01C  32  SHPR2  System Handler Priority Register 2
+//	0x020  32  SHPR3  System Handler Priority Register 3
+//	0x024  32  SHCSR  System Handler Control and State Register
+//	0x028  32  CFSR   Configurable Fault Status Register
+//	0x02C  32  HFSR   HardFault Status Register
+//	0x034  32  MMFR   MemManage Fault Address Register
+//	0x038  32  BFAR   BusFault Address Register
+//	0x03C  32  AFSR   Auxiliary Fault Status Register
 package scb
 
 const (
