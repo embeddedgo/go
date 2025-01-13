@@ -9,6 +9,8 @@
 
 package runtime
 
+const taskerNCPU = 1
+
 const (
 	_OS                             = 0
 	noos                            = true

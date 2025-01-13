@@ -105,7 +105,7 @@ func readRandom(r []byte) int {
 
 //go:nosplit
 func osinit() {
-	ncpu = 1 // for now only single CPU is supported (see identcurcpu, cpuid)
+	ncpu = taskerNCPU
 	physPageSize = _PageSize
 }
 
