@@ -12,6 +12,23 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	//NOP2
 	//B -1(PC)
 
+	// Cortex-M settings
+	MOVW  $0, R0                    // dummy RA
+	MOVW  $runtime·vectors(SB), R1  // arg
+	MOVM.DB.W  [R0-R1], (R13)
+	BL    runtime·initCPU(SB)
+	ADD   $8, R13
+
+	B   runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
+
+
+#define PALLOC_MIN 24*1024
+
+// rt0_go initializes BSS and data segments, noos tasker, Go scheduler and
+// continues as the first thread that runs the first goroutine. If the system
+// has multiple CPUs (cores) only one CPU can run this function (init CPU,
+// usually CPU0). Other CPUs must wait until the tasker is ready.
+TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// initialize data and BSS
 	MOVW       R13, R0  // R13 points to the top of ISR stack and the beggining of DATA segment
 	MOVW       $runtime·romdata(SB), R1
@@ -32,18 +49,6 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	BL         runtime·memclrNoHeapPointers(SB)  // clear non-DMA memory
 	ADD        $12, R13                          // remove call frame
 
-	B   runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
-
-
-#define PALLOC_MIN 24*1024
-
-#define SCB_BASE 0xE000ED00
-#define SCB_VTOR 0x008
-#define SCB_CPACR 0x088
-#define SCB_FPCCR 0x234
-
-TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
-
 	// setup main stack in the cpus[0].gh
 	MOVW  $runtime·cpus(SB), R0      // gh is the first field of the cpuctx struct
 	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of RAM
@@ -59,13 +64,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVW  R1, g_m(R0)   // cpu0.gh.m = m0
 
 	MOVW  R0, g  // set g to gh
-
-	// Cortex-M settings
-	MOVW  $0, R0                    // dummy RA
-	MOVW  $runtime·vectors(SB), R1  // arg
-	MOVM.DB.W  [R0-R1], (R13)
-	BL    runtime·initCPU(SB)
-	ADD   $8, R13
 
 	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
 	BL  runtime·check(SB)

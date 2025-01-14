@@ -113,6 +113,9 @@ func taskerinit() {
 	curcpu().exe.set(getg().m)
 }
 
+// initCPU is called by every CPU in the system, very early, even before BSS and
+// data segments are initialized.
+//
 //go:nowritebarrierrec
 //go:nosplit
 func initCPU(vectors uintptr) {
@@ -124,7 +127,7 @@ func initCPU(vectors uintptr) {
 	SCB.SHCSR.SetBits(scb.MEMFAULTENA | scb.BUSFAULTENA | scb.USGFAULTENA)
 	// Division by zero will causes the UsageFault.
 	SCB.CCR.SetBits(scb.DIV_0_TRP)
-	// set PendSV and SVCall priorities according to description in rtos package
+	// Set PendSV and SVCall priorities according to description in rtos package
 	SCB.SHPR2.StoreBits(scb.PRI_SVCall, (4<<5)<<scb.PRI_SVCalln)
 	SCB.SHPR3.StoreBits(scb.PRI_PendSV, 255<<scb.PRI_PendSVn)
 
