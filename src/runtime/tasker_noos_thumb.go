@@ -18,6 +18,7 @@ import (
 	"internal/cpu/armm/pft"
 	"internal/cpu/armm/scb"
 	"internal/cpu/armm/scid"
+	"runtime/internal/atomic"
 	"unsafe"
 )
 
@@ -80,8 +81,9 @@ func archnewm(m *m) {
 }
 
 var (
-	cpus  [taskerNCPU]cpuctx
-	cpups [taskerNCPU]uintptr
+	cpus         [taskerNCPU]cpuctx
+	cpups        [taskerNCPU]uintptr
+	runOtherCPUs atomic.Bool
 )
 
 //go:nosplit
@@ -109,6 +111,9 @@ func taskerinit() {
 	allcpu.len = len(cpus)
 	allcpu.cap = len(cpus)
 
+	runOtherCPUs.Store(true)
+	sev()
+
 	// taskerinit is called with g set to this CPU gh so curcpu works.
 	curcpu().exe.set(getg().m)
 }
@@ -134,9 +139,9 @@ func initCPU(vectors uintptr) {
 	// All other exceptions/interrupts by default have the highest priority.
 
 	// Enable FPU.
-	if goarmsoftfp == 0 {
-		FPU := fpu.FPU()
-		FPU.CPACR.Store(fpu.CP10 | fpu.CP11)
+	FPU := fpu.FPU()
+	FPU.CPACR.Store(fpu.CP10 | fpu.CP11)
+	if FPU.CPACR.LoadBits(fpu.CP10|fpu.CP11) == fpu.CP10|fpu.CP11 {
 		FPU.FPCCR.Store(fpu.LSPEN | fpu.ASPEN)
 	}
 

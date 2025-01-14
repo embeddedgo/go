@@ -13,42 +13,47 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	//B -1(PC)
 
 	// Cortex-M settings
-	MOVW  $0, R0                    // dummy RA
-	MOVW  $runtime·vectors(SB), R1  // arg
+	MOVW       $0, R0                    // dummy RA
+	MOVW       $runtime·vectors(SB), R1  // arg
 	MOVM.DB.W  [R0-R1], (R13)
-	BL    runtime·initCPU(SB)
-	ADD   $8, R13
+	BL         runtime·initCPU(SB)
+	ADD        $8, R13
+
+	BL  runtime·initRAMfromROM(SB)
 
 	B   runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
 
 
-#define PALLOC_MIN 24*1024
-
-// rt0_go initializes BSS and data segments, noos tasker, Go scheduler and
-// continues as the first thread that runs the first goroutine. If the system
-// has multiple CPUs (cores) only one CPU can run this function (init CPU,
-// usually CPU0). Other CPUs must wait until the tasker is ready.
-TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
-	// initialize data and BSS
-	MOVW       R13, R0  // R13 points to the top of ISR stack and the beggining of DATA segment
+// initRAMfromROM copies the Data segment from ROM to RAM and clears the
+// remaining RAM.
+TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
+	MOVW       R13, R0  // R13 points to the beggining of Data segment in RAM
 	MOVW       $runtime·romdata(SB), R1
 	MOVW       $runtime·bss(SB), R3
 	MOVW       $runtime·ramend(SB), R4
-	SUB        R0, R3, R2           // R2 = romDataSize = bssStart - isrStackEnd
-	SUB        R3, R4               // R4 = bssSize = ramEnd - bssStart
-	MOVM.DB.W  [R0-R4], (R13)       // push: to,from,n for memmove; ptr,n for memclr
-	SUB        $4, R13              // "push" fake return address on the stack
+	SUB        R0, R3, R2  // R2 = romDataSize = bssStart - isrStackEnd
+	SUB        R3, R4      // R4 = remainRAMSize = ramEnd - bssStart
+	MOVW       $runtime·nodmastart(SB), R5
+	MOVW       $runtime·nodmaend(SB), R6
+	SUB        R5, R6               // R6 = non-DMA RAM size
+	MOVM.DB.W  [R0-R6,LR], (R13)    // push (to,from,n) for memmove, 2 x (ptr,n) for memclr, RA
+	SUB        $4, R13              // "push" fake (random) RA
 	BL         runtime·memmove(SB)  // copy data to RAM
 	ADD        $12, R13
-	BL         runtime·memclrNoHeapPointers(SB)  // clear BSS and unallocated memory
-	MOVW       $runtime·nodmastart(SB), R0
-	MOVW       $runtime·nodmaend(SB), R1
-	SUB        R0, R1
-	MOVW       R0, 4(R13)
-	MOVW       R1, 8(R13)
-	BL         runtime·memclrNoHeapPointers(SB)  // clear non-DMA memory
-	ADD        $12, R13                          // remove call frame
+	BL         runtime·memclrNoHeapPointers(SB)  // clear the remaining RAM
+	ADD        $8, R13
+	BL         runtime·memclrNoHeapPointers(SB)  // clear non-DMA RAM
+	ADD        $12, R13
+	MOVW.P     4(R13), R15  // return
 
+
+#define PALLOC_MIN 24*1024
+
+// rt0_go initializes the noos tasker, Go scheduler and continues as the first
+// thread that runs the first goroutine. If the system has multiple CPUs
+// only one CPU can run this function (init CPU, usually CPU0). Other CPUs must
+// wait until the tasker is ready.
+TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// setup main stack in the cpus[0].gh
 	MOVW  $runtime·cpus(SB), R0      // gh is the first field of the cpuctx struct
 	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of RAM
