@@ -14,8 +14,8 @@ import "unsafe"
 // noosMemory returns the address and size of the memory allocated to the arena
 // (heapArenaBytes aligned) and the memory limit for GC.
 //
-// sysReserve allocates down from noosMem.end always returning _PageSize aligned
-// memory.
+// sysReserve allocates down from noosMem.*.end always returning _PageSize
+// aligned memory.
 //
 // noosPersistentAlloc provides fast and memory efficient implementation of
 // the persistentalloc1 function.
@@ -33,17 +33,32 @@ func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd uintptr) {
 	nodmaSize := nodmaEnd - nodmaStart
 	size := freeSize + nodmaSize
 
-	// Estimate the space needed for non-heap allocations
-	const pallocMin = 2 * noosDefaultHeapMinimum
-	palloc := int((freeSize>>(pageShift))*unsafe.Sizeof(emptymspan) + pallocMin)
+	// Estimate the space needed for non-heap allocations. We assumed a linear
+	// relationship between the required space and the free memory counted as
+	// the number of pages:
+	//
+	//	palloc = A * freePages + B
+	//
+	// As the information about the heap memory is stored mainly in the mspan
+	// structs the A coefficient is proportional to the size of mspan. The B
+	// coefficient takes into account the pointer size. TODO: Replace this
+	// heuristic relationship with something more strict.
+	const (
+		A = unsafe.Sizeof(emptymspan) / 2
+		B = unsafe.Sizeof(uintptr(0)) * 1024
+	)
+	palloc := A*(freeSize>>pageShift) + B
 
-	// We prefer the non-DMA memory for non-heap objects to preserve as much
-	// as possible of the DMA capable memory for heap allocations
-	pallocInFree := max(palloc-int(nodmaSize), 0)
+	// We can use non-DMA memory for non-heap objects to preserve as much as
+	// possible of the DMA capable memory for heap.
+	pallocInFree := uintptr(0)
+	if palloc > nodmaSize {
+		pallocInFree = palloc - nodmaSize
+	}
 
-	// Reduce the arena by the remainder of the non-heap space that did not fit in
-	// the non-DMA memory, properly align the arena
-	arenaStart := freeStart + uintptr(pallocInFree)
+	// Reduce the arena by the remainder of the non-heap space that did not fit
+	// in the non-DMA memory, properly align the arena.
+	arenaStart := freeStart + pallocInFree
 	arenaAlign := uintptr(heapArenaBytes) - 1
 	arenaStart = (arenaStart + arenaAlign) &^ arenaAlign
 	arenaSize := freeEnd - arenaStart

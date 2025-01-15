@@ -75,7 +75,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	BL  runtime·osinit(SB)
 
 	// initialize noosMem
-
+/*
 	MOVW  $runtime·end(SB), R0
 	MOVW  $runtime·ramend(SB), R1
 	SUB   R0, R1, R5  // size of available memory (DMA capable)
@@ -105,6 +105,16 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize,size}
 	MOVW     $runtime·noosMem(SB), R7
 	MOVM.IA  [R0-R6], (R7)
+*/
+
+	MOVW      $0, R0                      // dummy RA
+	MOVW      $runtime·end(SB), R1        // freeStart
+	MOVW      $runtime·ramend(SB), R2     // freeEnd
+	MOVW      $runtime·nodmastart(SB), R3 // nodmaStart
+	MOVW      $runtime·nodmaend(SB), R4   // nodmaEnd
+	MOVM.DB.W [R0-R4], (R13)
+	BL        runtime·meminit(SB)
+	ADD       $20, R13
 
 	// initialize noos tasker and Go scheduler
 
