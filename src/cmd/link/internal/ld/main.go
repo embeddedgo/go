@@ -119,37 +119,47 @@ var (
 )
 
 type MemBlock struct {
-	Base, Size int64
+	Base, Size, Offset int64
 }
 
 func (mb *MemBlock) set(descr string) {
-	i := strings.IndexByte(descr, ':')
-	if i < 0 {
-		Exitf("memory desciption: no BASE:SIZE separator: %s", descr)
+	v := [3]int64{0, 0, -1}
+
+	a := strings.SplitN(descr, ":", len(v)+1)
+	if len(a) > len(v) || len(a) == 0 {
+		Exitf(`memory block: "%s" doesn't match BASE:SIZE[:OFFSET] format`, descr)
 	}
-	var err error
-	mb.Base, err = strconv.ParseInt(descr[:i], 0, 64)
-	if err != nil {
-		Exitf("memory desciption: bad BASE address: %v", err)
+	for i, s := range a {
+		scale := int64(1)
+		if i != 0 {
+			switch s[len(s)-1] {
+			case 'K':
+				scale = 1024
+			case 'M':
+				scale = 1024 * 1024
+			case 'G':
+				scale = 1024 * 1024 * 1024
+			}
+			if scale != 1 {
+				s = s[:len(s)-1]
+			}
+		}
+		var err error
+		v[i], err = strconv.ParseInt(s, 0, 64)
+		if err != nil {
+			Exitf("memory block: bad BASE/SIZE/OFFSET %s: %v", s, err)
+		}
+		if i != 0 && v[i] < 0 {
+			Exitf("memory block: negative SIZE/OFFSET %s", s)
+		}
+		v[i] *= scale
 	}
-	size := descr[i+1:]
-	scale := int64(1)
-	switch size[len(size)-1] {
-	case 'K':
-		scale = 1024
-	case 'M':
-		scale = 1024 * 1024
-	case 'G':
-		scale = 1024 * 1024 * 1024
+	mb.Base = v[0]
+	mb.Size = v[1]
+	mb.Offset = v[2]
+	if mb.Offset > mb.Size {
+		Exitf(`memory block: "%s OFFSET" > SIZE`, descr)
 	}
-	if scale != 1 {
-		size = size[:len(size)-1]
-	}
-	mb.Size, err = strconv.ParseInt(size, 0, 64)
-	if err != nil {
-		Exitf("memory layout (-M): bad SIZE: %v", err)
-	}
-	mb.Size *= scale
 }
 
 // ternaryFlag is like a boolean flag, but has a default value that is
@@ -239,7 +249,7 @@ func Main(arch *sys.Arch, theArch Arch) {
 
 	var flagMemory, flagFlash string
 	if buildcfg.GOOS == "noos" {
-		flag.StringVar(&flagMemory, "M", "", "set memory layout: ADDR1:SIZE1[,ADDR2:SIZE2]")
+		flag.StringVar(&flagMemory, "M", "", "set memory layout: ADDR1:SIZE1[:OFFSET1][,ADDR2:SIZE2]")
 		flag.StringVar(&flagFlash, "F", "", "set text memory (ROM/Flash) address and size: ADDR:SIZE")
 	}
 

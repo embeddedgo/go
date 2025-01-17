@@ -2881,9 +2881,9 @@ func (ctxt *Link) address() []*sym.Segment {
 		switch ctxt.Arch {
 		case sys.ArchThumb:
 			// Main stack on the lowest addresses so overflows can be detected
-			// even without MPU. Segdata.Laddr is set to the main stack size
-			// (see ../thumb/asm.go:/Laddr = /) BUG: Assumes single-core system.
-			va = uint64(RAM.Base) + Segdata.Laddr
+			// even without MPU. Segdata.Vaddr is set to the main stack size
+			// (see ../thumb/asm.go:/Vaddr = /)
+			va = Segdata.Vaddr
 		}
 	}
 

@@ -28,7 +28,11 @@ var noosMem struct {
 }
 
 //go:nosplit
-func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd uintptr) {
+func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd, isrSP uintptr) (nodmaStack bool) {
+	if nodmaStart < isrSP && isrSP < nodmaEnd {
+		nodmaStart = isrSP // ISR stack(s) in the NoDMA memory
+		nodmaStack = true
+	}
 	freeSize := freeEnd - freeStart
 	nodmaSize := nodmaEnd - nodmaStart
 	size := freeSize + nodmaSize
@@ -70,6 +74,8 @@ func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd uintptr) {
 	noosMem.arenaStart = arenaStart
 	noosMem.arenaSize = arenaSize
 	noosMem.size = size
+
+	return
 }
 
 type pamem struct {

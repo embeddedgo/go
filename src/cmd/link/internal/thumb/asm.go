@@ -81,13 +81,35 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 		}
 	}
 
-	ld.Segdata.Laddr = 2048 // pass the main stack size to the Link.address()
+	// For compatibility, if no any MemBlock.Offset is specified, the stack
+	// has default size and is placed at the beggining of NoDMA or RAM block.
+	minFreeRAM := int64(64 * 1024 * 1024)
+	mainStackSize := int64(2048)
 	if !buildcfg.GOARM.SoftFloat {
-		ld.Segdata.Laddr *= 2 // more space for floating-point registers
+		mainStackSize *= 2 // more space for floating-point registers
 	}
-	msp := uint32(uint64(ld.RAM.Base) + ld.Segdata.Laddr)
-	vectors.AddUint32(ctxt.Arch, msp) // Main Stack Pointer after reset
+	var msp int64
+	if ld.NoDMA.Size >= mainStackSize {
+		msp = ld.NoDMA.Base + mainStackSize
+		ld.Segdata.Vaddr = uint64(ld.RAM.Base)
+	} else if ld.RAM.Size >= mainStackSize+minFreeRAM {
+		msp = ld.RAM.Base + mainStackSize
+		ld.Segdata.Vaddr = uint64(msp)
+	} else {
+		ld.Errorf(nil, "RAM block is too small")
+	}
+	// Otherwise the MemBlock.Offset sepcifies the place (beginning of NoDMA
+	// or RAM) and size reserved for the main stack (multiple cores stacks).
+	// If both offsets are zero there is no memory reserved for the main stack.
+	if ld.NoDMA.Offset >= 0 {
+		msp = ld.NoDMA.Base + ld.NoDMA.Offset
+		ld.Segdata.Vaddr = uint64(ld.RAM.Base)
+	} else if ld.RAM.Offset >= 0 {
+		msp = ld.RAM.Base + ld.RAM.Offset
+		ld.Segdata.Vaddr = uint64(msp)
+	}
 
+	vectors.AddUint32(ctxt.Arch, uint32(msp)) // Main Stack Pointer after reset
 	relocs := vectors.AddRelocs(irqNum + 15)
 	addHandler := func(irqn int, fname string) {
 		s := lookupFuncSym(ldr, fname)

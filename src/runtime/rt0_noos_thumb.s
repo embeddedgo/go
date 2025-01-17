@@ -25,26 +25,43 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 
 
 // initRAMfromROM copies the Data segment from ROM to RAM and clears the
-// remaining RAM.
+// remaining RAM. As it clears the whole free RAM and doesn't know about CPU
+// stacks it may be called only when stacks are empty.
 TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
-	MOVW       R13, R0  // R13 points to the beggining of Data segment in RAM
-	MOVW       $runtime·romdata(SB), R1
-	MOVW       $runtime·bss(SB), R3
-	MOVW       $runtime·ramend(SB), R4
-	SUB        R0, R3, R2  // R2 = romDataSize = bssStart - isrStackEnd
-	SUB        R3, R4      // R4 = remainRAMSize = ramEnd - bssStart
-	MOVW       $runtime·nodmastart(SB), R5
-	MOVW       $runtime·nodmaend(SB), R6
-	SUB        R5, R6               // R6 = non-DMA RAM size
-	MOVM.DB.W  [R0-R6,LR], (R13)    // push (to,from,n) for memmove, 2 x (ptr,n) for memclr, RA
-	SUB        $4, R13              // "push" fake (random) RA
-	BL         runtime·memmove(SB)  // copy data to RAM
-	ADD        $12, R13
-	BL         runtime·memclrNoHeapPointers(SB)  // clear the remaining RAM
-	ADD        $8, R13
-	BL         runtime·memclrNoHeapPointers(SB)  // clear non-DMA RAM
-	ADD        $12, R13
-	MOVW.P     4(R13), R15  // return
+	MOVW    $0, R0        // dummy RA
+	MOVW.W  R0, -16(R13)  // make a "frame"
+
+	MOVW    $runtime·bss(SB), R0
+	MOVW    $runtime·ramend(SB), R1
+	MOVW.W  LR, -4(R1)  // save LR at the end of RAM
+	SUB     R0, R1      // R1 = freeSize = ramEnd-4 - bssStart
+	MOVW    R0, 4(R13)
+	MOVW    R1, 8(R13)
+	BL      runtime·memclrNoHeapPointers(SB)  // clear free RAM
+
+	MOVW  $runtime·nodmastart(SB), R0
+	MOVW  $runtime·nodmaend(SB), R1
+	SUB   R0, R1  // R1 = nondmaSize = nodmaEnd - nodmaStart
+	MOVW  R0, 4(R13)
+	MOVW  R1, 8(R13)
+	BL    runtime·memclrNoHeapPointers(SB)  // clear non-DMA RAM
+
+	MOVW  $runtime·noptrdata(SB), R0
+	MOVW  $runtime·romdata(SB), R1
+	MOVW  $runtime·edata(SB), R2
+	SUB   R0, R2  // R2 = dataSize = dataStart - dataEnd
+	MOVW  R0, 4(R13)
+	MOVW  R1, 8(R13)
+	MOVW  R2, 12(R13)
+	BL    runtime·memmove(SB)  // copy data to RAM
+
+	// Clear the SP, restore LR and return
+	ADD     $16, R13
+	MOVW    $runtime·ramend(SB), R0
+	MOVW.W  -4(R0), LR
+	MOVW    $0, R1
+	MOVW    R1, (R0)  // clear the last word of RAM
+	RET
 
 
 #define PALLOC_MIN 24*1024
@@ -54,6 +71,16 @@ TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
 // only one CPU can run this function (init CPU, usually CPU0). Other CPUs must
 // wait until the tasker is ready.
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
+	// Initialize the noos memory allocator
+	MOVW       $0, R0                       // dummy RA
+	MOVW       $runtime·end(SB), R1         // freeStart
+	MOVW       $runtime·ramend(SB), R2      // freeEnd
+	MOVW       $runtime·nodmastart(SB), R3  // nodmaStart
+	MOVW       $runtime·nodmaend(SB), R4    // nodmaEnd
+	MOVM.DB.W  [R0-R4], (R13)
+	BL         runtime·meminit(SB)
+	ADD        $20, R13
+
 	// setup main stack in the cpus[0].gh
 	MOVW  $runtime·cpus(SB), R0      // gh is the first field of the cpuctx struct
 	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of RAM
@@ -105,16 +132,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize,size}
 	MOVW     $runtime·noosMem(SB), R7
 	MOVM.IA  [R0-R6], (R7)
-*/
-
-	MOVW      $0, R0                      // dummy RA
-	MOVW      $runtime·end(SB), R1        // freeStart
-	MOVW      $runtime·ramend(SB), R2     // freeEnd
-	MOVW      $runtime·nodmastart(SB), R3 // nodmaStart
-	MOVW      $runtime·nodmaend(SB), R4   // nodmaEnd
-	MOVM.DB.W [R0-R4], (R13)
-	BL        runtime·meminit(SB)
-	ADD       $20, R13
+	*/
 
 	// initialize noos tasker and Go scheduler
 
