@@ -18,13 +18,6 @@
 #define ICSR_ADDR 0xE000ED04
 #define ICSR_PENDSVCLR (1<<27)
 
-// identcurcpu indetifies the current CPU and returns a pointer to its cpuctx in
-// R0. It can clobber R0-R4,LR registers (other registers must be preserved).
-TEXT ·identcurcpu(SB),NOSPLIT|NOFRAME,$0-0
-	// for now only single CPU is supported (see also cpuid, osinit)
-	MOVW  $·cpus(SB), R0
-	RET
-
 // func sev()
 TEXT ·sev(SB),NOSPLIT|NOFRAME,$0-0
 	SEV

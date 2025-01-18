@@ -83,7 +83,7 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 
 	// For compatibility, if no any MemBlock.Offset is specified, the stack
 	// has default size and is placed at the beggining of NoDMA or RAM block.
-	minFreeRAM := int64(64 * 1024 * 1024)
+	minFreeRAM := int64(64 * 1024)
 	mainStackSize := int64(2048)
 	if !buildcfg.GOARM.SoftFloat {
 		mainStackSize *= 2 // more space for floating-point registers
@@ -96,6 +96,7 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 		msp = ld.RAM.Base + mainStackSize
 		ld.Segdata.Vaddr = uint64(msp)
 	} else {
+		fmt.Println(ld.NoDMA, ld.RAM, mainStackSize+minFreeRAM)
 		ld.Errorf(nil, "RAM block is too small")
 	}
 	// Otherwise the MemBlock.Offset sepcifies the place (beginning of NoDMA

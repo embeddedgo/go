@@ -18,6 +18,7 @@ import (
 	"internal/cpu/armm/pft"
 	"internal/cpu/armm/scb"
 	"internal/cpu/armm/scid"
+	"internal/goarch"
 	"runtime/internal/atomic"
 	"unsafe"
 )
@@ -27,12 +28,6 @@ func isb()
 func curcpuSleep()
 func curcpuSavectxSched()
 func curcpuSavectxCall() {} // all registars saved on caller's stack
-
-//go:nosplit
-func cpuid() int {
-	// for now only single CPU is supported (see also identcurcpu, osinit)
-	return 0
-}
 
 //go:nosplit
 func curcpuWakeup() { sev() } // see ARM Errata 563915, STM32F10xx Errata 1.1.2
@@ -80,12 +75,6 @@ func archnewm(m *m) {
 	m.libcall.fn = uintptr(unsafe.Pointer(m.g0))
 }
 
-var (
-	cpus         [taskerNCPU]cpuctx
-	cpups        [taskerNCPU]uintptr
-	runOtherCPUs atomic.Bool
-)
-
 //go:nosplit
 func leadingZeros32(x uint32) uint {
 	var n uint
@@ -96,27 +85,34 @@ func leadingZeros32(x uint32) uint {
 	return 32 - n
 }
 
-const debugBusFault = false
+var runOtherCPUs atomic.Bool
 
 //go:nowritebarrierrec
 //go:nosplit
-func taskerinit() {
-	for i := range cpus {
-		cpu := &cpus[i]
-		*(*uintptr)(unsafe.Pointer(&cpu.t)) = uintptr(unsafe.Pointer(&thetasker))
-		cpups[i] = uintptr(unsafe.Pointer(cpu))
-	}
-	allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
-	*(*uintptr)(unsafe.Pointer(&allcpu.array)) = uintptr(unsafe.Pointer(&cpups))
-	allcpu.len = len(cpus)
-	allcpu.cap = len(cpus)
+func taskerinit(stackStart, stackEnd uintptr) {
+	allcpu := (*notInHeapSlice)(unsafe.Pointer(&thetasker.allcpu))
+	allcpu.len = int(ncpu)
+	allcpu.cap = int(ncpu)
+	allcpu.array = (*notInHeap)(noosRawAlloc(goarch.PtrSize*uintptr(ncpu), goarch.PtrSize))
 
+	stackSize := (stackEnd - stackStart) / uintptr(ncpu)
+	for i := range thetasker.allcpu {
+		cpu := (*cpuctx)(noosRawAlloc(unsafe.Sizeof(cpuctx{}), unsafe.Alignof(cpuctx{})))
+		cpu.t = &thetasker
+		cpu.gh.stack.lo = stackStart
+		cpu.gh.stack.hi = stackStart + stackSize
+		cpu.gh.stackguard0 = stackStart + stackGuard
+		cpu.gh.stackguard1 = stackStart + stackGuard
+		thetasker.allcpu[i] = cpu
+		stackStart += stackSize
+	}
+
+	// Now the target identcurcpu should work so other CPUs can enter tasker.
 	runOtherCPUs.Store(true)
 	sev()
-
-	// taskerinit is called with g set to this CPU gh so curcpu works.
-	curcpu().exe.set(getg().m)
 }
+
+const debugBusFault = false
 
 // initCPU is called by every CPU in the system, very early, even before BSS and
 // data segments are initialized.

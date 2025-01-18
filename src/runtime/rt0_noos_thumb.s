@@ -7,7 +7,7 @@
 #include "funcdata.h"
 #include "textflag.h"
 
-
+// _rt0_thumb_noos is the first function of Embedded Go program
 TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 	//NOP2
 	//B -1(PC)
@@ -21,8 +21,21 @@ TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
 
 	BL  runtime·initRAMfromROM(SB)
 
-	B   runtime·rt0_go(SB)  // rt0_go is known as top of a goroutine stack
+	// Set the numer of available CPUs.
+	MOVW  $1,R0
+	MOVW  $runtime·ncpu(SB), R1
+	MOVW  R0, (R1)
 
+	MOVW  R0, R1  // inform rt0_go that we use default stack arrangement
+	B     runtime·rt0_go(SB)
+
+// identcurcpu indetifies the current CPU and returns a pointer to its cpuctx in
+// R0. It can clobber R0-R4,LR registers (other registers must be preserved).
+TEXT runtime·identcurcpu(SB),NOSPLIT|NOFRAME,$0-0
+	MOVW  $runtime·thetasker(SB), R0
+	MOVW  tasker_allcpu(R0), R0
+	MOVW  (R0), R0  // this function supports single CPU
+	RET
 
 // initRAMfromROM copies the Data segment from ROM to RAM and clears the
 // remaining RAM. As it clears the whole free RAM and doesn't know about CPU
@@ -55,12 +68,12 @@ TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
 	MOVW  R2, 12(R13)
 	BL    runtime·memmove(SB)  // copy data to RAM
 
-	// Clear the SP, restore LR and return
+	// Restore SP, LR and return
 	ADD     $16, R13
 	MOVW    $runtime·ramend(SB), R0
 	MOVW.W  -4(R0), LR
 	MOVW    $0, R1
-	MOVW    R1, (R0)  // clear the last word of RAM
+	MOVW    R1, (R0)  // clear the last word in RAM
 	RET
 
 
@@ -71,72 +84,46 @@ TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
 // only one CPU can run this function (init CPU, usually CPU0). Other CPUs must
 // wait until the tasker is ready.
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
-	// Initialize the noos memory allocator
+	// _rt0_thumb_noos may provide stackStart and stackEnd in R0, R1
+	CMP        R0, R1
+	MOVW.NE    R1, R13                    // change stack
+	MOVW.EQ    $runtime·ramstart(SB), R0  // default stackStart
+	MOVW.EQ    R13, R1                    // default stackEnd
+	MOVM.DB.W  [R0, R1], (R13)            // save stackStart,stackEnd
+
+	// Initialize the memory allocator
 	MOVW       $0, R0                       // dummy RA
 	MOVW       $runtime·end(SB), R1         // freeStart
 	MOVW       $runtime·ramend(SB), R2      // freeEnd
 	MOVW       $runtime·nodmastart(SB), R3  // nodmaStart
 	MOVW       $runtime·nodmaend(SB), R4    // nodmaEnd
-	MOVM.DB.W  [R0-R4], (R13)
+	ADD        $8, R13, R5                  // stackTop
+	MOVW       $0, R6                       // return value
+	MOVM.DB.W  [R0-R6], (R13)
 	BL         runtime·meminit(SB)
-	ADD        $20, R13
+	ADD        $24, R13  // SP points to the nodmaStack (return value)
 
-	// setup main stack in the cpus[0].gh
-	MOVW  $runtime·cpus(SB), R0      // gh is the first field of the cpuctx struct
-	MOVW  $runtime·ramstart(SB), R1  // main stack starts at the beggining of RAM
-	MOVW  R1, (g_stack+stack_lo)(R0)
-	MOVW  R13, (g_stack+stack_hi)(R0)
-	ADD   $const_stackGuard, R1
-	MOVW  R1, g_stackguard0(R0)
-	MOVW  R1, g_stackguard1(R0)
+	// Initialize tasker
+	MOVW  (R13), R0  // load nodmaStack
+	CBZ   R0, argsReady
+	MOVW  $0, R0
+	MOVW  R0, (R13)                    // dummy RA
+	MOVW  $runtime·nodmastart(SB), R0  // bottom of the stack space
+	MOVW  R0, 4(R13)                   // update stackStart
+argsReady:
+	BL   runtime·taskerinit(SB)
+	ADD  $12, R13
 
-	// set up m0 (bootstrap thread), temporarily use cpu0.gh as g
+	// set up m0 (bootstrap thread), temporarily use gh as g
+	BL    ·identcurcpu(SB)  // R0 = cpuctx for current cpu
 	MOVW  $runtime·m0(SB), R1
-	MOVW  R0, m_g0(R1)  // m0.g0 = cpu0.gh
-	MOVW  R1, g_m(R0)   // cpu0.gh.m = m0
-
-	MOVW  R0, g  // set g to gh
+	MOVW  R0, m_g0(R1)        // m0.g0 = curcpu.gh
+	MOVW  R1, g_m(R0)         // curcpu.gh.m = &m0
+	MOVW  R0, g               // set g to gh
+	MOVW  R1, cpuctx_exe(R0)  // curcpu.exe = &m0
 
 	//BL  runtime·emptyfunc(SB)  // fault if stack check is wrong
 	BL  runtime·check(SB)
-	BL  runtime·osinit(SB)
-
-	// initialize noosMem
-/*
-	MOVW  $runtime·end(SB), R0
-	MOVW  $runtime·ramend(SB), R1
-	SUB   R0, R1, R5  // size of available memory (DMA capable)
-
-	// estimate the space need for non-heap allocations
-	MOVW  R5>>(const__PageShift+2), R4
-	MOVW  $mspan__size, R2
-	MUL   R2, R4
-	ADD   $PALLOC_MIN, R4
-
-	MOVW  $runtime·nodmastart(SB), R2
-	MOVW  $runtime·nodmaend(SB), R3
-	SUB   R2, R3, R7  // size of non-DMA memory
-	ADD   R5, R7, R6  // size of the whole free memory
-
-	// we prefer the non-DMA memory for non-heap objects to preserve as much as
-	// possible of the DMA capable memory for heap allocations
-	SUB.S  R7, R4
-
-	// reduce the arena by the remain of the non-heap space that did not fit in
-	// the non-DMA memory, properly align the arena
-	SUB.HI  R4, R5
-	BIC     $(const_heapArenaBytes-1), R5
-	SUB     R5, R1
-	MOVW    R1, R4
-
-	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize,size}
-	MOVW     $runtime·noosMem(SB), R7
-	MOVM.IA  [R0-R6], (R7)
-	*/
-
-	// initialize noos tasker and Go scheduler
-
-	BL  runtime·taskerinit(SB)
 	BL  runtime·schedinit(SB)
 
 	// allocate g0 for m0 and leave gh

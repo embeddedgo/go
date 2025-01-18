@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"runtime/internal/atomic"
+	"runtime/internal/sys"
 	"unsafe"
 )
 
@@ -90,6 +91,7 @@ var thetasker = tasker{
 const fbnum = 4 // number of futex hash table buckets, must be power of two
 
 type cpuctx struct {
+	_        sys.NotInHeap
 	gh       g               // for ISRs, must be the first field in this struct
 	t        *tasker         // points to thetasker
 	exe      muintptr        // m currently executed by CPU
@@ -108,6 +110,8 @@ type cpuctx struct {
 func (cpu *cpuctx) id() int { return int(cpu.gh.goid) }
 
 type tasker struct {
+	_ sys.NotInHeap
+
 	allcpu   []*cpuctx
 	waitingf [fbnum]mcl // threads waiting on futex
 	tidgen   uintptr

@@ -43,6 +43,7 @@ var (
 //go:nowritebarrierrec
 //go:nosplit
 func taskerinit() {
+	ncpu = 1 // N64 specific, TODO: should be set/detected in _rt0_mips64_noos
 	*(*uintptr)(unsafe.Pointer(&cpu0.t)) = uintptr(unsafe.Pointer(&thetasker))
 	cpu0.exe.set(getg().m)
 	allcpu := (*slice)(unsafe.Pointer(&thetasker.allcpu))
@@ -67,12 +68,6 @@ func curcpuSavectxSched() {}
 
 //go:nosplit
 func curcpuSavectxCall() {}
-
-//go:nosplit
-func cpuid() int {
-	// for now only single CPU is supported
-	return 0
-}
 
 //go:nosplit
 func archnewm(m *m) {
