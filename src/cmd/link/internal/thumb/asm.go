@@ -96,16 +96,15 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 		msp = ld.RAM.Base + mainStackSize
 		ld.Segdata.Vaddr = uint64(msp)
 	} else {
-		fmt.Println(ld.NoDMA, ld.RAM, mainStackSize+minFreeRAM)
 		ld.Errorf(nil, "RAM block is too small")
 	}
 	// Otherwise the MemBlock.Offset sepcifies the place (beginning of NoDMA
 	// or RAM) and size reserved for the main stack (multiple cores stacks).
 	// If both offsets are zero there is no memory reserved for the main stack.
-	if ld.NoDMA.Offset >= 0 {
+	if ld.NoDMA.Size != 0 && ld.NoDMA.Offset >= 0 {
 		msp = ld.NoDMA.Base + ld.NoDMA.Offset
 		ld.Segdata.Vaddr = uint64(ld.RAM.Base)
-	} else if ld.RAM.Offset >= 0 {
+	} else if ld.RAM.Size != 0 && ld.RAM.Offset >= 0 {
 		msp = ld.RAM.Base + ld.RAM.Offset
 		ld.Segdata.Vaddr = uint64(msp)
 	}
