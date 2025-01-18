@@ -28,9 +28,9 @@ var noosMem struct {
 }
 
 //go:nosplit
-func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd, isrSP uintptr) (nodmaStack bool) {
-	if nodmaStart < isrSP && isrSP < nodmaEnd {
-		nodmaStart = isrSP // ISR stack(s) in the NoDMA memory
+func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd, stackTop uintptr) (nodmaStack bool) {
+	if nodmaStart < stackTop && stackTop < nodmaEnd {
+		nodmaStart = stackTop // ISR stack(s) in the NoDMA memory
 		nodmaStack = true
 	}
 	freeSize := freeEnd - freeStart
@@ -75,6 +75,7 @@ func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd, isrSP uintptr) (nodmaStac
 	noosMem.arenaSize = arenaSize
 	noosMem.size = size
 
+	physPageSize = _PageSize
 	return
 }
 
@@ -156,6 +157,14 @@ func noosMemory() (heapBase, heapSize, limit uintptr) {
 	return noosMem.arenaStart, noosMem.arenaSize, noosMem.size
 }
 
+func noosRawAlloc(size, align uintptr) unsafe.Pointer {
+	p := noosMem.free.alloc(size, align)
+	if p == nil {
+		p = noosMem.nodma.alloc(size, align)
+	}
+	return p
+}
+
 // align must be power of two
 //
 //go:nosplit
@@ -167,10 +176,7 @@ func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) (p *notInHeap
 			align = 8
 		}
 		lock(&noosMem.mx)
-		p = (*notInHeap)(noosMem.free.alloc(size, align))
-		if p == nil {
-			p = (*notInHeap)(noosMem.nodma.alloc(size, align))
-		}
+		p = (*notInHeap)(noosRawAlloc(size, align))
 		unlock(&noosMem.mx)
 	}
 	if p == nil {

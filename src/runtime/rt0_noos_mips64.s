@@ -80,7 +80,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVV  R8, g  // set g to gh
 
 	JAL   runtime·check(SB)
-	JAL   runtime·osinit(SB)
 
 	// initialize noosMem
 	MOVV  $runtime·end(SB), R8

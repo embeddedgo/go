@@ -175,7 +175,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	MOV  A0, g_m(g)   // harts[0].gh.m = m0
 
 	CALL  runtime·check<ABIInternal>(SB)
-	CALL  runtime·osinit<ABIInternal>(SB)
 
 	// initialize noosMem
 

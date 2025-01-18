@@ -11,7 +11,7 @@ import (
 	"unsafe"
 )
 
-func cpuid() int
+func cpuid() int // TODO: remove this function, use curcpu() instead
 func curcpuSavectxSched()
 func curcpuSleep()
 func curcpuWakeup()      {}
@@ -47,6 +47,7 @@ var (
 func taskerinit() {
 	// only hart0 runs this function
 
+	ncpu = 2 // Maix Bit specific TODO: should be set/detected in _rt0_riscv64_noos
 	uharts := (*[maxHarts]uintptr)(unsafe.Pointer(&pharts))
 	for i := range harts {
 		hart := &harts[i]

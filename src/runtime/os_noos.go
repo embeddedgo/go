@@ -103,11 +103,10 @@ func readRandom(r []byte) int {
 	return len(r) // should inline well into randinit
 }
 
-//go:nosplit
-func osinit() {
-	ncpu = taskerNCPU
-	physPageSize = _PageSize
-}
+// Unused on noos (physPageSize is set by meminit)
+//func osinit() {
+//physPageSize = _PageSize
+//}
 
 //go:nosplit
 func isr() bool {
