@@ -94,10 +94,10 @@ func taskerinit(stackStart, stackEnd uintptr) {
 	allcpu.len = int(ncpu)
 	allcpu.cap = int(ncpu)
 	allcpu.array = (*notInHeap)(noosRawAlloc(goarch.PtrSize*uintptr(ncpu), goarch.PtrSize))
-
+	cpus := noosRawAlloc(unsafe.Sizeof(cpuctx{})*uintptr(ncpu), unsafe.Alignof(cpuctx{}))
 	stackSize := (stackEnd - stackStart) / uintptr(ncpu)
 	for i := range thetasker.allcpu {
-		cpu := (*cpuctx)(noosRawAlloc(unsafe.Sizeof(cpuctx{}), unsafe.Alignof(cpuctx{})))
+		cpu := (*cpuctx)(cpus)
 		cpu.t = &thetasker
 		cpu.gh.stack.lo = stackStart
 		cpu.gh.stack.hi = stackStart + stackSize
@@ -105,6 +105,7 @@ func taskerinit(stackStart, stackEnd uintptr) {
 		cpu.gh.stackguard1 = stackStart + stackGuard
 		thetasker.allcpu[i] = cpu
 		stackStart += stackSize
+		cpus = unsafe.Add(cpus, unsafe.Sizeof(cpuctx{}))
 	}
 
 	// Now the target identcurcpu should work so other CPUs can enter tasker.

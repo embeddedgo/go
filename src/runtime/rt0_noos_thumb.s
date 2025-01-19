@@ -7,35 +7,10 @@
 #include "funcdata.h"
 #include "textflag.h"
 
-// _rt0_thumb_noos is the first function of Embedded Go program
-TEXT _rt0_thumb_noos(SB),NOSPLIT|NOFRAME,$0
-	//NOP2
-	//B -1(PC)
-
-	// Cortex-M settings
-	MOVW       $0, R0                    // dummy RA
-	MOVW       $runtime·vectors(SB), R1  // arg
-	MOVM.DB.W  [R0-R1], (R13)
-	BL         runtime·initCPU(SB)
-	ADD        $8, R13
-
-	BL  runtime·initRAMfromROM(SB)
-
-	// Set the numer of available CPUs.
-	MOVW  $1,R0
-	MOVW  $runtime·ncpu(SB), R1
-	MOVW  R0, (R1)
-
-	MOVW  R0, R1  // inform rt0_go that we use default stack arrangement
-	B     runtime·rt0_go(SB)
-
-// identcurcpu indetifies the current CPU and returns a pointer to its cpuctx in
-// R0. It can clobber R0-R4,LR registers (other registers must be preserved).
-TEXT runtime·identcurcpu(SB),NOSPLIT|NOFRAME,$0-0
-	MOVW  $runtime·thetasker(SB), R0
-	MOVW  tasker_allcpu(R0), R0
-	MOVW  (R0), R0  // this function supports single CPU
-	RET
+// The runtime package dosn't implement required _rt0_thumb_noos and
+// runtime·identcurcpu functions because they are generally target specific.
+// See the hal/system package in the https://github.com/embeddedgo/stm32 or
+// https://github.com/embeddedgo/pico repositories for example implementation.
 
 // initRAMfromROM copies the Data segment from ROM to RAM and clears the
 // remaining RAM. As it clears the whole free RAM and doesn't know about CPU
@@ -75,7 +50,6 @@ TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
 	MOVW    $0, R1
 	MOVW    R1, (R0)  // clear the last word in RAM
 	RET
-
 
 #define PALLOC_MIN 24*1024
 

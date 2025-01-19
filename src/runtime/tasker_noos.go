@@ -112,7 +112,7 @@ func (cpu *cpuctx) id() int { return int(cpu.gh.goid) }
 type tasker struct {
 	_ sys.NotInHeap
 
-	allcpu   []*cpuctx
+	allcpu   []*cpuctx  // must be the first field (used by the target rt0.s)
 	waitingf [fbnum]mcl // threads waiting on futex
 	tidgen   uintptr
 
