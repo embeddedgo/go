@@ -96,16 +96,20 @@ func taskerinit(stackStart, stackEnd uintptr) {
 	allcpu.array = (*notInHeap)(noosRawAlloc(goarch.PtrSize*uintptr(ncpu), goarch.PtrSize))
 	cpus := noosRawAlloc(unsafe.Sizeof(cpuctx{})*uintptr(ncpu), unsafe.Alignof(cpuctx{}))
 	stackSize := (stackEnd - stackStart) / uintptr(ncpu)
+
+	// In case of multiple CPUs, the CPU0 main stack is at the top of the stack
+	// space. The CPU1 stack is just below the CPU0 stack and so on.
 	for i := range thetasker.allcpu {
+		stackStart = stackEnd - stackSize
 		cpu := (*cpuctx)(cpus)
 		cpu.t = &thetasker
 		cpu.gh.stack.lo = stackStart
-		cpu.gh.stack.hi = stackStart + stackSize
+		cpu.gh.stack.hi = stackEnd
 		cpu.gh.stackguard0 = stackStart + stackGuard
 		cpu.gh.stackguard1 = stackStart + stackGuard
 		thetasker.allcpu[i] = cpu
-		stackStart += stackSize
 		cpus = unsafe.Add(cpus, unsafe.Sizeof(cpuctx{}))
+		stackEnd = stackStart
 	}
 
 	// Now the target identcurcpu should work so other CPUs can enter tasker.
