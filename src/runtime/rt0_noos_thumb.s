@@ -60,7 +60,6 @@ TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// _rt0_thumb_noos may provide stackStart and stackEnd in R0, R1
 	CMP        R0, R1
-	MOVW.NE    R1, R13                    // change stack
 	MOVW.EQ    $runtime·ramstart(SB), R0  // default stackStart
 	MOVW.EQ    R13, R1                    // default stackEnd
 	MOVM.DB.W  [R0, R1], (R13)            // save stackStart,stackEnd
