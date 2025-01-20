@@ -80,8 +80,8 @@ const (
 	REG_IEPSR       // 7
 	REG_MSP         // 8
 	REG_PSP         // 9
-	_               // 10
-	_               // 11
+	REG_MSPLIM      // 10 ARMv8-M
+	REG_PSPLIM      // 11 ARMv8-M
 	_               // 12
 	_               // 13
 	_               // 14

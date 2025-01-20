@@ -120,6 +120,10 @@ func rconv(r int) string {
 		return "MSP"
 	case REG_PSP:
 		return "PSP"
+	case REG_MSPLIM:
+		return "MSPLIM"
+	case REG_PSPLIM:
+		return "PSPLIM"
 
 	case REG_PRIMASK:
 		return "PRIMASK"
