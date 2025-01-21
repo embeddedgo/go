@@ -149,8 +149,13 @@ func taskerSetrunnable(m *m) bool {
 	var (
 		bestcpu *cpuctx
 		bestn   int
+		p       puintptr
 	)
-	p := m.nextp
+	if uint32(m._bind) < uint32(len(allcpu)) {
+		bestcpu = allcpu[m._bind]
+		goto end
+	}
+	p = m.nextp
 	if p != 0 {
 		goto byid
 	}
@@ -426,6 +431,7 @@ func sysnanotime() int64 {
 func sysnewosproc(m *m) {
 	curcpu := curcpu()
 	m.procid = uint64(atomic.Xadduintptr(&curcpu.t.tidgen, 1))
+	m._bind = -1
 	archnewm(m)
 	if taskerSetrunnable(m) {
 		curcpuSchedule()
@@ -517,6 +523,29 @@ func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 {
 	n = int32(t.write(int(fd), (*[1 << 30]byte)(p)[:n]))
 	t.writemx.unlock()
 	return n
+}
+
+//go:nosplit
+func sysbind(core int) (oldcore, errno int) {
+	// core == -1 mans unbind
+	curcpu := curcpu()
+	if uint(core+1) > uint(len(curcpu.t.allcpu)) {
+		errno = 7 // rtos.ErrBadExeCtx
+		return
+	}
+	m := curcpu.exe.ptr()
+	oldcore = int(m._bind)
+	if core == oldcore {
+		return
+	}
+	m._bind = int32(core)
+	if core >= 0 && curcpu == curcpu.t.allcpu[core] {
+		return
+	}
+	curcpu.exe = 0
+	taskerSetrunnable(m)
+	curcpuSchedule()
+	return
 }
 
 // m fields used

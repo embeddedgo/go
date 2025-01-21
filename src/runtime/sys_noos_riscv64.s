@@ -26,6 +26,7 @@ DATA runtime·syscalls+(SYS_futexwakeup*8)(SB)/8, $·sysfutexwakeup(SB)
 DATA runtime·syscalls+(SYS_osyield*8)(SB)/8, $·curcpuSchedule(SB)
 DATA runtime·syscalls+(SYS_nanosleep*8)(SB)/8, $·sysnanosleep(SB)
 DATA runtime·syscalls+(SYS_reset*8)(SB)/8, $·sysreset(SB)
+DATA runtime·syscalls+(SYS_bind*8)(SB)/8, $·sysbind(SB)
 
 GLOBL runtime·syscalls(SB), RODATA, $(SYS_NUM*8)
 
@@ -56,6 +57,14 @@ TEXT ·irqctl(SB),NOSPLIT|NOFRAME,$0-48
 // func setprivlevel(newlevel int) (oldlevel, errno int)
 TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
 	MOV  $SYS_setprivlevel, A3
+	MOV  $(8+8), A4
+	MOV  $16, A5
+	ECALL
+	RET
+
+// func bind(core int) (oldcore, errno int)
+TEXT ·bind(SB),NOSPLIT|NOFRAME,$0-24
+	MOV  $SYS_bind, A3
 	MOV  $(8+8), A4
 	MOV  $16, A5
 	ECALL
