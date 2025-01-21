@@ -115,22 +115,24 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	}
 	if uint(ctxid) > uint(len(PLIC.EN)) {
 		errno = 6 // rtos.ErrBadIntCtx
-	}
-	// rtos package ensures valid ctl
-	if ctl >= 0 {
-		PLIC.PRIO[irq].Store(uint32(ctl))
+		return
 	}
 	rn, bn := irq>>5, uint(irq&31)
+	// rtos package ensures valid ctl
 	switch {
-	case ctl >= -1:
+	case ctl >= -1: // enable IRQ
+		if ctl >= 0 {
+			// ctl contains new priority
+			PLIC.PRIO[irq].Store(uint32(ctl))
+		}
 		plicmx.lock()
 		PLIC.EN[ctxid][rn].SetBits(1 << bn)
 		plicmx.unlock()
-	case ctl == -2:
+	case ctl == -2: // disable IRQ
 		plicmx.lock()
 		PLIC.EN[ctxid][rn].ClearBits(1 << bn)
 		plicmx.unlock()
-	default:
+	default: // -3, IRQ status
 		enabled = int(PLIC.EN[ctxid][rn].Load()) >> bn & 1
 		prio = int(PLIC.PRIO[irq].Load())
 	}

@@ -346,21 +346,23 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 		errno = 4 // rtos.ErrBadIntNumber
 		return
 	}
-	if uint(ctxid) > 0 {
+	if uint(ctxid) >= uint(len(thetasker.allcpu)) {
 		errno = 6 // rtos.ErrBadIntCtx
+		return
 	}
 	NVIC := nvic.NVIC()
-	// rtos package ensures valid ctl
-	if ctl >= 0 {
-		NVIC.IPR[irq].Store(nvic.IPR(255 - ctl))
-	}
 	rn, bn := irq>>5, uint(irq&31)
+	// rtos package ensures valid ctl
 	switch {
-	case ctl >= -1:
+	case ctl >= -1: // enable IRQ
+		if ctl >= 0 {
+			// ctl contains new priority
+			NVIC.IPR[irq].Store(nvic.IPR(255 - ctl))
+		}
 		NVIC.ISER[rn].Store(1 << bn)
-	case ctl == -2:
+	case ctl == -2: // disable IRQ
 		NVIC.ICER[rn].Store(1 << bn)
-	default:
+	default: // -3, IRQ status
 		enabled = int(NVIC.ISER[irq>>5].Load()) >> bn & 1
 		prio = 255 - int(NVIC.IPR[irq].Load())
 	}

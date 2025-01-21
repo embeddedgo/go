@@ -119,21 +119,23 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 		errno = 4 // rtos.ErrBadIntNumber
 		return
 	}
-	if uint(ctxid) != 0 {
+	if ctxid != 0 {
 		errno = 6 // rtos.ErrBadIntCtx
+		return
 	}
-
 	irqMask := uint32(1 << (irq + 7))
-	switch ctl { // Values defined in embedded/rtos/irq_noos_mips64.go
-	case 1:
-		atomic.Or32(&highPrioIRQMask, irqMask)
-	case 0:
-		atomic.And32(&highPrioIRQMask, ^irqMask)
-	case -1: // IRQ.Enable()
+	// ctl values defined in embedded/rtos/irq_noos_mips64.go
+	switch {
+	case ctl >= -1: // enable IRQ
+		if ctl == 0 {
+			atomic.And32(&highPrioIRQMask, ^irqMask) // set prio to low
+		} else if ctl > 0 {
+			atomic.Or32(&highPrioIRQMask, irqMask) // set prio to high
+		}
 		creg.STATUS.SetBits(irqMask)
-	case -2: // IRQ.Disable()
+	case ctl == -2: // disable IRQ
 		creg.STATUS.ClearBits(irqMask)
-	case -3: // IRQ.Status()
+	default: // -3, IRQ status
 		if irqMask&atomic.Load(&highPrioIRQMask) != 0 {
 			prio = 1
 		}
@@ -141,7 +143,6 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 			enabled = 1
 		}
 	}
-
 	return
 }
 
