@@ -526,20 +526,20 @@ func syswrite(fd uintptr, p unsafe.Pointer, n int32) int32 {
 }
 
 //go:nosplit
-func sysbind(core int) (oldcore, errno int) {
+func sysbind(cpuid int) (oldcpuid, errno int) {
 	// core == -1 mans unbind
 	curcpu := curcpu()
-	if uint(core+1) > uint(len(curcpu.t.allcpu)) {
+	if uint(cpuid+1) > uint(len(curcpu.t.allcpu)) {
 		errno = 7 // rtos.ErrBadExeCtx
 		return
 	}
 	m := curcpu.exe.ptr()
-	oldcore = int(m._bind)
-	if core == oldcore {
+	oldcpuid = int(m._bind)
+	if cpuid == oldcpuid {
 		return
 	}
-	m._bind = int32(core)
-	if core >= 0 && curcpu == curcpu.t.allcpu[core] {
+	m._bind = int32(cpuid)
+	if cpuid >= 0 && curcpu == curcpu.t.allcpu[cpuid] {
 		return
 	}
 	curcpu.exe = 0

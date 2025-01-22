@@ -4,6 +4,11 @@
 
 package rtos
 
+import (
+	"runtime"
+	_ "unsafe"
+)
+
 const (
 	intPrioHighest  = 255 - 0<<5 // do not use with nRF52 SoftDevice
 	intPrioHigh     = 255 - 1<<5
@@ -16,3 +21,17 @@ const (
 
 	intPrioCurrent = -1
 )
+
+func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
+	runtime.LockOSThread()
+	exeCtx, errno := runtime_bind(ctxid)
+	if errno == 0 {
+		enabled, prio, errno = runtime_irqctl(irq, prio, ctxid)
+		runtime_bind(exeCtx)
+	}
+	runtime.UnlockOSThread()
+	return
+}
+
+//go:linkname runtime_irqctl runtime.irqctl
+func runtime_irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)

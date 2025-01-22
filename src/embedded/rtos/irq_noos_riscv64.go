@@ -4,6 +4,8 @@
 
 package rtos
 
+import _ "unsafe"
+
 // Positive numbers are PLIC priority levels. It seems the lowest number of the
 // priority levels supported by real hardware is 7. CLIC based designs were not
 // considered.
@@ -17,3 +19,6 @@ const (
 	intPrioSysTimer = intPrioHighest + 1
 	intPrioSysCall  = intPrioHighest + 1
 )
+
+//go:linkname irqctl runtime.irqctl
+func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)

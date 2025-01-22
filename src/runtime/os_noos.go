@@ -195,7 +195,7 @@ func exitThread(wait *atomic.Uint32)
 // syscalls not used by runtime
 
 func setprivlevel(newlevel int) (oldlevel, errno int)
-func bind(core int) (oldcore, errno int)
+func bind(cpuid int) (oldcpuid, errno int)
 func irqenabled(irq int) (enabled, errno int)
 func setirqenabled(irq, enabled int) (errno int)
 func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)

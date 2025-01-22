@@ -16,3 +16,6 @@ const (
 
 	intPrioCurrent = -1
 )
+
+//go:linkname irqctl runtime.irqctl
+func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
