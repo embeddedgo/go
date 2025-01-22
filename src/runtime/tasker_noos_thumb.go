@@ -346,7 +346,7 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 		errno = 4 // rtos.ErrBadIntNumber
 		return
 	}
-	if uint(ctxid) >= uint(len(thetasker.allcpu)) {
+	if ctxid != -1 {
 		errno = 6 // rtos.ErrBadIntCtx
 		return
 	}

@@ -26,7 +26,7 @@ func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	runtime.LockOSThread()
 	exeCtx, errno := runtime_bind(ctxid)
 	if errno == 0 {
-		enabled, prio, errno = runtime_irqctl(irq, prio, ctxid)
+		enabled, prio, errno = runtime_irqctl(irq, prio, -1)
 		runtime_bind(exeCtx)
 	}
 	runtime.UnlockOSThread()
