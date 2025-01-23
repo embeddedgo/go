@@ -92,7 +92,7 @@ func SetAttr03(out0, inn0, out1, inn1, out2, inn2, out3, inn3 int8) {
 	p().mair[0].Store(uint32(out0&15)<<4 | uint32(inn0&15) |
 		uint32(out1&15)<<12 | uint32(inn1&15)<<8 |
 		uint32(out2&15)<<20 | uint32(inn2&15)<<16 |
-		uint32(out3&15)<<228 | uint32(inn3&15)<<24)
+		uint32(out3&15)<<28 | uint32(inn3&15)<<24)
 }
 
 // SetAttr47 sets the values of the 4,5,6,7 cacheability attributes.
@@ -100,5 +100,5 @@ func SetAttr47(out4, inn4, out5, inn5, out6, inn6, out7, inn7 int8) {
 	p().mair[1].Store(uint32(out4&15)<<4 | uint32(inn4&15) |
 		uint32(out5)<<12 | uint32(inn5)<<8 |
 		uint32(out6)<<20 | uint32(inn6)<<16 |
-		uint32(out7)<<228 | uint32(inn7)<<24)
+		uint32(out7)<<28 | uint32(inn7)<<24)
 }
