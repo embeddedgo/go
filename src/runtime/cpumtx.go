@@ -22,5 +22,10 @@ func (l *cpumtx) lock() {
 
 //go:nosplit
 func (l *cpumtx) unlock() {
+	v := atomic.Load(&l.v)
+	for v == 0 {
+		// catch the case of unlocking a not locked mutex
+		*(*int)(nil) = 0
+	}
 	atomic.Store(&l.v, 0)
 }
