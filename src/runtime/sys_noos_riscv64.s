@@ -62,7 +62,7 @@ TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
 	ECALL
 	RET
 
-func bind(cpuid int) (oldcpuid, errno int)
+// func bind(cpuid int) (oldcpuid, errno int)
 TEXT ·bind(SB),NOSPLIT|NOFRAME,$0-24
 	MOV  $SYS_bind, A3
 	MOV  $(8+8), A4
