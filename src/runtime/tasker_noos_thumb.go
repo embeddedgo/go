@@ -101,12 +101,17 @@ func taskerinit(stackStart, stackEnd uintptr) {
 	// space. The CPU1 stack is just below the CPU0 stack and so on.
 	for i := range thetasker.allcpu {
 		stackStart = stackEnd - stackSize
+
 		cpu := (*cpuctx)(cpus)
 		cpu.t = &thetasker
 		cpu.gh.stack.lo = stackStart
 		cpu.gh.stack.hi = stackEnd
 		cpu.gh.stackguard0 = stackStart + stackGuard
 		cpu.gh.stackguard1 = stackStart + stackGuard
+		setMNoWB(&cpu.gh.m, &cpu.mh)
+		setGNoWB(&cpu.mh.g0, &cpu.gh)
+		setGNoWB(&cpu.mh.gsignal, &cpu.gh)
+
 		thetasker.allcpu[i] = cpu
 		cpus = unsafe.Add(cpus, unsafe.Sizeof(cpuctx{}))
 		stackEnd = stackStart
