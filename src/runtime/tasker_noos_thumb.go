@@ -30,11 +30,18 @@ func curcpuSavectxSched()
 func curcpuSavectxCall() {} // all registars saved on caller's stack
 
 //go:nosplit
-func curcpuWakeup() { sev() } // see ARM Errata 563915, STM32F10xx Errata 1.1.2
+func curcpuWakeup() {
+	if len(curcpu().t.allcpu) > 1 {
+		// The bug that requires SEV workaround is fixed in Cortex-M3 r2p1.
+		// There is no multicore system known that uses older revisions.
+		return
+	}
+	sev() // see ARM Errata 563915, STM32F10xx Errata 1.1.2
+}
 
 //go:nosplit
 func (cpu *cpuctx) newwork() {
-	scb.SCB().ICSR.Store(scb.PENDSVSET)
+	// There is no portable way to wakeup a specific ARM-M CPU so wakeup all.
 	sev()
 }
 
@@ -333,15 +340,6 @@ func syssetprivlevel(newlevel int) (oldlevel, errno int) {
 		errno = 2 // rtos.ErrBadPrivLevel
 	}
 	return
-}
-
-//go:nowritebarrierrec
-//go:nosplit
-func sysirqenabled(irq int) (enabled, errno int) {
-	if uint(irq) >= irqNum() {
-		return 0, 4 // rtos.ErrBadIRQNumber
-	}
-	return int(nvic.NVIC().ISER[irq>>5].Load()) >> uint(irq&31), 0
 }
 
 //go:nowritebarrierrec

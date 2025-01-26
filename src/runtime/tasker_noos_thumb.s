@@ -143,7 +143,7 @@ TEXT ·svcallHandler(SB),NOSPLIT|NOFRAME,$0-0
 	CMP  $SYS_NUM, R4
 	BGE  badSyscall
 
-	// stacked SP to R7
+	// SP used for the frame to R7
 	TST      $(1<<2), LR
 	MOVW.EQ  MSP, R7
 	MOVW.NE  PSP, R7
@@ -241,15 +241,15 @@ TEXT ·pendsvHandler(SB),NOSPLIT|NOFRAME,$0-0
 	// save not stacked registers (R4-R11), SP, CONTROL[nPRIV], EXC_RETURN
 	MOVW     (cpuctx_exe)(R0), R3
 	TST      $(1<<2), R12
-	MOVW.EQ  MSP, R1
-	MOVW.NE  PSP, R1
+	BEQ      pendSVonMSP  // catch the PendSV exception when MSP was used
+	MOVW     PSP, R1
 	MOVW     CONTROL, R2
 	AND      $const_thrPrivLevel, R2
 	ORR      R2, R1
 	MOVW     R1, (m_tls+const_msp*4)(R3)
 	MOVW     R12, (m_tls+const_mer*4)(R3)
 	ADD      $m_libcall, R3
-	MOVM.IA  [R4-R11], (R3)
+	MOVM.IA  [R4-R11], (R3)  // save to m.libcall, m.libcallpc, m.libcallsp
 
 contextSaved:
 	MOVW  $0, R3
@@ -294,25 +294,29 @@ newexe:
 	ORR   R4, R2
 	MOVW  R2, CONTROL
 
-	// restore PSP or MSP
-	BIC      $(const_thrPrivLevel+const_thrSmallCtx), R0, R2
-	TST      $(1<<2), R1
-	MOVW.EQ  R2, MSP
-	MOVW.NE  R2, PSP
+	// restore PSP
+	BIC   $(const_thrPrivLevel+const_thrSmallCtx), R0, R2
+	MOVW  R2, PSP
 
 	// fast path in case of small context (only g saved in libcall)
 	TST      $const_thrSmallCtx, R0
 	MOVW.NE  (m_libcall)(R3), g
 	B.NE     (R1)
 
-	// restore registers saved in m.libcall
+	// restore registers saved in m.libcall, m.libcallpc, m.libcallsp
 	ADD        $m_libcall, R3
 	MOVM.IA.W  (R3), [R4-R11]
 	TST        $0x10, R1
 	BNE        3(PC)
+	// restore registers saved in m.libcallg, m.syscall, m.vdsoSP, m.vdsoPC, mOS
 	HWORD      $0xEC93  // VLDM R3
 	HWORD      $0x8B10  // [D8-D15]
 	B          (R1)
+
+pendSVonMSP:
+	BKPT
+	B   -1(PC)
+
 
 TEXT ·curcpuSavectxSched(SB),NOSPLIT|NOFRAME,$0-0
 	MOVW  (cpuctx_exe)(g), R0

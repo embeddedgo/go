@@ -25,7 +25,7 @@ func (l *cpumtx) unlock() {
 	v := atomic.Load(&l.v)
 	for v == 0 {
 		// catch the case of unlocking a not locked mutex
-		*(*int)(nil) = 0
+		breakpoint()
 	}
 	atomic.Store(&l.v, 0)
 }

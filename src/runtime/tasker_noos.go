@@ -143,7 +143,7 @@ func (t *tasker) fbucketbyaddr(addr uintptr) *mcl {
 func curcpu() *cpuctx { return (*cpuctx)(unsafe.Pointer(getg())) }
 
 //go:nosplit
-func taskerSetrunnable(m *m) bool {
+func taskerSetrunnable(m *m) (schedule bool) {
 	curcpu := curcpu()
 	allcpu := curcpu.t.allcpu
 	var (
@@ -479,11 +479,14 @@ func sysfutexsleep(addr *uint32, val uint32, ns int64) {
 	fb.unlock()
 	if sleep {
 		curcpuSchedule()
-	} else if ns >= 0 {
+		return
+	}
+	if ns >= 0 {
 		// revert the pre-insert
-		curcpu.waitingt.lock()
-		curcpu.waitingt.remove(m)
-		curcpu.waitingt.unlock()
+		wt := &curcpu.waitingt
+		wt.lock()
+		wt.remove(m)
+		wt.unlock()
 	}
 }
 
