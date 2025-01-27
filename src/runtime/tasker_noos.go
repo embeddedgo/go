@@ -66,8 +66,8 @@ import (
 //
 // curcpuSchedule
 //
-// Run scheduler immediately or at syscall exit. It's called only just before
-// syscall exit.
+// Run scheduler immediately or at syscall exit. It must be called only just
+// before syscall/ISR exit.
 //
 // The actual context switch is performed by architecture specific code at
 // curcpuRunScheduler exit. It should check the cpuctx.newexe variable and if
@@ -291,6 +291,13 @@ func curcpuRunScheduler() {
 
 		if n != 0 {
 			nextschedt = now + 2e6
+		} else if GOARCH == "thumb" && (next != nil || exe != nil) {
+			// Workaround for thumb until its cpuctx.newwork implementation can
+			// force the other CPU to enter scheduler.
+			preemptAt := now + 4e6
+			if uint64(nextschedt) > uint64(preemptAt) {
+				nextschedt = preemptAt
+			}
 		}
 		curcpu.t.setalarm(nextschedt)
 

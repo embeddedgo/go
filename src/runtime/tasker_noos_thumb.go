@@ -41,6 +41,10 @@ func curcpuWakeup() {
 
 //go:nosplit
 func (cpu *cpuctx) newwork() {
+	// TODO: Provide target specific implementation that forces specific CPU
+	// to enter the scheduler while executing a thread. Remember to remove
+	// workaround in the curcpuRunScheduler.
+
 	// There is no portable way to wakeup a specific ARM-M CPU so wakeup all.
 	sev()
 }
@@ -60,6 +64,7 @@ func curcpuSchedule() {
 	// Caution! You can't rely on tail-chaining in case of debuging.
 	curcpu().schedule = true
 	scb.SCB().ICSR.Store(scb.PENDSVSET)
+	mmio.MB()
 }
 
 // ARMv7-M requires at least 4 byte stack alignment so there are two bits
@@ -111,6 +116,7 @@ func taskerinit(stackStart, stackEnd uintptr) {
 
 		cpu := (*cpuctx)(cpus)
 		cpu.t = &thetasker
+		cpu.gh.goid = uint64(i) // cpuid
 		cpu.gh.stack.lo = stackStart
 		cpu.gh.stack.hi = stackEnd
 		cpu.gh.stackguard0 = stackStart + stackGuard

@@ -11,7 +11,7 @@ import (
 	"unsafe"
 )
 
-func cpuid() int // TODO: remove this function, use curcpu() instead
+func cpuid() int // TODO: remove this function, use curcpu().id() instead
 func curcpuSavectxSched()
 func curcpuSleep()
 func curcpuWakeup()      {}
