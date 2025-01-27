@@ -247,7 +247,7 @@ func initCPU(vectors uintptr) {
 
 		// First RAM region, 512 MiB.
 		mpu.Select(2)
-		mpu8.SetBas(0x2000_0000, mpu8.Arwrw)
+		mpu8.SetBas(0x2000_0000, mpu8.Arwrw|mpu8.SI)
 		mpu8.SetLim(0x3fff_ffff, NormalWB, true)
 
 		// Peripherals.
@@ -257,7 +257,7 @@ func initCPU(vectors uintptr) {
 
 		// Second RAM region, 1 GiB.
 		mpu.Select(4)
-		mpu8.SetBas(0x6000_0000, mpu8.Arwrw)
+		mpu8.SetBas(0x6000_0000, mpu8.Arwrw|mpu8.SI)
 		mpu8.SetLim(0x9fff_ffff, NormalWB, true)
 
 		// External device region, 1 GiB
