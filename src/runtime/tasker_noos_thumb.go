@@ -28,25 +28,16 @@ func isb()
 func curcpuSleep()
 func curcpuSavectxSched()
 func curcpuSavectxCall() {} // all registars saved on caller's stack
+func preemptOrWakeup(cpuid int)
 
 //go:nosplit
 func curcpuWakeup() {
-	if len(curcpu().t.allcpu) > 1 {
-		// The bug that requires SEV workaround is fixed in Cortex-M3 r2p1.
-		// There is no multicore system known that uses older revisions.
-		return
-	}
-	sev() // see ARM Errata 563915, STM32F10xx Errata 1.1.2
+	preemptOrWakeup(-1)
 }
 
 //go:nosplit
 func (cpu *cpuctx) newwork() {
-	// TODO: Provide target specific implementation that forces specific CPU
-	// to enter the scheduler while executing a thread. Remember to remove
-	// workaround in the curcpuRunScheduler.
-
-	// There is no portable way to wakeup a specific ARM-M CPU so wakeup all.
-	sev()
+	preemptOrWakeup(int(cpu.gh.goid))
 }
 
 //go:nosplit
@@ -64,7 +55,6 @@ func curcpuSchedule() {
 	// Caution! You can't rely on tail-chaining in case of debuging.
 	curcpu().schedule = true
 	scb.SCB().ICSR.Store(scb.PENDSVSET)
-	mmio.MB()
 }
 
 // ARMv7-M requires at least 4 byte stack alignment so there are two bits

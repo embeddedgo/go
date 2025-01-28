@@ -51,7 +51,6 @@ TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
 	MOVW    R1, (R0)  // clear the last word in RAM
 	RET
 
-#define PALLOC_MIN 24*1024
 
 // rt0_go initializes the noos tasker, Go scheduler and continues as the first
 // thread that runs the first goroutine. If the system has multiple CPUs
@@ -86,6 +85,9 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 argsReady:
 	BL   runtime·taskerinit(SB)
 	ADD  $12, R13
+
+	// Enable exceptions
+	CPSIE
 
 	// set up m0 (bootstrap thread), temporarily use gh as g
 	BL    ·identcurcpu(SB)  // R0 = cpuctx for current cpu

@@ -291,13 +291,6 @@ func curcpuRunScheduler() {
 
 		if n != 0 {
 			nextschedt = now + 2e6
-		} else if GOARCH == "thumb" && (next != nil || exe != nil) {
-			// Workaround for thumb until its cpuctx.newwork implementation can
-			// force the other CPU to enter scheduler.
-			preemptAt := now + 4e6
-			if uint64(nextschedt) > uint64(preemptAt) {
-				nextschedt = preemptAt
-			}
 		}
 		curcpu.t.setalarm(nextschedt)
 
@@ -409,13 +402,22 @@ func (l *notelist) removeall() *notel {
 //go:nowritebarrierrec
 //go:nosplit
 func syssetsystim1() {
-	t := curcpu().t
+	curcpu := curcpu()
+	t := curcpu.t
 	const n = unsafe.Sizeof(t.nanotime) / unsafe.Sizeof(uintptr(0))
 	// BUG: non-atomic writes
+	atomic.Store(&t.systimset, 0)
 	*(*[n]uintptr)(unsafe.Pointer(&t.nanotime)) = *(*[n]uintptr)(unsafe.Pointer(&t.newnanotime))
 	*(*[n]uintptr)(unsafe.Pointer(&t.setalarm)) = *(*[n]uintptr)(unsafe.Pointer(&t.newsetalarm))
 	atomic.Store(&t.systimset, 1)
-	curcpuSchedule() // ensure scheduler uses new timer: BUG(md): other CPUs?
+
+	// Ensure the new timer is used by all CPUs.
+	//for _, cpu := range t.allcpus {
+	//	if cpu != curcpu {
+	//		cpu.newwork()
+	//	}
+	//}
+	curcpuSchedule()
 }
 
 //go:nowritebarrierrec
