@@ -6,14 +6,12 @@ package runtime
 
 import (
 	"runtime/internal/atomic"
+	"runtime/internal/sys"
 )
 
 // A mq represents a queue of threads.
 type mq struct {
-	_mqprivate
-}
-
-type _mqprivate struct {
+	_     sys.NotInHeap
 	first muintptr
 	last  muintptr
 	n     uint
@@ -28,10 +26,12 @@ func (q *mq) unlock() { q.mx.unlock() }
 
 // atomicLen returns the approximate number of elements in the q. It returns an
 // exact value if called by the only mutator of q.
+//
 //go:nosplit
 func (q *mq) atomicLen() int { return int(atomic.Loaduint(&q.n)) }
 
 // push inserts m at the end of q
+//
 //go:nosplit
 func (q *mq) push(m *m) {
 	if q.n == 0 {
@@ -44,6 +44,7 @@ func (q *mq) push(m *m) {
 }
 
 // pop removes the first m from the beginning of q and returns it
+//
 //go:nosplit
 func (q *mq) pop() *m {
 	var ret *m
@@ -57,14 +58,11 @@ func (q *mq) pop() *m {
 
 // A mcl represents a circular list of threads.
 type mcl struct {
-	_mclprivate
-	//_ [(cpu.CacheLinePadSize - unsafe.Sizeof(_mclprivate{}))]byte
-}
-
-type _mclprivate struct {
+	_   sys.NotInHeap
 	cur muintptr
 	n   uint
 	mx  cpumtx
+	//_ [(cpu.CacheLinePadSize - unsafe.Sizeof(_mclprivate{}))]byte
 }
 
 //go:nosplit
@@ -74,6 +72,7 @@ func (q *mcl) lock() { q.mx.lock() }
 func (q *mcl) unlock() { q.mx.unlock() }
 
 // push inserts m just before the current m.
+//
 //go:nosplit
 func (q *mcl) push(m *m) {
 	if q.n == 0 {
@@ -94,6 +93,7 @@ func (q *mcl) push(m *m) {
 // find finds and returns the pointer to the first m in q that matches the
 // provided key. As a side effect it rotates the q so the m.next becomes the
 // current element.
+//
 //go:nosplit
 func (q *mcl) find(key uintptr) *m {
 	if q.n == 0 {
@@ -115,6 +115,7 @@ func (q *mcl) find(key uintptr) *m {
 
 // remove removes m from q. Remove is fast (O(1)) but the caller must ensure
 // that m belongs to q, othervise the effect of remove is unpredictable.
+//
 //go:nosplit
 func (q *mcl) remove(m *m) {
 	q.n--
@@ -132,10 +133,7 @@ func (q *mcl) remove(m *m) {
 
 // A msl represents a sorted list of threads.
 type msl struct {
-	_mslprivate
-}
-
-type _mslprivate struct {
+	_    sys.NotInHeap
 	head muintptr
 	n    uint
 	mx   cpumtx
@@ -148,6 +146,7 @@ func (q *msl) lock() { q.mx.lock() }
 func (q *msl) unlock() { q.mx.unlock() }
 
 // insertbyval inserts m into q just before the first item with greater value
+//
 //go:nosplit
 func (q *msl) insertbyval(m *m) {
 	if q.n == 0 {
@@ -181,6 +180,7 @@ func (q *msl) insertbyval(m *m) {
 }
 
 // first returns the pointer to the first m in q.
+//
 //go:nosplit
 func (q *msl) first() *m {
 	if q.n == 0 {
@@ -191,6 +191,7 @@ func (q *msl) first() *m {
 
 // remove removes m from q. Remove is fast (O(1)) but the caller must ensure
 // that m belongs to q, othervise the effect of remove is unpredictable.
+//
 //go:nosplit
 func (q *msl) remove(m *m) {
 	q.n--
