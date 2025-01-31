@@ -181,6 +181,10 @@ func timeSleep(ns int64) {
 	}
 
 	gp := getg()
+	if gp == gp.m.g0 {
+		nanosleep(ns) // support raw tasks created by rtos.NewRawTask
+		return
+	}
 	t := gp.timer
 	if t == nil {
 		t = new(timer)

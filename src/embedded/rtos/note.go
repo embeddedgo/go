@@ -29,7 +29,7 @@ type Note struct {
 // call Wakeup or until the timeout. Reports whether it was awakened before
 // timeout.
 func (n *Note) Sleep(timeout time.Duration) bool {
-	return runtime_notetsleepg(n, int64(timeout))
+	return notetsleep(n, int64(timeout))
 }
 
 // Wakeup wakeups the goroutine that sleeps on the note. The Wakeup remains in
@@ -45,5 +45,5 @@ func (n *Note) Clear() {
 	publicationBarrier()
 }
 
-//go:linkname runtime_notetsleepg runtime.notetsleepg
-func runtime_notetsleepg(n *Note, ns int64) bool
+//go:linkname notetsleep runtime.rtos_notetsleep
+func notetsleep(n *Note, ns int64) bool

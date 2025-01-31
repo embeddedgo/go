@@ -180,6 +180,20 @@ func newosproc(mp *m)
 func exit(code int32)
 func osyield()
 
+func rtos_newrawtask(fn func()) {
+	systemstack(func() {
+		newm(fn, nil, -1)
+	})
+}
+
+func rtos_notetsleep(n *note, ns int64) bool {
+	gp := getg()
+	if gp == gp.m.g0 {
+		return notetsleep(n, ns)
+	}
+	return notetsleepg(n, ns)
+}
+
 //go:noescape
 func write(fd uintptr, p unsafe.Pointer, n int32) int32
 
