@@ -151,6 +151,10 @@ func taskerSetrunnable(m *m) (schedule bool) {
 		bestn   int
 		p       puintptr
 	)
+	if len(allcpu) == 1 {
+		bestcpu = allcpu[0]
+		goto end
+	}
 	if uint32(m._bind) < uint32(len(allcpu)) {
 		bestcpu = allcpu[m._bind]
 		goto end
