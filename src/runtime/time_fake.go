@@ -96,3 +96,6 @@ func write(fd uintptr, p unsafe.Pointer, n int32) int32 {
 	unlock(&faketimeState.lock)
 	return res
 }
+
+// nanosleep added by noos
+func nanosleep(ns int64) { usleep(uint32(ns / 1000)) }
