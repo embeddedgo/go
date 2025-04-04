@@ -4,6 +4,8 @@
 
 package rtos
 
+import _ "unsafe"
+
 const (
 	intPrioHighest = 1
 	intPrioHigh    = 1
