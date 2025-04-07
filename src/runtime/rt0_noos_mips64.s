@@ -11,7 +11,11 @@
 
 #define SIGNAL_STACK_SIZE 4096
 
+// R4: ram size
 TEXT runtime·_rt0_mips64_noos1(SB),NOSPLIT|NOFRAME,$0
+	// Store RAM size in a register not used by memclrNoHeapPointers
+	MOVV R4, R16
+
 	// Clear .bss, .noptrbss and unallocated memory.
 	SUBU $16, R29
 
@@ -30,7 +34,7 @@ TEXT runtime·_rt0_mips64_noos1(SB),NOSPLIT|NOFRAME,$0
 	JAL  runtime·memclrNoHeapPointers(SB)
 
 	MOVW $runtime·end(SB), R4
-	MOVW $runtime·ramend(SB), R5
+	MOVV R16, R5
 	SUB  R4, R5
 	MOVV R4, 8(R29)
 	MOVV R5, 16(R29)
@@ -57,13 +61,15 @@ loop:
 	ADDU $-1, R10
 	BGTZ R10,loop
 
+	MOVV R16, R4
 	JMP runtime·rt0_go(SB)
 
 
+// R4: ram size
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// setup main stack in cpu0.gh
 	MOVV  $runtime·cpu0(SB), R8  // gh is the first field of the cpuctx struct
-	MOVV  $runtime·ramend(SB), R29  // main stack starts at the end of memory
+	MOVV  R4, R29  // main stack starts at the end of memory
 	SUB   $16, R29
 	MOVV  R29, (g_stack+stack_hi)(R8)
 	SUB   $SIGNAL_STACK_SIZE, R29, R9
@@ -79,11 +85,18 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 
 	MOVV  R8, g  // set g to gh
 
+	// Store RAM size on stack
+	SUBU $8, R29
+	MOVV R4, 8(R29)
+
 	JAL   runtime·check(SB)
+
+	MOVV 8(R29), R4
+	ADDU $8, R29
 
 	// initialize noosMem
 	MOVV  $runtime·end(SB), R8
-	MOVV  $runtime·ramend(SB), R9
+	MOVV  R4, R9
 	MOVV  $runtime·nodmastart(SB), R10
 	MOVV  $runtime·nodmaend(SB), R11
 	SUB   $SIGNAL_STACK_SIZE, R9
