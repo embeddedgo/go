@@ -416,11 +416,11 @@ func syssetsystim1() {
 	atomic.Store(&t.systimset, 1)
 
 	// Ensure the new timer is used by all CPUs.
-	//for _, cpu := range t.allcpus {
-	//	if cpu != curcpu {
-	//		cpu.newwork()
-	//	}
-	//}
+	for _, cpu := range t.allcpu {
+		if cpu != curcpu {
+			cpu.newwork()
+		}
+	}
 	curcpuSchedule()
 }
 
