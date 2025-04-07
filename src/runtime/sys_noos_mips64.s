@@ -55,7 +55,7 @@ TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
 	RET
 
 // func bind(cpuid int) (oldcpuid, errno int)
-TEXT ·setprivlevel(SB),NOSPLIT|NOFRAME,$0-24
+TEXT ·bind(SB),NOSPLIT|NOFRAME,$0-24
 	MOVV  $SYS_bind, R8
 	MOVV  $(8+8), R9
 	MOVV  $16, R10

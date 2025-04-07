@@ -49,7 +49,7 @@ func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd, stackTop uintptr) (nodmaS
 	// heuristic relationship with something more strict.
 	const (
 		A = unsafe.Sizeof(emptymspan) / 2
-		B = unsafe.Sizeof(uintptr(0)) * 1024
+		B = unsafe.Sizeof(uintptr(0)) * 1024 * 8
 	)
 	palloc := A*(freeSize>>pageShift) + B
 
