@@ -80,10 +80,12 @@ const (
 // netpollblock parks the goroutine on pd.  It returns whether the note was
 // woken up in the timeout specified by ns.
 func netpollblock(pd *pollDesc, ns int64) bool {
+	var gp *g
+	var t *timer
 	gpp := &pd.g
 
-	if ns <= 0 {
-		return gpp.Load() == pdReady
+	if ns == 0 {
+		goto clear
 	}
 
 	lock(&pd.lock)
@@ -91,8 +93,8 @@ func netpollblock(pd *pollDesc, ns int64) bool {
 	unlock(&pd.lock)
 
 	// configure deadline timer
-	gp := getg()
-	t := gp.timer
+	gp = getg()
+	t = gp.timer
 	if t == nil {
 		t = new(timer)
 		gp.timer = t
@@ -111,7 +113,8 @@ func netpollblock(pd *pollDesc, ns int64) bool {
 
 	// set the gpp semaphore to pdWait
 	for {
-		if gpp.Load() == pdReady {
+		// Consume notification if already ready.
+		if gpp.CompareAndSwap(pdReady, pdNil) {
 			return true
 		}
 		if gpp.CompareAndSwap(pdNil, pdWait) {
@@ -127,7 +130,9 @@ func netpollblock(pd *pollDesc, ns int64) bool {
 
 	gopark(netpollblockcommit, unsafe.Pointer(gpp), waitReasonIOWait, traceBlockNet, 5)
 
-	old := gpp.Load()
+clear:
+	// be careful to not lose concurrent pdReady notification
+	old := gpp.Swap(pdNil)
 	if old > pdWait {
 		throw("runtime: corrupted polldesc")
 	}
