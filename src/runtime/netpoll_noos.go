@@ -8,6 +8,7 @@ package runtime
 
 import (
 	"runtime/internal/atomic"
+	"runtime/internal/sys"
 	"unsafe"
 )
 
@@ -43,11 +44,10 @@ func netpoll(delay int64) (toRun gList, delta int32) {
 		notetsleep(&netpollNote, delay)
 	}
 
-	n := wakerq.removeall()
+	n := wakerq.free()
 	for n != nil {
-		next := n.release()
 		delta += netpollready(&toRun, n)
-		n = next
+		n = n.pop()
 	}
 
 	unlock(&netpollStubLock)
@@ -235,9 +235,7 @@ func rtos_condsignal(n *pollDesc) {
 		}
 	}
 
-	if n.acquire() {
-		wakerq.insert(n)
-
+	if wakerq.insert(n) {
 		if isr() {
 			if !atomic.Cas(key32(&netpollNote.key), 0, 1) {
 				return
@@ -250,77 +248,42 @@ func rtos_condsignal(n *pollDesc) {
 	}
 }
 
-// eventlist
-
-// pollDesc is a event that contains a link field to construct linked lists of
-// events
 type pollDesc struct {
+	_    sys.NotInHeap
 	g    atomic.Uintptr
 	seq  uintptr
 	lock mutex // protects seq
-	link pollp
+	link atomic.Uintptr
 }
 
 //go:nosplit
-func (n *pollDesc) acquire() bool {
-	return (&n.link).atomicCAS(0, 1)
-}
-
-//go:nosplit
-func (n *pollDesc) release() *pollDesc {
-	next := n.link
-	atomic.Storeuintptr((*uintptr)(&n.link), 0)
-	return next.ptr()
-}
-
-//go:nosplit
-func (n *pollDesc) pollp() pollp { return pollp(unsafe.Pointer(n)) }
-
-type pollp uintptr
-
-//go:nosplit
-func (n pollp) ptr() *pollDesc { return (*pollDesc)(unsafe.Pointer(n)) }
-
-//go:nosplit
-func (p *pollp) atomicLoad() pollp {
-	return pollp(atomic.Loaduintptr((*uintptr)(p)))
-}
-
-//go:nosplit
-func (p *pollp) atomicCAS(old, new pollp) bool {
-	return atomic.Casuintptr((*uintptr)(p), uintptr(old), uintptr(new))
+func (n *pollDesc) pop() *pollDesc {
+	next := n.link.Swap(0)
+	return (*pollDesc)(unsafe.Pointer(next))
 }
 
 type pollList struct {
-	head pollp
+	head atomic.Uintptr
 }
 
-// insert inserts n at the beginning of l. You must acquire n before insert it.
+// insert inserts n at the beginning of l if it isn't already
 //
 //go:nosplit
-func (l *pollList) insert(n *pollDesc) {
-	if n.link != 1 {
-		for {
-			breakpoint()
-		}
+func (l *pollList) insert(n *pollDesc) bool {
+	if !n.link.CompareAndSwap(0, 1) {
+		return false
 	}
 	for {
-		head := (&l.head).atomicLoad()
-		n.link = head
-		if (&l.head).atomicCAS(head, n.pollp()) {
-			return
+		head := l.head.Load()
+		n.link.Store(head)
+		if l.head.CompareAndSwap(head, uintptr(unsafe.Pointer(n))) {
+			break
 		}
 	}
+	return true
 }
 
-// removeall removes and returns the whole content of l.
-//
 //go:nosplit
-func (l *pollList) removeall() *pollDesc {
-	for {
-		head := (&l.head).atomicLoad()
-		if (&l.head).atomicCAS(head, 0) {
-			return head.ptr()
-		}
-	}
+func (l *pollList) free() *pollDesc {
+	return (*pollDesc)(unsafe.Pointer(l.head.Swap(0)))
 }
