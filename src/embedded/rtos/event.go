@@ -21,6 +21,7 @@ type Cond struct {
 	seq  uintptr
 	lock uintptr // FIXME mutex size?
 	link uintptr
+	self *Cond
 }
 
 // Wait waits on the Cond to become true and consumes it by setting it back to

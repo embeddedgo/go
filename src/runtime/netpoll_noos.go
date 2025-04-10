@@ -100,7 +100,8 @@ func netpollblock(pd *pollDesc, ns int64) bool {
 		gp.timer = t
 	}
 	t.f = netpolldeadline
-	t.arg = pd
+	pd.self = pd
+	t.arg = pd.makeArg()
 	t.seq = pd.seq
 	if ns < 0 {
 		t.nextwhen = maxWhen
@@ -248,12 +249,17 @@ func rtos_condsignal(n *pollDesc) {
 	}
 }
 
+// Network poller descriptor.
+//
+// No heap pointers.
 type pollDesc struct {
+	// must be in sync with embedded/rtos.Cond
 	_    sys.NotInHeap
 	g    atomic.Uintptr
 	seq  uintptr
 	lock mutex // protects seq
 	link atomic.Uintptr
+	self *pollDesc // storage for indirect interface. See (*pollDesc).makeArg.
 }
 
 //go:nosplit
@@ -287,3 +293,16 @@ func (l *pollList) insert(n *pollDesc) bool {
 func (l *pollList) free() *pollDesc {
 	return (*pollDesc)(unsafe.Pointer(l.head.Swap(0)))
 }
+
+// Helps to avoid heap escape. See comment of same function in netpoll.go
+func (pd *pollDesc) makeArg() (i any) {
+	x := (*eface)(unsafe.Pointer(&i))
+	x._type = pdType
+	x.data = unsafe.Pointer(&pd.self)
+	return
+}
+
+var (
+	pdEface any    = (*pollDesc)(nil)
+	pdType  *_type = efaceOf(&pdEface)._type
+)
