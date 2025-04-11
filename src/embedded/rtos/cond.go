@@ -14,7 +14,8 @@ import (
 // Exactly one goroutine can call Wait but it is allowed for multiple goroutines
 // or interrupt handlers to call Signal.
 //
-// A Cond must not be copied after first use.
+// A Cond must always be declared as a global variable and must not be copied
+// after first use.
 type Cond struct {
 	// must be in sync with runtime.pollDesc
 	key  uintptr

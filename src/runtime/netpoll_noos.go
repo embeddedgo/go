@@ -216,6 +216,9 @@ func netpolldeadline(arg any, seq uintptr) {
 }
 
 func rtos_condwait(n *pollDesc, timeout int64) bool {
+	if inheap(uintptr(unsafe.Pointer(n))) {
+		throw("runtime: rtos.Cond in heap")
+	}
 	return netpollblock(n, timeout)
 }
 
