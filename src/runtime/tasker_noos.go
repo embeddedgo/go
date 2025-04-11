@@ -91,16 +91,17 @@ var thetasker = tasker{
 const fbnum = 4 // number of futex hash table buckets, must be power of two
 
 type cpuctx struct {
-	_        sys.NotInHeap
-	gh       g               // for ISRs, must be the first field in this struct
-	t        *tasker         // points to thetasker
-	exe      muintptr        // m currently executed by CPU
-	newexe   bool            // for architecture-dependent code: exe changed
-	schedule bool            // for architecture-dependent code: run scheduler
-	runnable mq              // threads in runnable state
-	waitingt msl             // threads waiting until some time elapses
-	wakerq   [fbnum]notelist // futex wakeup request from interrupt handlers
-	mh       m               // for ISRs, mostly not written so works as cache line pad
+	_             sys.NotInHeap
+	gh            g               // for ISRs, must be the first field in this struct
+	t             *tasker         // points to thetasker
+	exe           muintptr        // m currently executed by CPU
+	newexe        bool            // for architecture-dependent code: exe changed
+	schedule      bool            // for architecture-dependent code: run scheduler
+	runnable      mq              // threads in runnable state
+	waitingt      msl             // threads waiting until some time elapses
+	wakerq        [fbnum]notelist // futex wakeup request from interrupt handlers
+	wakeNetpoller bool            // netpoller wakeup request from interrupt handlers
+	mh            m               // for ISRs, mostly not written so works as cache line pad
 }
 
 // id returns CPU identifier. It must be a positive integer from 0 to the
@@ -243,6 +244,12 @@ func curcpuRunScheduler() {
 				taskerFutexwakeup(&curcpu.t.waitingf[i], key32(&n.key), 1)
 				n = next
 			}
+		}
+		if curcpu.wakeNetpoller {
+			nn := &netpollNote
+			fb := fhash(uintptr(unsafe.Pointer(&nn.key)))
+			taskerFutexwakeup(&curcpu.t.waitingf[fb], key32(&nn.key), 1)
+			curcpu.wakeNetpoller = false
 		}
 
 		var nextschedt int64
