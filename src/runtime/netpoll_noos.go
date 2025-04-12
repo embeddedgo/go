@@ -15,33 +15,37 @@ import (
 var netpollInited atomic.Uint32
 var netpollWaiters atomic.Uint32
 
-var netpollStubLock mutex
 var netpollNote note
 
 var wakerq pollList
 
 func netpollGenericInit() {
+	noteclear(&netpollNote)
 	netpollInited.Store(1)
 }
 
+//go:nowritebarrierrec
+//go:nosplit
 func netpollBreak() {
-	// do not use notewakeup, we allow multiple wakeups for this note
+	// Failing to cas indicates there is an in-flight wakeup, so we're done here.
 	if !atomic.Cas(key32(&netpollNote.key), 0, 1) {
 		return
 	}
-	futexwakeup(key32(&netpollNote.key), 1)
-	return
+
+	if isr() {
+		curcpu().wakeNetpoller = true
+		curcpuWakeup()
+	} else {
+		futexwakeup(key32(&netpollNote.key), 1)
+	}
 }
 
 // Polls for goroutines waiting on interrupts.
 // Returns list of goroutines that become runnable.
 func netpoll(delay int64) (toRun gList, delta int32) {
-	// This lock ensures that only one goroutine tries to use
-	// the note. It should normally be completely uncontended.
-	lock(&netpollStubLock)
-
-	if !atomic.Cas(key32(&netpollNote.key), 1, 0) { // try noteclear
+	if delay != 0 {
 		notetsleep(&netpollNote, delay)
+		noteclear(&netpollNote)
 	}
 
 	n := wakerq.free()
@@ -49,8 +53,6 @@ func netpoll(delay int64) (toRun gList, delta int32) {
 		delta += netpollready(&toRun, n)
 		n = n.pop()
 	}
-
-	unlock(&netpollStubLock)
 
 	return
 }
@@ -240,15 +242,7 @@ func rtos_condsignal(n *pollDesc) {
 	}
 
 	if wakerq.insert(n) {
-		if isr() {
-			if !atomic.Cas(key32(&netpollNote.key), 0, 1) {
-				return
-			}
-			curcpu().wakeNetpoller = true
-			curcpuWakeup()
-		} else {
-			netpollBreak()
-		}
+		netpollBreak()
 	}
 }
 
