@@ -14,19 +14,21 @@ import (
 // Exactly one goroutine can call Wait but it is allowed for multiple goroutines
 // or interrupt handlers to call Signal.
 //
-// A Cond must not be copied after first use.
+// A Cond must always be declared as a global variable and must not be copied
+// after first use.
 type Cond struct {
 	// must be in sync with runtime.pollDesc
 	key  uintptr
 	seq  uintptr
-	lock uintptr // FIXME mutex size?
+	lock uintptr // incompatible with goexperiment.staticlockranking
 	link uintptr
 	self *Cond
 }
 
 // Wait waits on the Cond to become true and consumes it by setting it back to
 // false. If there previously was a call to Signal Wait returns immediately.
-// Returns whether the Cond became true during the call.
+// Sleeps indefinitely for a negative timeout. Returns whether the Cond became
+// true during the call.
 func (n *Cond) Wait(timeout time.Duration) bool { return condwait(n, int64(timeout)) }
 
 // Signal sets the Cond to true.
