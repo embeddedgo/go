@@ -213,8 +213,6 @@ TEXT ·libc_getfsstat_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_getfsstat(SB)
 TEXT ·libc_utimensat_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_utimensat(SB)
-TEXT ·libc_syscall_trampoline(SB),NOSPLIT,$0-0
-	JMP	libc_syscall(SB)
 TEXT ·libc_lseek_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_lseek(SB)
 TEXT ·libc_getcwd_trampoline(SB),NOSPLIT,$0-0
@@ -229,8 +227,6 @@ TEXT ·libc_exit_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_exit(SB)
 TEXT ·libc_ptrace_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_ptrace(SB)
-TEXT ·libc_getentropy_trampoline(SB),NOSPLIT,$0-0
-	JMP	libc_getentropy(SB)
 TEXT ·libc_fstatat_trampoline(SB),NOSPLIT,$0-0
 	JMP	libc_fstatat(SB)
 TEXT ·libc_unlinkat_trampoline(SB),NOSPLIT,$0-0

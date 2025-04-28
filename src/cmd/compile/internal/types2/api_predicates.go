@@ -19,7 +19,7 @@ func AssertableTo(V *Interface, T Type) bool {
 	if !isValid(T.Underlying()) {
 		return false
 	}
-	return (*Checker)(nil).newAssertableTo(nopos, V, T, nil)
+	return (*Checker)(nil).newAssertableTo(V, T, nil)
 }
 
 // AssignableTo reports whether a value of type V is assignable to a variable
@@ -57,7 +57,7 @@ func Implements(V Type, T *Interface) bool {
 	if !isValid(V.Underlying()) {
 		return false
 	}
-	return (*Checker)(nil).implements(nopos, V, T, false, nil)
+	return (*Checker)(nil).implements(V, T, false, nil)
 }
 
 // Satisfies reports whether type V satisfies the constraint T.
@@ -65,11 +65,23 @@ func Implements(V Type, T *Interface) bool {
 // The behavior of Satisfies is unspecified if V is Typ[Invalid] or an uninstantiated
 // generic type.
 func Satisfies(V Type, T *Interface) bool {
-	return (*Checker)(nil).implements(nopos, V, T, true, nil)
+	return (*Checker)(nil).implements(V, T, true, nil)
 }
 
 // Identical reports whether x and y are identical types.
 // Receivers of [Signature] types are ignored.
+//
+// Predicates such as [Identical], [Implements], and
+// [Satisfies] assume that both operands belong to a
+// consistent collection of symbols ([Object] values).
+// For example, two [Named] types can be identical only if their
+// [Named.Obj] methods return the same [TypeName] symbol.
+// A collection of symbols is consistent if, for each logical
+// package whose path is P, the creation of those symbols
+// involved at most one call to [NewPackage](P, ...).
+// To ensure consistency, use a single [Importer] for
+// all loaded packages and their dependencies.
+// For more information, see https://github.com/golang/go/issues/57497.
 func Identical(x, y Type) bool {
 	var c comparer
 	return c.identical(x, y, nil)

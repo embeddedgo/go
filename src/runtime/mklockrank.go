@@ -50,23 +50,24 @@ NONE < defer;
 NONE <
   sweepWaiters,
   assistQueue,
+  strongFromWeakQueue,
   sweep;
 
 # Test only
 NONE < testR, testW;
 
+NONE < timerSend;
+
 # Scheduler, timers, netpoll
-NONE <
-  allocmW,
-  execW,
-  cpuprof,
-  pollDesc,
-  wakeableSleep;
+NONE < allocmW, execW, cpuprof, pollCache, pollDesc, wakeableSleep;
+scavenge, sweep, testR, wakeableSleep, timerSend < hchan;
 assistQueue,
   cpuprof,
   forcegc,
+  hchan,
   pollDesc, # pollDesc can interact with timers, which can lock sched.
   scavenge,
+  strongFromWeakQueue,
   sweep,
   sweepWaiters,
   testR,
@@ -75,16 +76,16 @@ assistQueue,
 < SCHED
 # Below SCHED is the scheduler implementation.
 < allocmR,
-  execR
-< sched;
+  execR;
+allocmR, execR, hchan < sched;
 sched < allg, allp;
-allp, wakeableSleep < timers;
-timers < netpollInit;
 
 # Channels
-scavenge, sweep, testR, wakeableSleep < hchan;
 NONE < notifyList;
 hchan, notifyList < sudog;
+
+hchan, pollDesc, wakeableSleep < timers;
+timers, timerSend < timer < netpollInit;
 
 # Semaphores
 NONE < root;
@@ -93,6 +94,9 @@ NONE < root;
 NONE
 < itab
 < reflectOffs;
+
+# Synctest
+hchan, root, timers, timer, notifyList, reflectOffs < synctest;
 
 # User arena state
 NONE < userArenaState;
@@ -111,12 +115,13 @@ traceBuf < traceStrings;
 # Malloc
 allg,
   allocmR,
+  allp, # procresize
   execR, # May grow stack
   execW, # May allocate after BeforeFork
   hchan,
   notifyList,
   reflectOffs,
-  timers,
+  timer,
   traceStrings,
   userArenaState
 # Above MALLOC are things that can allocate memory.
@@ -125,6 +130,7 @@ allg,
 < fin,
   spanSetSpine,
   mspanSpecial,
+  traceTypeTab,
   MPROF;
 
 # We can acquire gcBitsArenas for pinner bits, and
@@ -142,6 +148,7 @@ gcBitsArenas,
   profInsert,
   profMemFuture,
   spanSetSpine,
+  synctest,
   fin,
   root
 # Anything that can grow the stack can acquire STACKGROW.
@@ -161,7 +168,9 @@ gscan < hchanLeaf;
 defer,
   gscan,
   mspanSpecial,
-  sudog
+  pollCache,
+  sudog,
+  timer
 # Anything that can have write barriers can acquire WB.
 # Above WB, we can have write barriers.
 < WB

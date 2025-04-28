@@ -26,10 +26,10 @@ import (
 	"cmd/go/internal/cache"
 	"cmd/go/internal/cfg"
 	"cmd/go/internal/load"
-	"cmd/go/internal/robustio"
 	"cmd/go/internal/str"
 	"cmd/go/internal/trace"
 	"cmd/internal/buildid"
+	"cmd/internal/robustio"
 )
 
 // A Builder holds global state about a build.
@@ -92,6 +92,8 @@ type Action struct {
 
 	TryCache func(*Builder, *Action) bool // callback for cache bypass
 
+	CacheExecutable bool // Whether to cache executables produced by link steps
+
 	// Generated files, directories.
 	Objdir   string         // directory for intermediate objects
 	Target   string         // goal of the action: the created package or executable
@@ -110,7 +112,7 @@ type Action struct {
 	// Execution state.
 	pending      int               // number of deps yet to complete
 	priority     int               // relative execution priority
-	Failed       bool              // whether the action failed
+	Failed       *Action           // set to root cause if the action failed
 	json         *actionJSON       // action graph information
 	nonGoOverlay map[string]string // map from non-.go source files to copied files in objdir. Nil if no overlay is used.
 	traceSpan    *trace.Span
@@ -208,7 +210,7 @@ func actionGraphJSON(a *Action) string {
 		}
 	}
 
-	var list []*actionJSON
+	list := make([]*actionJSON, 0, len(workq))
 	for id, a := range workq {
 		if a.json == nil {
 			a.json = &actionJSON{
@@ -218,7 +220,7 @@ func actionGraphJSON(a *Action) string {
 				Args:       a.Args,
 				Objdir:     a.Objdir,
 				Target:     a.Target,
-				Failed:     a.Failed,
+				Failed:     a.Failed != nil,
 				Priority:   a.priority,
 				Built:      a.built,
 				VetxOnly:   a.VetxOnly,
@@ -269,6 +271,7 @@ func NewBuilder(workDir string) *Builder {
 	b.toolIDCache = make(map[string]string)
 	b.buildIDCache = make(map[string]string)
 
+	printWorkDir := false
 	if workDir != "" {
 		b.WorkDir = workDir
 	} else if cfg.BuildN {
@@ -291,12 +294,14 @@ func NewBuilder(workDir string) *Builder {
 		}
 		b.WorkDir = tmp
 		builderWorkDirs.Store(b, b.WorkDir)
-		if cfg.BuildX || cfg.BuildWork {
-			fmt.Fprintf(os.Stderr, "WORK=%s\n", b.WorkDir)
-		}
+		printWorkDir = cfg.BuildX || cfg.BuildWork
 	}
 
 	b.backgroundSh = NewShell(b.WorkDir, nil)
+
+	if printWorkDir {
+		b.BackgroundShell().Printf("WORK=%s\n", b.WorkDir)
+	}
 
 	if err := CheckGOOSARCHPair(cfg.Goos, cfg.Goarch); err != nil {
 		fmt.Fprintf(os.Stderr, "go: %v\n", err)
@@ -384,6 +389,7 @@ func readpkglist(shlibpath string) (pkgs []*load.Package) {
 		if err != nil {
 			base.Fatal(fmt.Errorf("failed to open shared library: %v", err))
 		}
+		defer f.Close()
 		sect := f.Section(".go_export")
 		if sect == nil {
 			base.Fatal(fmt.Errorf("%s: missing .go_export section", shlibpath))
@@ -460,6 +466,69 @@ func (ba *buildActor) Act(b *Builder, ctx context.Context, a *Action) error {
 	return b.build(ctx, a)
 }
 
+// pgoActionID computes the action ID for a preprocess PGO action.
+func (b *Builder) pgoActionID(input string) cache.ActionID {
+	h := cache.NewHash("preprocess PGO profile " + input)
+
+	fmt.Fprintf(h, "preprocess PGO profile\n")
+	fmt.Fprintf(h, "preprofile %s\n", b.toolID("preprofile"))
+	fmt.Fprintf(h, "input %q\n", b.fileHash(input))
+
+	return h.Sum()
+}
+
+// pgoActor implements the Actor interface for preprocessing PGO profiles.
+type pgoActor struct {
+	// input is the path to the original pprof profile.
+	input string
+}
+
+func (p *pgoActor) Act(b *Builder, ctx context.Context, a *Action) error {
+	if b.useCache(a, b.pgoActionID(p.input), a.Target, !b.IsCmdList) || b.IsCmdList {
+		return nil
+	}
+	defer b.flushOutput(a)
+
+	sh := b.Shell(a)
+
+	if err := sh.Mkdir(a.Objdir); err != nil {
+		return err
+	}
+
+	if err := sh.run(".", p.input, nil, cfg.BuildToolexec, base.Tool("preprofile"), "-o", a.Target, "-i", p.input); err != nil {
+		return err
+	}
+
+	// N.B. Builder.build looks for the out in a.built, regardless of
+	// whether this came from cache.
+	a.built = a.Target
+
+	if !cfg.BuildN {
+		// Cache the output.
+		//
+		// N.B. We don't use updateBuildID here, as preprocessed PGO profiles
+		// do not contain a build ID. updateBuildID is typically responsible
+		// for adding to the cache, thus we must do so ourselves instead.
+
+		r, err := os.Open(a.Target)
+		if err != nil {
+			return fmt.Errorf("error opening target for caching: %w", err)
+		}
+
+		c := cache.Default()
+		outputID, _, err := c.Put(a.actionID, r)
+		r.Close()
+		if err != nil {
+			return fmt.Errorf("error adding target to cache: %w", err)
+		}
+		if cfg.BuildX {
+			sh.ShowCmd("", "%s # internal", joinUnambiguously(str.StringList("cp", a.Target, c.OutputFile(outputID))))
+		}
+	}
+
+	return nil
+}
+
 // CompileAction returns the action for compiling and possibly installing
 // (according to mode) the given package. The resulting action is only
 // for building packages (archives), never for linking executables.
@@ -491,6 +560,20 @@ func (b *Builder) CompileAction(mode, depMode BuildMode, p *load.Package) *Actio
 			for _, p1 := range p.Internal.Imports {
 				a.Deps = append(a.Deps, b.CompileAction(depMode, depMode, p1))
 			}
+		}
+
+		if p.Internal.PGOProfile != "" {
+			pgoAction := b.cacheAction("preprocess PGO profile "+p.Internal.PGOProfile, nil, func() *Action {
+				a := &Action{
+					Mode:   "preprocess PGO profile",
+					Actor:  &pgoActor{input: p.Internal.PGOProfile},
+					Objdir: b.NewObjdir(),
+				}
+				a.Target = filepath.Join(a.Objdir, "pgo.preprofile")
+
+				return a
+			})
+			a.Deps = append(a.Deps, pgoAction)
 		}
 
 		if p.Standard {
@@ -553,7 +636,7 @@ func (b *Builder) vetAction(mode, depMode BuildMode, p *load.Package) *Action {
 
 		// vet expects to be able to import "fmt".
 		var stk load.ImportStack
-		stk.Push("vet")
+		stk.Push(load.NewImportInfo("vet", nil))
 		p1, err := load.LoadImportWithFlags("fmt", p.Dir, p, &stk, nil, 0)
 		if err != nil {
 			base.Fatalf("unexpected error loading fmt package from package %s: %v", p.ImportPath, err)

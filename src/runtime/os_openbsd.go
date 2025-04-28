@@ -6,7 +6,7 @@ package runtime
 
 import (
 	"internal/abi"
-	"runtime/internal/atomic"
+	"internal/runtime/atomic"
 	"unsafe"
 )
 
@@ -138,6 +138,9 @@ func osinit() {
 	ncpu = getncpu()
 	physPageSize = getPageSize()
 }
+
+// TODO(#69781): set startupRand using the .openbsd.randomdata ELF section.
+// See SPECS.randomdata.
 
 var urandom_dev = []byte("/dev/urandom\x00")
 

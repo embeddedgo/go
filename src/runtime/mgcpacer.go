@@ -7,7 +7,7 @@ package runtime
 import (
 	"internal/cpu"
 	"internal/goexperiment"
-	"runtime/internal/atomic"
+	"internal/runtime/atomic"
 	_ "unsafe" // for go:linkname
 )
 
@@ -749,6 +749,17 @@ func (c *gcControllerState) findRunnableGCWorker(pp *p, now int64) (*g, int64) {
 		// the end of the mark phase when there are still
 		// assists tapering off. Don't bother running a worker
 		// now because it'll just return immediately.
+		return nil, now
+	}
+
+	if c.dedicatedMarkWorkersNeeded.Load() <= 0 && c.fractionalUtilizationGoal == 0 {
+		// No current need for dedicated workers, and no need at all for
+		// fractional workers. Check before trying to acquire a worker; when
+		// GOMAXPROCS is large, that can be expensive and is often unnecessary.
+		//
+		// When a dedicated worker stops running, the gcBgMarkWorker loop notes
+		// the need for the worker before returning it to the pool. If we don't
+		// see the need now, we wouldn't have found it in the pool anyway.
 		return nil, now
 	}
 

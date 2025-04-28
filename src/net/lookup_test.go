@@ -12,13 +12,15 @@ import (
 	"net/netip"
 	"reflect"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+var goResolver = Resolver{PreferGo: true}
 
 func hasSuffixFold(s, suffix string) bool {
 	return strings.HasSuffix(strings.ToLower(s), strings.ToLower(suffix))
@@ -244,14 +246,10 @@ func TestLookupGmailTXT(t *testing.T) {
 		if len(txts) == 0 {
 			t.Error("got no record")
 		}
-		found := false
-		for _, txt := range txts {
-			if strings.Contains(txt, tt.txt) && (strings.HasSuffix(txt, tt.host) || strings.HasSuffix(txt, tt.host+".")) {
-				found = true
-				break
-			}
-		}
-		if !found {
+
+		if !slices.ContainsFunc(txts, func(txt string) bool {
+			return strings.Contains(txt, tt.txt) && (strings.HasSuffix(txt, tt.host) || strings.HasSuffix(txt, tt.host+"."))
+		}) {
 			t.Errorf("got %v; want a record containing %s, %s", txts, tt.txt, tt.host)
 		}
 	}
@@ -300,14 +298,7 @@ func TestLookupIPv6LinkLocalAddr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
-	for _, addr := range addrs {
-		if addr == "fe80::1%lo0" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(addrs, "fe80::1%lo0") {
 		t.Skipf("not supported on %s", runtime.GOOS)
 	}
 	if _, err := LookupAddr("fe80::1%lo0"); err != nil {
@@ -426,12 +417,12 @@ func TestLookupLongTXT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sort.Strings(txts)
+	slices.Sort(txts)
 	want := []string{
 		strings.Repeat("abcdefghijklmnopqrstuvwxyABCDEFGHJIKLMNOPQRSTUVWXY", 10),
 		"gophers rule",
 	}
-	if !reflect.DeepEqual(txts, want) {
+	if !slices.Equal(txts, want) {
 		t.Fatalf("LookupTXT golang.rsc.io incorrect\nhave %q\nwant %q", txts, want)
 	}
 }
@@ -1509,22 +1500,6 @@ func TestLookupPortIPNetworkString(t *testing.T) {
 	})
 }
 
-func allResolvers(t *testing.T, f func(t *testing.T)) {
-	t.Run("default resolver", f)
-	t.Run("forced go resolver", func(t *testing.T) {
-		if fixup := forceGoDNS(); fixup != nil {
-			defer fixup()
-			f(t)
-		}
-	})
-	t.Run("forced cgo resolver", func(t *testing.T) {
-		if fixup := forceCgoDNS(); fixup != nil {
-			defer fixup()
-			f(t)
-		}
-	})
-}
-
 func TestLookupNoSuchHost(t *testing.T) {
 	mustHaveExternalNetwork(t)
 
@@ -1644,5 +1619,35 @@ func TestLookupNoSuchHost(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func TestDNSErrorUnwrap(t *testing.T) {
+	if runtime.GOOS == "plan9" {
+		// The Plan 9 implementation of the resolver doesn't use the Dial function yet. See https://go.dev/cl/409234
+		t.Skip("skipping on plan9")
+	}
+	rDeadlineExcceeded := &Resolver{PreferGo: true, Dial: func(ctx context.Context, network, address string) (Conn, error) {
+		return nil, context.DeadlineExceeded
+	}}
+	rCancelled := &Resolver{PreferGo: true, Dial: func(ctx context.Context, network, address string) (Conn, error) {
+		return nil, context.Canceled
+	}}
+
+	_, err := rDeadlineExcceeded.LookupHost(context.Background(), "test.go.dev")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("errors.Is(err, context.DeadlineExceeded) = false; want = true")
+	}
+
+	_, err = rCancelled.LookupHost(context.Background(), "test.go.dev")
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("errors.Is(err, context.Canceled) = false; want = true")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = goResolver.LookupHost(ctx, "text.go.dev")
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("errors.Is(err, context.Canceled) = false; want = true")
 	}
 }

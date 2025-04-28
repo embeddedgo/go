@@ -46,16 +46,19 @@ It can use a pure Go resolver that sends DNS requests directly to the servers
 listed in /etc/resolv.conf, or it can use a cgo-based resolver that calls C
 library routines such as getaddrinfo and getnameinfo.
 
-By default the pure Go resolver is used, because a blocked DNS request consumes
-only a goroutine, while a blocked C call consumes an operating system thread.
+On Unix the pure Go resolver is preferred over the cgo resolver, because a blocked DNS
+request consumes only a goroutine, while a blocked C call consumes an operating system thread.
 When cgo is available, the cgo-based resolver is used instead under a variety of
 conditions: on systems that do not let programs make direct DNS requests (OS X),
 when the LOCALDOMAIN environment variable is present (even if empty),
 when the RES_OPTIONS or HOSTALIASES environment variable is non-empty,
 when the ASR_CONFIG environment variable is non-empty (OpenBSD only),
 when /etc/resolv.conf or /etc/nsswitch.conf specify the use of features that the
-Go resolver does not implement, and when the name being looked up ends in .local
-or is an mDNS name.
+Go resolver does not implement.
+
+On all systems (except Plan 9), when the cgo resolver is being used
+this package applies a concurrent cgo lookup limit to prevent the system
+from running out of system threads. Currently, it is limited to 500 concurrent lookups.
 
 The resolver decision can be overridden by setting the netdns value of the
 GODEBUG environment variable (see package runtime) to go or cgo, as in:
@@ -65,11 +68,22 @@ GODEBUG environment variable (see package runtime) to go or cgo, as in:
 
 The decision can also be forced while building the Go source tree
 by setting the netgo or netcgo build tag.
+The netgo build tag disables entirely the use of the native (CGO) resolver,
+meaning the Go resolver is the only one that can be used.
+With the netcgo build tag the native and the pure Go resolver are compiled into the binary,
+but the native (CGO) resolver is preferred over the Go resolver.
+With netcgo, the Go resolver can still be forced at runtime with GODEBUG=netdns=go.
 
 A numeric netdns setting, as in GODEBUG=netdns=1, causes the resolver
 to print debugging information about its decisions.
 To force a particular resolver while also printing debugging information,
 join the two settings by a plus sign, as in GODEBUG=netdns=go+1.
+
+The Go resolver will send an EDNS0 additional header with a DNS request,
+to signal a willingness to accept a larger DNS packet size.
+This can reportedly cause sporadic failures with the DNS server run
+by some modems and routers. Setting GODEBUG=netedns0=0 will disable
+sending the additional header.
 
 On macOS, if Go code that uses the net package is built with
 -buildmode=c-archive, linking the resulting archive into a C program
@@ -94,6 +108,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	_ "unsafe" // for linkname
 )
 
 // Addr represents a network end point address.
@@ -372,6 +387,18 @@ var listenerBacklogCache struct {
 }
 
 // listenerBacklog is a caching wrapper around maxListenerBacklog.
+//
+// listenerBacklog should be an internal detail,
+// but widely used packages access it using linkname.
+// Notable members of the hall of shame include:
+//   - github.com/database64128/tfo-go/v2
+//   - github.com/metacubex/tfo-go
+//   - github.com/sagernet/tfo-go
+//
+// Do not remove or change the type signature.
+// See go.dev/issue/67401.
+//
+//go:linkname listenerBacklog
 func listenerBacklog() int {
 	listenerBacklogCache.Do(func() { listenerBacklogCache.val = maxListenerBacklog() })
 	return listenerBacklogCache.val
@@ -617,11 +644,27 @@ func (e *DNSConfigError) Temporary() bool { return false }
 
 // Various errors contained in DNSError.
 var (
-	errNoSuchHost = errors.New("no such host")
+	errNoSuchHost  = &notFoundError{"no such host"}
+	errUnknownPort = &notFoundError{"unknown port"}
 )
+
+// notFoundError is a special error understood by the newDNSError function,
+// which causes a creation of a DNSError with IsNotFound field set to true.
+type notFoundError struct{ s string }
+
+func (e *notFoundError) Error() string { return e.s }
+
+// temporaryError is an error type that implements the [Error] interface.
+// It returns true from the Temporary method.
+type temporaryError struct{ s string }
+
+func (e *temporaryError) Error() string   { return e.s }
+func (e *temporaryError) Temporary() bool { return true }
+func (e *temporaryError) Timeout() bool   { return false }
 
 // DNSError represents a DNS lookup error.
 type DNSError struct {
+	UnwrapErr   error  // error returned by the [DNSError.Unwrap] method, might be nil
 	Err         string // description of the error
 	Name        string // name looked for
 	Server      string // server used
@@ -633,6 +676,41 @@ type DNSError struct {
 	// or the name itself was not found (NXDOMAIN).
 	IsNotFound bool
 }
+
+// newDNSError creates a new *DNSError.
+// Based on the err, it sets the UnwrapErr, IsTimeout, IsTemporary, IsNotFound fields.
+func newDNSError(err error, name, server string) *DNSError {
+	var (
+		isTimeout   bool
+		isTemporary bool
+		unwrapErr   error
+	)
+
+	if err, ok := err.(Error); ok {
+		isTimeout = err.Timeout()
+		isTemporary = err.Temporary()
+	}
+
+	// At this time, the only errors we wrap are context errors, to allow
+	// users to check for canceled/timed out requests.
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		unwrapErr = err
+	}
+
+	_, isNotFound := err.(*notFoundError)
+	return &DNSError{
+		UnwrapErr:   unwrapErr,
+		Err:         err.Error(),
+		Name:        name,
+		Server:      server,
+		IsTimeout:   isTimeout,
+		IsTemporary: isTemporary,
+		IsNotFound:  isNotFound,
+	}
+}
+
+// Unwrap returns e.UnwrapErr.
+func (e *DNSError) Unwrap() error { return e.UnwrapErr }
 
 func (e *DNSError) Error() string {
 	if e == nil {
@@ -726,11 +804,16 @@ var threadLimit chan struct{}
 
 var threadOnce sync.Once
 
-func acquireThread() {
+func acquireThread(ctx context.Context) error {
 	threadOnce.Do(func() {
 		threadLimit = make(chan struct{}, concurrentThreadsLimit())
 	})
-	threadLimit <- struct{}{}
+	select {
+	case threadLimit <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func releaseThread() {

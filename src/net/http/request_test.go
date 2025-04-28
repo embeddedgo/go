@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -68,22 +70,22 @@ func TestParseFormQuery(t *testing.T) {
 	if bz := req.PostFormValue("z"); bz != "post" {
 		t.Errorf(`req.PostFormValue("z") = %q, want "post"`, bz)
 	}
-	if qs := req.Form["q"]; !reflect.DeepEqual(qs, []string{"foo", "bar"}) {
+	if qs := req.Form["q"]; !slices.Equal(qs, []string{"foo", "bar"}) {
 		t.Errorf(`req.Form["q"] = %q, want ["foo", "bar"]`, qs)
 	}
-	if both := req.Form["both"]; !reflect.DeepEqual(both, []string{"y", "x"}) {
+	if both := req.Form["both"]; !slices.Equal(both, []string{"y", "x"}) {
 		t.Errorf(`req.Form["both"] = %q, want ["y", "x"]`, both)
 	}
 	if prio := req.FormValue("prio"); prio != "2" {
 		t.Errorf(`req.FormValue("prio") = %q, want "2" (from body)`, prio)
 	}
-	if orphan := req.Form["orphan"]; !reflect.DeepEqual(orphan, []string{"", "nope"}) {
+	if orphan := req.Form["orphan"]; !slices.Equal(orphan, []string{"", "nope"}) {
 		t.Errorf(`req.FormValue("orphan") = %q, want "" (from body)`, orphan)
 	}
-	if empty := req.Form["empty"]; !reflect.DeepEqual(empty, []string{"", "not"}) {
+	if empty := req.Form["empty"]; !slices.Equal(empty, []string{"", "not"}) {
 		t.Errorf(`req.FormValue("empty") = %q, want "" (from body)`, empty)
 	}
-	if nokey := req.Form[""]; !reflect.DeepEqual(nokey, []string{"nokey"}) {
+	if nokey := req.Form[""]; !slices.Equal(nokey, []string{"nokey"}) {
 		t.Errorf(`req.FormValue("nokey") = %q, want "nokey" (from body)`, nokey)
 	}
 }
@@ -764,7 +766,7 @@ func TestRequestWriteBufferedWriter(t *testing.T) {
 		"User-Agent: " + DefaultUserAgent + "\r\n",
 		"\r\n",
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("Writes = %q\n  Want = %q", got, want)
 	}
 }
@@ -784,7 +786,7 @@ func TestRequestBadHostHeader(t *testing.T) {
 		"User-Agent: " + DefaultUserAgent + "\r\n",
 		"\r\n",
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("Writes = %q\n  Want = %q", got, want)
 	}
 }
@@ -803,7 +805,7 @@ func TestRequestBadUserAgent(t *testing.T) {
 		"User-Agent: evil  X-Evil: evil\r\n",
 		"\r\n",
 	}
-	if !reflect.DeepEqual(got, want) {
+	if !slices.Equal(got, want) {
 		t.Errorf("Writes = %q\n  Want = %q", got, want)
 	}
 }
@@ -1256,6 +1258,76 @@ func TestRequestCookie(t *testing.T) {
 	}
 }
 
+func TestRequestCookiesByName(t *testing.T) {
+	tests := []struct {
+		in     []*Cookie
+		filter string
+		want   []*Cookie
+	}{
+		{
+			in: []*Cookie{
+				{Name: "foo", Value: "foo-1"},
+				{Name: "bar", Value: "bar"},
+			},
+			filter: "foo",
+			want:   []*Cookie{{Name: "foo", Value: "foo-1"}},
+		},
+		{
+			in: []*Cookie{
+				{Name: "foo", Value: "foo-1"},
+				{Name: "foo", Value: "foo-2"},
+				{Name: "bar", Value: "bar"},
+			},
+			filter: "foo",
+			want: []*Cookie{
+				{Name: "foo", Value: "foo-1"},
+				{Name: "foo", Value: "foo-2"},
+			},
+		},
+		{
+			in: []*Cookie{
+				{Name: "bar", Value: "bar"},
+			},
+			filter: "foo",
+			want:   []*Cookie{},
+		},
+		{
+			in: []*Cookie{
+				{Name: "bar", Value: "bar"},
+			},
+			filter: "",
+			want:   []*Cookie{},
+		},
+		{
+			in:     []*Cookie{},
+			filter: "foo",
+			want:   []*Cookie{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.filter, func(t *testing.T) {
+			req, err := NewRequest("GET", "http://example.com/", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, c := range tt.in {
+				req.AddCookie(c)
+			}
+
+			got := req.CookiesNamed(tt.filter)
+
+			if !reflect.DeepEqual(got, tt.want) {
+				asStr := func(v any) string {
+					blob, _ := json.MarshalIndent(v, "", "  ")
+					return string(blob)
+				}
+				t.Fatalf("Result mismatch\n\tGot: %s\n\tWant: %s", asStr(got), asStr(tt.want))
+			}
+		})
+	}
+}
+
 const (
 	fileaContents = "This is a test file."
 	filebContents = "Another test file."
@@ -1456,7 +1528,7 @@ func TestPathValueNoMatch(t *testing.T) {
 	}
 }
 
-func TestPathValue(t *testing.T) {
+func TestPathValueAndPattern(t *testing.T) {
 	for _, test := range []struct {
 		pattern string
 		url     string
@@ -1488,6 +1560,14 @@ func TestPathValue(t *testing.T) {
 				"other": "there/is//more",
 			},
 		},
+		{
+			"/names/{name}/{other...}",
+			"/names/n/*",
+			map[string]string{
+				"name":  "n",
+				"other": "*",
+			},
+		},
 	} {
 		mux := NewServeMux()
 		mux.HandleFunc(test.pattern, func(w ResponseWriter, r *Request) {
@@ -1496,6 +1576,9 @@ func TestPathValue(t *testing.T) {
 				if got != want {
 					t.Errorf("%q, %q: got %q, want %q", test.pattern, name, got, want)
 				}
+			}
+			if r.Pattern != test.pattern {
+				t.Errorf("pattern: got %s, want %s", r.Pattern, test.pattern)
 			}
 		})
 		server := httptest.NewServer(mux)

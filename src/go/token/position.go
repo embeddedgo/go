@@ -5,12 +5,17 @@
 package token
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"sync"
 	"sync/atomic"
 )
+
+// If debug is set, invalid offset and position values cause a panic
+// (go.dev/issue/57490).
+const debug = false
 
 // -----------------------------------------------------------------------------
 // Positions
@@ -261,24 +266,54 @@ func (f *File) AddLineColumnInfo(offset int, filename string, line, column int) 
 	f.mutex.Unlock()
 }
 
-// Pos returns the Pos value for the given file offset;
-// the offset must be <= f.Size().
-// f.Pos(f.Offset(p)) == p.
-func (f *File) Pos(offset int) Pos {
-	if offset > f.size {
-		panic(fmt.Sprintf("invalid file offset %d (should be <= %d)", offset, f.size))
+// fixOffset fixes an out-of-bounds offset such that 0 <= offset <= f.size.
+func (f *File) fixOffset(offset int) int {
+	switch {
+	case offset < 0:
+		if !debug {
+			return 0
+		}
+	case offset > f.size:
+		if !debug {
+			return f.size
+		}
+	default:
+		return offset
 	}
-	return Pos(f.base + offset)
+
+	// only generate this code if needed
+	if debug {
+		panic(fmt.Sprintf("offset %d out of bounds [%d, %d] (position %d out of bounds [%d, %d])",
+			0 /* for symmetry */, offset, f.size,
+			f.base+offset, f.base, f.base+f.size))
+	}
+	return 0
 }
 
-// Offset returns the offset for the given file position p;
-// p must be a valid [Pos] value in that file.
-// f.Offset(f.Pos(offset)) == offset.
+// Pos returns the Pos value for the given file offset.
+//
+// If offset is negative, the result is the file's start
+// position; if the offset is too large, the result is
+// the file's end position (see also go.dev/issue/57490).
+//
+// The following invariant, though not true for Pos values
+// in general, holds for the result p:
+// f.Pos(f.Offset(p)) == p.
+func (f *File) Pos(offset int) Pos {
+	return Pos(f.base + f.fixOffset(offset))
+}
+
+// Offset returns the offset for the given file position p.
+//
+// If p is before the file's start position (or if p is NoPos),
+// the result is 0; if p is past the file's end position,
+// the result is the file size (see also go.dev/issue/57490).
+//
+// The following invariant, though not true for offset values
+// in general, holds for the result offset:
+// f.Offset(f.Pos(offset)) == offset
 func (f *File) Offset(p Pos) int {
-	if int(p) < f.base || int(p) > f.base+f.size {
-		panic(fmt.Sprintf("invalid Pos value %d (should be in [%d, %d])", p, f.base, f.base+f.size))
-	}
-	return int(p) - f.base
+	return f.fixOffset(int(p) - f.base)
 }
 
 // Line returns the line number for the given file position p;
@@ -288,7 +323,15 @@ func (f *File) Line(p Pos) int {
 }
 
 func searchLineInfos(a []lineInfo, x int) int {
-	return sort.Search(len(a), func(i int) bool { return a[i].Offset > x }) - 1
+	i, found := slices.BinarySearchFunc(a, x, func(a lineInfo, x int) int {
+		return cmp.Compare(a.Offset, x)
+	})
+	if !found {
+		// We want the lineInfo containing x, but if we didn't
+		// find x then i is the next one.
+		i--
+	}
+	return i
 }
 
 // unpack returns the filename and line and column number for a file offset.
@@ -330,27 +373,26 @@ func (f *File) unpack(offset int, adjusted bool) (filename string, line, column 
 }
 
 func (f *File) position(p Pos, adjusted bool) (pos Position) {
-	offset := int(p) - f.base
+	offset := f.fixOffset(int(p) - f.base)
 	pos.Offset = offset
 	pos.Filename, pos.Line, pos.Column = f.unpack(offset, adjusted)
 	return
 }
 
 // PositionFor returns the Position value for the given file position p.
+// If p is out of bounds, it is adjusted to match the File.Offset behavior.
 // If adjusted is set, the position may be adjusted by position-altering
 // //line comments; otherwise those comments are ignored.
 // p must be a Pos value in f or NoPos.
 func (f *File) PositionFor(p Pos, adjusted bool) (pos Position) {
 	if p != NoPos {
-		if int(p) < f.base || int(p) > f.base+f.size {
-			panic(fmt.Sprintf("invalid Pos value %d (should be in [%d, %d])", p, f.base, f.base+f.size))
-		}
 		pos = f.position(p, adjusted)
 	}
 	return
 }
 
 // Position returns the Position value for the given file position p.
+// If p is out of bounds, it is adjusted to match the File.Offset behavior.
 // Calling f.Position(p) is equivalent to calling f.PositionFor(p, true).
 func (f *File) Position(p Pos) (pos Position) {
 	return f.PositionFor(p, true)
@@ -461,7 +503,7 @@ func (s *FileSet) RemoveFile(file *File) {
 
 	if i := searchFiles(s.files, file.base); i >= 0 && s.files[i] == file {
 		last := &s.files[len(s.files)-1]
-		s.files = append(s.files[:i], s.files[i+1:]...)
+		s.files = slices.Delete(s.files, i, i+1)
 		*last = nil // don't prolong lifetime when popping last element
 	}
 }
@@ -483,7 +525,15 @@ func (s *FileSet) Iterate(f func(*File) bool) {
 }
 
 func searchFiles(a []*File, x int) int {
-	return sort.Search(len(a), func(i int) bool { return a[i].base > x }) - 1
+	i, found := slices.BinarySearchFunc(a, x, func(a *File, x int) int {
+		return cmp.Compare(a.base, x)
+	})
+	if !found {
+		// We want the File containing x, but if we didn't
+		// find x then i is the next one.
+		i--
+	}
+	return i
 }
 
 func (s *FileSet) file(p Pos) *File {

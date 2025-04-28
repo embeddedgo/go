@@ -17,7 +17,6 @@ type mutatorRand interface {
 	uint32() uint32
 	intn(int) int
 	uint32n(uint32) uint32
-	exp2() int
 	bool() bool
 
 	save(randState, randInc *uint64)
@@ -123,11 +122,6 @@ func (r *pcgRand) uint32n(n uint32) uint32 {
 	return uint32(prod >> 32)
 }
 
-// exp2 generates n with probability 1/2^(n+1).
-func (r *pcgRand) exp2() int {
-	return bits.TrailingZeros32(r.uint32())
-}
-
 // bool generates a random bool.
 func (r *pcgRand) bool() bool {
 	return r.uint32()&1 == 0
@@ -140,6 +134,6 @@ func (r *pcgRand) bool() bool {
 // for details.
 type noCopy struct{}
 
-// lock is a no-op used by -copylocks checker from `go vet`.
-func (*noCopy) lock()   {}
-func (*noCopy) unlock() {}
+// Lock is a no-op used by -copylocks checker from `go vet`.
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}

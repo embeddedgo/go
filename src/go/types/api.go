@@ -10,19 +10,23 @@
 //
 // Type-checking consists of several interdependent phases:
 //
-// Name resolution maps each identifier (ast.Ident) in the program to the
-// language object ([Object]) it denotes.
-// Use [Info].{Defs,Uses,Implicits} for the results of name resolution.
+// Name resolution maps each identifier ([ast.Ident]) in the program
+// to the symbol ([Object]) it denotes. Use the Defs and Uses fields
+// of [Info] or the [Info.ObjectOf] method to find the symbol for an
+// identifier, and use the Implicits field of [Info] to find the
+// symbol for certain other kinds of syntax node.
 //
-// Constant folding computes the exact constant value (constant.Value)
-// for every expression (ast.Expr) that is a compile-time constant.
-// Use Info.Types[expr].Value for the results of constant folding.
+// Constant folding computes the exact constant value
+// ([constant.Value]) of every expression ([ast.Expr]) that is a
+// compile-time constant. Use the Types field of [Info] to find the
+// results of constant folding for an expression.
 //
-// [Type] inference computes the type ([Type]) of every expression ([ast.Expr])
-// and checks for compliance with the language specification.
-// Use [Info.Types][expr].Type for the results of type inference.
+// Type deduction computes the type ([Type]) of every expression
+// ([ast.Expr]) and checks for compliance with the language
+// specification. Use the Types field of [Info] for the results of
+// type deduction.
 //
-// For a tutorial, see https://golang.org/s/types-tutorial.
+// For a tutorial, see https://go.dev/s/types-tutorial.
 package types
 
 import (
@@ -32,6 +36,7 @@ import (
 	"go/constant"
 	"go/token"
 	. "internal/types/errors"
+	_ "unsafe" // for linkname
 )
 
 // An Error describes a type-checking error; it implements the error interface.
@@ -176,7 +181,20 @@ type Config struct {
 	// of an error message. ErrorURL must be a format string containing
 	// exactly one "%s" format, e.g. "[go.dev/e/%s]".
 	_ErrorURL string
+
+	// If EnableAlias is set, alias declarations produce an Alias type. Otherwise
+	// the alias information is only in the type name, which points directly to
+	// the actual (aliased) type.
+	//
+	// This setting must not differ among concurrent type-checking operations,
+	// since it affects the behavior of Universe.Lookup("any").
+	//
+	// This flag will eventually be removed (with Go 1.24 at the earliest).
+	_EnableAlias bool
 }
+
+// Linkname for use from srcimporter.
+//go:linkname srcimporter_setUsesCgo
 
 func srcimporter_setUsesCgo(conf *Config) {
 	conf.go115UsesCgo = true
@@ -199,11 +217,19 @@ type Info struct {
 	//
 	// The Types map does not record the type of every identifier,
 	// only those that appear where an arbitrary expression is
-	// permitted. For instance, the identifier f in a selector
-	// expression x.f is found only in the Selections map, the
-	// identifier z in a variable declaration 'var z int' is found
-	// only in the Defs map, and identifiers denoting packages in
-	// qualified identifiers are collected in the Uses map.
+	// permitted. For instance:
+	// - an identifier f in a selector expression x.f is found
+	//   only in the Selections map;
+	// - an identifier z in a variable declaration 'var z int'
+	//   is found only in the Defs map;
+	// - an identifier p denoting a package in a qualified
+	//   identifier p.X is found only in the Uses map.
+	//
+	// Similarly, no type is recorded for the (synthetic) FuncType
+	// node in a FuncDecl.Type field, since there is no corresponding
+	// syntactic function type expression in the source in this case
+	// Instead, the function type is found in the Defs.map entry for
+	// the corresponding function declaration.
 	Types map[ast.Expr]TypeAndValue
 
 	// Instances maps identifiers denoting generic types or functions to their

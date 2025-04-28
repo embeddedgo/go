@@ -13,7 +13,6 @@ import (
 var (
 	pollCopyFileRange = poll.CopyFileRange
 	pollSplice        = poll.Splice
-	pollSendFile      = poll.SendFile
 )
 
 func (f *File) writeTo(w io.Writer) (written int64, handled bool, err error) {
@@ -29,7 +28,7 @@ func (f *File) writeTo(w io.Writer) (written int64, handled bool, err error) {
 	}
 
 	rerr := sc.Read(func(fd uintptr) (done bool) {
-		written, err, handled = pollSendFile(pfd, int(fd), 1<<63-1)
+		written, err, handled = poll.SendFile(pfd, int(fd), 0)
 		return true
 	})
 
@@ -78,14 +77,13 @@ func (f *File) spliceToFile(r io.Reader) (written int64, handled bool, err error
 		return
 	}
 
-	var syscallName string
-	written, handled, syscallName, err = pollSplice(&f.pfd, pfd, remain)
+	written, handled, err = pollSplice(&f.pfd, pfd, remain)
 
 	if lr != nil {
 		lr.N = remain - written
 	}
 
-	return written, handled, wrapSyscallError(syscallName, err)
+	return written, handled, wrapSyscallError("splice", err)
 }
 
 func (f *File) copyFileRange(r io.Reader) (written int64, handled bool, err error) {
@@ -140,21 +138,6 @@ func getPollFDAndNetwork(i any) (*poll.FD, poll.String) {
 		return nil, ""
 	}
 	return irc.PollFD(), irc.Network()
-}
-
-// tryLimitedReader tries to assert the io.Reader to io.LimitedReader, it returns the io.LimitedReader,
-// the underlying io.Reader and the remaining amount of bytes if the assertion succeeds,
-// otherwise it just returns the original io.Reader and the theoretical unlimited remaining amount of bytes.
-func tryLimitedReader(r io.Reader) (*io.LimitedReader, io.Reader, int64) {
-	var remain int64 = 1<<63 - 1 // by default, copy until EOF
-
-	lr, ok := r.(*io.LimitedReader)
-	if !ok {
-		return nil, r, remain
-	}
-
-	remain = lr.N
-	return lr, lr.R, remain
 }
 
 func isUnixOrTCP(network string) bool {

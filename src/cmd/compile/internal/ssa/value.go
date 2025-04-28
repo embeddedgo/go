@@ -139,7 +139,7 @@ func (v *Value) AuxValAndOff() ValAndOff {
 
 func (v *Value) AuxArm64BitField() arm64BitField {
 	if opcodeTable[v.Op].auxType != auxARM64BitField {
-		v.Fatalf("op %s doesn't have a ValAndOff aux field", v.Op)
+		v.Fatalf("op %s doesn't have a ARM64BitField aux field", v.Op)
 	}
 	return arm64BitField(v.AuxInt)
 }
@@ -200,8 +200,8 @@ func (v *Value) auxString() string {
 	case auxUInt8:
 		return fmt.Sprintf(" [%d]", v.AuxUInt8())
 	case auxARM64BitField:
-		lsb := v.AuxArm64BitField().getARM64BFlsb()
-		width := v.AuxArm64BitField().getARM64BFwidth()
+		lsb := v.AuxArm64BitField().lsb()
+		width := v.AuxArm64BitField().width()
 		return fmt.Sprintf(" [lsb=%d,width=%d]", lsb, width)
 	case auxFloat32, auxFloat64:
 		return fmt.Sprintf(" [%g]", v.AuxFloat())
@@ -228,7 +228,7 @@ func (v *Value) auxString() string {
 		}
 		return s + fmt.Sprintf(" [%s]", v.AuxValAndOff())
 	case auxCCop:
-		return fmt.Sprintf(" {%s}", Op(v.AuxInt))
+		return fmt.Sprintf(" [%s]", Op(v.AuxInt))
 	case auxS390XCCMask, auxS390XRotateParams:
 		return fmt.Sprintf(" {%v}", v.Aux)
 	case auxFlagConstant:

@@ -7,7 +7,9 @@ package pprof
 import (
 	"bytes"
 	"fmt"
+	"internal/asan"
 	"internal/profile"
+	"internal/profilerecord"
 	"internal/testenv"
 	"runtime"
 	"slices"
@@ -24,10 +26,10 @@ func TestConvertMemProfile(t *testing.T) {
 	// from these and get back to addr1 and addr2.
 	a1, a2 := uintptr(addr1)+1, uintptr(addr2)+1
 	rate := int64(512 * 1024)
-	rec := []runtime.MemProfileRecord{
-		{AllocBytes: 4096, FreeBytes: 1024, AllocObjects: 4, FreeObjects: 1, Stack0: [32]uintptr{a1, a2}},
-		{AllocBytes: 512 * 1024, FreeBytes: 0, AllocObjects: 1, FreeObjects: 0, Stack0: [32]uintptr{a2 + 1, a2 + 2}},
-		{AllocBytes: 512 * 1024, FreeBytes: 512 * 1024, AllocObjects: 1, FreeObjects: 1, Stack0: [32]uintptr{a1 + 1, a1 + 2, a2 + 3}},
+	rec := []profilerecord.MemProfileRecord{
+		{AllocBytes: 4096, FreeBytes: 1024, AllocObjects: 4, FreeObjects: 1, Stack: []uintptr{a1, a2}},
+		{AllocBytes: 512 * 1024, FreeBytes: 0, AllocObjects: 1, FreeObjects: 0, Stack: []uintptr{a2 + 1, a2 + 2}},
+		{AllocBytes: 512 * 1024, FreeBytes: 512 * 1024, AllocObjects: 1, FreeObjects: 1, Stack: []uintptr{a1 + 1, a1 + 2, a2 + 3}},
 	}
 
 	periodType := &profile.ValueType{Type: "space", Unit: "bytes"}
@@ -116,8 +118,11 @@ func locationToStrings(loc *profile.Location, funcs []string) []string {
 	return funcs
 }
 
-// This is a regression test for https://go.dev/issue/64528 .
+// This is a regression test for https://go.dev/issue/64528.
 func TestGenericsHashKeyInPprofBuilder(t *testing.T) {
+	if asan.Enabled {
+		t.Skip("extra allocations with -asan throw off the test; see #70079")
+	}
 	previousRate := runtime.MemProfileRate
 	runtime.MemProfileRate = 1
 	defer func() {
@@ -177,6 +182,9 @@ func nonRecursiveGenericAllocFunction[CurrentOp any, OtherOp any](alloc bool) {
 }
 
 func TestGenericsInlineLocations(t *testing.T) {
+	if asan.Enabled {
+		t.Skip("extra allocations with -asan throw off the test; see #70079")
+	}
 	if testenv.OptimizationOff() {
 		t.Skip("skipping test with optimizations disabled")
 	}
@@ -219,5 +227,63 @@ func TestGenericsInlineLocations(t *testing.T) {
 	actual := strings.Join(locationToStrings(loc, nil), ";")
 	if expectedLocation != actual && expectedLocationNewInliner != actual {
 		t.Errorf("expected a location with at least 3 functions\n%s\ngot\n%s\n", expectedLocation, actual)
+	}
+}
+
+func growMap() {
+	m := make(map[int]int)
+	for i := range 512 {
+		m[i] = i
+	}
+}
+
+// Runtime frames are hidden in heap profiles.
+// This is a regression test for https://go.dev/issue/71174.
+func TestHeapRuntimeFrames(t *testing.T) {
+	previousRate := runtime.MemProfileRate
+	runtime.MemProfileRate = 1
+	defer func() {
+		runtime.MemProfileRate = previousRate
+	}()
+
+	growMap()
+
+	runtime.GC()
+	buf := bytes.NewBuffer(nil)
+	if err := WriteHeapProfile(buf); err != nil {
+		t.Fatalf("writing profile: %v", err)
+	}
+	p, err := profile.Parse(buf)
+	if err != nil {
+		t.Fatalf("profile.Parse: %v", err)
+	}
+
+	actual := profileToStrings(p)
+
+	// We must see growMap at least once.
+	foundGrowMap := false
+	for _, l := range actual {
+		if !strings.Contains(l, "runtime/pprof.growMap") {
+			continue
+		}
+		foundGrowMap = true
+
+		// Runtime frames like mapassign and map internals should be hidden.
+		if strings.Contains(l, "runtime.") {
+			t.Errorf("Sample got %s, want no runtime frames", l)
+		}
+		if strings.Contains(l, "internal/runtime/") {
+			t.Errorf("Sample got %s, want no runtime frames", l)
+		}
+		if strings.Contains(l, "runtime/internal/") {
+			t.Errorf("Sample got %s, want no runtime frames", l)
+		}
+		if strings.Contains(l, "mapassign") { // in case mapassign moves to a package not matching above paths.
+			t.Errorf("Sample got %s, want no mapassign frames", l)
+		}
+	}
+
+	if !foundGrowMap {
+		t.Errorf("Profile got:\n%s\nwant sample in runtime/pprof.growMap", strings.Join(actual, "\n"))
 	}
 }

@@ -90,7 +90,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -420,8 +420,8 @@ func sortFlags(flags map[string]*Flag) []*Flag {
 		result[i] = f
 		i++
 	}
-	sort.Slice(result, func(i, j int) bool {
-		return result[i].Name < result[j].Name
+	slices.SortFunc(result, func(a, b *Flag) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 	return result
 }
@@ -1196,9 +1196,16 @@ func Parsed() bool {
 // CommandLine is the default set of command-line flags, parsed from [os.Args].
 // The top-level functions such as [BoolVar], [Arg], and so on are wrappers for the
 // methods of CommandLine.
-var CommandLine = NewFlagSet(os.Args[0], ExitOnError)
+var CommandLine *FlagSet
 
 func init() {
+	// It's possible for execl to hand us an empty os.Args.
+	if len(os.Args) == 0 {
+		CommandLine = NewFlagSet("", ExitOnError)
+	} else {
+		CommandLine = NewFlagSet(os.Args[0], ExitOnError)
+	}
+
 	// Override generic FlagSet default Usage with call to global Usage.
 	// Note: This is not CommandLine.Usage = Usage,
 	// because we want any eventual call to use any updated value of Usage,

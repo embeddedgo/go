@@ -56,7 +56,7 @@ func (check *Checker) conversion(x *operand, T Type) {
 		// If T's type set is empty, or if it doesn't
 		// have specific types, constant x cannot be
 		// converted.
-		ok = T.(*TypeParam).underIs(func(u Type) bool {
+		ok = underIs(T, func(u Type) bool {
 			// u is nil if there are no specific type terms
 			if u == nil {
 				cause = check.sprintf("%s does not contain specific types", T)
@@ -98,17 +98,18 @@ func (check *Checker) conversion(x *operand, T Type) {
 	// given a type explicitly by a constant declaration or conversion,...".
 	if isUntyped(x.typ) {
 		final := T
-		// - For conversions to interfaces, except for untyped nil arguments,
-		//   use the argument's default type.
+		// - For conversions to interfaces, except for untyped nil arguments
+		//   and isTypes2, use the argument's default type.
 		// - For conversions of untyped constants to non-constant types, also
 		//   use the default type (e.g., []byte("foo") should report string
 		//   not []byte as type for the constant "foo").
+		// - If !isTypes2, keep untyped nil for untyped nil arguments.
 		// - For constant integer to string conversions, keep the argument type.
 		//   (See also the TODO below.)
-		if x.typ == Typ[UntypedNil] {
+		if isTypes2 && x.typ == Typ[UntypedNil] {
 			// ok
-		} else if isNonTypeParamInterface(T) || constArg && !isConstType(T) {
-			final = Default(x.typ)
+		} else if isNonTypeParamInterface(T) || constArg && !isConstType(T) || !isTypes2 && x.isNil() {
+			final = Default(x.typ) // default type of untyped nil is untyped nil
 		} else if x.mode == constant_ && isInteger(x.typ) && allString(T) {
 			final = x.typ
 		}
@@ -138,13 +139,16 @@ func (x *operand) convertibleTo(check *Checker, T Type, cause *string) bool {
 		return true
 	}
 
-	// "V and T have identical underlying types if tags are ignored
-	// and V and T are not type parameters"
-	V := x.typ
+	origT := T
+	V := Unalias(x.typ)
+	T = Unalias(T)
 	Vu := under(V)
 	Tu := under(T)
 	Vp, _ := V.(*TypeParam)
 	Tp, _ := T.(*TypeParam)
+
+	// "V and T have identical underlying types if tags are ignored
+	// and V and T are not type parameters"
 	if IdenticalIgnoreTags(Vu, Tu) && Vp == nil && Tp == nil {
 		return true
 	}
@@ -196,25 +200,25 @@ func (x *operand) convertibleTo(check *Checker, T Type, cause *string) bool {
 		switch a := Tu.(type) {
 		case *Array:
 			if Identical(s.Elem(), a.Elem()) {
-				if check == nil || check.allowVersion(check.pkg, x, go1_20) {
+				if check == nil || check.allowVersion(go1_20) {
 					return true
 				}
 				// check != nil
 				if cause != nil {
 					// TODO(gri) consider restructuring versionErrorf so we can use it here and below
-					*cause = "conversion of slices to arrays requires go1.20 or later"
+					*cause = "conversion of slice to array requires go1.20 or later"
 				}
 				return false
 			}
 		case *Pointer:
 			if a, _ := under(a.Elem()).(*Array); a != nil {
 				if Identical(s.Elem(), a.Elem()) {
-					if check == nil || check.allowVersion(check.pkg, x, go1_17) {
+					if check == nil || check.allowVersion(go1_17) {
 						return true
 					}
 					// check != nil
 					if cause != nil {
-						*cause = "conversion of slices to array pointers requires go1.17 or later"
+						*cause = "conversion of slice to array pointer requires go1.17 or later"
 					}
 					return false
 				}
@@ -227,7 +231,7 @@ func (x *operand) convertibleTo(check *Checker, T Type, cause *string) bool {
 		return false
 	}
 
-	errorf := func(format string, args ...interface{}) {
+	errorf := func(format string, args ...any) {
 		if check != nil && cause != nil {
 			msg := check.sprintf(format, args...)
 			if *cause != "" {
@@ -266,7 +270,7 @@ func (x *operand) convertibleTo(check *Checker, T Type, cause *string) bool {
 			}
 			x.typ = V.typ
 			if !x.convertibleTo(check, T, cause) {
-				errorf("cannot convert %s (in %s) to type %s", V.typ, Vp, T)
+				errorf("cannot convert %s (in %s) to type %s", V.typ, Vp, origT)
 				return false
 			}
 			return true

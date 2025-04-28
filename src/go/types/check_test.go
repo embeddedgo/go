@@ -34,7 +34,6 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/scanner"
 	"go/token"
@@ -134,10 +133,10 @@ func parseFlags(src []byte, flags *flag.FlagSet) error {
 //
 // If provided, opts may be used to mutate the Config before type-checking.
 func testFiles(t *testing.T, filenames []string, srcs [][]byte, manual bool, opts ...func(*Config)) {
-	// Alias types are disabled by default
+	// Alias types are enabled by default
 	testFilesImpl(t, filenames, srcs, manual, opts...)
 	if !manual {
-		t.Setenv("GODEBUG", "gotypesalias=1")
+		t.Setenv("GODEBUG", "gotypesalias=0")
 		testFilesImpl(t, filenames, srcs, manual, opts...)
 	}
 }
@@ -164,7 +163,7 @@ func testFilesImpl(t *testing.T, filenames []string, srcs [][]byte, manual bool,
 	// set up typechecker
 	var conf Config
 	*boolFieldAddr(&conf, "_Trace") = manual && testing.Verbose()
-	conf.Importer = importer.Default()
+	conf.Importer = defaultImporter(fset)
 	conf.Error = func(err error) {
 		if *haltOnError {
 			defer panic(err)
@@ -196,15 +195,10 @@ func testFilesImpl(t *testing.T, filenames []string, srcs [][]byte, manual bool,
 		t.Fatal(err)
 	}
 
-	exp, err := buildcfg.ParseGOEXPERIMENT(runtime.GOOS, runtime.GOARCH, goexperiment)
-	if err != nil {
-		t.Fatal(err)
+	if goexperiment != "" {
+		revert := setGOEXPERIMENT(goexperiment)
+		defer revert()
 	}
-	old := buildcfg.Experiment
-	defer func() {
-		buildcfg.Experiment = old
-	}()
-	buildcfg.Experiment = *exp
 
 	// By default, gotypesalias is not set.
 	if gotypesalias != "" {
@@ -262,17 +256,17 @@ func testFilesImpl(t *testing.T, filenames []string, srcs [][]byte, manual bool,
 					panic("unreachable")
 				}
 			}
-			pattern, err := strconv.Unquote(strings.TrimSpace(pattern))
+			unquoted, err := strconv.Unquote(strings.TrimSpace(pattern))
 			if err != nil {
-				t.Errorf("%s:%d:%d: %v", filename, line, want.col, err)
+				t.Errorf("%s:%d:%d: invalid ERROR pattern (cannot unquote %s)", filename, line, want.col, pattern)
 				continue
 			}
 			if substr {
-				if !strings.Contains(gotMsg, pattern) {
+				if !strings.Contains(gotMsg, unquoted) {
 					continue
 				}
 			} else {
-				rx, err := regexp.Compile(pattern)
+				rx, err := regexp.Compile(unquoted)
 				if err != nil {
 					t.Errorf("%s:%d:%d: %v", filename, line, want.col, err)
 					continue
@@ -350,6 +344,20 @@ func boolFieldAddr(conf *Config, name string) *bool {
 func stringFieldAddr(conf *Config, name string) *string {
 	v := reflect.Indirect(reflect.ValueOf(conf))
 	return (*string)(v.FieldByName(name).Addr().UnsafePointer())
+}
+
+// setGOEXPERIMENT overwrites the existing buildcfg.Experiment with a new one
+// based on the provided goexperiment string. Calling the result function
+// (typically via defer), reverts buildcfg.Experiment to the prior value.
+// For testing use, only.
+func setGOEXPERIMENT(goexperiment string) func() {
+	exp, err := buildcfg.ParseGOEXPERIMENT(runtime.GOOS, runtime.GOARCH, goexperiment)
+	if err != nil {
+		panic(err)
+	}
+	old := buildcfg.Experiment
+	buildcfg.Experiment = *exp
+	return func() { buildcfg.Experiment = old }
 }
 
 // TestManual is for manual testing of a package - either provided

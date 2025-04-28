@@ -8,13 +8,14 @@ import (
 	"cmd/compile/internal/base"
 	"cmd/compile/internal/ir"
 	"cmd/compile/internal/types"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"internal/buildcfg"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -95,7 +96,7 @@ func AnalyzeFunc(fn *ir.Func, canInline func(*ir.Func), budgetForFunc func(*ir.F
 	// only after the closures it contains have been processed, so
 	// iterate through the list in reverse order. Once a function has
 	// been analyzed, revisit the question of whether it should be
-	// inlinable; if it is over the default hairyness limit and it
+	// inlinable; if it is over the default hairiness limit and it
 	// doesn't have any interesting properties, then we don't want
 	// the overhead of writing out its inline body.
 	nameFinder := newNameFinder(fn)
@@ -338,7 +339,7 @@ func dumpFnPreamble(w io.Writer, funcInlHeur *fnInlHeur, ecst encodedCallSiteTab
 	fmt.Fprintf(w, "%s// %s\n", funcInlHeur.props.ToString("// "), comDelimiter)
 	data, err := json.Marshal(funcInlHeur.props)
 	if err != nil {
-		return fmt.Errorf("marshall error %v\n", err)
+		return fmt.Errorf("marshal error %v\n", err)
 	}
 	fmt.Fprintf(w, "// %s\n", string(data))
 	dumpCallSiteComments(w, funcInlHeur.cstab, ecst)
@@ -349,11 +350,11 @@ func dumpFnPreamble(w io.Writer, funcInlHeur *fnInlHeur, ecst encodedCallSiteTab
 // sortFnInlHeurSlice sorts a slice of fnInlHeur based on
 // the starting line of the function definition, then by name.
 func sortFnInlHeurSlice(sl []fnInlHeur) []fnInlHeur {
-	sort.SliceStable(sl, func(i, j int) bool {
-		if sl[i].line != sl[j].line {
-			return sl[i].line < sl[j].line
+	slices.SortStableFunc(sl, func(a, b fnInlHeur) int {
+		if a.line != b.line {
+			return cmp.Compare(a.line, b.line)
 		}
-		return sl[i].fname < sl[j].fname
+		return strings.Compare(a.fname, b.fname)
 	})
 	return sl
 }

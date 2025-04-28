@@ -6,9 +6,9 @@
 // functionality. The design is Unix-like, although the error handling is
 // Go-like; failing calls return values of type error rather than error numbers.
 // Often, more information is available within the error. For example,
-// if a call that takes a file name fails, such as Open or Stat, the error
+// if a call that takes a file name fails, such as [Open] or [Stat], the error
 // will include the failing file name when printed and will be of type
-// *PathError, which may be unpacked for more information.
+// [*PathError], which may be unpacked for more information.
 //
 // The os interface is intended to be uniform across all operating systems.
 // Features not generally available appear in the system-specific package syscall.
@@ -34,15 +34,19 @@
 //	}
 //	fmt.Printf("read %d bytes: %q\n", count, data[:count])
 //
-// Note: The maximum number of concurrent operations on a File may be limited by
-// the OS or the system. The number should be high, but exceeding it may degrade
-// performance or cause other issues.
+// # Concurrency
+//
+// The methods of [File] correspond to file system operations. All are
+// safe for concurrent use. The maximum number of concurrent
+// operations on a File may be limited by the OS or the system. The
+// number should be high, but exceeding it may degrade performance or
+// cause other issues.
 package os
 
 import (
 	"errors"
+	"internal/filepathlite"
 	"internal/poll"
-	"internal/safefilepath"
 	"internal/testlog"
 	"io"
 	"io/fs"
@@ -53,6 +57,8 @@ import (
 )
 
 // Name returns the name of the file as presented to Open.
+//
+// It is safe to call Name after [Close].
 func (f *File) Name() string { return f.name }
 
 // Stdin, Stdout, and Stderr are open Files pointing to the standard input,
@@ -279,7 +285,7 @@ func (f *File) Seek(offset int64, whence int) (ret int64, err error) {
 		return 0, err
 	}
 	r, e := f.seek(offset, whence)
-	if e == nil && f.dirinfo != nil && r != 0 {
+	if e == nil && f.dirinfo.Load() != nil && r != 0 {
 		e = syscall.EISDIR
 	}
 	if e != nil {
@@ -337,6 +343,16 @@ func Chdir(dir string) error {
 		testlog.Open(dir) // observe likely non-existent directory
 		return &PathError{Op: "chdir", Path: dir, Err: e}
 	}
+	if runtime.GOOS == "windows" {
+		abs := filepathlite.IsAbs(dir)
+		getwdCache.Lock()
+		if abs {
+			getwdCache.dir = dir
+		} else {
+			getwdCache.dir = ""
+		}
+		getwdCache.Unlock()
+	}
 	if log := testlog.Logger(); log != nil {
 		wd, err := Getwd()
 		if err == nil {
@@ -355,9 +371,10 @@ func Open(name string) (*File, error) {
 }
 
 // Create creates or truncates the named file. If the file already exists,
-// it is truncated. If the file does not exist, it is created with mode 0666
+// it is truncated. If the file does not exist, it is created with mode 0o666
 // (before umask). If successful, methods on the returned File can
 // be used for I/O; the associated file descriptor has mode O_RDWR.
+// The directory containing the file must already exist.
 // If there is an error, it will be of type *PathError.
 func Create(name string) (*File, error) {
 	return OpenFile(name, O_RDWR|O_CREATE|O_TRUNC, 0666)
@@ -366,7 +383,8 @@ func Create(name string) (*File, error) {
 // OpenFile is the generalized open call; most users will use Open
 // or Create instead. It opens the named file with specified flag
 // (O_RDONLY etc.). If the file does not exist, and the O_CREATE flag
-// is passed, it is created with mode perm (before umask). If successful,
+// is passed, it is created with mode perm (before umask);
+// the containing directory must exist. If successful,
 // methods on the returned File can be used for I/O.
 // If there is an error, it will be of type *PathError.
 func OpenFile(name string, flag int, perm FileMode) (*File, error) {
@@ -380,11 +398,22 @@ func OpenFile(name string, flag int, perm FileMode) (*File, error) {
 	return f, nil
 }
 
+var errPathEscapes = errors.New("path escapes from parent")
+
+// openDir opens a file which is assumed to be a directory. As such, it skips
+// the syscalls that make the file descriptor non-blocking as these take time
+// and will fail on file descriptors for directories.
+func openDir(name string) (*File, error) {
+	testlog.Open(name)
+	return openDirNolog(name)
+}
+
 // lstat is overridden in tests.
 var lstat = Lstat
 
 // Rename renames (moves) oldpath to newpath.
 // If newpath already exists and is not a directory, Rename replaces it.
+// If newpath already exists and is a directory, Rename returns an error.
 // OS-specific restrictions may apply when oldpath and newpath are in different directories.
 // Even within the same directory, on non-Unix platforms Rename is not an atomic operation.
 // If there is an error, it will be of type *LinkError.
@@ -453,8 +482,8 @@ func TempDir() string {
 // On Windows, it returns %LocalAppData%.
 // On Plan 9, it returns $home/lib/cache.
 //
-// If the location cannot be determined (for example, $HOME is not defined),
-// then it will return an error.
+// If the location cannot be determined (for example, $HOME is not defined) or
+// the path in $XDG_CACHE_HOME is relative, then it will return an error.
 func UserCacheDir() (string, error) {
 	var dir string
 
@@ -487,6 +516,8 @@ func UserCacheDir() (string, error) {
 				return "", errors.New("neither $XDG_CACHE_HOME nor $HOME are defined")
 			}
 			dir += "/.cache"
+		} else if !filepathlite.IsAbs(dir) {
+			return "", errors.New("path in $XDG_CACHE_HOME is relative")
 		}
 	}
 
@@ -504,8 +535,8 @@ func UserCacheDir() (string, error) {
 // On Windows, it returns %AppData%.
 // On Plan 9, it returns $home/lib.
 //
-// If the location cannot be determined (for example, $HOME is not defined),
-// then it will return an error.
+// If the location cannot be determined (for example, $HOME is not defined) or
+// the path in $XDG_CONFIG_HOME is relative, then it will return an error.
 func UserConfigDir() (string, error) {
 	var dir string
 
@@ -538,6 +569,8 @@ func UserConfigDir() (string, error) {
 				return "", errors.New("neither $XDG_CONFIG_HOME nor $HOME are defined")
 			}
 			dir += "/.config"
+		} else if !filepathlite.IsAbs(dir) {
+			return "", errors.New("path in $XDG_CONFIG_HOME is relative")
 		}
 	}
 
@@ -583,11 +616,11 @@ func UserHomeDir() (string, error) {
 // On Unix, the mode's permission bits, ModeSetuid, ModeSetgid, and
 // ModeSticky are used.
 //
-// On Windows, only the 0200 bit (owner writable) of mode is used; it
+// On Windows, only the 0o200 bit (owner writable) of mode is used; it
 // controls whether the file's read-only attribute is set or cleared.
 // The other bits are currently unused. For compatibility with Go 1.12
-// and earlier, use a non-zero mode. Use mode 0400 for a read-only
-// file and 0600 for a readable+writable file.
+// and earlier, use a non-zero mode. Use mode 0o400 for a read-only
+// file and 0o600 for a readable+writable file.
 //
 // On Plan 9, the mode's permission bits, ModeAppend, ModeExclusive,
 // and ModeTemporary are used.
@@ -662,6 +695,8 @@ func (f *File) SyscallConn() (syscall.RawConn, error) {
 // DirFS("prefix"), will be affected by later calls to Chdir. DirFS is therefore not
 // a general substitute for a chroot-style security mechanism when the directory tree
 // contains arbitrary content.
+//
+// Use [Root.FS] to obtain a fs.FS that prevents escapes from the tree via symbolic links.
 //
 // The directory dir must not be "".
 //
@@ -747,10 +782,7 @@ func (dir dirFS) join(name string) (string, error) {
 	if dir == "" {
 		return "", errors.New("os: DirFS with empty root")
 	}
-	if !fs.ValidPath(name) {
-		return "", ErrInvalid
-	}
-	name, err := safefilepath.FromFS(name)
+	name, err := filepathlite.Localize(name)
 	if err != nil {
 		return "", ErrInvalid
 	}
@@ -770,7 +802,10 @@ func ReadFile(name string) ([]byte, error) {
 		return nil, err
 	}
 	defer f.Close()
+	return readFileContents(f)
+}
 
+func readFileContents(f *File) ([]byte, error) {
 	var size int
 	if info, err := f.Stat(); err == nil {
 		size64 := info.Size()

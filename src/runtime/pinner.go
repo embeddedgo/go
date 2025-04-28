@@ -5,7 +5,8 @@
 package runtime
 
 import (
-	"runtime/internal/atomic"
+	"internal/abi"
+	"internal/runtime/atomic"
 	"unsafe"
 )
 
@@ -107,7 +108,7 @@ func pinnerGetPtr(i *any) unsafe.Pointer {
 	if etyp == nil {
 		panic(errorString("runtime.Pinner: argument is nil"))
 	}
-	if kind := etyp.Kind_ & kindMask; kind != kindPtr && kind != kindUnsafePointer {
+	if kind := etyp.Kind_ & abi.KindMask; kind != abi.Pointer && kind != abi.UnsafePointer {
 		panic(errorString("runtime.Pinner: argument is not a pointer: " + toRType(etyp).string()))
 	}
 	if inUserArenaChunk(uintptr(e.data)) {
@@ -271,7 +272,7 @@ func (s *mspan) pinnerBitSize() uintptr {
 }
 
 // newPinnerBits returns a pointer to 8 byte aligned bytes to be used for this
-// span's pinner bits. newPinneBits is used to mark objects that are pinned.
+// span's pinner bits. newPinnerBits is used to mark objects that are pinned.
 // They are copied when the span is swept.
 func (s *mspan) newPinnerBits() *pinnerBits {
 	return (*pinnerBits)(newMarkBits(uintptr(s.nelems) * 2))
@@ -330,7 +331,7 @@ func (span *mspan) incPinCounter(offset uintptr) {
 		rec = (*specialPinCounter)(mheap_.specialPinCounterAlloc.alloc())
 		unlock(&mheap_.speciallock)
 		// splice in record, fill in offset.
-		rec.special.offset = uint16(offset)
+		rec.special.offset = offset
 		rec.special.kind = _KindSpecialPinCounter
 		rec.special.next = *ref
 		*ref = (*special)(unsafe.Pointer(rec))

@@ -6,7 +6,7 @@ package debug
 
 import (
 	"runtime"
-	"sort"
+	"slices"
 	"time"
 )
 
@@ -63,15 +63,13 @@ func ReadGCStats(stats *GCStats) {
 
 	if len(stats.PauseQuantiles) > 0 {
 		if n == 0 {
-			for i := range stats.PauseQuantiles {
-				stats.PauseQuantiles[i] = 0
-			}
+			clear(stats.PauseQuantiles)
 		} else {
 			// There's room for a second copy of the data in stats.Pause.
 			// See the allocation at the top of the function.
 			sorted := stats.Pause[n : n+n]
 			copy(sorted, stats.Pause)
-			sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+			slices.Sort(sorted)
 			nq := len(stats.PauseQuantiles) - 1
 			for i := 0; i < nq; i++ {
 				stats.PauseQuantiles[i] = sorted[len(sorted)*i/nq]

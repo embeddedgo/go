@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package types declares the data types and implements
+// Package types2 declares the data types and implements
 // the algorithms for type-checking of Go packages. Use
 // Config.Check to invoke the type checker for a package.
 // Alternatively, create a new type checker with NewChecker
@@ -175,6 +175,16 @@ type Config struct {
 	// of an error message. ErrorURL must be a format string containing
 	// exactly one "%s" format, e.g. "[go.dev/e/%s]".
 	ErrorURL string
+
+	// If EnableAlias is set, alias declarations produce an Alias type. Otherwise
+	// the alias information is only in the type name, which points directly to
+	// the actual (aliased) type.
+	//
+	// This setting must not differ among concurrent type-checking operations,
+	// since it affects the behavior of Universe.Lookup("any").
+	//
+	// This flag will eventually be removed (with Go 1.24 at the earliest).
+	EnableAlias bool
 }
 
 func srcimporter_setUsesCgo(conf *Config) {
@@ -198,11 +208,19 @@ type Info struct {
 	//
 	// The Types map does not record the type of every identifier,
 	// only those that appear where an arbitrary expression is
-	// permitted. For instance, the identifier f in a selector
-	// expression x.f is found only in the Selections map, the
-	// identifier z in a variable declaration 'var z int' is found
-	// only in the Defs map, and identifiers denoting packages in
-	// qualified identifiers are collected in the Uses map.
+	// permitted. For instance:
+	// - an identifier f in a selector expression x.f is found
+	//   only in the Selections map;
+	// - an identifier z in a variable declaration 'var z int'
+	//   is found only in the Defs map;
+	// - an identifier p denoting a package in a qualified
+	//   identifier p.X is found only in the Uses map.
+	//
+	// Similarly, no type is recorded for the (synthetic) FuncType
+	// node in a FuncDecl.Type field, since there is no corresponding
+	// syntactic function type expression in the source in this case
+	// Instead, the function type is found in the Defs.map entry for
+	// the corresponding function declaration.
 	Types map[syntax.Expr]TypeAndValue
 
 	// If StoreTypesInSyntax is set, type information identical to
@@ -311,7 +329,7 @@ func (info *Info) recordTypes() bool {
 }
 
 // TypeOf returns the type of expression e, or nil if not found.
-// Precondition 1: the Types map is populated or StoreTypesInSynax is set.
+// Precondition 1: the Types map is populated or StoreTypesInSyntax is set.
 // Precondition 2: Uses and Defs maps are populated.
 func (info *Info) TypeOf(e syntax.Expr) Type {
 	if info.Types != nil {

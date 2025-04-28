@@ -299,6 +299,18 @@ type (
 	}
 
 	// A BasicLit node represents a literal of basic type.
+	//
+	// Note that for the CHAR and STRING kinds, the literal is stored
+	// with its quotes. For example, for a double-quoted STRING, the
+	// first and the last rune in the Value field will be ". The
+	// [strconv.Unquote] and [strconv.UnquoteChar] functions can be
+	// used to unquote STRING and CHAR values, respectively.
+	//
+	// For raw string literals (Kind == token.STRING && Value[0] == '`'),
+	// the Value field contains the string text without carriage returns (\r) that
+	// may have been present in the source. Because the end position is
+	// computed using len(Value), the position reported by [BasicLit.End] does not match the
+	// true source end position for raw string literals containing carriage returns.
 	BasicLit struct {
 		ValuePos token.Pos   // literal position
 		Kind     token.Token // token.INT, token.FLOAT, token.IMAG, token.CHAR, or token.STRING
@@ -1032,9 +1044,12 @@ func (*FuncDecl) declNode() {}
 // positions). A [CommentMap] may be used to facilitate some of these operations.
 //
 // Whether and how a comment is associated with a node depends on the
-// interpretation of the syntax tree by the manipulating program: Except for Doc
+// interpretation of the syntax tree by the manipulating program: except for Doc
 // and [Comment] comments directly associated with nodes, the remaining comments
-// are "free-floating" (see also issues #18593, #20744).
+// are "free-floating" (see also issues [#18593], [#20744]).
+//
+// [#18593]: https://go.dev/issue/18593
+// [#20744]: https://go.dev/issue/20744
 type File struct {
 	Doc     *CommentGroup // associated documentation; or nil
 	Package token.Pos     // position of "package" keyword
@@ -1050,11 +1065,15 @@ type File struct {
 }
 
 // Pos returns the position of the package declaration.
-// (Use FileStart for the start of the entire file.)
+// It may be invalid, for example in an empty file.
+//
+// (Use FileStart for the start of the entire file. It is always valid.)
 func (f *File) Pos() token.Pos { return f.Package }
 
 // End returns the end of the last declaration in the file.
-// (Use FileEnd for the end of the entire file.)
+// It may be invalid, for example in an empty file.
+//
+// (Use FileEnd for the end of the entire file. It is always valid.)
 func (f *File) End() token.Pos {
 	if n := len(f.Decls); n > 0 {
 		return f.Decls[n-1].End()
@@ -1080,7 +1099,7 @@ func (p *Package) End() token.Pos { return token.NoPos }
 // not handwritten, by detecting the special comment described
 // at https://go.dev/s/generatedcode.
 //
-// The syntax tree must have been parsed with the ParseComments flag.
+// The syntax tree must have been parsed with the [parser.ParseComments] flag.
 // Example:
 //
 //	f, err := parser.ParseFile(fset, filename, src, parser.ParseComments|parser.PackageClauseOnly)

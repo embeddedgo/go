@@ -35,9 +35,6 @@ time.
 The GODEBUG variable controls debugging variables within the runtime.
 It is a comma-separated list of name=val pairs setting these named variables:
 
-	allocfreetrace: setting allocfreetrace=1 causes every allocation to be
-	profiled and a stack trace printed on each object's allocation and free.
-
 	clobberfree: setting clobberfree=1 causes the garbage collector to
 	clobber the memory content of an object with bad content when it frees
 	the object.
@@ -145,6 +142,13 @@ It is a comma-separated list of name=val pairs setting these named variables:
 	When set to 0 memory profiling is disabled.  Refer to the description of
 	MemProfileRate for the default value.
 
+	profstackdepth: profstackdepth=128 (the default) will set the maximum stack
+	depth used by all pprof profilers except for the CPU profiler to 128 frames.
+	Stack traces that exceed this limit will be truncated to the limit starting
+	from the leaf frame. Setting profstackdepth to any value above 1024 will
+	silently default to 1024. Future versions of Go may remove this limitation
+	and extend profstackdepth to apply to the CPU profiler and execution tracer.
+
 	pagetrace: setting pagetrace=/path/to/file will write out a trace of page events
 	that can be viewed, analyzed, and visualized using the x/debug/cmd/pagetrace tool.
 	Build your program with GOEXPERIMENT=pagetrace to enable this functionality. Do not
@@ -198,9 +202,8 @@ It is a comma-separated list of name=val pairs setting these named variables:
 
 	tracebackancestors: setting tracebackancestors=N extends tracebacks with the stacks at
 	which goroutines were created, where N limits the number of ancestor goroutines to
-	report. This also extends the information returned by runtime.Stack. Ancestor's goroutine
-	IDs will refer to the ID of the goroutine at the time of creation; it's possible for this
-	ID to be reused for another goroutine. Setting N to 0 will report no ancestry information.
+	report. This also extends the information returned by runtime.Stack.
+	Setting N to 0 will report no ancestry information.
 
 	tracefpunwindoff: setting tracefpunwindoff=1 forces the execution tracer to
 	use the runtime's default stack unwinder instead of frame pointer unwinding.
@@ -210,6 +213,9 @@ It is a comma-separated list of name=val pairs setting these named variables:
 	traceadvanceperiod: the approximate period in nanoseconds between trace generations. Only
 	applies if a program is built with GOEXPERIMENT=exectracer2. Used primarily for testing
 	and debugging the execution tracer.
+
+	tracecheckstackownership: setting tracecheckstackownership=1 enables a debug check in the
+	execution tracer to double-check stack ownership before taking a stack trace.
 
 	asyncpreemptoff: asyncpreemptoff=1 disables signal-based
 	asynchronous goroutine preemption. This makes some loops
@@ -288,13 +294,14 @@ import (
 
 // Caller reports file and line number information about function invocations on
 // the calling goroutine's stack. The argument skip is the number of stack frames
-// to ascend, with 0 identifying the caller of Caller.  (For historical reasons the
-// meaning of skip differs between Caller and [Callers].) The return values report the
-// program counter, file name, and line number within the file of the corresponding
-// call. The boolean ok is false if it was not possible to recover the information.
+// to ascend, with 0 identifying the caller of Caller. (For historical reasons the
+// meaning of skip differs between Caller and [Callers].) The return values report
+// the program counter, the file name (using forward slashes as path separator, even
+// on Windows), and the line number within the file of the corresponding call.
+// The boolean ok is false if it was not possible to recover the information.
 func Caller(skip int) (pc uintptr, file string, line int, ok bool) {
 	rpc := make([]uintptr, 1)
-	n := callers(skip+1, rpc[:])
+	n := callers(skip+1, rpc)
 	if n < 1 {
 		return
 	}
@@ -330,6 +337,11 @@ var defaultGOROOT string // set by cmd/link
 // GOROOT returns the root of the Go tree. It uses the
 // GOROOT environment variable, if set at process start,
 // or else the root used during the Go build.
+//
+// Deprecated: The root used during the Go build will not be
+// meaningful if the binary is copied to another machine.
+// Use the system path to locate the “go” binary, and use
+// “go env GOROOT” to find its GOROOT.
 func GOROOT() string {
 	s := gogetenv("GOROOT")
 	if s != "" {

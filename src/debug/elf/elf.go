@@ -773,6 +773,7 @@ const (
 
 	PT_OPENBSD_RANDOMIZE ProgType = 0x65a3dbe6 /* Random data */
 	PT_OPENBSD_WXNEEDED  ProgType = 0x65a3dbe7 /* W^X violations */
+	PT_OPENBSD_NOBTCFI   ProgType = 0x65a3dbe8 /* No branch target CFI */
 	PT_OPENBSD_BOOTDATA  ProgType = 0x65a41be6 /* Boot arguments */
 
 	PT_SUNW_EH_FRAME ProgType = 0x6474e550 /* Frame unwind information */
@@ -1286,6 +1287,11 @@ const (
 	STT_HIOS    SymType = 12 /*   specific semantics. */
 	STT_LOPROC  SymType = 13 /* reserved range for processor */
 	STT_HIPROC  SymType = 15 /*   specific semantics. */
+
+	/* Non-standard symbol types. */
+	STT_RELC      SymType = 8  /* Complex relocation expression. */
+	STT_SRELC     SymType = 9  /* Signed complex relocation expression. */
+	STT_GNU_IFUNC SymType = 10 /* Indirect code object. */
 )
 
 var sttStrings = []intName{
@@ -1296,6 +1302,8 @@ var sttStrings = []intName{
 	{4, "STT_FILE"},
 	{5, "STT_COMMON"},
 	{6, "STT_TLS"},
+	{8, "STT_RELC"},
+	{9, "STT_SRELC"},
 	{10, "STT_LOOS"},
 	{12, "STT_HIOS"},
 	{13, "STT_LOPROC"},
@@ -3570,6 +3578,15 @@ type intName struct {
 	i uint32
 	s string
 }
+
+// Dynamic version flags.
+type DynamicVersionFlag uint16
+
+const (
+	VER_FLG_BASE DynamicVersionFlag = 0x1 /* Version definition of the file. */
+	VER_FLG_WEAK DynamicVersionFlag = 0x2 /* Weak version identifier. */
+	VER_FLG_INFO DynamicVersionFlag = 0x4 /* Reference exists for informational purposes. */
+)
 
 func stringName(i uint32, names []intName, goSyntax bool) string {
 	for _, n := range names {

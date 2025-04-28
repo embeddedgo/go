@@ -8,13 +8,11 @@ import (
 	"bytes"
 	"internal/poll"
 	"io"
-	"math/rand"
 	"net"
 	. "os"
 	"strconv"
 	"syscall"
 	"testing"
-	"time"
 )
 
 func TestSendFile(t *testing.T) {
@@ -102,15 +100,25 @@ func newSendFileTest(t *testing.T, proto string, size int64) (net.Conn, *File, n
 	hook := hookSendFile(t)
 
 	client, server := createSocketPair(t, proto)
-	tempFile, data := createTempFile(t, size)
+	tempFile, data := createTempFile(t, "writeto-sendfile-to-socket", size)
 
 	return client, tempFile, server, data, hook
 }
 
 func hookSendFile(t *testing.T) *sendFileHook {
 	h := new(sendFileHook)
-	h.install()
-	t.Cleanup(h.uninstall)
+	orig := poll.TestHookDidSendFile
+	t.Cleanup(func() {
+		poll.TestHookDidSendFile = orig
+	})
+	poll.TestHookDidSendFile = func(dstFD *poll.FD, src int, written int64, err error, handled bool) {
+		h.called = true
+		h.dstfd = dstFD.Sysfd
+		h.srcfd = src
+		h.written = written
+		h.err = err
+		h.handled = handled
+	}
 	return h
 }
 
@@ -118,54 +126,8 @@ type sendFileHook struct {
 	called bool
 	dstfd  int
 	srcfd  int
-	remain int64
 
 	written int64
 	handled bool
 	err     error
-
-	original func(dst *poll.FD, src int, remain int64) (int64, error, bool)
-}
-
-func (h *sendFileHook) install() {
-	h.original = *PollSendFile
-	*PollSendFile = func(dst *poll.FD, src int, remain int64) (int64, error, bool) {
-		h.called = true
-		h.dstfd = dst.Sysfd
-		h.srcfd = src
-		h.remain = remain
-		h.written, h.err, h.handled = h.original(dst, src, remain)
-		return h.written, h.err, h.handled
-	}
-}
-
-func (h *sendFileHook) uninstall() {
-	*PollSendFile = h.original
-}
-
-func createTempFile(t *testing.T, size int64) (*File, []byte) {
-	f, err := CreateTemp(t.TempDir(), "writeto-sendfile-to-socket")
-	if err != nil {
-		t.Fatalf("failed to create temporary file: %v", err)
-	}
-	t.Cleanup(func() {
-		f.Close()
-	})
-
-	randSeed := time.Now().Unix()
-	t.Logf("random data seed: %d\n", randSeed)
-	prng := rand.New(rand.NewSource(randSeed))
-	data := make([]byte, size)
-	prng.Read(data)
-	if _, err := f.Write(data); err != nil {
-		t.Fatalf("failed to create and feed the file: %v", err)
-	}
-	if err := f.Sync(); err != nil {
-		t.Fatalf("failed to save the file: %v", err)
-	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		t.Fatalf("failed to rewind the file: %v", err)
-	}
-
-	return f, data
 }

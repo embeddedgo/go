@@ -27,7 +27,8 @@ var ArrayType *types.Type
 var ChanType *types.Type
 var FuncType *types.Type
 var InterfaceType *types.Type
-var MapType *types.Type
+var OldMapType *types.Type
+var SwissMapType *types.Type
 var PtrType *types.Type
 var SliceType *types.Type
 var StructType *types.Type
@@ -42,6 +43,9 @@ var UncommonType *types.Type
 var InterfaceSwitch *types.Type
 var TypeAssert *types.Type
 
+// Interface tables (itabs)
+var ITab *types.Type
+
 func Init() {
 	// Note: this has to be called explicitly instead of being
 	// an init function so it runs after the types package has
@@ -51,7 +55,8 @@ func Init() {
 	ChanType = fromReflect(reflect.TypeOf(abi.ChanType{}))
 	FuncType = fromReflect(reflect.TypeOf(abi.FuncType{}))
 	InterfaceType = fromReflect(reflect.TypeOf(abi.InterfaceType{}))
-	MapType = fromReflect(reflect.TypeOf(abi.MapType{}))
+	OldMapType = fromReflect(reflect.TypeOf(abi.OldMapType{}))
+	SwissMapType = fromReflect(reflect.TypeOf(abi.SwissMapType{}))
 	PtrType = fromReflect(reflect.TypeOf(abi.PtrType{}))
 	SliceType = fromReflect(reflect.TypeOf(abi.SliceType{}))
 	StructType = fromReflect(reflect.TypeOf(abi.StructType{}))
@@ -63,6 +68,8 @@ func Init() {
 
 	InterfaceSwitch = fromReflect(reflect.TypeOf(abi.InterfaceSwitch{}))
 	TypeAssert = fromReflect(reflect.TypeOf(abi.TypeAssert{}))
+
+	ITab = fromReflect(reflect.TypeOf(abi.ITab{}))
 
 	// Make sure abi functions are correct. These functions are used
 	// by the linker which doesn't have the ability to do type layout,
@@ -79,6 +86,9 @@ func Init() {
 	}
 	if got, want := int64(abi.TFlagOff(ptrSize)), Type.OffsetOf("TFlag"); got != want {
 		base.Fatalf("abi.TFlagOff() == %d, want %d", got, want)
+	}
+	if got, want := int64(abi.ITabTypeOff(ptrSize)), ITab.OffsetOf("Type"); got != want {
+		base.Fatalf("abi.ITabTypeOff() == %d, want %d", got, want)
 	}
 }
 
@@ -153,6 +163,12 @@ func (c Cursor) WritePtr(target *obj.LSym) {
 	} else {
 		objw.SymPtr(c.lsym, int(c.offset), target, 0)
 	}
+}
+func (c Cursor) WritePtrWeak(target *obj.LSym) {
+	if c.typ.Kind() != types.TUINTPTR {
+		base.Fatalf("can't write ptr, it has kind %s", c.typ.Kind())
+	}
+	objw.SymPtrWeak(c.lsym, int(c.offset), target, 0)
 }
 func (c Cursor) WriteUintptr(val uint64) {
 	if c.typ.Kind() != types.TUINTPTR {
@@ -229,11 +245,10 @@ func (c Cursor) WriteSlice(target *obj.LSym, off, len, cap int64) {
 
 // Reloc adds a relocation from the current cursor position.
 // Reloc fills in Off and Siz fields. Caller should fill in the rest (Type, others).
-func (c Cursor) Reloc() *obj.Reloc {
-	r := obj.Addrel(c.lsym)
-	r.Off = int32(c.offset)
-	r.Siz = uint8(c.typ.Size())
-	return r
+func (c Cursor) Reloc(rel obj.Reloc) {
+	rel.Off = int32(c.offset)
+	rel.Siz = uint8(c.typ.Size())
+	c.lsym.AddRel(base.Ctxt, rel)
 }
 
 // Field selects the field with the given name from the struct pointed to by c.
@@ -248,6 +263,17 @@ func (c Cursor) Field(name string) Cursor {
 	}
 	base.Fatalf("couldn't find field %s in %v", name, c.typ)
 	return Cursor{}
+}
+
+func (c Cursor) Elem(i int64) Cursor {
+	if c.typ.Kind() != types.TARRAY {
+		base.Fatalf("can't call Elem on non-array %v", c.typ)
+	}
+	if i < 0 || i >= c.typ.NumElem() {
+		base.Fatalf("element access out of bounds [%d] in [0:%d]", i, c.typ.NumElem())
+	}
+	elem := c.typ.Elem()
+	return Cursor{lsym: c.lsym, offset: c.offset + i*elem.Size(), typ: elem}
 }
 
 type ArrayCursor struct {
