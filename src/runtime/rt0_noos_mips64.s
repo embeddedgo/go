@@ -105,13 +105,14 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	MOVV  $runtime·nodmaend(SB), R11
 	SUB   $SIGNAL_STACK_SIZE, R9
 
-	SUB   $32, R29
+	SUB   $48, R29
 	MOVV  R8, 8(R29)
 	MOVV  R9, 16(R29)
 	MOVV  R10, 24(R29)
 	MOVV  R11, 32(R29)
+	MOVV  R0, 40(R29)
 	JAL   runtime·meminit(SB)
-	ADD   $32, R29
+	ADD   $48, R29
 
 	// initialize noos tasker and Go scheduler
 	JAL   runtime·taskerinit(SB)
