@@ -16,6 +16,10 @@ TEXT runtime·_rt0_mips64_noos1(SB),NOSPLIT|NOFRAME,$0
 	// Store RAM size in a register not used by memclrNoHeapPointers
 	MOVV R4, R16
 
+	// Make sure the MIPS64X struct is initialized before calling
+	// memclrNoHeapPointers.
+	MOVBU	R0, internal∕cpu·MIPS64X+const_offsetMIPS64XHasMSA(SB)
+
 	// Clear .bss, .noptrbss and unallocated memory.
 	SUBU $16, R29
 
