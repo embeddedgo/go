@@ -4,7 +4,7 @@
 
 package runtime
 
-import "runtime/internal/atomic"
+import "internal/runtime/atomic"
 
 var scavenge struct {
 	gcPercentGoal  atomic.Uint64

@@ -19,7 +19,7 @@ import (
 	"internal/cpu/armm/scb"
 	"internal/cpu/armm/scid"
 	"internal/goarch"
-	"runtime/internal/atomic"
+	"internal/runtime/atomic"
 	"unsafe"
 )
 

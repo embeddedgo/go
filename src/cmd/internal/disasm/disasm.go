@@ -96,7 +96,7 @@ func disasmForEntry(e *objfile.Entry) (*Disasm, error) {
 		goarch:    goarch,
 		disasm:    disasm,
 		byteOrder: byteOrder,
-		gofile:    e.gofile,
+		gofile:    e.IsGoFile(),
 	}
 
 	return d, nil
@@ -466,7 +466,6 @@ func disasm_thumb(code []byte, pc uint64, lookup lookupFunc, byteOrder binary.By
 	}
 	return text, size
 }
-
 
 var disasms = map[string]disasmFunc{
 	"386":     disasm_386,

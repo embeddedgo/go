@@ -179,6 +179,10 @@ func (e *Entry) DWARF() (*dwarf.Data, error) {
 	return e.raw.dwarf()
 }
 
+func (e *Entry) IsGoFile() bool {
+	return e.gofile
+}
+
 type Liner interface {
 	// Given a pc, returns the corresponding file, line, and function data.
 	// If unknown, returns "",0,nil.

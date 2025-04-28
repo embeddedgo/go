@@ -541,10 +541,10 @@ func _B__Rm(c *Ctx, p *obj.Prog, out []uint16) int {
 	o1 := 0x4700 | int(p.To.Reg)&15<<3
 	if p.As == ABL {
 		o1 |= 0x0080
-		rel := obj.Addrel(c.cursym)
-		rel.Off = int32(p.Pc)
-		rel.Siz = 0
-		rel.Type = objabi.R_CALLIND
+		c.cursym.AddRel(c.ctxt, obj.Reloc{
+			Type: objabi.R_CALLIND,
+			Off:  int32(p.Pc),
+		})
 	}
 	out[0] = uint16(o1)
 	return 2
@@ -904,7 +904,7 @@ func _Bcond__ji20_1(c *Ctx, p *obj.Prog, out []uint16) int {
 	return 4
 }
 
-//1110 1000 1101 nnnn  1111 0000 000h mmmm
+// 1110 1000 1101 nnnn  1111 0000 000h mmmm
 func _TBB__Rm__Rn(c *Ctx, p *obj.Prog, out []uint16) int {
 	o1, o2 := 0xE8D0, 0xF000
 	if p.As == ATBH {
@@ -1457,12 +1457,13 @@ func _TST__lit__Rn(c *Ctx, p *obj.Prog, out []uint16) int {
 
 func _WORD__u32(c *Ctx, p *obj.Prog, out []uint16) int {
 	if p.To.Sym != nil {
-		rel := obj.Addrel(c.cursym)
-		rel.Off = int32(p.Pc)
-		rel.Siz = 4
-		rel.Sym = p.To.Sym
-		rel.Add = p.To.Offset
-		rel.Type = objabi.R_ADDR
+		c.cursym.AddRel(c.ctxt, obj.Reloc{
+			Type: objabi.R_ADDR,
+			Off:  int32(p.Pc),
+			Siz:  4,
+			Sym:  p.To.Sym,
+			Add:  p.To.Offset,
+		})
 		out[0] = 0
 		out[1] = 0
 	} else {
@@ -1897,13 +1898,14 @@ func (c *Ctx) boffsetrel(p *obj.Prog, o1, o2 int) int {
 		}
 		return v >> 1
 	}
-	rel := obj.Addrel(c.cursym)
-	rel.Off = int32(p.Pc)
-	rel.Siz = 4
-	rel.Sym = p.To.Sym
 	v += int(p.To.Offset)
-	rel.Add = int64(o2)<<48 | int64(o1)<<32 | int64(uint32(v))
-	rel.Type = objabi.R_CALLARM
+	c.cursym.AddRel(c.ctxt, obj.Reloc{
+		Type: objabi.R_CALLARM,
+		Off:  int32(p.Pc),
+		Siz:  4,
+		Sym:  p.To.Sym,
+		Add:  int64(o2)<<48 | int64(o1)<<32 | int64(uint32(v)),
+	})
 	return 0
 }
 

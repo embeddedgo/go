@@ -18,7 +18,7 @@ import (
 	"internal/abi"
 	"internal/cpu"
 	"internal/cpu/r4000/creg"
-	"runtime/internal/atomic"
+	"internal/runtime/atomic"
 	"unsafe"
 )
 

@@ -65,7 +65,7 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 
 	unhandledException := ldr.Lookup("runtime.unhandledException", sym.SymVerABI0)
 	if unhandledException == 0 {
-		ld.Errorf(nil, "runtime.unhandledException not defined")
+		ld.Errorf("runtime.unhandledException not defined")
 	}
 
 	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
@@ -96,7 +96,7 @@ func gentext(ctxt *ld.Link, ldr *loader.Loader) {
 		msp = ld.RAM.Base + mainStackSize
 		ld.Segdata.Vaddr = uint64(msp)
 	} else {
-		ld.Errorf(nil, "RAM block is too small")
+		ld.Errorf("RAM block is too small")
 	}
 	// Otherwise the MemBlock.Offset sepcifies the place (beginning of NoDMA
 	// or RAM) and size reserved for the main stack (multiple cores stacks).
@@ -258,7 +258,7 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 		if ldr.SymType(tramp) == 0 {
 			// trampoline does not exist, create one
 			trampb := ldr.MakeSymbolUpdater(tramp)
-			ctxt.AddTramp(trampb)
+			ctxt.AddTramp(trampb, ldr.SymType(s))
 			gentramp(ctxt.Arch, ctxt.LinkMode, ldr, trampb, rs, int64(offset))
 		}
 		// modify reloc to point to tramp, which will be resolved later

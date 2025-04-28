@@ -79,7 +79,7 @@ func gentext_noos(ctxt *ld.Link, ldr *loader.Loader) {
 
 	unhandledInterrupt := ldr.Lookup("runtime.unhandledExternalInterrupt", sym.SymVerABI0)
 	if unhandledInterrupt == 0 {
-		ld.Errorf(nil, "runtime.unhandledExternalInterrupt not defined")
+		ld.Errorf("runtime.unhandledExternalInterrupt not defined")
 	}
 
 	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
@@ -113,7 +113,7 @@ func gentext_noos(ctxt *ld.Link, ldr *loader.Loader) {
 	// move the entry symbol at the beggining of the text segment
 	entry := lookupFuncSym(ldr, *ld.FlagEntrySymbol)
 	if entry == 0 {
-		ld.Errorf(nil, "cannot find entry function: %s", *ld.FlagEntrySymbol)
+		ld.Errorf("cannot find entry function: %s", *ld.FlagEntrySymbol)
 	}
 	for i, s := range ctxt.Textp {
 		if s == entry {
