@@ -6,6 +6,8 @@
 
 package runtime
 
+import _ "unsafe"
+
 func isr() bool {
 	return false
 }
@@ -17,3 +19,5 @@ func noosMemory() (heapBase, heapSize, limit uintptr) {
 func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) *notInHeap {
 	return nil
 }
+
+//go:linkname notewakeup embedded/rtos.notewakeup

@@ -305,6 +305,7 @@ func goexit(neverCallThisFunction)
 // side naturally has a data dependency order. All architectures that
 // Go supports or seems likely to ever support automatically enforce
 // data dependency ordering.
+//
 func publicationBarrier()
 
 //go:noescape

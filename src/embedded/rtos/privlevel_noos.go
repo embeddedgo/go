@@ -11,5 +11,5 @@ func setPrivLevel(newlevel int) (oldlevel int, err error) {
 	return oldlevel, errnoError(errno)
 }
 
-//go:linkname runtime_setprivlevel runtime.setprivlevel
-func runtime_setprivlevel(newlevel int) (oldlevel, errno int)
+//go:linkname setprivlevel runtime.setprivlevel
+func setprivlevel(newlevel int) (oldlevel, errno int)

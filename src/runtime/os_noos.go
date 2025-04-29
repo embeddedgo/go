@@ -54,6 +54,7 @@ func crash() {
 	}
 }
 
+//go:linkname setsystim embedded/rtos.setsystim
 //go:nosplit
 func setsystim(nanotime func() int64, setalarm func(ns int64)) {
 	if nanotime != nil {
@@ -70,6 +71,7 @@ func setsystim(nanotime func() int64, setalarm func(ns int64)) {
 	setsystim1()
 }
 
+//go:linkname setsyswriter embedded/rtos.setsyswriter
 //go:nosplit
 func setsyswriter(w func(fd int, p []byte) int) {
 	if w != nil {
@@ -108,6 +110,7 @@ func readRandom(r []byte) int {
 //physPageSize = _PageSize
 //}
 
+//go:linkname isr embedded/rtos.handlerMode
 //go:nosplit
 func isr() bool {
 	gp := getg()
@@ -180,12 +183,14 @@ func newosproc(mp *m)
 func exit(code int32)
 func osyield()
 
-func rtos_newrawtask(fn func()) {
+//go:linkname newrawtask embedded/rtos.newrawtask
+func newrawtask(fn func()) {
 	systemstack(func() {
 		newm(fn, nil, -1)
 	})
 }
 
+//go:linkname rtos_notetsleep embedded/rtos.notetsleep
 func rtos_notetsleep(n *note, ns int64) bool {
 	gp := getg()
 	if gp == gp.m.g0 {
@@ -208,17 +213,27 @@ func exitThread(wait *atomic.Uint32)
 
 // syscalls not used by runtime
 
-func setprivlevel(newlevel int) (oldlevel, errno int)
-func bind(cpuid int) (oldcpuid, errno int)
 func irqenabled(irq int) (enabled, errno int)
 func setirqenabled(irq, enabled int) (errno int)
-func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
 func nanosleep(ns int64)
+
+//go:linkname bind embedded/rtos.bind
+func bind(cpuid int) (oldcpuid, errno int)
+
+//go:linkname setprivlevel embedded/rtos.setprivlevel
+func setprivlevel(newlevel int) (oldlevel, errno int)
+
+//go:linkname irqctl embedded/rtos.irqctl
+func irqctl(irq, ctl, ctxid int) (enabled, prio, errno int)
+
+//go:linkname nanotime embedded/rtos.runtime_nanotime
 func nanotime() int64
 
+//go:linkname cachemaint embedded/rtos/cacheMaint
 //go:noescape
 func cachemaint(op int, p unsafe.Pointer, size int)
 
+//go:linkname reset embedded/rtos.reset
 //go:noescape
 func reset(level int, addr unsafe.Pointer) bool
 

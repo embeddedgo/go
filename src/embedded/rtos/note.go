@@ -47,3 +47,6 @@ func (n *Note) Clear() {
 
 //go:linkname notetsleep runtime.rtos_notetsleep
 func notetsleep(n *Note, ns int64) bool
+
+//go:linkname publicationBarrier runtime.publicationBarrier
+func publicationBarrier()

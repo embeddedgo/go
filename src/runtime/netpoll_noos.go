@@ -217,6 +217,7 @@ func netpolldeadline(arg any, seq uintptr) {
 	netpollAdjustWaiters(delta)
 }
 
+//go:linkname rtos_condwait embedded/rtos/condwait
 func rtos_condwait(n *pollDesc, timeout int64) bool {
 	if inheap(uintptr(unsafe.Pointer(n))) {
 		throw("runtime: rtos.Cond in heap")
@@ -227,6 +228,7 @@ func rtos_condwait(n *pollDesc, timeout int64) bool {
 // rtos_condsignal wakes up the netpoller if a goroutine is waiting or in
 // pdWait.  Otherwise it only sets the event to pdReady.
 //
+//go:linkname rtos_condsignal embedded/rtos/condsignal
 //go:nowritebarrierrec
 //go:nosplit
 func rtos_condsignal(n *pollDesc) {

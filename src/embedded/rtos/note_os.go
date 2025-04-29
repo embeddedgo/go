@@ -10,6 +10,3 @@ import _ "unsafe"
 
 //go:linkname notewakeup runtime.notewakeup
 func notewakeup(n *Note)
-
-//go:linkname publicationBarrier runtime.publicationBarrier
-func publicationBarrier()

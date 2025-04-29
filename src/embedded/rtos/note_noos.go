@@ -8,5 +8,3 @@ import _ "unsafe"
 
 //go:linkname notewakeup runtime.rtos_notewakeup
 func notewakeup(n *Note)
-
-func publicationBarrier()

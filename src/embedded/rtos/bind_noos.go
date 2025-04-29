@@ -7,9 +7,9 @@ package rtos
 import _ "unsafe"
 
 func bind(ctx ExeCtx) (oldctx ExeCtx, err error) {
-	old, errno := runtime_bind(int(ctx))
+	old, errno := bind(int(ctx))
 	return ExeCtx(old), errnoError(errno)
 }
 
-//go:linkname runtime_bind runtime.bind
-func runtime_bind(cpuid int) (oldcpuid, errno int)
+//go:linkname bind runtime.bind
+func bind(cpuid int) (oldcpuid, errno int)

@@ -6,6 +6,6 @@ package rtos
 
 import _ "unsafe"
 
+//go:linkname NewRawTask runtime.newrawtask
 func NewRawTask(fn func())
 
-//go:linkname NewRawTask runtime.rtos_newrawtask
