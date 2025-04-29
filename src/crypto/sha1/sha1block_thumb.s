@@ -4,6 +4,8 @@
 //
 // Thumb version of md5block.go
 
+//go:build !purego
+
 #include "textflag.h"
 
 // SHA-1 block routine. See sha1block.go for Go equivalent.
@@ -149,7 +151,7 @@ TEXT	·block(SB), 0, $352-16
 
 loop:
 	// Save registers at SP+4 onwards
-	
+
 	ADD     $4, R13, Rt0
 	MOVM.IA [Ra,Rb,Rc,Rd,Re], (Rt0)
 
