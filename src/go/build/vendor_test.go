@@ -22,6 +22,8 @@ var allowedPackagePrefixes = []string{
 	"github.com/google/pprof",
 	"github.com/ianlancetaylor/demangle",
 	"rsc.io/markdown",
+	"github.com/embeddedgo/fs/semihostfs",
+	"github.com/embeddedgo/noostest/init",
 }
 
 // Verify that the vendor directories contain only packages matching the list above.

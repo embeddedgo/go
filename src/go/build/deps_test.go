@@ -73,17 +73,19 @@ var depsRules = `
 	unsafe
 	< embedded/mmio
 	< embedded/arch/cortexm/mpu,
-	  internal/cpu/cortexm,
-	  internal/cpu/cortexm/acc,
-	  internal/cpu/cortexm/bitband,
-	  internal/cpu/cortexm/cmt,
-	  internal/cpu/cortexm/debug/itm,
-	  internal/cpu/cortexm/fpu,
-	  internal/cpu/cortexm/nvic,
-	  internal/cpu/cortexm/pft,
-	  internal/cpu/cortexm/scb,
-	  internal/cpu/cortexm/scid,
-	  internal/cpu/cortexm/systick,
+	  embedded/arch/cortexm/mpu/mpu7,
+	  embedded/arch/cortexm/mpu/mpu8,
+	  internal/cpu/armm,
+	  internal/cpu/armm/acc,
+	  internal/cpu/armm/bitband,
+	  internal/cpu/armm/cmt,
+	  internal/cpu/armm/debug/itm,
+	  internal/cpu/armm/fpu,
+	  internal/cpu/armm/nvic,
+	  internal/cpu/armm/pft,
+	  internal/cpu/armm/scb,
+	  internal/cpu/armm/scid,
+	  internal/cpu/armm/systick,
 	  internal/cpu/riscv/clint,
 	  internal/cpu/riscv/plic,
 	  internal/cpu/r4000/creg
@@ -684,7 +686,7 @@ var depsRules = `
 	internal/godebug, math/rand, encoding/hex
 	< internal/fuzz;
 
-	embedded/rtos, internal/cpu/cortexm/scb, internal/cpu/cortexm/systick
+	embedded/rtos, internal/cpu/armm/scb, internal/cpu/armm/systick
 	< embedded/arch/cortexm/systim;
 
 	embedded/rtos, internal/cpu/riscv/clint
@@ -699,10 +701,6 @@ var depsRules = `
 	FMT, embedded/arch/cortexm/systim, embedded/arch/riscv/systim,
 	github.com/embeddedgo/fs/semihostfs
 	< github.com/embeddedgo/noostest/init;
-
-	github.com/embeddedgo/noostest/init,
-	internal/fuzz, internal/testlog, runtime/pprof, regexp
-	< testing/internal/testdeps;
 
 	OS, flag, testing, internal/cfg, internal/platform, internal/goroot
 	< internal/testenv;
@@ -799,7 +797,8 @@ var depsRules = `
 	< internal/coverage/cfile
 	< runtime/coverage;
 
-	internal/coverage/cfile, internal/fuzz, internal/testlog, runtime/pprof, regexp
+	internal/coverage/cfile, internal/fuzz, internal/testlog, runtime/pprof, regexp,
+	github.com/embeddedgo/noostest/init
 	< testing/internal/testdeps;
 
 	# Test-only packages can have anything they want
