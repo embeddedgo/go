@@ -1,3 +1,7 @@
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 #include "textflag.h"
 
 TEXT ·load32(SB),NOSPLIT,$0-8
@@ -39,5 +43,5 @@ TEXT ·store8(SB),NOSPLIT,$0-5
 TEXT ·MB(SB),NOSPLIT,$0
 	 // use DSB instead of DMB because an IO access can affect CPU directly (eg:
 	 // generate interrupt, change CPU behavior via memory-mapped control reg.)
-	DSB 
+	DSB
 	RET

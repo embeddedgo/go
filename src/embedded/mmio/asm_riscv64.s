@@ -1,5 +1,8 @@
-#include "textflag.h"
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
+#include "textflag.h"
 
 TEXT ·load64(SB),NOSPLIT,$0-16
 	MOV  addr+0(FP), A0
