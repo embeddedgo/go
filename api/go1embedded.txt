@@ -1,3 +1,102 @@
+pkg embedded/arch/cortexm/mpu, const ENABLE = 1
+pkg embedded/arch/cortexm/mpu, const ENABLE uint32
+pkg embedded/arch/cortexm/mpu, const HFNMIENA = 2
+pkg embedded/arch/cortexm/mpu, const HFNMIENA uint32
+pkg embedded/arch/cortexm/mpu, const PRIVDEFENA = 4
+pkg embedded/arch/cortexm/mpu, const PRIVDEFENA uint32
+pkg embedded/arch/cortexm/mpu, func Clear(uint32)
+pkg embedded/arch/cortexm/mpu, func Current() int
+pkg embedded/arch/cortexm/mpu, func Select(int)
+pkg embedded/arch/cortexm/mpu, func Set(uint32)
+pkg embedded/arch/cortexm/mpu, func State() uint32
+pkg embedded/arch/cortexm/mpu, func Type() (int, int, bool)
+pkg embedded/arch/cortexm/mpu/mpu7, const A____ = 0
+pkg embedded/arch/cortexm/mpu/mpu7, const A____ Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const Amask = 117440512
+pkg embedded/arch/cortexm/mpu/mpu7, const Amask Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const Ar___ = 83886080
+pkg embedded/arch/cortexm/mpu/mpu7, const Ar___ Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const Ar_r_ = 100663296
+pkg embedded/arch/cortexm/mpu/mpu7, const Ar_r_ Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const Arw__ = 16777216
+pkg embedded/arch/cortexm/mpu/mpu7, const Arw__ Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const Arwr_ = 33554432
+pkg embedded/arch/cortexm/mpu/mpu7, const Arwr_ Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const Arwrw = 50331648
+pkg embedded/arch/cortexm/mpu/mpu7, const Arwrw Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const B = 65536
+pkg embedded/arch/cortexm/mpu/mpu7, const B Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const C = 131072
+pkg embedded/arch/cortexm/mpu/mpu7, const C Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const ENA = 1
+pkg embedded/arch/cortexm/mpu/mpu7, const ENA Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const S = 262144
+pkg embedded/arch/cortexm/mpu/mpu7, const S Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const TEX0 = 0
+pkg embedded/arch/cortexm/mpu/mpu7, const TEX0 Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const TEX1 = 524288
+pkg embedded/arch/cortexm/mpu/mpu7, const TEX1 Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const TEX2 = 1048576
+pkg embedded/arch/cortexm/mpu/mpu7, const TEX2 Attr
+pkg embedded/arch/cortexm/mpu/mpu7, const VALID = 16
+pkg embedded/arch/cortexm/mpu/mpu7, const VALID ideal-int
+pkg embedded/arch/cortexm/mpu/mpu7, const XN = 268435456
+pkg embedded/arch/cortexm/mpu/mpu7, const XN Attr
+pkg embedded/arch/cortexm/mpu/mpu7, func Region() (uintptr, Attr)
+pkg embedded/arch/cortexm/mpu/mpu7, func SIZE(int) Attr
+pkg embedded/arch/cortexm/mpu/mpu7, func SRD(uint8) Attr
+pkg embedded/arch/cortexm/mpu/mpu7, func SetRegion(uintptr, Attr)
+pkg embedded/arch/cortexm/mpu/mpu7, func TEX(int) Attr
+pkg embedded/arch/cortexm/mpu/mpu7, method (Attr) SIZE() int
+pkg embedded/arch/cortexm/mpu/mpu7, method (Attr) SRD() uint8
+pkg embedded/arch/cortexm/mpu/mpu7, method (Attr) TEX() int
+pkg embedded/arch/cortexm/mpu/mpu7, type Attr uint32
+pkg embedded/arch/cortexm/mpu/mpu8, const Ar___ = 4
+pkg embedded/arch/cortexm/mpu/mpu8, const Ar___ uint8
+pkg embedded/arch/cortexm/mpu/mpu8, const Ar_r_ = 6
+pkg embedded/arch/cortexm/mpu/mpu8, const Ar_r_ uint8
+pkg embedded/arch/cortexm/mpu/mpu8, const Arw__ = 0
+pkg embedded/arch/cortexm/mpu/mpu8, const Arw__ uint8
+pkg embedded/arch/cortexm/mpu/mpu8, const Arwrw = 2
+pkg embedded/arch/cortexm/mpu/mpu8, const Arwrw uint8
+pkg embedded/arch/cortexm/mpu/mpu8, const DGRE = 3
+pkg embedded/arch/cortexm/mpu/mpu8, const DGRE int8
+pkg embedded/arch/cortexm/mpu/mpu8, const Device = 0
+pkg embedded/arch/cortexm/mpu/mpu8, const Device int8
+pkg embedded/arch/cortexm/mpu/mpu8, const DnGRE = 2
+pkg embedded/arch/cortexm/mpu/mpu8, const DnGRE int8
+pkg embedded/arch/cortexm/mpu/mpu8, const DnGnRE = 1
+pkg embedded/arch/cortexm/mpu/mpu8, const DnGnRE int8
+pkg embedded/arch/cortexm/mpu/mpu8, const DnGnRnE = 0
+pkg embedded/arch/cortexm/mpu/mpu8, const DnGnRnE int8
+pkg embedded/arch/cortexm/mpu/mpu8, const NT = 8
+pkg embedded/arch/cortexm/mpu/mpu8, const NT int8
+pkg embedded/arch/cortexm/mpu/mpu8, const NormalNC = 4
+pkg embedded/arch/cortexm/mpu/mpu8, const NormalNC int8
+pkg embedded/arch/cortexm/mpu/mpu8, const NormalWB = 15
+pkg embedded/arch/cortexm/mpu/mpu8, const NormalWB int8
+pkg embedded/arch/cortexm/mpu/mpu8, const NormalWT = 10
+pkg embedded/arch/cortexm/mpu/mpu8, const NormalWT int8
+pkg embedded/arch/cortexm/mpu/mpu8, const RA = 2
+pkg embedded/arch/cortexm/mpu/mpu8, const RA int8
+pkg embedded/arch/cortexm/mpu/mpu8, const SI = 24
+pkg embedded/arch/cortexm/mpu/mpu8, const SI uint8
+pkg embedded/arch/cortexm/mpu/mpu8, const SN = 0
+pkg embedded/arch/cortexm/mpu/mpu8, const SN uint8
+pkg embedded/arch/cortexm/mpu/mpu8, const SO = 16
+pkg embedded/arch/cortexm/mpu/mpu8, const SO uint8
+pkg embedded/arch/cortexm/mpu/mpu8, const WA = 1
+pkg embedded/arch/cortexm/mpu/mpu8, const WA int8
+pkg embedded/arch/cortexm/mpu/mpu8, const WB = 4
+pkg embedded/arch/cortexm/mpu/mpu8, const WB int8
+pkg embedded/arch/cortexm/mpu/mpu8, const XN = 1
+pkg embedded/arch/cortexm/mpu/mpu8, const XN uint8
+pkg embedded/arch/cortexm/mpu/mpu8, func Bas() (uintptr, int8)
+pkg embedded/arch/cortexm/mpu/mpu8, func Lim() (uintptr, int, bool)
+pkg embedded/arch/cortexm/mpu/mpu8, func SetAttr03(int8, int8, int8, int8, int8, int8, int8, int8)
+pkg embedded/arch/cortexm/mpu/mpu8, func SetAttr47(int8, int8, int8, int8, int8, int8, int8, int8)
+pkg embedded/arch/cortexm/mpu/mpu8, func SetBas(uintptr, uint8)
+pkg embedded/arch/cortexm/mpu/mpu8, func SetLim(uintptr, int, bool)
 pkg embedded/mmio, func MB()
 pkg embedded/mmio, method (*P32) Addr() uintptr
 pkg embedded/mmio, method (*P32) Load() uintptr
@@ -85,16 +184,16 @@ pkg embedded/mmio, type R64[$0 T64] struct
 pkg embedded/mmio, type R8[$0 T8] struct
 pkg embedded/mmio, type RM16[$0 T16] struct
 pkg embedded/mmio, type RM16[$0 T16] struct, Mask $0
-pkg embedded/mmio, type RM16[$0 T16] struct, R *R16
+pkg embedded/mmio, type RM16[$0 T16] struct, R *R16[$0]
 pkg embedded/mmio, type RM32[$0 T32] struct
 pkg embedded/mmio, type RM32[$0 T32] struct, Mask $0
-pkg embedded/mmio, type RM32[$0 T32] struct, R *R32
+pkg embedded/mmio, type RM32[$0 T32] struct, R *R32[$0]
 pkg embedded/mmio, type RM64[$0 T64] struct
 pkg embedded/mmio, type RM64[$0 T64] struct, Mask $0
-pkg embedded/mmio, type RM64[$0 T64] struct, R *R64
+pkg embedded/mmio, type RM64[$0 T64] struct, R *R64[$0]
 pkg embedded/mmio, type RM8[$0 T8] struct
 pkg embedded/mmio, type RM8[$0 T8] struct, Mask $0
-pkg embedded/mmio, type RM8[$0 T8] struct, R *R8
+pkg embedded/mmio, type RM8[$0 T8] struct, R *R8[$0]
 pkg embedded/mmio, type T16 interface {}
 pkg embedded/mmio, type T32 interface {}
 pkg embedded/mmio, type T64 interface {}
@@ -165,17 +264,23 @@ pkg embedded/rtos, const IntPrioSysCall = 0
 pkg embedded/rtos, const IntPrioSysCall ideal-int
 pkg embedded/rtos, const IntPrioSysTimer = 0
 pkg embedded/rtos, const IntPrioSysTimer ideal-int
+pkg embedded/rtos, const NotBound = -1
+pkg embedded/rtos, const NotBound ExeCtx
 pkg embedded/rtos, const SystemReset = 0
 pkg embedded/rtos, const SystemReset ideal-int
 pkg embedded/rtos, const UnsafeReboot = 15
 pkg embedded/rtos, const UnsafeReboot ideal-int
+pkg embedded/rtos, func Bind(ExeCtx) (ExeCtx, error)
 pkg embedded/rtos, func CacheMaint(int, unsafe.Pointer, int)
 pkg embedded/rtos, func HandlerMode() bool
 pkg embedded/rtos, func Nanotime() time.Duration
+pkg embedded/rtos, func NewRawTask(func())
 pkg embedded/rtos, func Reset(int, unsafe.Pointer) bool
 pkg embedded/rtos, func SetPrivLevel(int) (int, error)
 pkg embedded/rtos, func SetSystemTimer(func() int64, func(int64)) error
 pkg embedded/rtos, func SetSystemWriter(func(int, []uint8) int) error
+pkg embedded/rtos, method (*Cond) Signal()
+pkg embedded/rtos, method (*Cond) Wait(time.Duration) bool
 pkg embedded/rtos, method (*Error) Error() string
 pkg embedded/rtos, method (*Note) Clear()
 pkg embedded/rtos, method (*Note) Sleep(time.Duration) bool
@@ -187,6 +292,7 @@ pkg embedded/rtos, type Error struct
 pkg embedded/rtos, type IRQ int
 pkg embedded/rtos, type IntCtx int
 pkg embedded/rtos, type Note struct
+pkg embedded/rtos, var ErrBadExeCtx *Error
 pkg embedded/rtos, var ErrBadIntNumber *Error
 pkg embedded/rtos, var ErrBadIntPrio *Error
 pkg embedded/rtos, var ErrBadPrivLevel *Error
@@ -197,6 +303,8 @@ pkg embedded/rtos, var ErrUknown *Error
 pkg embedded/rtos, func Mount(FS, string) error
 pkg embedded/rtos, func Mounts() []*MountPoint
 pkg embedded/rtos, func Unmount(FS, string) error
+pkg embedded/rtos, type Cond struct
+pkg embedded/rtos, type ExeCtx int
 pkg embedded/rtos, type FS interface { Name, OpenWithFinalizer, Type, Usage }
 pkg embedded/rtos, type FS interface, Name() string
 pkg embedded/rtos, type FS interface, OpenWithFinalizer(string, int, fs.FileMode, func()) (fs.File, error)
