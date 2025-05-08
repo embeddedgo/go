@@ -110,12 +110,18 @@ func mv(val byte) *m {
 	return m
 }
 
+var (
+	qv  mq
+	clv mcl
+	slv msl
+)
+
 func MQTest() string {
 	if !atomic.Cas(&run, 0, 1) {
 		return "" // run only once
 	}
 
-	q := new(mq)
+	q := &qv
 
 	mqfill(q)
 	if q.str() != fillkeys {
@@ -146,7 +152,7 @@ func MQTest() string {
 		return "mq: order != fillkeys"
 	}
 
-	cl := new(mcl)
+	cl := &clv
 
 	mclfill(cl)
 	if cl.str() != fillkeys {
@@ -246,7 +252,7 @@ func MQTest() string {
 		return "mcl: removebykey, key unknown"
 	}
 
-	sl := new(msl)
+	sl := &slv
 
 	sl.insertbyval(mv('3'))
 	sl.insertbyval(mv('0'))
