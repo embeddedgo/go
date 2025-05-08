@@ -238,7 +238,6 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				// during the execution of the function prologue, the traceback
 				// code will not see a half-updated stack frame.
 				p = obj.Appendp(p, c.newprog)
-				p.Pos = p.Pos
 				p.As = ASUB
 				p.From.Type = obj.TYPE_CONST
 				p.From.Offset = int64(autosize)
@@ -247,7 +246,6 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.To.Reg = REGTMP
 
 				p = obj.Appendp(p, c.newprog)
-				p.Pos = p.Pos
 				p.As = AMOVW
 				p.From.Type = obj.TYPE_REG
 				p.From.Reg = REGLINK
@@ -255,7 +253,6 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				p.To.Reg = REGTMP
 
 				p = obj.Appendp(p, c.newprog)
-				p.Pos = p.Pos
 				p.As = AMOVW
 				p.From.Type = obj.TYPE_REG
 				p.From.Reg = REGTMP
