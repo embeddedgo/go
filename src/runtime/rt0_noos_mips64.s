@@ -160,10 +160,9 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	ADD   $16, R29
 
 	// enable interrupts
-	// TODO where to enable interupts correctly?
 	MOVW R0, M(C0_COMPARE)
 	MOVW M(C0_SR), R8
-	OR   $(SR_IE|INTR_SW|INTR_EXT), R8
+	OR   $(SR_IE|INTR_SW), R8
 	MOVW R8, M(C0_SR)
 
 	// start this M

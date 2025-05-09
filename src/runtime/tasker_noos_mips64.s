@@ -184,7 +184,7 @@ TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
 
 currentStack:
 	BGTZ  R4, badSyscall // slow syscall from handler
-	ADD   $excCtxSize, R29, R1 // duffcopy src handler
+	ADD   $excCtxSize, R29, R1 // duffcopy src
 
 duffcopy:
 	// 3 extra registers to preserve src, dst and size of result
@@ -287,6 +287,10 @@ TEXT runtime·enterScheduler(SB),NOSPLIT|NOFRAME,$0
 
 	// Restore mstatus from exception context
 	MOVV  _mstatus(R29), R1
+	AND   $~INTR_EXT, R1
+	MOVW  ·globalIRQMask(SB), R2
+	AND   $INTR_EXT, R2
+	OR    R2, R1
 	MOVV  R1, M(C0_SR)
 	ADD   $excCtxSize, R29
 
@@ -406,6 +410,10 @@ fatal:
 
 TEXT runtime·exceptionReturn(SB),NOSPLIT|NOFRAME,$0
 	MOVV  _mstatus(R29), R26
+	AND   $~INTR_EXT, R26
+	MOVW  ·globalIRQMask(SB), R27
+	AND   $INTR_EXT, R27
+	OR    R27, R26
 	MOVV  R26, M(C0_SR)
 	MOVV  _lr(R29), R26
 	MOVV  $~1, R27
@@ -420,8 +428,18 @@ TEXT runtime·exceptionReturn(SB),NOSPLIT|NOFRAME,$0
 
 	ADD   $excCtxSize, R29
 
-	// Don't switch stacks yet if we were called from handler
+	// Don't restore interrupt mask or switch stacks yet if we were called
+	// from handler
 	BNE   R27, R0, return
+
+	MOVW  M(C0_SR), R26
+	MOVW  $~INTR_EXT, R27
+	AND   R27, R26
+	MOVW  $·globalIRQMask(SB), R27
+	MOVW  (R27), R27
+	AND   $INTR_EXT, R27
+	OR    R27, R26
+	MOVW  R26, M(C0_SR)
 
 	MOVV  $·cpu0(SB), R26
 	MOVV  (g_sched+gobuf_sp)(R26), R29
