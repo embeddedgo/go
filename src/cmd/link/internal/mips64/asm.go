@@ -85,7 +85,7 @@ func gentext_noos(ctxt *ld.Link, ldr *loader.Loader) {
 	// search for user defined ISRs: //go:linkname functionName IRQ%d_Handler
 	// This code tries to keep runtime.vectors small, by cutting off all irq
 	// at the end that point to runtime.unhandledExternalInterrupt.
-	var irqHandlers [5]loader.Sym
+	var irqHandlers [8]loader.Sym
 	irqNum := 1
 	for i := 1; i < len(irqHandlers); i++ {
 		s := lookupFuncSym(ldr, ld.InterruptHandler(i))
