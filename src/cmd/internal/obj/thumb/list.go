@@ -39,43 +39,7 @@ func init() {
 	obj.RegisterRegister(obj.RBaseThumb, MAXREG, rconv)
 	obj.RegisterOpcode(obj.ABaseThumb, Anames)
 	obj.RegisterRegisterList(obj.RegListARMLo, obj.RegListARMHi, rlconv)
-	obj.RegisterOpSuffix("thumb", cconv)
-}
-
-var condCode = []string{
-	".EQ",
-	".NE",
-	".CS",
-	".CC",
-	".MI",
-	".PL",
-	".VS",
-	".VC",
-	".HI",
-	".LS",
-	".GE",
-	".LT",
-	".GT",
-	".LE",
-	"",
-	".NV",
-}
-
-func cconv(s uint8) string {
-	sc := condCode[(s&C_SCOND)^C_SCOND_XOR]
-	if s&C_SBIT != 0 {
-		sc += ".S"
-	}
-	if s&C_PBIT != 0 {
-		sc += ".P"
-	}
-	if s&C_WBIT != 0 {
-		sc += ".W"
-	}
-	if s&C_UBIT != 0 { /* ambiguous with FBIT */
-		sc += ".U"
-	}
-	return sc
+	obj.RegisterOpSuffix("thumb", obj.CConvARM)
 }
 
 func rconv(r int) string {
