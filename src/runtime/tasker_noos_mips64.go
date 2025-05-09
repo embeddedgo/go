@@ -112,7 +112,10 @@ func syscachemaint(op int, p unsafe.Pointer, size int) {
 	}
 }
 
-var highPrioIRQMask uint32
+var (
+	globalIRQMask   uint32
+	highPrioIRQMask uint32
+)
 
 func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 	if uint(irq) > 8 { // TODO PIC dependent
@@ -132,14 +135,14 @@ func sysirqctl(irq, ctl, ctxid int) (enabled, prio, errno int) {
 		} else if ctl > 0 {
 			atomic.Or32(&highPrioIRQMask, irqMask) // set prio to high
 		}
-		creg.STATUS.SetBits(irqMask)
+		atomic.Or32(&globalIRQMask, irqMask)
 	case ctl == -2: // disable IRQ
-		creg.STATUS.ClearBits(irqMask)
+		atomic.And32(&globalIRQMask, ^irqMask)
 	default: // -3, IRQ status
 		if irqMask&atomic.Load(&highPrioIRQMask) != 0 {
 			prio = 1
 		}
-		if creg.STATUS.LoadBits(irqMask) != 0 {
+		if atomic.Load(&globalIRQMask)&irqMask != 0 {
 			enabled = 1
 		}
 	}
