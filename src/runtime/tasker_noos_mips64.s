@@ -46,7 +46,8 @@
 #define _lr        (0*8)
 #define _mstatus   (1*8)
 #define _mepc      (2*8)
-#define excCtxSize (3*8)
+#define _mregtmp   (3*8)
+#define excCtxSize (4*8)
 
 
 // This will be copied into the processor's general exception vector.  Since the
@@ -69,6 +70,9 @@ TEXT runtime·intvector(SB),NOSPLIT|NOFRAME,$0
 // Only syscalls and interrupts are handled at the moment, all other exceptions
 // are fatal.
 TEXT runtime·exceptionHandler(SB),NOSPLIT|NOFRAME,$0
+	// Be especially careful to not clobber REGTMP with multi-instruction
+	// statements until it's saved on the stack.
+
 	// Determine caller stack
 	MOVV  $·cpu0(SB), R26
 	BNE   R26, g, fromThread
@@ -89,6 +93,7 @@ fromThread:
 fromHandler:
 	// Save exception context on ISR stack
 	SUB   $excCtxSize, R29
+	MOVV  R23, _mregtmp(R29) // R23 (REGTMP) is now free for use
 	OR    $1, R31, R26 // Encode smallCtx flag in lr
 	MOVV  R26, _lr(R29) // R29 is now free for use
 	MOVV  M(C0_SR), R26
@@ -170,7 +175,8 @@ TEXT runtime·syscallHandler(SB),NOSPLIT|NOFRAME,$0
 
 	MOVV  _lr(R29), R3
 	MOVV  R3, (m_mOS+mOS_ra)(R2)
-
+	MOVV  _mregtmp(R29), R3
+	MOVV  R3, (m_mOS+mOS_tmp)(R2)
 	MOVV  _mepc(R29), R3
 	AND   $~1, R3  // Remove fromHandler flag from epc
 	MOVV  R3, (m_mOS+mOS_epc)(R2)
@@ -249,6 +255,9 @@ TEXT runtime·softwareInterruptHandler(SB),NOSPLIT|NOFRAME,$0
 	// Save thread context in mOS
 	MOVV  (cpuctx_exe)(g), R27
 
+	MOVV  _mregtmp(R29), R26
+	MOVV  R26, (m_mOS+mOS_tmp)(R27)
+
 	MOVV  _lr(R29), R26
 	AND   $~1, R26  // Remove smallCtx flag from lr
 	MOVV  R26, (m_mOS+mOS_ra)(R27)
@@ -315,8 +324,8 @@ smallCtx:
 	MOVV  (m_mOS+mOS_ra)(R27), R31
 	MOVV  (m_mOS+mOS_epc)(R27), R26
 	MOVV  R26, M(C0_EPC)
-	MOVV  $~1, R27
-	AND   R27, R31 // Remove smallCtx flag
+	AND   $~1, R31 // Remove smallCtx flag
+	MOVV  (m_mOS+mOS_tmp)(R27), R23
 
 	ERET
 
@@ -426,11 +435,9 @@ TEXT runtime·exceptionReturn(SB),NOSPLIT|NOFRAME,$0
 	MOVV  $1, R27
 	AND   R26, R27
 
-	ADD   $excCtxSize, R29
-
 	// Don't restore interrupt mask or switch stacks yet if we were called
 	// from handler
-	BNE   R27, R0, return
+	BNE   R27, R0, fromHandler
 
 	MOVW  M(C0_SR), R26
 	MOVW  $~INTR_EXT, R27
@@ -441,11 +448,18 @@ TEXT runtime·exceptionReturn(SB),NOSPLIT|NOFRAME,$0
 	OR    R27, R26
 	MOVW  R26, M(C0_SR)
 
+	MOVV  _mregtmp(R29), R23
+	ADD   $excCtxSize, R29
 	MOVV  $·cpu0(SB), R26
 	MOVV  (g_sched+gobuf_sp)(R26), R29
 	MOVV  (g_sched+gobuf_g)(R26), g
 
-return:
+	ERET
+
+fromHandler:
+	MOVV  _mregtmp(R29), R23
+	ADD   $excCtxSize, R29
+
 	ERET
 
 
@@ -478,29 +492,25 @@ TEXT ·saveGPRs(SB),NOSPLIT|NOFRAME,$0
 	MOVV R20, 152(R26)
 	MOVV R21, 160(R26)
 	MOVV R22, 168(R26)
-	MOVV R23, 176(R26)
-	MOVV R24, 184(R26)
-	MOVV R25, 192(R26)
-	MOVV RSB, 200(R26)
+	MOVV R24, 176(R26)
+	MOVV R25, 184(R26)
+	MOVV RSB, 192(R26)
 	MOVV HI, R1
-	MOVV R1, 208(R26)
+	MOVV R1, 200(R26)
 	MOVV LO, R1
-	MOVV R1, 216(R26)
+	MOVV R1, 208(R26)
 	RET
 
 
-// R26 must point to stored gprs.  Only use R26, R27 after restoring.  Be
-// especially careful and look at the disassembly;  The assembler might decide
-// to use R16-R23 for you.
+// R26 must point to stored gprs.  Only use R26, R27 after restoring.
 TEXT ·restoreGPRs(SB),NOSPLIT|NOFRAME,$0
-	MOVV 216(R26), R1
-	MOVV R1, LO
 	MOVV 208(R26), R1
+	MOVV R1, LO
+	MOVV 200(R26), R1
 	MOVV R1, HI
-	MOVV 200(R26), RSB
-	MOVV 192(R26), R25
-	MOVV 184(R26), R24
-	MOVV 176(R26), R23
+	MOVV 192(R26), RSB
+	MOVV 184(R26), R25
+	MOVV 176(R26), R24
 	MOVV 168(R26), R22
 	MOVV 160(R26), R21
 	MOVV 152(R26), R20

@@ -24,15 +24,15 @@ import (
 
 // See saveGPRS and saveFPRS
 const (
-	numGPRS = 28
+	numGPRS = 27
 	numFPRS = 33
 )
 
 type mOS struct {
 	// thread context
-	gprs            [numGPRS]uintptr
-	fprs            [numFPRS]float64
-	sp, fp, ra, epc uintptr
+	gprs                 [numGPRS]uintptr
+	fprs                 [numFPRS]float64
+	sp, fp, ra, epc, tmp uintptr
 }
 
 var (
