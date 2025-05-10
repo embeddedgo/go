@@ -424,26 +424,21 @@ TEXT runtime·exceptionReturn(SB),NOSPLIT|NOFRAME,$0
 	AND   $INTR_EXT, R27
 	OR    R27, R26
 	MOVV  R26, M(C0_SR)
-	MOVV  _lr(R29), R26
-	MOVV  $~1, R27
-	AND   R27, R26, R31 // Remove smallCtx flag from lr
+	MOVV  _lr(R29), R31
+	AND   $~1, R31 // Remove smallCtx flag from lr
 	MOVV  _mepc(R29), R26
-	MOVV  $~1, R27
-	AND   R26, R27  // Remove fromHandler flag from EPC
+	AND   $~1, R26, R27  // Remove fromHandler flag from EPC
 	MOVV  R27, M(C0_EPC)
 
-	MOVV  $1, R27
-	AND   R26, R27
+	AND   $1, R26, R27
 
 	// Don't restore interrupt mask or switch stacks yet if we were called
 	// from handler
 	BNE   R27, R0, fromHandler
 
 	MOVW  M(C0_SR), R26
-	MOVW  $~INTR_EXT, R27
-	AND   R27, R26
-	MOVW  $·globalIRQMask(SB), R27
-	MOVW  (R27), R27
+	AND   $~INTR_EXT, R26
+	MOVW  ·globalIRQMask(SB), R27
 	AND   $INTR_EXT, R27
 	OR    R27, R26
 	MOVW  R26, M(C0_SR)
