@@ -37,38 +37,11 @@ func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd, stackTop uintptr) (nodmaS
 	nodmaSize := nodmaEnd - nodmaStart
 	size := freeSize + nodmaSize
 
-	// Estimate the space needed for non-heap allocations. We assumed a linear
-	// relationship between the required space and the free memory counted as
-	// the number of pages:
-	//
-	//	palloc = A * freePages + B
-	//
-	// As the information about the heap memory is stored mainly in the mspan
-	// structs the A coefficient is proportional to the size of mspan. The B
-	// coefficient takes into account the pointer size. TODO: Replace this
-	// heuristic relationship with something more strict.
-	const (
-		A = unsafe.Sizeof(emptymspan) / 2
-		B = unsafe.Sizeof(uintptr(0)) * 1024 * 8
-	)
-	palloc := A*(freeSize>>pageShift) + B
-
-	// We can use non-DMA memory for non-heap objects to preserve as much as
-	// possible of the DMA capable memory for heap.
-	pallocInFree := uintptr(0)
-	if palloc > nodmaSize {
-		pallocInFree = palloc - nodmaSize
-	}
-
-	// Reduce the arena by the remainder of the non-heap space that did not fit
-	// in the non-DMA memory, properly align the arena.
-	arenaStart := freeStart + pallocInFree
-	arenaAlign := uintptr(heapArenaBytes) - 1
-	arenaStart = (arenaStart + arenaAlign) &^ arenaAlign
+	arenaStart := alignUp(freeStart, heapArenaBytes)
 	arenaSize := freeEnd - arenaStart
 
 	noosMem.free.start = freeStart
-	noosMem.free.end = arenaStart
+	noosMem.free.end = freeEnd
 	noosMem.nodma.start = nodmaStart
 	noosMem.nodma.end = nodmaEnd
 	noosMem.arenaStart = arenaStart
@@ -84,36 +57,14 @@ type pamem struct {
 }
 
 //go:nosplit
-func (m *pamem) allocPages(size uintptr) unsafe.Pointer {
+func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
 	var p uintptr
-	if m.end-m.start >= size {
-		p = m.end - size
+	astart := alignDown(m.end-size, align)
+	if astart-m.start >= size {
+		p = astart
 		m.end = p
 	}
 	return unsafe.Pointer(p)
-}
-
-//go:nosplit
-func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
-	var p uintptr
-	align-- // align must be power of two
-	astart := (m.start + align) &^ align
-	if m.end-astart >= size {
-		p = astart
-		m.start = astart + size
-	}
-	return unsafe.Pointer(p)
-}
-
-//go:nosplit
-func sysReserve1(size uintptr) unsafe.Pointer {
-	lock(&noosMem.mx)
-	p := noosMem.free.allocPages(size)
-	if p == nil {
-		p = noosMem.nodma.allocPages(size)
-	}
-	unlock(&noosMem.mx)
-	return p
 }
 
 //go:nosplit
@@ -125,26 +76,31 @@ func sysReserveOS(v unsafe.Pointer, size uintptr) unsafe.Pointer {
 		// right away and we don't reuse chunks passed to sysFree.
 		return nil
 	}
-	size += (_PageSize - 1)
-	size &^= (_PageSize - 1)
-	return sysReserve1(size)
+	return noosRawAlloc(size, 8)
+
 }
 
 //go:nosplit
 func sysAllocOS(size uintptr) unsafe.Pointer {
-	size += (_PageSize - 1)
-	size &^= (_PageSize - 1)
-	p := sysReserve1(size)
+	p := noosRawAlloc(size, 8)
 	if p == nil {
 		throw("runtime: cannot allocate memory")
 	}
 	return p
 }
 
+func sysUsedOS(v unsafe.Pointer, n uintptr) {
+	lock(&noosMem.mx)
+	noosMem.free.start = max(noosMem.free.start, uintptr(v)+n)
+	if noosMem.free.start > noosMem.free.end {
+		throw("runtime: cannot allocate memory")
+	}
+	unlock(&noosMem.mx)
+}
+
 func sysFreeOS(v unsafe.Pointer, n uintptr)             {}
 func sysMapOS(v unsafe.Pointer, n uintptr)              {}
 func sysUnusedOS(v unsafe.Pointer, n uintptr)           {}
-func sysUsedOS(v unsafe.Pointer, n uintptr)             {}
 func sysFaultOS(v unsafe.Pointer, n uintptr)            {}
 func sysHugePageOS(v unsafe.Pointer, n uintptr)         {}
 func sysNoHugePageOS(v unsafe.Pointer, n uintptr)       {}
@@ -158,10 +114,12 @@ func noosMemory() (heapBase, heapSize, limit uintptr) {
 }
 
 func noosRawAlloc(size, align uintptr) unsafe.Pointer {
+	lock(&noosMem.mx)
 	p := noosMem.free.alloc(size, align)
 	if p == nil {
 		p = noosMem.nodma.alloc(size, align)
 	}
+	unlock(&noosMem.mx)
 	return p
 }
 
@@ -169,16 +127,8 @@ func noosRawAlloc(size, align uintptr) unsafe.Pointer {
 //
 //go:nosplit
 func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) (p *notInHeap) {
-	if size&(_PageSize-1) == 0 {
-		p = (*notInHeap)(sysReserve1(size))
-	} else {
-		if align == 0 {
-			align = 8
-		}
-		lock(&noosMem.mx)
-		p = (*notInHeap)(noosRawAlloc(size, align))
-		unlock(&noosMem.mx)
-	}
+	align = max(align, 8)
+	p = (*notInHeap)(noosRawAlloc(size, align))
 	if p == nil {
 		throw("runtime: cannot allocate memory")
 	}
