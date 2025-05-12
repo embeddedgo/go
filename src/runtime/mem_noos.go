@@ -58,12 +58,11 @@ type pamem struct {
 
 //go:nosplit
 func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
-	var p uintptr
-	astart := alignDown(m.end-size, align)
-	if astart-m.start >= size {
-		p = astart
-		m.end = p
+	p := alignDown(m.end-size, align)
+	if p < m.start || p > m.end {
+		return nil
 	}
+	m.end = p
 	return unsafe.Pointer(p)
 }
 
@@ -115,9 +114,9 @@ func noosMemory() (heapBase, heapSize, limit uintptr) {
 
 func noosRawAlloc(size, align uintptr) unsafe.Pointer {
 	lock(&noosMem.mx)
-	p := noosMem.free.alloc(size, align)
+	p := noosMem.nodma.alloc(size, align)
 	if p == nil {
-		p = noosMem.nodma.alloc(size, align)
+		p = noosMem.free.alloc(size, align)
 	}
 	unlock(&noosMem.mx)
 	return p
