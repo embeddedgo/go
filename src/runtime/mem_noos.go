@@ -14,14 +14,13 @@ import "unsafe"
 // noosMemory returns the address and size of the memory allocated to the arena
 // (heapArenaBytes aligned) and the memory limit for GC.
 //
-// sysReserve allocates down from noosMem.*.end always returning _PageSize
-// aligned memory.
+// sysReserve allocates down from noosMem.*.end.
 //
 // noosPersistentAlloc provides fast and memory efficient implementation of
 // the persistentalloc1 function.
 
 var noosMem struct {
-	free, nodma           pamem
+	free, arena, nodma    pamem
 	arenaStart, arenaSize uintptr
 	size                  uintptr // initial sum of free, nodma and arena bytes
 	mx                    mutex
@@ -40,10 +39,9 @@ func meminit(freeStart, freeEnd, nodmaStart, nodmaEnd, stackTop uintptr) (nodmaS
 	arenaStart := alignUp(freeStart, heapArenaBytes)
 	arenaSize := freeEnd - arenaStart
 
-	noosMem.free.start = freeStart
-	noosMem.free.end = freeEnd
-	noosMem.nodma.start = nodmaStart
-	noosMem.nodma.end = nodmaEnd
+	noosMem.free = pamem{freeStart, arenaStart} // free memory before the arena
+	noosMem.arena = pamem{arenaStart, freeEnd}  // memory also reserved by the arena
+	noosMem.nodma = pamem{nodmaStart, nodmaEnd} // extra nadma memory
 	noosMem.arenaStart = arenaStart
 	noosMem.arenaSize = arenaSize
 	noosMem.size = size
@@ -90,8 +88,8 @@ func sysAllocOS(size uintptr) unsafe.Pointer {
 
 func sysUsedOS(v unsafe.Pointer, n uintptr) {
 	lock(&noosMem.mx)
-	noosMem.free.start = max(noosMem.free.start, uintptr(v)+n)
-	if noosMem.free.start > noosMem.free.end {
+	noosMem.arena.start = max(noosMem.arena.start, uintptr(v)+n)
+	if noosMem.arena.start > noosMem.arena.end {
 		throw("runtime: cannot allocate memory")
 	}
 	unlock(&noosMem.mx)
@@ -114,9 +112,15 @@ func noosMemory() (heapBase, heapSize, limit uintptr) {
 
 func noosRawAlloc(size, align uintptr) unsafe.Pointer {
 	lock(&noosMem.mx)
-	p := noosMem.nodma.alloc(size, align)
+	p := noosMem.free.alloc(size, align)
 	if p == nil {
-		p = noosMem.free.alloc(size, align)
+		p = noosMem.nodma.alloc(size, align)
+	}
+	if p == nil {
+		// If both free and nodma don't have enough space left, start
+		// allocating in the arena. While the arena allocates from
+		// bottom, pamem allocates from top.
+		p = noosMem.arena.alloc(size, align)
 	}
 	unlock(&noosMem.mx)
 	return p
