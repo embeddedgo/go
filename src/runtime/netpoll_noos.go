@@ -84,6 +84,7 @@ const (
 func netpollblock(pd *pollDesc, ns int64) bool {
 	var gp *g
 	var t *timer
+	var deadline int64 = maxWhen
 	gpp := &pd.g
 
 	if ns == 0 {
@@ -105,14 +106,13 @@ func netpollblock(pd *pollDesc, ns int64) bool {
 	pd.self = pd
 	t.arg = pd.makeArg()
 	t.seq = pd.seq
-	if ns < 0 {
-		t.nextwhen = maxWhen
-	} else {
-		t.nextwhen = nanotime() + ns
-		if t.nextwhen < 0 { // check for overflow.
-			t.nextwhen = maxWhen
+	if ns >= 0 {
+		deadline = nanotime() + ns
+		if deadline < 0 { // check for overflow.
+			deadline = maxWhen
 		}
 	}
+	t.reset(deadline, 0)
 
 	// set the gpp semaphore to pdWait
 	for {
@@ -144,7 +144,6 @@ clear:
 
 func netpollblockcommit(gp *g, gpp unsafe.Pointer) bool {
 	r := atomic.Casuintptr((*uintptr)(gpp), pdWait, uintptr(unsafe.Pointer(gp)))
-	resettimer(gp.timer, gp.timer.nextwhen)
 	if r {
 		netpollAdjustWaiters(1)
 	}
@@ -198,7 +197,7 @@ func netpollready(toRun *gList, pd *pollDesc) (delta int32) {
 }
 
 // netpolldeadline is the deadline timers callback.
-func netpolldeadline(arg any, seq uintptr) {
+func netpolldeadline(arg any, seq uintptr, delay int64) {
 	pd := arg.(*pollDesc)
 
 	lock(&pd.lock)
@@ -217,7 +216,7 @@ func netpolldeadline(arg any, seq uintptr) {
 	netpollAdjustWaiters(delta)
 }
 
-//go:linkname rtos_condwait embedded/rtos/condwait
+//go:linkname rtos_condwait
 func rtos_condwait(n *pollDesc, timeout int64) bool {
 	if inheap(uintptr(unsafe.Pointer(n))) {
 		throw("runtime: rtos.Cond in heap")
@@ -228,7 +227,7 @@ func rtos_condwait(n *pollDesc, timeout int64) bool {
 // rtos_condsignal wakes up the netpoller if a goroutine is waiting or in
 // pdWait.  Otherwise it only sets the event to pdReady.
 //
-//go:linkname rtos_condsignal embedded/rtos/condsignal
+//go:linkname rtos_condsignal
 //go:nowritebarrierrec
 //go:nosplit
 func rtos_condsignal(n *pollDesc) {
