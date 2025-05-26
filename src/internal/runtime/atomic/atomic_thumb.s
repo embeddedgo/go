@@ -48,6 +48,19 @@ loop:
 	MOVW   R0, ret+8(FP)
 	RET
 
+TEXT ·Xchg8(SB),NOSPLIT|NOFRAME,$0-9
+	MOVW  addr+0(FP), R1
+	MOVB  v+4(FP), R2
+loop:
+	LDREXB  (R1), R0
+	DMB     MB_ISHST
+	STREXB  R2, (R1), R3
+	CMP     $0, R3
+	BNE     loop
+	DMB     MB_ISH
+	MOVW    R0, ret+8(FP)
+	RET
+
 TEXT ·Cas(SB),NOSPLIT|NOFRAME,$0-13
 	MOVW  ptr+0(FP), R1
 	MOVW  old+4(FP), R2

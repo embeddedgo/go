@@ -12,6 +12,20 @@ import (
 
 // Export some functions via linkname to assembly in sync/atomic.
 //
+//go:linkname And64
+//go:linkname Anduintptr
+//go:linkname Cas64
+//go:linkname Load64
+//go:linkname LoadAcquintptr
+//go:linkname Or64
+//go:linkname Oruintptr
+//go:linkname Store64
+//go:linkname StoreReluintptr
+//go:linkname Xadd
+//go:linkname Xadd64
+//go:linkname Xadduintptr
+//go:linkname Xchg
+//go:linkname Xchg64
 //go:linkname Xchguintptr
 
 type spinlock struct {
@@ -73,6 +87,24 @@ func goXadd64(addr *uint64, delta int64) uint64 {
 	*addr = r
 	addrLock(addr).unlock()
 	return r
+}
+
+//go:nosplit
+func goXchg8(addr *uint8, v uint8) uint8 {
+	// Align down to 4 bytes and use 32-bit CAS.
+	addr32 := (*uint32)(unsafe.Pointer(uintptr(unsafe.Pointer(addr)) &^ 3))
+	shift := (uintptr(unsafe.Pointer(addr)) & 3) * 8 // little endian
+	word := uint32(v) << shift
+	mask := uint32(0xFF) << shift
+
+	for {
+		old := *addr32 // Read the old 32-bit value
+		// Clear the old 8 bits then insert the new value
+		if Cas(addr32, old, (old&^mask)|word) {
+			// Return the old 8-bit value
+			return uint8((old & mask) >> shift)
+		}
+	}
 }
 
 //go:nosplit
@@ -172,6 +204,9 @@ func Xadd(val *uint32, delta int32) uint32
 
 //go:noescape
 func Xchg(addr *uint32, v uint32) uint32
+
+//go:noescape
+func Xchg8(addr *uint8, v uint8) uint8
 
 //go:nosplit
 func Load64(addr *uint64) uint64 {
