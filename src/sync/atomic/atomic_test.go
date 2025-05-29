@@ -116,12 +116,15 @@ func TestSwapUint32Method(t *testing.T) {
 	}
 }
 
+var sink any
+
 func TestSwapInt64(t *testing.T) {
 	var x struct {
 		before int64
 		i      int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -144,6 +147,7 @@ func TestSwapInt64Method(t *testing.T) {
 		i      Int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -166,6 +170,7 @@ func TestSwapUint64(t *testing.T) {
 		i      uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -188,6 +193,7 @@ func TestSwapUint64Method(t *testing.T) {
 		i      Uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -403,6 +409,7 @@ func TestAddInt64(t *testing.T) {
 		i      int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -425,6 +432,7 @@ func TestAddInt64Method(t *testing.T) {
 		i      Int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -447,6 +455,7 @@ func TestAddUint64(t *testing.T) {
 		i      uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -469,6 +478,7 @@ func TestAddUint64Method(t *testing.T) {
 		i      Uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -629,6 +639,7 @@ func TestAndInt64(t *testing.T) {
 		i      int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -653,6 +664,7 @@ func TestAndInt64Method(t *testing.T) {
 		i      Int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -677,6 +689,7 @@ func TestAndUint64(t *testing.T) {
 		i      uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -701,6 +714,7 @@ func TestAndUint64Method(t *testing.T) {
 		i      Uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -863,6 +877,7 @@ func TestOrInt64(t *testing.T) {
 		i      int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -886,6 +901,7 @@ func TestOrInt64Method(t *testing.T) {
 		i      Int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -909,6 +925,7 @@ func TestOrUint64(t *testing.T) {
 		i      uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -932,6 +949,7 @@ func TestOrUint64Method(t *testing.T) {
 		i      Uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1119,6 +1137,7 @@ func TestCompareAndSwapInt64(t *testing.T) {
 		i      int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1149,6 +1168,7 @@ func TestCompareAndSwapInt64Method(t *testing.T) {
 		i      Int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1179,6 +1199,7 @@ func testCompareAndSwapUint64(t *testing.T, cas func(*uint64, uint64, uint64) bo
 		i      uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1213,6 +1234,7 @@ func TestCompareAndSwapUint64Method(t *testing.T) {
 		i      Uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1452,6 +1474,7 @@ func TestLoadInt64(t *testing.T) {
 		i      int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1473,6 +1496,7 @@ func TestLoadInt64Method(t *testing.T) {
 		i      Int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1496,6 +1520,7 @@ func TestLoadUint64(t *testing.T) {
 		i      uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1517,6 +1542,7 @@ func TestLoadUint64Method(t *testing.T) {
 		i      Uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1715,6 +1741,7 @@ func TestStoreInt64(t *testing.T) {
 		i      int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1737,6 +1764,7 @@ func TestStoreInt64Method(t *testing.T) {
 		i      Int64
 		after  int64
 	}
+	sink = &x
 	magic64 := int64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1759,6 +1787,7 @@ func TestStoreUint64(t *testing.T) {
 		i      uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
@@ -1781,6 +1810,7 @@ func TestStoreUint64Method(t *testing.T) {
 		i      Uint64
 		after  uint64
 	}
+	sink = &x
 	magic64 := uint64(magic64)
 	x.before = magic64
 	x.after = magic64
