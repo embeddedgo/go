@@ -44,6 +44,7 @@ func Supported() error {
 	// See EnableFIPS in cmd/internal/obj/fips.go for commentary.
 	switch {
 	case runtime.GOARCH == "wasm",
+		runtime.GOOS == "noos" || runtime.GOARCH == "thumb",
 		runtime.GOOS == "windows" && runtime.GOARCH == "386",
 		runtime.GOOS == "windows" && runtime.GOARCH == "arm",
 		runtime.GOOS == "openbsd", // due to -fexecute-only, see #70880

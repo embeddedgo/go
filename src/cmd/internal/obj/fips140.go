@@ -211,6 +211,10 @@ func EnableFIPS() bool {
 		return false
 	}
 
+	if buildcfg.GOARCH == "thumb" || buildcfg.GOOS == "noos" {
+		return false
+	}
+
 	return enableFIPS
 }
 

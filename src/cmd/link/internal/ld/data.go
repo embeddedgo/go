@@ -442,7 +442,9 @@ func (st *relocSymState) relocsym(s loader.Sym, P []byte, dwarf bool) {
 				o -= PEBASE
 			}
 
-			if !dwarf && target.IsThumb() && (ldr.SymType(r.Sym()) == sym.STEXT) {
+			if !dwarf && target.IsThumb() && ldr.SymType(r.Sym()) == sym.STEXT {
+				// FIXME: Use ldr.SymUnit(r.Sym())!=nil or ldr.FuncInfo().Valid to limit setting thumb bit to functions only.
+				// Currently it doesn't work mainly because of the pcln/func tables require thumb bit in moduledata.text.
 				if o&1 != 0 {
 					panic("relocsym: thumb bit already set")
 				}

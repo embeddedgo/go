@@ -1810,6 +1810,7 @@ func (t *tester) fipsSupported() bool {
 	// to make a decision on a per-version basis.
 	switch {
 	case goarch == "wasm",
+		goos == "noos" || goarch == "thumb",
 		goos == "windows" && goarch == "386",
 		goos == "windows" && goarch == "arm",
 		goos == "openbsd",
