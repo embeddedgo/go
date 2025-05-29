@@ -37,99 +37,99 @@ func (rm RMCLIDR) Load() CLIDR   { return CLIDR(rm.UM32.Load()) }
 func (rm RMCLIDR) Store(b CLIDR) { rm.UM32.Store(uint32(b)) }
 
 func CL1I_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL1I)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL1I)}}
 }
 
 func CL1D_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL1D)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL1D)}}
 }
 
 func CL1U_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL1U)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL1U)}}
 }
 
 func CL2I_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL2I)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL2I)}}
 }
 
 func CL2D_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL2D)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL2D)}}
 }
 
 func CL2U_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL2U)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL2U)}}
 }
 
 func CL3I_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL3I)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL3I)}}
 }
 
 func CL3D_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL3D)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL3D)}}
 }
 
 func CL3U_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL3U)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL3U)}}
 }
 
 func CL4I_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL4I)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL4I)}}
 }
 
 func CL4D_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL4D)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL4D)}}
 }
 
 func CL4U_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL4U)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL4U)}}
 }
 
 func CL5I_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL5I)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL5I)}}
 }
 
 func CL5D_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL5D)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL5D)}}
 }
 
 func CL5U_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL5U)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL5U)}}
 }
 
 func CL6I_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL6I)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL6I)}}
 }
 
 func CL6D_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL6D)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL6D)}}
 }
 
 func CL6U_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL6U)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL6U)}}
 }
 
 func CL7I_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL7I)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL7I)}}
 }
 
 func CL7D_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL7D)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL7D)}}
 }
 
 func CL7U_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(CL7U)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(CL7U)}}
 }
 
 func LoUIS_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(LoUIS)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(LoUIS)}}
 }
 
 func LoC_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(LoC)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(LoC)}}
 }
 
 func LoU_(p *Periph) RMCLIDR {
-	return RMCLIDR{mmio.UM32{&p.CLIDR.U32, uint32(LoU)}}
+	return RMCLIDR{mmio.UM32{R: &p.CLIDR.U32, Mask: uint32(LoU)}}
 }
 
 type CTR uint32
@@ -149,23 +149,23 @@ func (rm RMCTR) Load() CTR   { return CTR(rm.UM32.Load()) }
 func (rm RMCTR) Store(b CTR) { rm.UM32.Store(uint32(b)) }
 
 func IMinLine_(p *Periph) RMCTR {
-	return RMCTR{mmio.UM32{&p.CTR.U32, uint32(IMinLine)}}
+	return RMCTR{mmio.UM32{R: &p.CTR.U32, Mask: uint32(IMinLine)}}
 }
 
 func DMinLine_(p *Periph) RMCTR {
-	return RMCTR{mmio.UM32{&p.CTR.U32, uint32(DMinLine)}}
+	return RMCTR{mmio.UM32{R: &p.CTR.U32, Mask: uint32(DMinLine)}}
 }
 
 func ERG_(p *Periph) RMCTR {
-	return RMCTR{mmio.UM32{&p.CTR.U32, uint32(ERG)}}
+	return RMCTR{mmio.UM32{R: &p.CTR.U32, Mask: uint32(ERG)}}
 }
 
 func CWG_(p *Periph) RMCTR {
-	return RMCTR{mmio.UM32{&p.CTR.U32, uint32(CWG)}}
+	return RMCTR{mmio.UM32{R: &p.CTR.U32, Mask: uint32(CWG)}}
 }
 
 func Format_(p *Periph) RMCTR {
-	return RMCTR{mmio.UM32{&p.CTR.U32, uint32(Format)}}
+	return RMCTR{mmio.UM32{R: &p.CTR.U32, Mask: uint32(Format)}}
 }
 
 type CCSIDR uint32
@@ -185,31 +185,31 @@ func (rm RMCCSIDR) Load() CCSIDR   { return CCSIDR(rm.UM32.Load()) }
 func (rm RMCCSIDR) Store(b CCSIDR) { rm.UM32.Store(uint32(b)) }
 
 func LineSize_(p *Periph) RMCCSIDR {
-	return RMCCSIDR{mmio.UM32{&p.CCSIDR.U32, uint32(LineSize)}}
+	return RMCCSIDR{mmio.UM32{R: &p.CCSIDR.U32, Mask: uint32(LineSize)}}
 }
 
 func Associativity_(p *Periph) RMCCSIDR {
-	return RMCCSIDR{mmio.UM32{&p.CCSIDR.U32, uint32(Associativity)}}
+	return RMCCSIDR{mmio.UM32{R: &p.CCSIDR.U32, Mask: uint32(Associativity)}}
 }
 
 func NumSets_(p *Periph) RMCCSIDR {
-	return RMCCSIDR{mmio.UM32{&p.CCSIDR.U32, uint32(NumSets)}}
+	return RMCCSIDR{mmio.UM32{R: &p.CCSIDR.U32, Mask: uint32(NumSets)}}
 }
 
 func WA_(p *Periph) RMCCSIDR {
-	return RMCCSIDR{mmio.UM32{&p.CCSIDR.U32, uint32(WA)}}
+	return RMCCSIDR{mmio.UM32{R: &p.CCSIDR.U32, Mask: uint32(WA)}}
 }
 
 func RA_(p *Periph) RMCCSIDR {
-	return RMCCSIDR{mmio.UM32{&p.CCSIDR.U32, uint32(RA)}}
+	return RMCCSIDR{mmio.UM32{R: &p.CCSIDR.U32, Mask: uint32(RA)}}
 }
 
 func WB_(p *Periph) RMCCSIDR {
-	return RMCCSIDR{mmio.UM32{&p.CCSIDR.U32, uint32(WB)}}
+	return RMCCSIDR{mmio.UM32{R: &p.CCSIDR.U32, Mask: uint32(WB)}}
 }
 
 func WT_(p *Periph) RMCCSIDR {
-	return RMCCSIDR{mmio.UM32{&p.CCSIDR.U32, uint32(WT)}}
+	return RMCCSIDR{mmio.UM32{R: &p.CCSIDR.U32, Mask: uint32(WT)}}
 }
 
 type CSSELR uint32
@@ -229,9 +229,9 @@ func (rm RMCSSELR) Load() CSSELR   { return CSSELR(rm.UM32.Load()) }
 func (rm RMCSSELR) Store(b CSSELR) { rm.UM32.Store(uint32(b)) }
 
 func InD_(p *Periph) RMCSSELR {
-	return RMCSSELR{mmio.UM32{&p.CSSELR.U32, uint32(InD)}}
+	return RMCSSELR{mmio.UM32{R: &p.CSSELR.U32, Mask: uint32(InD)}}
 }
 
 func Level_(p *Periph) RMCSSELR {
-	return RMCSSELR{mmio.UM32{&p.CSSELR.U32, uint32(Level)}}
+	return RMCSSELR{mmio.UM32{R: &p.CSSELR.U32, Mask: uint32(Level)}}
 }

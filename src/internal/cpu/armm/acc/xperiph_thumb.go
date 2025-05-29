@@ -40,19 +40,19 @@ func (rm RMITCMCR) Load() ITCMCR   { return ITCMCR(rm.UM32.Load()) }
 func (rm RMITCMCR) Store(b ITCMCR) { rm.UM32.Store(uint32(b)) }
 
 func ITCMEN_(p *Periph) RMITCMCR {
-	return RMITCMCR{mmio.UM32{&p.ITCMCR.U32, uint32(ITCMEN)}}
+	return RMITCMCR{mmio.UM32{R: &p.ITCMCR.U32, Mask: uint32(ITCMEN)}}
 }
 
 func ITCMRMW_(p *Periph) RMITCMCR {
-	return RMITCMCR{mmio.UM32{&p.ITCMCR.U32, uint32(ITCMRMW)}}
+	return RMITCMCR{mmio.UM32{R: &p.ITCMCR.U32, Mask: uint32(ITCMRMW)}}
 }
 
 func ITCMRETEN_(p *Periph) RMITCMCR {
-	return RMITCMCR{mmio.UM32{&p.ITCMCR.U32, uint32(ITCMRETEN)}}
+	return RMITCMCR{mmio.UM32{R: &p.ITCMCR.U32, Mask: uint32(ITCMRETEN)}}
 }
 
 func ITCMSZ_(p *Periph) RMITCMCR {
-	return RMITCMCR{mmio.UM32{&p.ITCMCR.U32, uint32(ITCMSZ)}}
+	return RMITCMCR{mmio.UM32{R: &p.ITCMCR.U32, Mask: uint32(ITCMSZ)}}
 }
 
 type DTCMCR uint32
@@ -72,19 +72,19 @@ func (rm RMDTCMCR) Load() DTCMCR   { return DTCMCR(rm.UM32.Load()) }
 func (rm RMDTCMCR) Store(b DTCMCR) { rm.UM32.Store(uint32(b)) }
 
 func DTCMEN_(p *Periph) RMDTCMCR {
-	return RMDTCMCR{mmio.UM32{&p.DTCMCR.U32, uint32(DTCMEN)}}
+	return RMDTCMCR{mmio.UM32{R: &p.DTCMCR.U32, Mask: uint32(DTCMEN)}}
 }
 
 func DTCMRMW_(p *Periph) RMDTCMCR {
-	return RMDTCMCR{mmio.UM32{&p.DTCMCR.U32, uint32(DTCMRMW)}}
+	return RMDTCMCR{mmio.UM32{R: &p.DTCMCR.U32, Mask: uint32(DTCMRMW)}}
 }
 
 func DTCMRETEN_(p *Periph) RMDTCMCR {
-	return RMDTCMCR{mmio.UM32{&p.DTCMCR.U32, uint32(DTCMRETEN)}}
+	return RMDTCMCR{mmio.UM32{R: &p.DTCMCR.U32, Mask: uint32(DTCMRETEN)}}
 }
 
 func DTCMSZ_(p *Periph) RMDTCMCR {
-	return RMDTCMCR{mmio.UM32{&p.DTCMCR.U32, uint32(DTCMSZ)}}
+	return RMDTCMCR{mmio.UM32{R: &p.DTCMCR.U32, Mask: uint32(DTCMSZ)}}
 }
 
 type AHBPCR uint32
@@ -104,11 +104,11 @@ func (rm RMAHBPCR) Load() AHBPCR   { return AHBPCR(rm.UM32.Load()) }
 func (rm RMAHBPCR) Store(b AHBPCR) { rm.UM32.Store(uint32(b)) }
 
 func AHBPEN_(p *Periph) RMAHBPCR {
-	return RMAHBPCR{mmio.UM32{&p.AHBPCR.U32, uint32(AHBPEN)}}
+	return RMAHBPCR{mmio.UM32{R: &p.AHBPCR.U32, Mask: uint32(AHBPEN)}}
 }
 
 func AHBPSZ_(p *Periph) RMAHBPCR {
-	return RMAHBPCR{mmio.UM32{&p.AHBPCR.U32, uint32(AHBPSZ)}}
+	return RMAHBPCR{mmio.UM32{R: &p.AHBPCR.U32, Mask: uint32(AHBPSZ)}}
 }
 
 type CACR uint32
@@ -128,15 +128,15 @@ func (rm RMCACR) Load() CACR   { return CACR(rm.UM32.Load()) }
 func (rm RMCACR) Store(b CACR) { rm.UM32.Store(uint32(b)) }
 
 func SIWT_(p *Periph) RMCACR {
-	return RMCACR{mmio.UM32{&p.CACR.U32, uint32(SIWT)}}
+	return RMCACR{mmio.UM32{R: &p.CACR.U32, Mask: uint32(SIWT)}}
 }
 
 func ECCDIS_(p *Periph) RMCACR {
-	return RMCACR{mmio.UM32{&p.CACR.U32, uint32(ECCDIS)}}
+	return RMCACR{mmio.UM32{R: &p.CACR.U32, Mask: uint32(ECCDIS)}}
 }
 
 func FORCEWT_(p *Periph) RMCACR {
-	return RMCACR{mmio.UM32{&p.CACR.U32, uint32(FORCEWT)}}
+	return RMCACR{mmio.UM32{R: &p.CACR.U32, Mask: uint32(FORCEWT)}}
 }
 
 type AHBSCR uint32
@@ -156,15 +156,15 @@ func (rm RMAHBSCR) Load() AHBSCR   { return AHBSCR(rm.UM32.Load()) }
 func (rm RMAHBSCR) Store(b AHBSCR) { rm.UM32.Store(uint32(b)) }
 
 func CTL_(p *Periph) RMAHBSCR {
-	return RMAHBSCR{mmio.UM32{&p.AHBSCR.U32, uint32(CTL)}}
+	return RMAHBSCR{mmio.UM32{R: &p.AHBSCR.U32, Mask: uint32(CTL)}}
 }
 
 func TPRI_(p *Periph) RMAHBSCR {
-	return RMAHBSCR{mmio.UM32{&p.AHBSCR.U32, uint32(TPRI)}}
+	return RMAHBSCR{mmio.UM32{R: &p.AHBSCR.U32, Mask: uint32(TPRI)}}
 }
 
 func INITCOUNT_(p *Periph) RMAHBSCR {
-	return RMAHBSCR{mmio.UM32{&p.AHBSCR.U32, uint32(INITCOUNT)}}
+	return RMAHBSCR{mmio.UM32{R: &p.AHBSCR.U32, Mask: uint32(INITCOUNT)}}
 }
 
 type ABFSR uint32
@@ -184,25 +184,25 @@ func (rm RMABFSR) Load() ABFSR   { return ABFSR(rm.UM32.Load()) }
 func (rm RMABFSR) Store(b ABFSR) { rm.UM32.Store(uint32(b)) }
 
 func ITCM_(p *Periph) RMABFSR {
-	return RMABFSR{mmio.UM32{&p.ABFSR.U32, uint32(ITCM)}}
+	return RMABFSR{mmio.UM32{R: &p.ABFSR.U32, Mask: uint32(ITCM)}}
 }
 
 func DTCM_(p *Periph) RMABFSR {
-	return RMABFSR{mmio.UM32{&p.ABFSR.U32, uint32(DTCM)}}
+	return RMABFSR{mmio.UM32{R: &p.ABFSR.U32, Mask: uint32(DTCM)}}
 }
 
 func AHBP_(p *Periph) RMABFSR {
-	return RMABFSR{mmio.UM32{&p.ABFSR.U32, uint32(AHBP)}}
+	return RMABFSR{mmio.UM32{R: &p.ABFSR.U32, Mask: uint32(AHBP)}}
 }
 
 func AXIM_(p *Periph) RMABFSR {
-	return RMABFSR{mmio.UM32{&p.ABFSR.U32, uint32(AXIM)}}
+	return RMABFSR{mmio.UM32{R: &p.ABFSR.U32, Mask: uint32(AXIM)}}
 }
 
 func EPPB_(p *Periph) RMABFSR {
-	return RMABFSR{mmio.UM32{&p.ABFSR.U32, uint32(EPPB)}}
+	return RMABFSR{mmio.UM32{R: &p.ABFSR.U32, Mask: uint32(EPPB)}}
 }
 
 func AXIMTYPE_(p *Periph) RMABFSR {
-	return RMABFSR{mmio.UM32{&p.ABFSR.U32, uint32(AXIMTYPE)}}
+	return RMABFSR{mmio.UM32{R: &p.ABFSR.U32, Mask: uint32(AXIMTYPE)}}
 }

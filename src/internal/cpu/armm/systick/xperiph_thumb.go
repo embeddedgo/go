@@ -37,19 +37,19 @@ func (rm RMCSR) Load() CSR   { return CSR(rm.UM32.Load()) }
 func (rm RMCSR) Store(b CSR) { rm.UM32.Store(uint32(b)) }
 
 func ENABLE_(p *Periph) RMCSR {
-	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(ENABLE)}}
+	return RMCSR{mmio.UM32{R: &p.CSR.U32, Mask: uint32(ENABLE)}}
 }
 
 func TICKINT_(p *Periph) RMCSR {
-	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(TICKINT)}}
+	return RMCSR{mmio.UM32{R: &p.CSR.U32, Mask: uint32(TICKINT)}}
 }
 
 func CLKSOURCE_(p *Periph) RMCSR {
-	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(CLKSOURCE)}}
+	return RMCSR{mmio.UM32{R: &p.CSR.U32, Mask: uint32(CLKSOURCE)}}
 }
 
 func COUNTFLAG_(p *Periph) RMCSR {
-	return RMCSR{mmio.UM32{&p.CSR.U32, uint32(COUNTFLAG)}}
+	return RMCSR{mmio.UM32{R: &p.CSR.U32, Mask: uint32(COUNTFLAG)}}
 }
 
 type RVR uint32
@@ -69,7 +69,7 @@ func (rm RMRVR) Load() RVR   { return RVR(rm.UM32.Load()) }
 func (rm RMRVR) Store(b RVR) { rm.UM32.Store(uint32(b)) }
 
 func RELOAD_(p *Periph) RMRVR {
-	return RMRVR{mmio.UM32{&p.RVR.U32, uint32(RELOAD)}}
+	return RMRVR{mmio.UM32{R: &p.RVR.U32, Mask: uint32(RELOAD)}}
 }
 
 type CVR uint32
@@ -89,7 +89,7 @@ func (rm RMCVR) Load() CVR   { return CVR(rm.UM32.Load()) }
 func (rm RMCVR) Store(b CVR) { rm.UM32.Store(uint32(b)) }
 
 func CURRENT_(p *Periph) RMCVR {
-	return RMCVR{mmio.UM32{&p.CVR.U32, uint32(CURRENT)}}
+	return RMCVR{mmio.UM32{R: &p.CVR.U32, Mask: uint32(CURRENT)}}
 }
 
 type CALIB uint32
@@ -109,13 +109,13 @@ func (rm RMCALIB) Load() CALIB   { return CALIB(rm.UM32.Load()) }
 func (rm RMCALIB) Store(b CALIB) { rm.UM32.Store(uint32(b)) }
 
 func TENMS_(p *Periph) RMCALIB {
-	return RMCALIB{mmio.UM32{&p.CALIB.U32, uint32(TENMS)}}
+	return RMCALIB{mmio.UM32{R: &p.CALIB.U32, Mask: uint32(TENMS)}}
 }
 
 func SKEW_(p *Periph) RMCALIB {
-	return RMCALIB{mmio.UM32{&p.CALIB.U32, uint32(SKEW)}}
+	return RMCALIB{mmio.UM32{R: &p.CALIB.U32, Mask: uint32(SKEW)}}
 }
 
 func NOREF_(p *Periph) RMCALIB {
-	return RMCALIB{mmio.UM32{&p.CALIB.U32, uint32(NOREF)}}
+	return RMCALIB{mmio.UM32{R: &p.CALIB.U32, Mask: uint32(NOREF)}}
 }

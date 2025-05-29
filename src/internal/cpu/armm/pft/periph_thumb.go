@@ -6,9 +6,9 @@
 //  PFT  0xE000ED78  -  -  Processor features registers
 // Registers:
 //  0x00 32  CLIDR   Cache Level ID
-//  0x00 32  CTR     Cache Type
-//  0x00 32  CCSIDR  Cache Size ID
-//  0x00 32  CSSELR  Cache Size Selection
+//  0x04 32  CTR     Cache Type
+//  0x08 32  CCSIDR  Cache Size ID
+//  0x0c 32  CSSELR  Cache Size Selection
 package pft
 
 const (

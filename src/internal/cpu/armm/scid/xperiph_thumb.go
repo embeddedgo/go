@@ -52,7 +52,7 @@ func (rm RMICTR) Load() ICTR   { return ICTR(rm.UM32.Load()) }
 func (rm RMICTR) Store(b ICTR) { rm.UM32.Store(uint32(b)) }
 
 func INTLINESNUM_(p *Periph) RMICTR {
-	return RMICTR{mmio.UM32{&p.ICTR.U32, uint32(INTLINESNUM)}}
+	return RMICTR{mmio.UM32{R: &p.ICTR.U32, Mask: uint32(INTLINESNUM)}}
 }
 
 type ACTLR uint32
@@ -72,21 +72,21 @@ func (rm RMACTLR) Load() ACTLR   { return ACTLR(rm.UM32.Load()) }
 func (rm RMACTLR) Store(b ACTLR) { rm.UM32.Store(uint32(b)) }
 
 func DISMCYCINT_(p *Periph) RMACTLR {
-	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISMCYCINT)}}
+	return RMACTLR{mmio.UM32{R: &p.ACTLR.U32, Mask: uint32(DISMCYCINT)}}
 }
 
 func DISDEFWBUF_(p *Periph) RMACTLR {
-	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISDEFWBUF)}}
+	return RMACTLR{mmio.UM32{R: &p.ACTLR.U32, Mask: uint32(DISDEFWBUF)}}
 }
 
 func DISFOLD_(p *Periph) RMACTLR {
-	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISFOLD)}}
+	return RMACTLR{mmio.UM32{R: &p.ACTLR.U32, Mask: uint32(DISFOLD)}}
 }
 
 func DISFPCA_(p *Periph) RMACTLR {
-	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISFPCA)}}
+	return RMACTLR{mmio.UM32{R: &p.ACTLR.U32, Mask: uint32(DISFPCA)}}
 }
 
 func DISOOFP_(p *Periph) RMACTLR {
-	return RMACTLR{mmio.UM32{&p.ACTLR.U32, uint32(DISOOFP)}}
+	return RMACTLR{mmio.UM32{R: &p.ACTLR.U32, Mask: uint32(DISOOFP)}}
 }

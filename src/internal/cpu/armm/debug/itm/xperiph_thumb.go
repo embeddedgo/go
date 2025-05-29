@@ -91,39 +91,39 @@ func (rm RMTCR) Load() TCR   { return TCR(rm.UM32.Load()) }
 func (rm RMTCR) Store(b TCR) { rm.UM32.Store(uint32(b)) }
 
 func ITMENA_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(ITMENA)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(ITMENA)}}
 }
 
 func TSENA_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TSENA)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(TSENA)}}
 }
 
 func SYNCENA_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(SYNCENA)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(SYNCENA)}}
 }
 
 func TXENA_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TXENA)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(TXENA)}}
 }
 
 func SWOENA_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(SWOENA)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(SWOENA)}}
 }
 
 func TSPrescale_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TSPrescale)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(TSPrescale)}}
 }
 
 func GTSFREQ_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(GTSFREQ)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(GTSFREQ)}}
 }
 
 func TraceBusID_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(TraceBusID)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(TraceBusID)}}
 }
 
 func BUSY_(p *ITM_Periph) RMTCR {
-	return RMTCR{mmio.UM32{&p.TCR.U32, uint32(BUSY)}}
+	return RMTCR{mmio.UM32{R: &p.TCR.U32, Mask: uint32(BUSY)}}
 }
 
 type PID uint32
