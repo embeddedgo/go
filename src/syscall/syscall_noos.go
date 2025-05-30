@@ -7,6 +7,7 @@ package syscall
 import (
 	"internal/oserror"
 	"sync"
+	_ "unsafe"
 )
 
 var (
@@ -34,8 +35,13 @@ var (
 	EBADF        = &Error{"bad file descriptor"}
 	ECANCELED    = &Error{"operation canceled"}
 	EINTR        = &Error{"interrupt"} // for os package only
+	ENOMEM       = &Error{"cannot allocate memory"}
 	//ENOPROTOOPT  = &Error{"protocol not available"} // for net package only
 )
+
+//go:linkname ENOTSUP os.errENOSYS
+//go:linkname EINVAL os.errERANGE
+//go:linkname ENOMEM os.errENOMEM
 
 func (e *Error) Is(target error) bool {
 	switch target {

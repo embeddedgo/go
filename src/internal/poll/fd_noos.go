@@ -34,3 +34,7 @@ func (fd *FD) RawWrite(f func(uintptr) bool) error {
 func (fd *FD) SetDeadline(t time.Time) error {
 	return syscall.ENOTSUP
 }
+
+func DupCloseOnExec(fd int) (int, string, error) {
+	return 0, "", syscall.ENOTSUP
+}

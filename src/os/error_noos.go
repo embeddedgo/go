@@ -4,6 +4,18 @@
 
 package os
 
-import "syscall"
+import (
+	"syscall"
+	_ "unsafe"
+)
 
 type syscallErrorType = *syscall.Error
+
+//go:linkname errENOSYS syscall.ENOTSUP
+//go:linkname errERANGE syscall.EINVAL
+//go:linkname errENOMEM syscall.ENOMEM
+var (
+	errENOSYS *syscall.Error
+	errERANGE *syscall.Error
+	errENOMEM *syscall.Error
+)

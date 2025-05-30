@@ -8,6 +8,7 @@ import (
 	_ "embedded/rtos"
 	"io"
 	"io/fs"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -19,7 +20,7 @@ func tempDir() string {
 type file struct {
 	f          fs.File
 	name       string
-	dirinfo    *dirInfo // nil unless directory being read
+	dirinfo    atomic.Pointer[dirInfo] // nil unless directory being read
 	appendMode bool
 }
 
@@ -29,6 +30,10 @@ func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
 		return nil, &PathError{Op: "open", Path: name, Err: err}
 	}
 	return &File{&file{f: f, name: name}}, nil
+}
+
+func openDirNolog(name string) (*File, error) {
+	return openFileNolog(name, O_RDONLY, 0)
 }
 
 func (f *File) readdir(n int, mode readdirMode) (names []string, dirents []DirEntry, fi []FileInfo, err error) {
@@ -210,6 +215,10 @@ func ignoringEINTR(fn func() error) error {
 	return fn()
 }
 
+func ignoringEINTR2[T any](fn func() (T, error)) (T, error) {
+	return fn()
+}
+
 // provided by package embedded/rtos
 
 func openFile(name string, flag int, perm fs.FileMode) (f fs.File, err error)
@@ -285,4 +294,12 @@ func (f *File) Truncate(size int64) (err error) {
 		}
 	}
 	return f.wrapErr("truncate", err)
+}
+
+func (f *File) Fd() uintptr {
+	return ^uintptr(0)
+}
+
+func (f *File) Chdir() error {
+	return f.wrapErr("chdir", syscall.ENOTSUP)
 }
