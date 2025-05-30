@@ -4,6 +4,8 @@
 
 package runtime
 
+import "internal/abi"
+
 const (
 	traceBlockGeneric traceBlockReason = iota
 	traceBlockForever
@@ -20,6 +22,8 @@ const (
 	traceBlockDebugCall
 	traceBlockUntilGCEnds
 	traceBlockSleep
+	traceBlockGCWeakToStrongWait
+	traceBlockSynctest
 )
 
 const defaultTraceAdvancePeriod = 0
@@ -39,34 +43,40 @@ func (_ *gTraceState) reset() {}
 
 type traceLocker struct{}
 
-func (_ traceLocker) GCSweepStart()                            {}
-func (_ traceLocker) GCSweepDone()                             {}
-func (_ traceLocker) GCStart()                                 {}
-func (_ traceLocker) GCDone()                                  {}
-func (_ traceLocker) GCMarkAssistDone()                        {}
-func (_ traceLocker) GCMarkAssistStart()                       {}
-func (_ traceLocker) GoUnpark(gp *g, skip int)                 {}
-func (_ traceLocker) HeapAlloc(live uint64)                    {}
-func (_ traceLocker) HeapGoal()                                {}
-func (_ traceLocker) GCSweepSpan(bytesSwept uintptr)           {}
-func (_ traceLocker) STWStart(reason stwReason)                {}
-func (_ traceLocker) GoSysBlock(pp *p)                         {}
-func (_ traceLocker) ProcSteal(pp *p, forMe bool)              {}
-func (_ traceLocker) STWDone()                                 {}
-func (_ traceLocker) GoCreateSyscall(gp *g)                    {}
-func (_ traceLocker) OneNewExtraM(gp *g)                       {}
-func (_ traceLocker) GoDestroySyscall()                        {}
-func (_ traceLocker) GoSysExit(lostP bool)                     {}
-func (_ traceLocker) GoStart()                                 {}
-func (_ traceLocker) GoPark(reason traceBlockReason, skip int) {}
-func (_ traceLocker) GoPreempt()                               {}
-func (_ traceLocker) GoSched()                                 {}
-func (_ traceLocker) GoEnd()                                   {}
-func (_ traceLocker) GoSysCall()                               {}
-func (_ traceLocker) ProcStop(pp *p)                           {}
-func (_ traceLocker) ProcStart()                               {}
-func (_ traceLocker) GoCreate(newg *g, pc uintptr)             {}
-func (_ traceLocker) Gomaxprocs(procs int32)                   {}
+func (_ traceLocker) GCSweepStart()                              {}
+func (_ traceLocker) GCSweepDone()                               {}
+func (_ traceLocker) GCStart()                                   {}
+func (_ traceLocker) GCDone()                                    {}
+func (_ traceLocker) GCMarkAssistDone()                          {}
+func (_ traceLocker) GCMarkAssistStart()                         {}
+func (_ traceLocker) GoUnpark(gp *g, skip int)                   {}
+func (_ traceLocker) HeapAlloc(live uint64)                      {}
+func (_ traceLocker) HeapGoal()                                  {}
+func (_ traceLocker) GCSweepSpan(bytesSwept uintptr)             {}
+func (_ traceLocker) STWStart(reason stwReason)                  {}
+func (_ traceLocker) GoSysBlock(pp *p)                           {}
+func (_ traceLocker) ProcSteal(pp *p, forMe bool)                {}
+func (_ traceLocker) STWDone()                                   {}
+func (_ traceLocker) GoCreateSyscall(gp *g)                      {}
+func (_ traceLocker) OneNewExtraM(gp *g)                         {}
+func (_ traceLocker) GoDestroySyscall()                          {}
+func (_ traceLocker) GoSysExit(lostP bool)                       {}
+func (_ traceLocker) GoStart()                                   {}
+func (_ traceLocker) GoPark(reason traceBlockReason, skip int)   {}
+func (_ traceLocker) GoPreempt()                                 {}
+func (_ traceLocker) GoSched()                                   {}
+func (_ traceLocker) GoEnd()                                     {}
+func (_ traceLocker) GoSysCall()                                 {}
+func (_ traceLocker) ProcStop(pp *p)                             {}
+func (_ traceLocker) ProcStart()                                 {}
+func (_ traceLocker) GoCreate(newg *g, pc uintptr, blocked bool) {}
+func (_ traceLocker) Gomaxprocs(procs int32)                     {}
+func (_ traceLocker) GoSwitch(nextg *g, destroy bool)            {}
+func (_ traceLocker) HeapObjectFree(addr uintptr)                {}
+func (_ traceLocker) SpanAlloc(s *mspan)                         {}
+func (_ traceLocker) SpanFree(s *mspan)                          {}
+func (_ traceLocker) GoroutineStackAlloc(base, size uintptr)     {}
+func (_ traceLocker) GoroutineStackFree(base uintptr)            {}
 
 //go:nosplit
 func (_ traceLocker) ok() bool { return false }
@@ -74,12 +84,16 @@ func (_ traceLocker) ok() bool { return false }
 //go:nosplit
 func (_ traceLocker) RecordSyscallExitedTime(gp *g, oldp *p) {}
 
+//go:nosplit
+func (_ traceLocker) HeapObjectAlloc(addr uintptr, typ *abi.Type) {}
+
 func traceLockInit()                                   {}
 func traceThreadDestroy(_ *m)                          {}
 func traceReaderAvailable() *g                         { return nil }
 func traceExitingSyscall()                             {}
 func traceExitedSyscall()                              {}
 func traceCPUSample(gp *g, _ *m, pp *p, stk []uintptr) {}
+func traceAdvance(stopTrace bool)                      {}
 
 //go:nosplit
 func traceAcquire() traceLocker { return traceLocker{} }
@@ -98,6 +112,9 @@ func traceReader() *g { return nil }
 
 //go:systemstack
 func traceProcFree(pp *p) {}
+
+//go:nosplit
+func traceAllocFreeEnabled() bool {return false }
 
 func StartTrace() error { return nil }
 func ReadTrace() []byte { return nil }

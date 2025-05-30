@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"internal/runtime/atomic"
+	"internal/runtime/sys"
 	"unsafe"
 )
 
@@ -18,6 +19,11 @@ const (
 	goroutineProfileAbsent = iota
 	goroutineProfileInProgress
 	goroutineProfileSatisfied
+)
+
+const (
+	maxSkip           = 0
+	maxProfStackDepth = 0
 )
 
 var (
@@ -40,17 +46,17 @@ type goroutineProfileStateHolder struct{}
 
 func (p *goroutineProfileStateHolder) Store(x int) {}
 
-func blockevent(cycles int64, skip int)                     {}
-func tracealloc(p unsafe.Pointer, size uintptr, typ *_type) {}
-func mProf_Malloc(p unsafe.Pointer, size uintptr)           {}
-func mProf_PostSweep()                                      {}
-func mProf_NextCycle()                                      {}
-func mProf_Flush()                                          {}
-func tracegc()                                              {}
-func tracefree(p unsafe.Pointer, size uintptr)              {}
-func mProf_Free(b *bucket, size uintptr)                    {}
-func tryRecordGoroutineProfileWB(gp1 *g)                    {}
-func tryRecordGoroutineProfile(gp1 *g, yield func())        {}
+func blockevent(cycles int64, skip int)                               {}
+func tracealloc(p unsafe.Pointer, size uintptr, typ *_type)           {}
+func mProf_Malloc(mp *m, p unsafe.Pointer, size uintptr)              {}
+func mProf_PostSweep()                                                {}
+func mProf_NextCycle()                                                {}
+func mProf_Flush()                                                    {}
+func tracegc()                                                        {}
+func tracefree(p unsafe.Pointer, size uintptr)                        {}
+func mProf_Free(b *bucket, size uintptr)                              {}
+func tryRecordGoroutineProfileWB(gp1 *g)                              {}
+func tryRecordGoroutineProfile(gp1 *g, pcbuf []uintptr, yield func()) {}
 
 //go:linkname mutexevent sync.event
 func mutexevent(cycles int64, skip int) {}
@@ -68,8 +74,8 @@ func Stack(buf []byte, all bool) int {
 	n := 0
 	if len(buf) > 0 {
 		gp := getg()
-		sp := getcallersp()
-		pc := getcallerpc()
+		sp := sys.GetCallerSP()
+		pc := sys.GetCallerPC()
 		systemstack(func() {
 			g0 := getg()
 			// Force traceback=1 to override GOTRACEBACK setting,
@@ -103,6 +109,7 @@ func (lt *lockTimer) end()   {}
 
 type mLockProfile struct {
 	waitTime atomic.Int64
+	stack    []uintptr
 }
 
 func (prof *mLockProfile) recordUnlock(l *mutex) {}
