@@ -93,6 +93,8 @@ type mOS struct {
 	x    [numGPRS]uintptr
 	fcsr uintptr
 	f    [numFPRS - 1]float64
+
+	waitsema uint32 // semaphore for parking on locks
 }
 
 //go:noescape

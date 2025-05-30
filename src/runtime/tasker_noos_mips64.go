@@ -33,6 +33,8 @@ type mOS struct {
 	gprs            [numGPRS]uintptr
 	fprs            [numFPRS]float64
 	sp, fp, ra, epc uintptr
+
+	waitsema uint32 // semaphore for parking on locks
 }
 
 var (

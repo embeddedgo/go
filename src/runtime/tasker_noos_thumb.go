@@ -387,7 +387,7 @@ func irqNum() uint {
 const msp = 4
 const mer = 5
 
-// Use libcall, libcallpc, libcallsp, libcallg, syscall, vdsoSP, vdsoPC and mOS
+// Use libcall, libcallpc, libcallsp, libcallg, winsyscall, vdsoSP, vdsoPC and mOS
 // to save the second part of thread context. We do not save it on the gorutine
 // stack to avoid waste of memory (need to increasing stack guard for any
 // gorutine stack and there are much more gorutines than threads).
@@ -405,17 +405,21 @@ const (
 	_mLibcallspSize      = int8((unsafe.Sizeof(m{}.libcallsp) - 4) * 129)
 	_mLibcallspLibcallg  = int8((unsafe.Offsetof(m{}.libcallg) - unsafe.Offsetof(m{}.libcallsp) - 4) * 129)
 	_mLibcallgSize       = int8((unsafe.Sizeof(m{}.libcallg) - 4) * 129)
-	_mLibcallgSyscall    = int8((unsafe.Offsetof(m{}.syscall) - unsafe.Offsetof(m{}.libcallg) - 4) * 129)
-	_mSyscallSize        = int8((unsafe.Sizeof(m{}.syscall) - 6*4) * 129)
-	_mSyscallVdsosp      = int8((unsafe.Offsetof(m{}.vdsoSP) - unsafe.Offsetof(m{}.syscall) - 6*4) * 129)
+	_mLibcallgSyscall    = int8((unsafe.Offsetof(m{}.winsyscall) - unsafe.Offsetof(m{}.libcallg) - 4) * 129)
+	_mSyscallSize        = int8((unsafe.Sizeof(m{}.winsyscall) - 0) * 129)
+	_mSyscallVdsosp      = int8((unsafe.Offsetof(m{}.vdsoSP) - unsafe.Offsetof(m{}.winsyscall) - 0) * 129)
 	_mVdsospSize         = int8((unsafe.Sizeof(m{}.vdsoSP) - 4) * 129)
 	_mVdsospVdsopc       = int8((unsafe.Offsetof(m{}.vdsoPC) - unsafe.Offsetof(m{}.vdsoSP) - 4) * 129)
 	_mVdsopcSize         = int8((unsafe.Sizeof(m{}.vdsoPC) - 4) * 129)
 	_mVdsopcMos          = int8((unsafe.Offsetof(m{}.mOS) - unsafe.Offsetof(m{}.vdsoPC) - 4) * 129)
-	_mSize               = int8((unsafe.Offsetof(m{}.mOS) - unsafe.Offsetof(m{}.libcall) + unsafe.Sizeof(m{}.mOS) - 24*4) * 129)
+	_mSize               = int8((unsafe.Offsetof(m{}.mOS) - unsafe.Offsetof(m{}.libcall) + unsafe.Sizeof(m{}.mOS) - 24*4 - 4) * 129)
 )
 
-type mOS [7]uint32
+type mOS struct {
+	_ [13]uint32
+
+	waitsema uint32 // semaphore for parking on locks
+}
 
 // Exceptions handled in runtime
 func svcallHandler()

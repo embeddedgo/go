@@ -308,7 +308,7 @@ newexe:
 	MOVM.IA.W  (R3), [R4-R11]
 	TST        $0x10, R1
 	BNE        3(PC)
-	// restore registers saved in m.libcallg, m.syscall, m.vdsoSP, m.vdsoPC, mOS
+	// restore registers saved in m.libcallg, m.winsyscall, m.vdsoSP, m.vdsoPC, mOS
 	HWORD  $0xEC93  // VLDM R3
 	HWORD  $0x8B10  // [D8-D15]
 	B      (R1)
