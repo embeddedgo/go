@@ -20,4 +20,4 @@ func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) *notInHeap {
 	return nil
 }
 
-//go:linkname notewakeup embedded/rtos.notewakeup
+//go:linkname notewakeup

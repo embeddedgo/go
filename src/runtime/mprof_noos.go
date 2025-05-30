@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"internal/profilerecord"
 	"internal/runtime/atomic"
 	"internal/runtime/sys"
 	"unsafe"
@@ -145,7 +146,32 @@ func SetMutexProfileFraction(rate int) int                             { return 
 func BlockProfile(p []BlockProfileRecord) (n int, ok bool)             { return 0, true }
 func MutexProfile(p []BlockProfileRecord) (n int, ok bool)             { return 0, true }
 
-//go:linkname runtime_goroutineProfileWithLabels runtime/pprof.runtime_goroutineProfileWithLabels
+//go:linkname runtime_goroutineProfileWithLabels
 func runtime_goroutineProfileWithLabels(p []StackRecord, labels []unsafe.Pointer) (n int, ok bool) {
 	return 0, true
+}
+
+//go:linkname pprof_goroutineProfileWithLabels
+func pprof_goroutineProfileWithLabels(p []profilerecord.StackRecord, labels []unsafe.Pointer) (n int, ok bool) {
+	return
+}
+
+//go:linkname pprof_threadCreateInternal
+func pprof_threadCreateInternal(p []profilerecord.StackRecord) (n int, ok bool) {
+	return
+}
+
+//go:linkname pprof_memProfileInternal
+func pprof_memProfileInternal(p []profilerecord.MemProfileRecord, inuseZero bool) (n int, ok bool) {
+	return
+}
+
+//go:linkname pprof_blockProfileInternal
+func pprof_blockProfileInternal(p []profilerecord.BlockProfileRecord) (n int, ok bool) {
+	return
+}
+
+//go:linkname pprof_mutexProfileInternal
+func pprof_mutexProfileInternal(p []profilerecord.BlockProfileRecord) (n int, ok bool) {
+	return
 }

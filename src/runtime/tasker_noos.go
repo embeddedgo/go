@@ -82,6 +82,7 @@ func dummyNanotime() int64 { return 1 }
 //go:nosplit
 func dummySetalarm(ns int64) {}
 
+//go:linkname thetasker
 var thetasker = tasker{
 	nanotime: dummyNanotime,
 	setalarm: dummySetalarm,
@@ -320,6 +321,7 @@ func curcpuRunScheduler() {
 	}
 }
 
+//go:linkname rtos_notewakeup
 //go:nowritebarrierrec
 //go:nosplit
 func rtos_notewakeup(n *notel) {

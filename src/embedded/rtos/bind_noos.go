@@ -6,10 +6,14 @@ package rtos
 
 import _ "unsafe"
 
+const notBound ExeCtx = -1
+
+type exeCtx int
+
 func bind(ctx ExeCtx) (oldctx ExeCtx, err error) {
-	old, errno := bind(int(ctx))
+	old, errno := runtime_bind(int(ctx))
 	return ExeCtx(old), errnoError(errno)
 }
 
-//go:linkname bind runtime.bind
-func bind(cpuid int) (oldcpuid, errno int)
+//go:linkname runtime_bind runtime.bind
+func runtime_bind(cpuid int) (oldcpuid, errno int)

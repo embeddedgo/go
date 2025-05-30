@@ -130,6 +130,7 @@ const debugBusFault = false
 // initCPU is called by every CPU in the system, very early, even before BSS and
 // data segments are initialized.
 //
+//go:linkname initCPU
 //go:nowritebarrierrec
 //go:nosplit
 func initCPU(vectors uintptr) {

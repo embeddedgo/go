@@ -15,5 +15,5 @@ func Nanotime() time.Duration {
 	return time.Duration(runtime_nanotime())
 }
 
-//go:linkname runtime_nanotime runtime.nanotime
+//go:linkname runtime_nanotime
 func runtime_nanotime() int64

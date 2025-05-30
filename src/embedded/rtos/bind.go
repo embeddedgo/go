@@ -13,10 +13,6 @@ const NotBound ExeCtx = notBound
 // a set of CPUs/cores, a NUMA node, etc.
 type ExeCtx exeCtx
 
-const notBound ExeCtx = -1
-
-type exeCtx int
-
 // Bind binds the current thread to the execution context ctx. It returns the
 // previous execution context the thread was tied end an error.
 func Bind(ctx ExeCtx) (oldctx ExeCtx, err error) {

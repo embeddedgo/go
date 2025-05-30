@@ -7,9 +7,10 @@ package runtime
 import "unsafe"
 
 const (
-	iscgo          = false
-	cgoAlwaysFalse = false
+	iscgo = false
 )
+
+var cgoAlwaysFalse bool
 
 var (
 	_cgo_thread_start             unsafe.Pointer
@@ -35,3 +36,8 @@ func cgoCheckMemmove(typ *_type, dst unsafe.Pointer, src unsafe.Pointer, off uin
 func cgoCheckPtrWrite(dst *unsafe.Pointer, src unsafe.Pointer)                                      {}
 func cgoCheckMemmove2(typ *_type, dst, src unsafe.Pointer, off, size uintptr)                       {}
 func callbackUpdateSystemStack(mp *m, sp uintptr, signal bool)                                      {}
+func cgoUse(any)                                                                                    {}
+func cgoKeepAlive(any)                                                                              {}
+func cgoCheckPointer(ptr any, arg any)                                                              {}
+func cgoCheckResult(val any)                                                                        {}
+func cgoNoCallback(v bool)                                                                          {}

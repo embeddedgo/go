@@ -7,6 +7,10 @@
 
 package rtos
 
+const notBound ExeCtx = -1
+
+type exeCtx int
+
 func bind(ctx ExeCtx) (oldctx ExeCtx, err error) {
 	return -1, ErrNotSupported
 }
