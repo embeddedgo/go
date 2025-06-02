@@ -6,7 +6,7 @@
 #include "go_tls.h"
 #include "funcdata.h"
 #include "textflag.h"
-#include "asm_riscv64.h"
+#include "asm_noos_riscv64.h"
 
 
 // Prefer X8-X15 registers (S0, S1, A0-A5) to allow compressed instructions if

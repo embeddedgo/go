@@ -6,7 +6,7 @@
 #include "go_tls.h"
 #include "textflag.h"
 #include "syscall_noos.h"
-#include "asm_riscv64.h"
+#include "asm_noos_riscv64.h"
 
 
 // func cpuid() int
