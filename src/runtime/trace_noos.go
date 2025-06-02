@@ -35,7 +35,10 @@ var trace struct {
 type traceBlockReason uint8
 
 type mTraceState struct{}
-type pTraceState struct{ reclaimed uintptr }
+type pTraceState struct {
+	reclaimed uintptr
+	_         uintptr // preserev the alignment of subsequent fields in p on 32-bit
+}
 
 type gTraceState struct{}
 
@@ -114,7 +117,7 @@ func traceReader() *g { return nil }
 func traceProcFree(pp *p) {}
 
 //go:nosplit
-func traceAllocFreeEnabled() bool {return false }
+func traceAllocFreeEnabled() bool { return false }
 
 func StartTrace() error { return nil }
 func ReadTrace() []byte { return nil }
