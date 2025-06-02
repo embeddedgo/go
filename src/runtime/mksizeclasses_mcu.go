@@ -43,7 +43,7 @@ import (
 
 // Generate msize.go
 
-var stdout = flag.Bool("stdout", false, "write to stdout instead of sizeclasses.go")
+var stdout = flag.Bool("stdout", false, "write to stdout instead of sizeclasses_mcu.go")
 
 func main() {
 	flag.Parse()
@@ -77,11 +77,12 @@ func main() {
 
 const (
 	// Constants that we use and will transfer to the runtime.
+	minHeapAlign = 8
 	maxSmallSize = 1 << 9
 	smallSizeDiv = 8
 	smallSizeMax = 256
 	largeSizeDiv = 128
-	pageShift    = 8
+	pageShift    = 9
 
 	// Derived constants.
 	pageSize = 1 << pageShift
@@ -101,14 +102,14 @@ func makeClasses() []class {
 
 	classes = append(classes, class{}) // class #0 is a dummy entry
 
-	align := 8
+	align := minHeapAlign
 	for size := align; size <= maxSmallSize; size += align {
 		if powerOfTwo(size) { // bump alignment once in a while
-			if size >= 2048 {
-				align = 256
+			if size >= 256 {
+				align = 64
 			} else if size >= 128 {
-				align = size / 8
-			} else if size >= 16 {
+				align = 32
+			} else if size >= 32 {
 				align = 16 // heap bitmaps assume 16 byte alignment for allocations >= 32 bytes.
 			}
 		}
@@ -155,7 +156,7 @@ func makeClasses() []class {
 		}
 	}
 
-	if false && len(classes) != 19 {
+	if len(classes) != 16 {
 		panic("number of size classes has changed")
 	}
 
@@ -290,6 +291,7 @@ func maxObjsPerSpan(classes []class) int {
 
 func printClasses(w io.Writer, classes []class) {
 	fmt.Fprintln(w, "const (")
+	fmt.Fprintf(w, "minHeapAlign = %d\n", minHeapAlign)
 	fmt.Fprintf(w, "_MaxSmallSize = %d\n", maxSmallSize)
 	fmt.Fprintf(w, "smallSizeDiv = %d\n", smallSizeDiv)
 	fmt.Fprintf(w, "smallSizeMax = %d\n", smallSizeMax)
