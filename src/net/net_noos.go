@@ -347,9 +347,29 @@ func (a *IPAddr) String() string {
 	return ip
 }
 
+type KeepAliveConfig struct {
+	// If Enable is true, keep-alive probes are enabled.
+	Enable bool
+
+	// Idle is the time that the connection must be idle before
+	// the first keep-alive probe is sent.
+	// If zero, a default value of 15 seconds is used.
+	Idle time.Duration
+
+	// Interval is the time between keep-alive probes.
+	// If zero, a default value of 15 seconds is used.
+	Interval time.Duration
+
+	// Count is the maximum number of keep-alive probes that
+	// can go unanswered before dropping a connection.
+	// If zero, a default value of 9 is used.
+	Count int
+}
+
 type conn interface {
 	Conn
 	CloseWrite() error
+	SetKeepAliveConfig(config KeepAliveConfig) error
 }
 
 // TCPConn is a stub on GOOS=noos.
