@@ -7,7 +7,8 @@
 #include "textflag.h"
 #include "syscall_noos.h"
 
-// This code uses ADD and ORR instructions when wants to set bits from 0 to 1.  // Mixing these two ways to do the same thing may seem seemingly inconsistent
+// This code uses ADD and ORR instructions when wants to set bits from 0 to 1.
+// Mixing these two ways to do the same thing may seem seemingly inconsistent
 // but it is not. The shorter encoding is prefered. If both gives the same
 // length the ORR instruction is used because of its less energy per instruction
 // factor (see: https://www.ics.forth.gr/carv/greenvm/files/tr450.pdf).

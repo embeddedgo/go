@@ -203,6 +203,7 @@ func elfreloc1(ctxt *ld.Link, out *ld.OutBuf, ldr *loader.Loader, s loader.Sym, 
 
 // Convert the direct jump relocation r to refer to a trampoline if the target is too far.
 func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
+	// TODO: avoid trampolines if ldr.SymValue(rs)==0 && sizeof(Flash)<=1<<24 (B/BL must be used and Flash<=16 MiB)
 	relocs := ldr.Relocs(s)
 	r := relocs.At(ri)
 	switch r.Type() {
@@ -222,13 +223,14 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
 			}
 			t = (ldr.SymValue(rs) + int64(int32(r.Add())) - (ldr.SymValue(s) + int64(r.Off())))
 		}
-		if -maxoffset <= t && t < maxoffset && *ld.FlagDebugTramp == 0 {
+		if -maxoffset <= t && t < maxoffset && ldr.SymValue(rs) != 0 && !(*ld.FlagDebugTramp > 1 && ldr.SymPkg(s) != ldr.SymPkg(rs)) {
 			return
 		}
+		//fmt.Printf("%s -> %s: t=%#x max=%#x symVal=%#x\n", ldr.SymName(s), ldr.SymName(rs), t, maxoffset, ldr.SymValue(rs))
 		// Direct call too far, need to insert trampoline.
 		// Look up existing trampolines first. If we found one within the range
 		// of direct call, we can reuse it. Otherwise create a new one.
-		offset := t + pcoff
+		offset := t
 		var tramp loader.Sym
 		for i := 0; ; i++ {
 			oName := ldr.SymName(rs)
@@ -277,13 +279,23 @@ func gentramp(arch *sys.Arch, linkmode ld.LinkMode, ldr *loader.Loader, tramp *l
 	tramp.SetSize(8) // 2+1 instructions
 	P := make([]byte, tramp.Size())
 	t := ldr.SymValue(target) + offset
-	o1 := uint16(0x4F00) // MOVW (R15), R7 // R15 is actual pc+4 (points to o3)
-	o2 := uint16(0x4738) // B  (R7)
-	o3 := uint32(t) | 1  // WORD $(target|1)
-	arch.ByteOrder.PutUint16(P, o1)
-	arch.ByteOrder.PutUint16(P[2:], o2)
-	arch.ByteOrder.PutUint32(P[4:], o3)
+	o1 := uint32(0xf000_f85f) // MOVW (R15), R15 // R15 is actual pc+4 (points to o2)
+	o2 := uint32(t) | 1       // WORD $(target|1)
+	arch.ByteOrder.PutUint32(P[0:], o1)
+	arch.ByteOrder.PutUint32(P[4:], o2)
 	tramp.SetData(P)
+
+	if linkmode == ld.LinkExternal {
+		log.Fatalf("BUGL: external linking not supported")
+	}
+	if ldr.SymValue(target) == 0 {
+		// Cross-package call (mainly caused by linknames and assembly in other packages).
+		r, _ := tramp.AddRel(objabi.R_ADDR)
+		r.SetOff(4)
+		r.SetSiz(4)
+		r.SetSym(target)
+		r.SetAdd(offset)
+	}
 }
 
 func archreloc(target *ld.Target, ldr *loader.Loader, syms *ld.ArchSyms, r loader.Reloc, s loader.Sym, val int64) (o int64, nExtReloc int, ok bool) {

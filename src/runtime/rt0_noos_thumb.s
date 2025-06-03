@@ -7,8 +7,13 @@
 #include "funcdata.h"
 #include "textflag.h"
 
-// The runtime package dosn't implement required _rt0_thumb_noos and
-// runtime·identcurcpu functions because they are generally target specific.
+// The runtime package requires _rt0_thumb_noos, runtime·identcurcpu,
+// runtime·preepmtOrWakeup to be defined in the target specific code.
+//
+// The runtime·identcurcpu indetifies the current CPU and returns a pointer
+// to its cpuctx struct in R0. It can clobber R0-R4,LR registers. All other
+// regesters including R7 (REGTMP) must be preserved.
+//
 // See the hal/system package in the https://github.com/embeddedgo/stm32 or
 // https://github.com/embeddedgo/pico repositories for example implementation.
 
