@@ -84,7 +84,8 @@ const (
 func netpollblock(pd *pollDesc, ns int64) bool {
 	var gp *g
 	var t *timer
-	var deadline int64 = maxWhen
+	var sleepf func(arg any, seq uintptr, delay int64)
+	var sleeparg any
 	gpp := &pd.g
 
 	if ns == 0 {
@@ -100,24 +101,27 @@ func netpollblock(pd *pollDesc, ns int64) bool {
 	t = gp.timer
 	if t == nil {
 		t = new(timer)
+		t.init(goroutineReady, gp)
 		gp.timer = t
 	}
+	sleepf, sleeparg = t.f, t.arg
 	t.f = netpolldeadline
 	pd.self = pd
 	t.arg = pd.makeArg()
 	t.seq = pd.seq
+	gp.sleepWhen = maxWhen
 	if ns >= 0 {
-		deadline = nanotime() + ns
-		if deadline < 0 { // check for overflow.
-			deadline = maxWhen
+		gp.sleepWhen = nanotime() + ns
+		if gp.sleepWhen < 0 { // check for overflow.
+			gp.sleepWhen = maxWhen
 		}
 	}
-	t.reset(deadline, 0)
 
 	// set the gpp semaphore to pdWait
 	for {
 		// Consume notification if already ready.
 		if gpp.CompareAndSwap(pdReady, pdNil) {
+			t.f, t.arg = sleepf, sleeparg
 			return true
 		}
 		if gpp.CompareAndSwap(pdNil, pdWait) {
@@ -133,6 +137,9 @@ func netpollblock(pd *pollDesc, ns int64) bool {
 
 	gopark(netpollblockcommit, unsafe.Pointer(gpp), waitReasonIOWait, traceBlockNet, 5)
 
+	t.stop()
+	t.f, t.arg = sleepf, sleeparg
+
 clear:
 	// be careful to not lose concurrent pdReady notification
 	old := gpp.Swap(pdNil)
@@ -145,6 +152,7 @@ clear:
 func netpollblockcommit(gp *g, gpp unsafe.Pointer) bool {
 	r := atomic.Casuintptr((*uintptr)(gpp), pdWait, uintptr(unsafe.Pointer(gp)))
 	if r {
+		gp.timer.reset(gp.sleepWhen, 0)
 		netpollAdjustWaiters(1)
 	}
 	return r
@@ -186,10 +194,11 @@ func netpollunblock(pd *pollDesc, ioready bool, delta *int32) *g {
 // This returns a delta to apply to netpollWaiters.
 //
 // This may run while the world is stopped, so write barriers are not allowed.
-//
-//go:nowritebarrier
 func netpollready(toRun *gList, pd *pollDesc) (delta int32) {
+	lock(&pd.lock)
+	pd.seq++
 	gp := netpollunblock(pd, true, &delta)
+	unlock(&pd.lock)
 	if gp != nil {
 		toRun.push(gp)
 	}
