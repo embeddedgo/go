@@ -40,3 +40,6 @@ func Set(old, new Time) Time {
 	sec0, nsec0 := move(sec, nsec)
 	return Unix(sec0, int64(nsec0))
 }
+
+func interrupt() {
+}
