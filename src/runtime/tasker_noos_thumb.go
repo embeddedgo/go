@@ -40,6 +40,7 @@ func (cpu *cpuctx) newwork() {
 	preemptOrWakeup(int(cpu.gh.goid))
 }
 
+//go:linkname curcpuSchedule
 //go:nosplit
 func curcpuSchedule() {
 	// Can't run the scheduler directly in the system call because the SVCall
@@ -87,6 +88,7 @@ func leadingZeros32(x uint32) uint {
 	return 32 - n
 }
 
+//go:linkname runOtherCPUs
 var runOtherCPUs atomic.Bool
 
 //go:nowritebarrierrec
