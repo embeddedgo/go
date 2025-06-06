@@ -16,7 +16,7 @@ const (
 	noosStackCacheSize              = 8 * 1024
 	noosNumStackOrders              = 2
 	noosHeapAddrBits                = 19         // enough for 512 KiB AXI SRAM (AHB SRAM not supported)
-	noosLogHeapArenaBytes           = 15         // 32 KiB
+	noosLogHeapArenaBytes           = 16         // 64 KiB
 	noosArenaBaseOffset             = 0x24000000 // the begginning of AXI SRAM
 	noosMinPhysPageSize             = 256
 	noosSpanSetInitSpineCap         = 8

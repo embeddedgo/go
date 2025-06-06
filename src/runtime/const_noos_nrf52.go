@@ -16,7 +16,7 @@ const (
 	noosStackCacheSize              = 4 * 1024
 	noosNumStackOrders              = 2
 	noosHeapAddrBits                = 18 // enough for 256 KiB of nRF52840
-	noosLogHeapArenaBytes           = 14 // 16 KiB
+	noosLogHeapArenaBytes           = 15 // 32 KiB
 	noosArenaBaseOffset             = 0x20000000
 	noosMinPhysPageSize             = 256
 	noosSpanSetInitSpineCap         = 8
