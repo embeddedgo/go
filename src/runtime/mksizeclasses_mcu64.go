@@ -105,10 +105,12 @@ func makeClasses() []class {
 	align := minHeapAlign
 	for size := align; size <= maxSmallSize; size += align {
 		if powerOfTwo(size) { // bump alignment once in a while
-			if size >= 2048 {
-				align = 256
+			if size >= 1024 {
+				align = 128
+			} else if size >= 256 {
+				align = 64
 			} else if size >= 128 {
-				align = size / 8
+				align = 32
 			} else if size >= 32 {
 				align = 16 // heap bitmaps assume 16 byte alignment for allocations >= 32 bytes.
 			}
@@ -156,7 +158,7 @@ func makeClasses() []class {
 		}
 	}
 
-	if len(classes) != 39 {
+	if len(classes) != 36 {
 		panic("number of size classes has changed")
 	}
 
