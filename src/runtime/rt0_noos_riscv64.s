@@ -169,7 +169,9 @@ parkHart:
 // rt0_go is known as top level function
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	// Initialize the memory allocator
-	MOV   $runtime·end(SB), A1         // freeStart
+	MOV   $runtime·end(SB), A1
+	ADD   $(const_maxHarts*handlerStackSize+15), A1
+	AND   $~15, A1                     // freeStart (just after handler stacks)
 	MOV   $runtime·ramend(SB), A2      // freeEnd
 	MOV   $runtime·nodmastart(SB), A3  // nodmaStart
 	MOV   $runtime·nodmaend(SB), A4    // nodmaEnd
