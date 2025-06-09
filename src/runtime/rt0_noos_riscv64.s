@@ -168,57 +168,31 @@ parkHart:
 
 // rt0_go is known as top level function
 TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
+	// Initialize the memory allocator
+	MOV   $runtime·end(SB), A1         // freeStart
+	MOV   $runtime·ramend(SB), A2      // freeEnd
+	MOV   $runtime·nodmastart(SB), A3  // nodmaStart
+	MOV   $runtime·nodmaend(SB), A4    // nodmaEnd
+	MOV   X2, A5                       // stack top
+	ADD   $-56, X2
+	MOV   ZERO, 0(X2)  // dummy RA
+	MOV   A1, 8(X2)
+	MOV   A2, 16(X2)
+	MOV   A3, 24(X2)
+	MOV   A4, 32(X2)
+	MOV   A5, 40(X2)
+	CALL  runtime·meminit(SB)
+	ADD   $56, X2
 
 	// set up m0 (bootstrap thread), temporarily use harts[0].gh as g
 	MOV  $runtime·m0(SB), A0
 	MOV  g, m_g0(A0)  // m0.g0 = harts[0].gh
 	MOV  A0, g_m(g)   // harts[0].gh.m = m0
 
-	CALL  runtime·check<ABIInternal>(SB)
-
-	// initialize noosMem
-
-	// calculate the beginning of free memory (just after handler stacks)
-	MOV  $runtime·end(SB), A0
-	ADD  $(const_maxHarts*handlerStackSize+15), A0
-	AND  $~15, A0
-	MOV  $runtime·ramend(SB), A1
-	SUB  A0, A1, A5  // size of available memory (DMA capable)
-
-	// estimate the space need for non-heap allocations
-	SRL  $(const__PageShift+1), A5, A4
-	MOV  $mspan__size, A2
-	MUL  A2, A4
-	ADD  $persistAllocMin, A4
-
-	MOV  $runtime·nodmastart(SB), A2
-	MOV  $runtime·nodmaend(SB), A3
-	SUB  A2, A3, S0  // size of non-DMA memory
-	ADD  A5, S0, S1  // size of the whole free memory
-
-	// we prefer the non-DMA memory for non-heap objects to preserve as much as
-	// possible of the DMA capable memory for heap allocations
-	SUB  S0, A4
-
-	// reduce the arena by the remain of the non-heap space that did not fit in
-	// the non-DMA memory, properly align the arena
-	BLT  A4, ZERO, 2(PC)
-	SUB  A4, A5
-	AND  $~(const_heapArenaBytes-1), A5
-	SUB  A5, A1
-
-	// save {free.start,free.end,nodma.start,nodma.end,arenaStart,arenaSize,size}
-	MOV  $runtime·noosMem(SB), S0
-	MOV  A0, 0(S0)
-	MOV  A1, 8(S0)
-	MOV  A2, 16(S0)
-	MOV  A3, 24(S0)
-	MOV  A1, 32(S0)
-	MOV  A5, 40(S0)
-	MOV  S1, 48(S0)
-
-	// initialize noos tasker and Go scheduler
+	// Initialize tasker
 	CALL  ·taskerinit<ABIInternal>(SB)
+
+	CALL  ·check<ABIInternal>(SB)
 	CALL  ·schedinit<ABIInternal>(SB)
 
 	// run other harts
