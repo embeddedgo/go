@@ -80,7 +80,7 @@ const (
 	minHeapAlign = 8
 	maxSmallSize = 1 << 12
 	smallSizeDiv = 8
-	smallSizeMax = 256
+	smallSizeMax = 512
 	largeSizeDiv = 128
 	pageShift    = 11
 
