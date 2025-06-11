@@ -73,19 +73,24 @@ func sysReserveOS(v unsafe.Pointer, size uintptr) unsafe.Pointer {
 		// right away and we don't reuse chunks passed to sysFree.
 		return nil
 	}
-	return noosRawAlloc(size, 8)
-
+	lock(&noosMem.mx)
+	p := noosRawAlloc(size, 8)
+	unlock(&noosMem.mx)
+	return p
 }
 
 //go:nosplit
 func sysAllocOS(size uintptr) unsafe.Pointer {
+	lock(&noosMem.mx)
 	p := noosRawAlloc(size, 8)
+	unlock(&noosMem.mx)
 	if p == nil {
 		throw("runtime: cannot allocate memory")
 	}
 	return p
 }
 
+//go:nosplit
 func sysUsedOS(v unsafe.Pointer, n uintptr) {
 	lock(&noosMem.mx)
 	noosMem.arena.start = max(noosMem.arena.start, uintptr(v)+n)
@@ -110,8 +115,12 @@ func noosMemory() (heapBase, heapSize, limit uintptr) {
 	return noosMem.arenaStart, noosMem.arenaSize, noosMem.size
 }
 
+// noosRawAlloc may be used at very early stage of the boot to allocate tasker
+// structures. At this stage even gh may not be available so it must no split
+// and can't call any runtime functions.
+//
+//go:nosplit
 func noosRawAlloc(size, align uintptr) unsafe.Pointer {
-	lock(&noosMem.mx)
 	p := noosMem.free.alloc(size, align)
 	if p == nil {
 		p = noosMem.nodma.alloc(size, align)
@@ -122,7 +131,6 @@ func noosRawAlloc(size, align uintptr) unsafe.Pointer {
 		// bottom, pamem allocates from top.
 		p = noosMem.arena.alloc(size, align)
 	}
-	unlock(&noosMem.mx)
 	return p
 }
 
@@ -131,7 +139,9 @@ func noosRawAlloc(size, align uintptr) unsafe.Pointer {
 //go:nosplit
 func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) (p *notInHeap) {
 	align = max(align, 8)
+	lock(&noosMem.mx)
 	p = (*notInHeap)(noosRawAlloc(size, align))
+	unlock(&noosMem.mx)
 	if p == nil {
 		throw("runtime: cannot allocate memory")
 	}
