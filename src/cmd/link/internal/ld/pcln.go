@@ -296,6 +296,19 @@ func walkFuncs(ctxt *Link, funcs []loader.Sym, f func(loader.Sym)) {
 	}
 }
 
+func stripFuncName(fname string) string {
+	if *stripFuncNames > 0 {
+		if *stripFuncNames == 1 {
+			if i := strings.LastIndex(fname, "/"); i >= 0 {
+				fname = fname[i+1:]
+			}
+		} else {
+			fname = ""
+		}
+	}
+	return fname
+}
+
 // generateFuncnametab creates the function name table. Returns a map of
 // func symbol to the name offset in runtime.funcnamtab.
 func (state *pclntab) generateFuncnametab(ctxt *Link, funcs []loader.Sym) map[loader.Sym]uint32 {
@@ -305,7 +318,7 @@ func (state *pclntab) generateFuncnametab(ctxt *Link, funcs []loader.Sym) map[lo
 	writeFuncNameTab := func(ctxt *Link, s loader.Sym) {
 		symtab := ctxt.loader.MakeSymbolUpdater(s)
 		for s, off := range nameOffsets {
-			symtab.AddCStringAt(int64(off), ctxt.loader.SymName(s))
+			symtab.AddCStringAt(int64(off), stripFuncName(ctxt.loader.SymName(s)))
 		}
 	}
 
@@ -313,7 +326,7 @@ func (state *pclntab) generateFuncnametab(ctxt *Link, funcs []loader.Sym) map[lo
 	var size int64
 	walkFuncs(ctxt, funcs, func(s loader.Sym) {
 		nameOffsets[s] = uint32(size)
-		size += int64(len(ctxt.loader.SymName(s)) + 1) // NULL terminate
+		size += int64(len(stripFuncName(ctxt.loader.SymName(s))) + 1) // NULL terminate
 	})
 
 	state.funcnametab = state.addGeneratedSym(ctxt, "runtime.funcnametab", size, writeFuncNameTab)

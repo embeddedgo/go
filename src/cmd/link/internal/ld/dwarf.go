@@ -1208,14 +1208,8 @@ func (d *dwctxt) importInfoSymbol(dsym loader.Sym) {
 func expandFile(fname string, pcln bool) string {
 	fname = strings.TrimPrefix(fname, src.FileSymPrefix)
 	fname = expandGoroot(fname)
-	if pcln && *stripFuncNames > 0 {
-		if *stripFuncNames == 1 {
-			if i := strings.LastIndex(fname, "/"); i >= 0 {
-				fname = fname[i+1:]
-			}
-		} else {
-			fname = ""
-		}
+	if pcln {
+		fname = stripFuncName(fname)
 	}
 	return fname
 }
