@@ -140,5 +140,8 @@ func init() {
 	mt.Unlock()
 	if e == 0 {
 		os.Args = strings.Fields(string(args))
+		if len(os.Args) == 0 {
+			os.Args = []string{""}
+		}
 	}
 }
