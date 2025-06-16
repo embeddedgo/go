@@ -43,6 +43,9 @@ func exeSuffix() string {
 	if Goos == "windows" {
 		return ".exe"
 	}
+	if Goos == "noos" {
+		return ".elf"
+	}
 	return ""
 }
 
