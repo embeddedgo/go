@@ -591,6 +591,9 @@ func (u *unwinder) symPC() uintptr {
 // If the current frame is not a cgo frame or if there's no registered cgo
 // unwinder, it returns 0.
 func (u *unwinder) cgoCallers(pcBuf []uintptr) int {
+	if noos {
+		return 0
+	}
 	if cgoTraceback == nil || u.frame.fn.funcID != abi.FuncID_cgocallback || u.cgoCtxt < 0 {
 		// We don't have a cgo unwinder (typical case), or we do but we're not
 		// in a cgo frame or we're out of cgo context.
