@@ -432,16 +432,16 @@ func (st *loadState) addSym(name string, ver int, r *oReader, li uint32, kind in
 		return i
 	}
 	// symbol already exists
+	// Fix for issue #47185 -- given two dupok or BSS symbols with
+	// different sizes, favor symbol with larger size. See also
+	// issue #46653 and #72032.
+	oldsz := l.SymSize(oldi)
+	sz := int64(r.Sym(li).Siz())
 	if osym.Dupok() {
 		if l.flags&FlagStrictDups != 0 {
 			l.checkdup(name, r, li, oldi)
 		}
-		// Fix for issue #47185 -- given two dupok symbols with
-		// different sizes, favor symbol with larger size. See
-		// also issue #46653.
-		szdup := l.SymSize(oldi)
-		sz := int64(r.Sym(li).Siz())
-		if szdup < sz {
+		if oldsz < sz {
 			// new symbol overwrites old symbol.
 			l.objSyms[oldi] = objSym{r.objidx, li}
 		}
@@ -452,20 +452,50 @@ func (st *loadState) addSym(name string, ver int, r *oReader, li uint32, kind in
 	if oldsym.Dupok() {
 		return oldi
 	}
-	overwrite := r.DataSize(li) != 0
-	if overwrite {
+	// If one is a DATA symbol (i.e. has content, DataSize != 0,
+	// including RODATA) and the other is BSS, the one with content wins.
+	// If both are BSS, the one with larger size wins.
+	//
+	// For a special case, we allow a TEXT symbol overwrites a BSS symbol
+	// even if the BSS symbol has larger size. This is because there is
+	// code like below to take the address of a function
+	//
+	//	//go:linkname fn
+	//	var fn uintptr
+	//	var fnAddr = uintptr(unsafe.Pointer(&fn))
+	//
+	// TODO: maybe limit this case to just pointer sized variable?
+	//
+	// In summary, the "overwrite" variable and the final result are
+	//
+	// new sym       old sym       result
+	// ---------------------------------------------
+	// TEXT          BSS           new wins
+	// DATA          DATA          ERROR
+	// DATA lg/eq    BSS  sm/eq    new wins
+	// DATA small    BSS  large    ERROR
+	// BSS  large    DATA small    ERROR
+	// BSS  large    BSS  small    new wins
+	// BSS  sm/eq    D/B  lg/eq    old wins
+	// BSS           TEXT          old wins
+	oldtyp := sym.AbiSymKindToSymKind[objabi.SymKind(oldsym.Type())]
+	newtyp := sym.AbiSymKindToSymKind[objabi.SymKind(osym.Type())]
+	oldIsText := oldtyp.IsText()
+	newIsText := newtyp.IsText()
+	oldHasContent := oldr.DataSize(oldli) != 0
+	newHasContent := r.DataSize(li) != 0
+	oldIsBSS := oldtyp.IsData() && !oldHasContent
+	newIsBSS := newtyp.IsData() && !newHasContent
+	switch {
+	case newIsText && oldIsBSS,
+		newHasContent && oldIsBSS && sz >= oldsz,
+		newIsBSS && oldIsBSS && sz > oldsz:
 		// new symbol overwrites old symbol.
-		oldtyp := sym.AbiSymKindToSymKind[objabi.SymKind(oldsym.Type())]
-		if !(oldtyp.IsData() && oldr.DataSize(oldli) == 0) {
-			log.Fatalf("duplicated definition of symbol %s, from %s and %s", name, r.unit.Lib.Pkg, oldr.unit.Lib.Pkg)
-		}
 		l.objSyms[oldi] = objSym{r.objidx, li}
-	} else {
-		// old symbol overwrites new symbol.
-		typ := sym.AbiSymKindToSymKind[objabi.SymKind(oldsym.Type())]
-		if !typ.IsData() { // only allow overwriting data symbol
-			log.Fatalf("duplicated definition of symbol %s, from %s and %s", name, r.unit.Lib.Pkg, oldr.unit.Lib.Pkg)
-		}
+	case newIsBSS && (oldsz >= sz || oldIsText):
+		// old win, just ignore the new symbol.
+	default:
+		log.Fatalf("duplicated definition of symbol %s, from %s (type %s size %d) and %s (type %s size %d)", name, r.unit.Lib.Pkg, newtyp, sz, oldr.unit.Lib.Pkg, oldtyp, oldsz)
 	}
 	return oldi
 }

@@ -42,6 +42,7 @@ import (
 	"cmd/compile/internal/types"
 	"cmd/internal/obj"
 	"cmd/internal/pgo"
+	"cmd/internal/src"
 )
 
 // Inlining budget parameters, gathered in one place
@@ -169,19 +170,8 @@ func CanInlineFuncs(funcs []*ir.Func, profile *pgoir.Profile) {
 	}
 
 	ir.VisitFuncsBottomUp(funcs, func(funcs []*ir.Func, recursive bool) {
-		numfns := numNonClosures(funcs)
-
 		for _, fn := range funcs {
-			if !recursive || numfns > 1 {
-				// We allow inlining if there is no
-				// recursion, or the recursion cycle is
-				// across more than one function.
-				CanInline(fn, profile)
-			} else {
-				if base.Flag.LowerM > 1 && fn.OClosure == nil {
-					fmt.Printf("%v: cannot inline %v: recursive\n", ir.Line(fn), fn.Nname)
-				}
-			}
+			CanInline(fn, profile)
 			if inlheur.Enabled() {
 				analyzeFuncProps(fn, profile)
 			}
@@ -974,6 +964,16 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCal
 	return true, 0, metric, hot
 }
 
+// parsePos returns all the inlining positions and the innermost position.
+func parsePos(pos src.XPos, posTmp []src.Pos) ([]src.Pos, src.Pos) {
+	ctxt := base.Ctxt
+	ctxt.AllPos(pos, func(p src.Pos) {
+		posTmp = append(posTmp, p)
+	})
+	l := len(posTmp) - 1
+	return posTmp[:l], posTmp[l]
+}
+
 // canInlineCallExpr returns true if the call n from caller to callee
 // can be inlined, plus the score computed for the call expr in question,
 // and whether the callee is hot according to PGO.
@@ -1001,12 +1001,15 @@ func canInlineCallExpr(callerfn *ir.Func, n *ir.CallExpr, callee *ir.Func, bigCa
 		return false, 0, false
 	}
 
-	if callee == callerfn {
-		// Can't recursively inline a function into itself.
-		if log && logopt.Enabled() {
-			logopt.LogOpt(n.Pos(), "cannotInlineCall", "inline", fmt.Sprintf("recursive call to %s", ir.FuncName(callerfn)))
+	callees, calleeInner := parsePos(n.Pos(), make([]src.Pos, 0, 10))
+
+	for _, p := range callees {
+		if p.Line() == calleeInner.Line() && p.Col() == calleeInner.Col() && p.AbsFilename() == calleeInner.AbsFilename() {
+			if log && logopt.Enabled() {
+				logopt.LogOpt(n.Pos(), "cannotInlineCall", "inline", fmt.Sprintf("recursive call to %s", ir.FuncName(callerfn)))
+			}
+			return false, 0, false
 		}
-		return false, 0, false
 	}
 
 	if base.Flag.Cfg.Instrumenting && types.IsNoInstrumentPkg(callee.Sym().Pkg) {
