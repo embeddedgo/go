@@ -268,10 +268,10 @@ func Main(arch *sys.Arch, theArch Arch) {
 		if len(descr) == 0 {
 			Exitf("memory layout (-M) not specified")
 		}
-		if len(descr) > 0 {
+		if len(descr) > 0 && descr[0] != "" {
 			RAM.set(descr[0])
 		}
-		if len(descr) > 1 {
+		if len(descr) > 1 && descr[1] != "" {
 			NoDMA.set(descr[1])
 		}
 		if len(descr) > 2 {
