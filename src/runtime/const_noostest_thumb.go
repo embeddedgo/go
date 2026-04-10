@@ -25,7 +25,6 @@ const (
 	noosStackMin                    = 2048
 	noosStackSystem                 = 27 * 4 // register stacking at exception entry
 	noosStackGuard                  = 464
-	noosFinBlockSize                = 2 * 1024
 	noosSweepMinHeapDistance        = 8 * 1024
 	noosDefaultHeapMinimum          = 64 * 1024
 	noosMemoryLimitHeapGoalHeadroom = 1 << 18

@@ -20,7 +20,6 @@ const (
 	noosStackMin                    = 0
 	noosStackSystem                 = 0
 	noosStackGuard                  = 0
-	noosFinBlockSize                = 0
 	noosSweepMinHeapDistance        = 0
 	noosDefaultHeapMinimum          = 0
 	noosMemoryLimitHeapGoalHeadroom = 0

@@ -61,7 +61,6 @@ var List = []OSArch{
 	{"wasip1", "wasm"},
 	{"windows", "386"},
 	{"windows", "amd64"},
-	{"windows", "arm"},
 	{"windows", "arm64"},
 }
 
@@ -78,7 +77,7 @@ var distInfo = map[OSArch]osArchInfo{
 	{"freebsd", "amd64"}:   {CgoSupported: true},
 	{"freebsd", "arm"}:     {CgoSupported: true},
 	{"freebsd", "arm64"}:   {CgoSupported: true},
-	{"freebsd", "riscv64"}: {CgoSupported: true},
+	{"freebsd", "riscv64"}: {CgoSupported: true, Broken: true},
 	{"illumos", "amd64"}:   {CgoSupported: true},
 	{"ios", "amd64"}:       {CgoSupported: true},
 	{"ios", "arm64"}:       {CgoSupported: true},
@@ -119,6 +118,5 @@ var distInfo = map[OSArch]osArchInfo{
 	{"wasip1", "wasm"}:     {},
 	{"windows", "386"}:     {CgoSupported: true, FirstClass: true},
 	{"windows", "amd64"}:   {CgoSupported: true, FirstClass: true},
-	{"windows", "arm"}:     {Broken: true},
 	{"windows", "arm64"}:   {CgoSupported: true},
 }

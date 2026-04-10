@@ -97,11 +97,8 @@ type pkgWriter struct {
 // newPkgWriter returns an initialized pkgWriter for the specified
 // package.
 func newPkgWriter(m posMap, pkg *types2.Package, info *types2.Info, otherInfo map[*syntax.FuncLit]bool) *pkgWriter {
-	// Use V2 as the encoded version aliastypeparams GOEXPERIMENT is enabled.
-	version := pkgbits.V1
-	if buildcfg.Experiment.AliasTypeParams {
-		version = pkgbits.V2
-	}
+	// Use V2 as the encoded version for aliastypeparams.
+	version := pkgbits.V2
 	return &pkgWriter{
 		PkgEncoder: pkgbits.NewPkgEncoder(version, base.Debug.SyncFrames),
 
@@ -124,12 +121,12 @@ func newPkgWriter(m posMap, pkg *types2.Package, info *types2.Info, otherInfo ma
 }
 
 // errorf reports a user error about thing p.
-func (pw *pkgWriter) errorf(p poser, msg string, args ...interface{}) {
+func (pw *pkgWriter) errorf(p poser, msg string, args ...any) {
 	base.ErrorfAt(pw.m.pos(p), 0, msg, args...)
 }
 
 // fatalf reports an internal compiler error about thing p.
-func (pw *pkgWriter) fatalf(p poser, msg string, args ...interface{}) {
+func (pw *pkgWriter) fatalf(p poser, msg string, args ...any) {
 	base.FatalfAt(pw.m.pos(p), msg, args...)
 }
 
@@ -175,7 +172,7 @@ func (pw *pkgWriter) typeOf(expr syntax.Expr) types2.Type {
 type writer struct {
 	p *pkgWriter
 
-	pkgbits.Encoder
+	*pkgbits.Encoder
 
 	// sig holds the signature for the current function body, if any.
 	sig *types2.Signature
@@ -368,7 +365,7 @@ func (dict *writerDict) itabIdx(typInfo, ifaceInfo typeInfo) int {
 	return idx
 }
 
-func (pw *pkgWriter) newWriter(k pkgbits.RelocKind, marker pkgbits.SyncMarker) *writer {
+func (pw *pkgWriter) newWriter(k pkgbits.SectionKind, marker pkgbits.SyncMarker) *writer {
 	return &writer{
 		Encoder: pw.NewEncoder(k, marker),
 		p:       pw,
@@ -396,7 +393,7 @@ func (w *writer) pos(p poser) {
 // posBase writes a reference to the given PosBase into the element
 // bitstream.
 func (w *writer) posBase(b *syntax.PosBase) {
-	w.Reloc(pkgbits.RelocPosBase, w.p.posBaseIdx(b))
+	w.Reloc(pkgbits.SectionPosBase, w.p.posBaseIdx(b))
 }
 
 // posBaseIdx returns the index for the given PosBase.
@@ -405,7 +402,7 @@ func (pw *pkgWriter) posBaseIdx(b *syntax.PosBase) index {
 		return idx
 	}
 
-	w := pw.newWriter(pkgbits.RelocPosBase, pkgbits.SyncPosBase)
+	w := pw.newWriter(pkgbits.SectionPosBase, pkgbits.SyncPosBase)
 	w.p.posBasesIdx[b] = w.Idx
 
 	w.String(trimFilename(b))
@@ -428,7 +425,7 @@ func (w *writer) pkg(pkg *types2.Package) {
 
 func (w *writer) pkgRef(idx index) {
 	w.Sync(pkgbits.SyncPkg)
-	w.Reloc(pkgbits.RelocPkg, idx)
+	w.Reloc(pkgbits.SectionPkg, idx)
 }
 
 // pkgIdx returns the index for the given package, adding it to the
@@ -438,7 +435,7 @@ func (pw *pkgWriter) pkgIdx(pkg *types2.Package) index {
 		return idx
 	}
 
-	w := pw.newWriter(pkgbits.RelocPkg, pkgbits.SyncPkgDef)
+	w := pw.newWriter(pkgbits.SectionPkg, pkgbits.SyncPkgDef)
 	pw.pkgsIdx[pkg] = w.Idx
 
 	// The universe and package unsafe need to be handled specially by
@@ -490,7 +487,7 @@ func (w *writer) typInfo(info typeInfo) {
 		w.Len(int(info.idx))
 		w.derived = true
 	} else {
-		w.Reloc(pkgbits.RelocType, info.idx)
+		w.Reloc(pkgbits.SectionType, info.idx)
 	}
 }
 
@@ -521,7 +518,7 @@ func (pw *pkgWriter) typIdx(typ types2.Type, dict *writerDict) typeInfo {
 		}
 	}
 
-	w := pw.newWriter(pkgbits.RelocType, pkgbits.SyncTypeIdx)
+	w := pw.newWriter(pkgbits.SectionType, pkgbits.SyncTypeIdx)
 	w.dict = dict
 
 	switch typ := typ.(type) {
@@ -738,7 +735,7 @@ func (w *writer) objInfo(info objInfo) {
 	if w.Version().Has(pkgbits.DerivedFuncInstance) {
 		w.Bool(false)
 	}
-	w.Reloc(pkgbits.RelocObj, info.idx)
+	w.Reloc(pkgbits.SectionObj, info.idx)
 
 	w.Len(len(info.explicits))
 	for _, info := range info.explicits {
@@ -800,10 +797,10 @@ func (pw *pkgWriter) objIdx(obj types2.Object) index {
 	// TODO(mdempsky): Re-evaluate whether RelocName still makes sense
 	// to keep separate from RelocObj.
 
-	w := pw.newWriter(pkgbits.RelocObj, pkgbits.SyncObject1)
-	wext := pw.newWriter(pkgbits.RelocObjExt, pkgbits.SyncObject1)
-	wname := pw.newWriter(pkgbits.RelocName, pkgbits.SyncObject1)
-	wdict := pw.newWriter(pkgbits.RelocObjDict, pkgbits.SyncObject1)
+	w := pw.newWriter(pkgbits.SectionObj, pkgbits.SyncObject1)
+	wext := pw.newWriter(pkgbits.SectionObjExt, pkgbits.SyncObject1)
+	wname := pw.newWriter(pkgbits.SectionName, pkgbits.SyncObject1)
+	wdict := pw.newWriter(pkgbits.SectionObjDict, pkgbits.SyncObject1)
 
 	pw.objsIdx[obj] = w.Idx // break cycles
 	assert(wext.Idx == w.Idx)
@@ -918,7 +915,7 @@ func (w *writer) objDict(obj types2.Object, dict *writerDict) {
 	nderived := len(dict.derived)
 	w.Len(nderived)
 	for _, typ := range dict.derived {
-		w.Reloc(pkgbits.RelocType, typ.idx)
+		w.Reloc(pkgbits.SectionType, typ.idx)
 		if w.Version().Has(pkgbits.DerivedInfoNeeded) {
 			w.Bool(false)
 		}
@@ -1133,7 +1130,7 @@ func (w *writer) funcExt(obj *types2.Func) {
 	}
 
 	w.Bool(false) // stub extension
-	w.Reloc(pkgbits.RelocBody, body)
+	w.Reloc(pkgbits.SectionBody, body)
 	w.Sync(pkgbits.SyncEOF)
 }
 
@@ -1171,7 +1168,7 @@ func (w *writer) pragmaFlag(p ir.PragmaFlag) {
 // bodyIdx returns the index for the given function body (specified by
 // block), adding it to the export data
 func (pw *pkgWriter) bodyIdx(sig *types2.Signature, block *syntax.BlockStmt, dict *writerDict) (idx index, closureVars []posVar) {
-	w := pw.newWriter(pkgbits.RelocBody, pkgbits.SyncFuncBody)
+	w := pw.newWriter(pkgbits.SectionBody, pkgbits.SyncFuncBody)
 	w.sig = sig
 	w.dict = dict
 
@@ -2039,10 +2036,16 @@ func (w *writer) expr(expr syntax.Expr) {
 			case "new":
 				assert(len(expr.ArgList) == 1)
 				assert(!expr.HasDots)
+				arg := expr.ArgList[0]
 
 				w.Code(exprNew)
 				w.pos(expr)
-				w.exprType(nil, expr.ArgList[0])
+				tv := w.p.typeAndValue(arg)
+				if w.Bool(!tv.IsType()) {
+					w.expr(arg) // new(expr), go1.26
+				} else {
+					w.exprType(nil, arg) // new(T)
+				}
 				return
 
 			case "Sizeof":
@@ -2402,7 +2405,7 @@ func (w *writer) funcLit(expr *syntax.FuncLit) {
 		w.useLocal(cv.pos, cv.var_)
 	}
 
-	w.Reloc(pkgbits.RelocBody, body)
+	w.Reloc(pkgbits.SectionBody, body)
 }
 
 type posVar struct {
@@ -2412,11 +2415,6 @@ type posVar struct {
 
 func (p posVar) String() string {
 	return p.pos.String() + ":" + p.var_.String()
-}
-
-func (w *writer) exprList(expr syntax.Expr) {
-	w.Sync(pkgbits.SyncExprList)
-	w.exprs(syntax.UnpackListExpr(expr))
 }
 
 func (w *writer) exprs(exprs []syntax.Expr) {

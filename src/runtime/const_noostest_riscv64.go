@@ -25,7 +25,6 @@ const (
 	noosStackMin                    = 2048
 	noosStackSystem                 = 0
 	noosStackGuard                  = 928
-	noosFinBlockSize                = 2 * 1024
 	noosSweepMinHeapDistance        = 8 * 1024
 	noosDefaultHeapMinimum          = 64 * 1024
 	noosMemoryLimitHeapGoalHeadroom = 1 << 18
