@@ -27,6 +27,7 @@ const (
 	PPC64
 	RISCV64
 	S390X
+	Thumb
 	WASM
 )
 
