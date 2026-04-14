@@ -21,6 +21,9 @@ func rewriteValueThumb(v *Value) bool {
 	case OpAdd32carry:
 		v.Op = OpThumbADDS
 		return true
+	case OpAdd32carrywithcarry:
+		v.Op = OpThumbADCS
+		return true
 	case OpAdd32withcarry:
 		v.Op = OpThumbADC
 		return true
@@ -49,8 +52,12 @@ func rewriteValueThumb(v *Value) bool {
 		return true
 	case OpAvg32u:
 		return rewriteValueThumb_OpAvg32u(v)
+	case OpBitLen16:
+		return rewriteValueThumb_OpBitLen16(v)
 	case OpBitLen32:
 		return rewriteValueThumb_OpBitLen32(v)
+	case OpBitLen8:
+		return rewriteValueThumb_OpBitLen8(v)
 	case OpBswap32:
 		v.Op = OpThumbREV
 		return true
@@ -341,9 +348,11 @@ func rewriteValueThumb(v *Value) bool {
 		v.Op = OpThumbOR
 		return true
 	case OpPanicBounds:
-		return rewriteValueThumb_OpPanicBounds(v)
+		v.Op = OpThumbLoweredPanicBoundsRR
+		return true
 	case OpPanicExtend:
-		return rewriteValueThumb_OpPanicExtend(v)
+		v.Op = OpThumbLoweredPanicExtendRR
+		return true
 	case OpPubBarrier:
 		v.Op = OpThumbDMB_ST
 		return true
@@ -576,6 +585,14 @@ func rewriteValueThumb(v *Value) bool {
 		return rewriteValueThumb_OpThumbLoadOnce8(v)
 	case OpThumbLoadOnce8idx:
 		return rewriteValueThumb_OpThumbLoadOnce8idx(v)
+	case OpThumbLoweredPanicBoundsRC:
+		return rewriteValueThumb_OpThumbLoweredPanicBoundsRC(v)
+	case OpThumbLoweredPanicBoundsRR:
+		return rewriteValueThumb_OpThumbLoweredPanicBoundsRR(v)
+	case OpThumbLoweredPanicExtendRC:
+		return rewriteValueThumb_OpThumbLoweredPanicExtendRC(v)
+	case OpThumbLoweredPanicExtendRR:
+		return rewriteValueThumb_OpThumbLoweredPanicExtendRR(v)
 	case OpThumbMOVBUload:
 		return rewriteValueThumb_OpThumbMOVBUload(v)
 	case OpThumbMOVBUloadidx:
@@ -870,6 +887,21 @@ func rewriteValueThumb_OpAvg32u(v *Value) bool {
 		return true
 	}
 }
+func rewriteValueThumb_OpBitLen16(v *Value) bool {
+	v_0 := v.Args[0]
+	b := v.Block
+	typ := &b.Func.Config.Types
+	// match: (BitLen16 x)
+	// result: (BitLen32 (ZeroExt16to32 x))
+	for {
+		x := v_0
+		v.reset(OpBitLen32)
+		v0 := b.NewValue0(v.Pos, OpZeroExt16to32, typ.UInt32)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+}
 func rewriteValueThumb_OpBitLen32(v *Value) bool {
 	v_0 := v.Args[0]
 	b := v.Block
@@ -881,6 +913,21 @@ func rewriteValueThumb_OpBitLen32(v *Value) bool {
 		v.reset(OpThumbRSBconst)
 		v.AuxInt = int32ToAuxInt(32)
 		v0 := b.NewValue0(v.Pos, OpThumbCLZ, t)
+		v0.AddArg(x)
+		v.AddArg(v0)
+		return true
+	}
+}
+func rewriteValueThumb_OpBitLen8(v *Value) bool {
+	v_0 := v.Args[0]
+	b := v.Block
+	typ := &b.Func.Config.Types
+	// match: (BitLen8 x)
+	// result: (BitLen32 (ZeroExt8to32 x))
+	for {
+		x := v_0
+		v.reset(OpBitLen32)
+		v0 := b.NewValue0(v.Pos, OpZeroExt8to32, typ.UInt32)
 		v0.AddArg(x)
 		v.AddArg(v0)
 		return true
@@ -2412,7 +2459,7 @@ func rewriteValueThumb_OpMove(v *Value) bool {
 		return true
 	}
 	// match: (Move [s] {t} dst src mem)
-	// cond: s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0 && !config.noDuffDevice && logLargeCopy(v, s)
+	// cond: s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0 && logLargeCopy(v, s)
 	// result: (DUFFCOPY [8 * (128 - s/4)] dst src mem)
 	for {
 		s := auxIntToInt64(v.AuxInt)
@@ -2420,7 +2467,7 @@ func rewriteValueThumb_OpMove(v *Value) bool {
 		dst := v_0
 		src := v_1
 		mem := v_2
-		if !(s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0 && !config.noDuffDevice && logLargeCopy(v, s)) {
+		if !(s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0 && logLargeCopy(v, s)) {
 			break
 		}
 		v.reset(OpThumbDUFFCOPY)
@@ -2429,7 +2476,7 @@ func rewriteValueThumb_OpMove(v *Value) bool {
 		return true
 	}
 	// match: (Move [s] {t} dst src mem)
-	// cond: ((s > 512 || config.noDuffDevice) || t.Alignment()%4 != 0) && logLargeCopy(v, s)
+	// cond: (s > 512 || t.Alignment()%4 != 0) && logLargeCopy(v, s)
 	// result: (LoweredMove [t.Alignment()] dst src (ADDconst <src.Type> src [int32(s-moveSize(t.Alignment(), config))]) mem)
 	for {
 		s := auxIntToInt64(v.AuxInt)
@@ -2437,7 +2484,7 @@ func rewriteValueThumb_OpMove(v *Value) bool {
 		dst := v_0
 		src := v_1
 		mem := v_2
-		if !(((s > 512 || config.noDuffDevice) || t.Alignment()%4 != 0) && logLargeCopy(v, s)) {
+		if !((s > 512 || t.Alignment()%4 != 0) && logLargeCopy(v, s)) {
 			break
 		}
 		v.reset(OpThumbLoweredMove)
@@ -2629,118 +2676,6 @@ func rewriteValueThumb_OpOffPtr(v *Value) bool {
 		v.AddArg(ptr)
 		return true
 	}
-}
-func rewriteValueThumb_OpPanicBounds(v *Value) bool {
-	v_2 := v.Args[2]
-	v_1 := v.Args[1]
-	v_0 := v.Args[0]
-	// match: (PanicBounds [kind] x y mem)
-	// cond: boundsABI(kind) == 0
-	// result: (LoweredPanicBoundsA [kind] x y mem)
-	for {
-		kind := auxIntToInt64(v.AuxInt)
-		x := v_0
-		y := v_1
-		mem := v_2
-		if !(boundsABI(kind) == 0) {
-			break
-		}
-		v.reset(OpThumbLoweredPanicBoundsA)
-		v.AuxInt = int64ToAuxInt(kind)
-		v.AddArg3(x, y, mem)
-		return true
-	}
-	// match: (PanicBounds [kind] x y mem)
-	// cond: boundsABI(kind) == 1
-	// result: (LoweredPanicBoundsB [kind] x y mem)
-	for {
-		kind := auxIntToInt64(v.AuxInt)
-		x := v_0
-		y := v_1
-		mem := v_2
-		if !(boundsABI(kind) == 1) {
-			break
-		}
-		v.reset(OpThumbLoweredPanicBoundsB)
-		v.AuxInt = int64ToAuxInt(kind)
-		v.AddArg3(x, y, mem)
-		return true
-	}
-	// match: (PanicBounds [kind] x y mem)
-	// cond: boundsABI(kind) == 2
-	// result: (LoweredPanicBoundsC [kind] x y mem)
-	for {
-		kind := auxIntToInt64(v.AuxInt)
-		x := v_0
-		y := v_1
-		mem := v_2
-		if !(boundsABI(kind) == 2) {
-			break
-		}
-		v.reset(OpThumbLoweredPanicBoundsC)
-		v.AuxInt = int64ToAuxInt(kind)
-		v.AddArg3(x, y, mem)
-		return true
-	}
-	return false
-}
-func rewriteValueThumb_OpPanicExtend(v *Value) bool {
-	v_3 := v.Args[3]
-	v_2 := v.Args[2]
-	v_1 := v.Args[1]
-	v_0 := v.Args[0]
-	// match: (PanicExtend [kind] hi lo y mem)
-	// cond: boundsABI(kind) == 0
-	// result: (LoweredPanicExtendA [kind] hi lo y mem)
-	for {
-		kind := auxIntToInt64(v.AuxInt)
-		hi := v_0
-		lo := v_1
-		y := v_2
-		mem := v_3
-		if !(boundsABI(kind) == 0) {
-			break
-		}
-		v.reset(OpThumbLoweredPanicExtendA)
-		v.AuxInt = int64ToAuxInt(kind)
-		v.AddArg4(hi, lo, y, mem)
-		return true
-	}
-	// match: (PanicExtend [kind] hi lo y mem)
-	// cond: boundsABI(kind) == 1
-	// result: (LoweredPanicExtendB [kind] hi lo y mem)
-	for {
-		kind := auxIntToInt64(v.AuxInt)
-		hi := v_0
-		lo := v_1
-		y := v_2
-		mem := v_3
-		if !(boundsABI(kind) == 1) {
-			break
-		}
-		v.reset(OpThumbLoweredPanicExtendB)
-		v.AuxInt = int64ToAuxInt(kind)
-		v.AddArg4(hi, lo, y, mem)
-		return true
-	}
-	// match: (PanicExtend [kind] hi lo y mem)
-	// cond: boundsABI(kind) == 2
-	// result: (LoweredPanicExtendC [kind] hi lo y mem)
-	for {
-		kind := auxIntToInt64(v.AuxInt)
-		hi := v_0
-		lo := v_1
-		y := v_2
-		mem := v_3
-		if !(boundsABI(kind) == 2) {
-			break
-		}
-		v.reset(OpThumbLoweredPanicExtendC)
-		v.AuxInt = int64ToAuxInt(kind)
-		v.AddArg4(hi, lo, y, mem)
-		return true
-	}
-	return false
 }
 func rewriteValueThumb_OpRotateLeft16(v *Value) bool {
 	v_1 := v.Args[1]
@@ -6433,6 +6368,135 @@ func rewriteValueThumb_OpThumbLoadOnce8idx(v *Value) bool {
 	}
 	return false
 }
+func rewriteValueThumb_OpThumbLoweredPanicBoundsRC(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoweredPanicBoundsRC [kind] {p} (MOVWconst [c]) mem)
+	// result: (LoweredPanicBoundsCC [kind] {PanicBoundsCC{Cx:int64(c), Cy:p.C}} mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		p := auxToPanicBoundsC(v.Aux)
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		mem := v_1
+		v.reset(OpThumbLoweredPanicBoundsCC)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCCToAux(PanicBoundsCC{Cx: int64(c), Cy: p.C})
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoweredPanicBoundsRR(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoweredPanicBoundsRR [kind] x (MOVWconst [c]) mem)
+	// result: (LoweredPanicBoundsRC [kind] x {PanicBoundsC{C:int64(c)}} mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		x := v_0
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		c := auxIntToInt32(v_1.AuxInt)
+		mem := v_2
+		v.reset(OpThumbLoweredPanicBoundsRC)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCToAux(PanicBoundsC{C: int64(c)})
+		v.AddArg2(x, mem)
+		return true
+	}
+	// match: (LoweredPanicBoundsRR [kind] (MOVWconst [c]) y mem)
+	// result: (LoweredPanicBoundsCR [kind] {PanicBoundsC{C:int64(c)}} y mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		c := auxIntToInt32(v_0.AuxInt)
+		y := v_1
+		mem := v_2
+		v.reset(OpThumbLoweredPanicBoundsCR)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCToAux(PanicBoundsC{C: int64(c)})
+		v.AddArg2(y, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoweredPanicExtendRC(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoweredPanicExtendRC [kind] {p} (MOVWconst [hi]) (MOVWconst [lo]) mem)
+	// result: (LoweredPanicBoundsCC [kind] {PanicBoundsCC{Cx:int64(hi)<<32+int64(uint32(lo)), Cy:p.C}} mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		p := auxToPanicBoundsC(v.Aux)
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		hi := auxIntToInt32(v_0.AuxInt)
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		lo := auxIntToInt32(v_1.AuxInt)
+		mem := v_2
+		v.reset(OpThumbLoweredPanicBoundsCC)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCCToAux(PanicBoundsCC{Cx: int64(hi)<<32 + int64(uint32(lo)), Cy: p.C})
+		v.AddArg(mem)
+		return true
+	}
+	return false
+}
+func rewriteValueThumb_OpThumbLoweredPanicExtendRR(v *Value) bool {
+	v_3 := v.Args[3]
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoweredPanicExtendRR [kind] hi lo (MOVWconst [c]) mem)
+	// result: (LoweredPanicExtendRC [kind] hi lo {PanicBoundsC{C:int64(c)}} mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		hi := v_0
+		lo := v_1
+		if v_2.Op != OpThumbMOVWconst {
+			break
+		}
+		c := auxIntToInt32(v_2.AuxInt)
+		mem := v_3
+		v.reset(OpThumbLoweredPanicExtendRC)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCToAux(PanicBoundsC{C: int64(c)})
+		v.AddArg3(hi, lo, mem)
+		return true
+	}
+	// match: (LoweredPanicExtendRR [kind] (MOVWconst [hi]) (MOVWconst [lo]) y mem)
+	// result: (LoweredPanicBoundsCR [kind] {PanicBoundsC{C:int64(hi)<<32 + int64(uint32(lo))}} y mem)
+	for {
+		kind := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpThumbMOVWconst {
+			break
+		}
+		hi := auxIntToInt32(v_0.AuxInt)
+		if v_1.Op != OpThumbMOVWconst {
+			break
+		}
+		lo := auxIntToInt32(v_1.AuxInt)
+		y := v_2
+		mem := v_3
+		v.reset(OpThumbLoweredPanicBoundsCR)
+		v.AuxInt = int64ToAuxInt(kind)
+		v.Aux = panicBoundsCToAux(PanicBoundsC{C: int64(hi)<<32 + int64(uint32(lo))})
+		v.AddArg2(y, mem)
+		return true
+	}
+	return false
+}
 func rewriteValueThumb_OpThumbMOVBUload(v *Value) bool {
 	v_1 := v.Args[1]
 	v_0 := v.Args[0]
@@ -6978,6 +7042,19 @@ func rewriteValueThumb_OpThumbMOVBload(v *Value) bool {
 		v.reset(OpThumbMOVBloadshiftLL)
 		v.AuxInt = int32ToAuxInt(c)
 		v.AddArg3(ptr, idx, mem)
+		return true
+	}
+	// match: (MOVBload [off] {sym} (SB) _)
+	// cond: symIsRO(sym)
+	// result: (MOVWconst [int32(int8(read8(sym, int64(off))))])
+	for {
+		off := auxIntToInt32(v.AuxInt)
+		sym := auxToSym(v.Aux)
+		if v_0.Op != OpSB || !(symIsRO(sym)) {
+			break
+		}
+		v.reset(OpThumbMOVWconst)
+		v.AuxInt = int32ToAuxInt(int32(int8(read8(sym, int64(off)))))
 		return true
 	}
 	return false
@@ -8369,6 +8446,8 @@ func rewriteValueThumb_OpThumbMOVHUreg(v *Value) bool {
 func rewriteValueThumb_OpThumbMOVHload(v *Value) bool {
 	v_1 := v.Args[1]
 	v_0 := v.Args[0]
+	b := v.Block
+	config := b.Func.Config
 	// match: (MOVHload [off1] {sym} (ADDconst [off2] ptr) mem)
 	// result: (MOVHload [off1+off2] {sym} ptr mem)
 	for {
@@ -8488,6 +8567,19 @@ func rewriteValueThumb_OpThumbMOVHload(v *Value) bool {
 		v.reset(OpThumbMOVHloadshiftLL)
 		v.AuxInt = int32ToAuxInt(c)
 		v.AddArg3(ptr, idx, mem)
+		return true
+	}
+	// match: (MOVHload [off] {sym} (SB) _)
+	// cond: symIsRO(sym)
+	// result: (MOVWconst [int32(int16(read16(sym, int64(off), config.ctxt.Arch.ByteOrder)))])
+	for {
+		off := auxIntToInt32(v.AuxInt)
+		sym := auxToSym(v.Aux)
+		if v_0.Op != OpSB || !(symIsRO(sym)) {
+			break
+		}
+		v.reset(OpThumbMOVWconst)
+		v.AuxInt = int32ToAuxInt(int32(int16(read16(sym, int64(off), config.ctxt.Arch.ByteOrder))))
 		return true
 	}
 	return false
@@ -14343,14 +14435,14 @@ func rewriteValueThumb_OpZero(v *Value) bool {
 		return true
 	}
 	// match: (Zero [s] {t} ptr mem)
-	// cond: s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0 && !config.noDuffDevice
+	// cond: s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0
 	// result: (DUFFZERO [4 * (128 - s/4)] ptr (MOVWconst [0]) mem)
 	for {
 		s := auxIntToInt64(v.AuxInt)
 		t := auxToType(v.Aux)
 		ptr := v_0
 		mem := v_1
-		if !(s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0 && !config.noDuffDevice) {
+		if !(s%4 == 0 && s > 4 && s <= 512 && t.Alignment()%4 == 0) {
 			break
 		}
 		v.reset(OpThumbDUFFZERO)
@@ -14361,14 +14453,14 @@ func rewriteValueThumb_OpZero(v *Value) bool {
 		return true
 	}
 	// match: (Zero [s] {t} ptr mem)
-	// cond: (s > 512 || config.noDuffDevice) || t.Alignment()%4 != 0
+	// cond: s > 512 || t.Alignment()%4 != 0
 	// result: (LoweredZero [t.Alignment()] ptr (ADDconst <ptr.Type> ptr [int32(s-moveSize(t.Alignment(), config))]) (MOVWconst [0]) mem)
 	for {
 		s := auxIntToInt64(v.AuxInt)
 		t := auxToType(v.Aux)
 		ptr := v_0
 		mem := v_1
-		if !((s > 512 || config.noDuffDevice) || t.Alignment()%4 != 0) {
+		if !(s > 512 || t.Alignment()%4 != 0) {
 			break
 		}
 		v.reset(OpThumbLoweredZero)

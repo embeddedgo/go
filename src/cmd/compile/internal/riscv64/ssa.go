@@ -15,6 +15,7 @@ import (
 	"cmd/internal/obj"
 	"cmd/internal/obj/riscv"
 	"internal/abi"
+	"internal/buildcfg"
 )
 
 // ssaRegToReg maps ssa register numbers to obj register numbers.

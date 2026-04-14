@@ -5649,6 +5649,7 @@ const (
 	OpThumbADDSconst
 	OpThumbADC
 	OpThumbADCconst
+	OpThumbADCS
 	OpThumbSUBS
 	OpThumbSUBSconst
 	OpThumbRSBSconst
@@ -5862,12 +5863,12 @@ const (
 	OpThumbLoweredGetClosurePtr
 	OpThumbLoweredGetCallerSP
 	OpThumbLoweredGetCallerPC
-	OpThumbLoweredPanicBoundsA
-	OpThumbLoweredPanicBoundsB
-	OpThumbLoweredPanicBoundsC
-	OpThumbLoweredPanicExtendA
-	OpThumbLoweredPanicExtendB
-	OpThumbLoweredPanicExtendC
+	OpThumbLoweredPanicBoundsRR
+	OpThumbLoweredPanicBoundsRC
+	OpThumbLoweredPanicBoundsCR
+	OpThumbLoweredPanicBoundsCC
+	OpThumbLoweredPanicExtendRR
+	OpThumbLoweredPanicExtendRC
 	OpThumbFlagConstant
 	OpThumbInvertFlags
 	OpThumbLoweredWB
@@ -85469,6 +85470,22 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
+		name:        "ADCS",
+		argLen:      3,
+		commutative: true,
+		asm:         thumb.AADC,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+				{1, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+			outputs: []outputInfo{
+				{1, 0},
+				{0, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
 		name:   "SUBS",
 		argLen: 2,
 		asm:    thumb.ASUB,
@@ -88417,77 +88434,68 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
-		name:    "LoweredPanicBoundsA",
+		name:    "LoweredPanicBoundsRR",
 		auxType: auxInt64,
 		argLen:  3,
 		call:    true,
 		reg: regInfo{
 			inputs: []inputInfo{
-				{0, 4}, // R2
-				{1, 8}, // R3
+				{0, 7039}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12
+				{1, 7039}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12
 			},
 		},
 	},
 	{
-		name:    "LoweredPanicBoundsB",
+		name:    "LoweredPanicBoundsRC",
+		auxType: auxPanicBoundsC,
+		argLen:  2,
+		call:    true,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 7039}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12
+			},
+		},
+	},
+	{
+		name:    "LoweredPanicBoundsCR",
+		auxType: auxPanicBoundsC,
+		argLen:  2,
+		call:    true,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 7039}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12
+			},
+		},
+	},
+	{
+		name:    "LoweredPanicBoundsCC",
+		auxType: auxPanicBoundsCC,
+		argLen:  1,
+		call:    true,
+		reg:     regInfo{},
+	},
+	{
+		name:    "LoweredPanicExtendRR",
 		auxType: auxInt64,
+		argLen:  4,
+		call:    true,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 15},    // R0 R1 R2 R3
+				{1, 15},    // R0 R1 R2 R3
+				{2, 23423}, // R0 R1 R2 R3 R4 R5 R6 R8 R9 R11 R12 R14
+			},
+		},
+	},
+	{
+		name:    "LoweredPanicExtendRC",
+		auxType: auxPanicBoundsC,
 		argLen:  3,
 		call:    true,
 		reg: regInfo{
 			inputs: []inputInfo{
-				{0, 2}, // R1
-				{1, 4}, // R2
-			},
-		},
-	},
-	{
-		name:    "LoweredPanicBoundsC",
-		auxType: auxInt64,
-		argLen:  3,
-		call:    true,
-		reg: regInfo{
-			inputs: []inputInfo{
-				{0, 1}, // R0
-				{1, 2}, // R1
-			},
-		},
-	},
-	{
-		name:    "LoweredPanicExtendA",
-		auxType: auxInt64,
-		argLen:  4,
-		call:    true,
-		reg: regInfo{
-			inputs: []inputInfo{
-				{0, 16}, // R4
-				{1, 4},  // R2
-				{2, 8},  // R3
-			},
-		},
-	},
-	{
-		name:    "LoweredPanicExtendB",
-		auxType: auxInt64,
-		argLen:  4,
-		call:    true,
-		reg: regInfo{
-			inputs: []inputInfo{
-				{0, 16}, // R4
-				{1, 2},  // R1
-				{2, 4},  // R2
-			},
-		},
-	},
-	{
-		name:    "LoweredPanicExtendC",
-		auxType: auxInt64,
-		argLen:  4,
-		call:    true,
-		reg: regInfo{
-			inputs: []inputInfo{
-				{0, 16}, // R4
-				{1, 1},  // R0
-				{2, 2},  // R1
+				{0, 15}, // R0 R1 R2 R3
+				{1, 15}, // R0 R1 R2 R3
 			},
 		},
 	},
@@ -100218,39 +100226,39 @@ var specialRegMaskS390X = regMask(0)
 var framepointerRegS390X = int8(-1)
 var linkRegS390X = int8(14)
 var registersThumb = [...]Register{
-	{0, thumb.REG_R0, 0, "R0"},
-	{1, thumb.REG_R1, 1, "R1"},
-	{2, thumb.REG_R2, 2, "R2"},
-	{3, thumb.REG_R3, 3, "R3"},
-	{4, thumb.REG_R4, 4, "R4"},
-	{5, thumb.REG_R5, 5, "R5"},
-	{6, thumb.REG_R6, 6, "R6"},
-	{7, thumb.REG_R7, -1, "R7"},
-	{8, thumb.REG_R8, 7, "R8"},
-	{9, thumb.REG_R9, 8, "R9"},
-	{10, thumb.REGG, -1, "g"},
-	{11, thumb.REG_R11, 9, "R11"},
-	{12, thumb.REG_R12, 10, "R12"},
-	{13, thumb.REGSP, -1, "SP"},
-	{14, thumb.REG_R14, 11, "R14"},
-	{15, thumb.REG_R15, -1, "R15"},
-	{16, thumb.REG_F0, -1, "F0"},
-	{17, thumb.REG_F1, -1, "F1"},
-	{18, thumb.REG_F2, -1, "F2"},
-	{19, thumb.REG_F3, -1, "F3"},
-	{20, thumb.REG_F4, -1, "F4"},
-	{21, thumb.REG_F5, -1, "F5"},
-	{22, thumb.REG_F6, -1, "F6"},
-	{23, thumb.REG_F7, -1, "F7"},
-	{24, thumb.REG_F8, -1, "F8"},
-	{25, thumb.REG_F9, -1, "F9"},
-	{26, thumb.REG_F10, -1, "F10"},
-	{27, thumb.REG_F11, -1, "F11"},
-	{28, thumb.REG_F12, -1, "F12"},
-	{29, thumb.REG_F13, -1, "F13"},
-	{30, thumb.REG_F14, -1, "F14"},
-	{31, thumb.REG_F15, -1, "F15"},
-	{32, 0, -1, "SB"},
+	{0, thumb.REG_R0, "R0"},
+	{1, thumb.REG_R1, "R1"},
+	{2, thumb.REG_R2, "R2"},
+	{3, thumb.REG_R3, "R3"},
+	{4, thumb.REG_R4, "R4"},
+	{5, thumb.REG_R5, "R5"},
+	{6, thumb.REG_R6, "R6"},
+	{7, thumb.REG_R7, "R7"},
+	{8, thumb.REG_R8, "R8"},
+	{9, thumb.REG_R9, "R9"},
+	{10, thumb.REGG, "g"},
+	{11, thumb.REG_R11, "R11"},
+	{12, thumb.REG_R12, "R12"},
+	{13, thumb.REGSP, "SP"},
+	{14, thumb.REG_R14, "R14"},
+	{15, thumb.REG_R15, "R15"},
+	{16, thumb.REG_F0, "F0"},
+	{17, thumb.REG_F1, "F1"},
+	{18, thumb.REG_F2, "F2"},
+	{19, thumb.REG_F3, "F3"},
+	{20, thumb.REG_F4, "F4"},
+	{21, thumb.REG_F5, "F5"},
+	{22, thumb.REG_F6, "F6"},
+	{23, thumb.REG_F7, "F7"},
+	{24, thumb.REG_F8, "F8"},
+	{25, thumb.REG_F9, "F9"},
+	{26, thumb.REG_F10, "F10"},
+	{27, thumb.REG_F11, "F11"},
+	{28, thumb.REG_F12, "F12"},
+	{29, thumb.REG_F13, "F13"},
+	{30, thumb.REG_F14, "F14"},
+	{31, thumb.REG_F15, "F15"},
+	{32, 0, "SB"},
 }
 var paramIntRegThumb = []int8(nil)
 var paramFloatRegThumb = []int8(nil)
