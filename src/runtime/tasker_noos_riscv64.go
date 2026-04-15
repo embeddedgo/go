@@ -95,6 +95,7 @@ type mOS struct {
 	f    [numFPRS - 1]float64
 
 	waitsema uint32 // semaphore for parking on locks
+	bind     int32  // for rtos.Bind
 }
 
 //go:noescape

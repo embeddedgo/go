@@ -422,6 +422,7 @@ type mOS struct {
 	_ [13]uint32
 
 	waitsema uint32 // semaphore for parking on locks
+	bind     int32  // for rtos.Bind
 }
 
 // Exceptions handled in runtime

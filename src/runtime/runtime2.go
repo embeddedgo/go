@@ -619,7 +619,6 @@ type m struct {
 	g0      *g     // goroutine with scheduling stack
 	morebuf gobuf  // gobuf arg to morestack
 	divmod  uint32 // div/mod denominator for arm - known to liblink
-	(md: already aligned, rename and move somewhere) _bind   int32  // align next field to 8 bytes
 
 	// Fields whose offsets are not known to debuggers.
 

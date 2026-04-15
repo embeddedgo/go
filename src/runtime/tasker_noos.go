@@ -157,8 +157,8 @@ func taskerSetrunnable(m *m) (schedule bool) {
 		bestcpu = allcpu[0]
 		goto end
 	}
-	if uint32(m._bind) < uint32(len(allcpu)) {
-		bestcpu = allcpu[m._bind]
+	if uint32(m.bind) < uint32(len(allcpu)) {
+		bestcpu = allcpu[m.bind]
 		goto end
 	}
 	p = m.nextp
@@ -453,7 +453,7 @@ func sysnanotime() int64 {
 func sysnewosproc(m *m) {
 	curcpu := curcpu()
 	m.procid = uint64(atomic.Xadduintptr(&curcpu.t.tidgen, 1))
-	m._bind = -1
+	m.bind = -1
 	archnewm(m)
 	if taskerSetrunnable(m) {
 		curcpuSchedule()
@@ -559,11 +559,11 @@ func sysbind(cpuid int) (oldcpuid, errno int) {
 		return
 	}
 	m := curcpu.exe.ptr()
-	oldcpuid = int(m._bind)
+	oldcpuid = int(m.bind)
 	if cpuid == oldcpuid {
 		return
 	}
-	m._bind = int32(cpuid)
+	m.bind = int32(cpuid)
 	if cpuid >= 0 && curcpu == curcpu.t.allcpu[cpuid] {
 		return
 	}

@@ -35,6 +35,7 @@ type mOS struct {
 	sp, fp, ra, epc, tmp uintptr
 
 	waitsema uint32 // semaphore for parking on locks
+	bind     int32  // for rtos.Bind
 }
 
 var (
