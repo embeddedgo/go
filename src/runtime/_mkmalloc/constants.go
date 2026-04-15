@@ -4,7 +4,7 @@
 
 package main
 
-const (
+var (
 	// Constants that we use and will transfer to the runtime.
 	minHeapAlign = 8
 	maxSmallSize = 32 << 10
@@ -18,8 +18,8 @@ const (
 	pageSize = 1 << pageShift
 )
 
-const (
-	maxPtrSize = max(4, 8)
+var (
+	maxPtrSize = uintptr(max(4, 8))
 	maxPtrBits = 8 * maxPtrSize
 
 	// Maximum size smallScanNoHeader would be called for, which is the
@@ -27,3 +27,21 @@ const (
 	// gc.MinSizeForMallocHeader is defined as goarch.PtrSize * goarch.PtrBits.
 	smallScanNoHeaderMax = maxPtrSize * maxPtrBits
 )
+
+var build = "!noos"
+
+func constsNoos() {
+	switch *noos {
+	case 32:
+		maxSmallSize = 1 << 9
+		smallSizeMax = 256
+		pageShift    = 9
+		build = "noos && thumb"
+	case 64:
+		maxSmallSize = 1 << 12
+		smallSizeMax = 512
+		pageShift    = 11
+		build = "noss && (riscv64 || mips64)"
+	}
+	pageSize = 1 << pageShift
+}
