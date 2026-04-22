@@ -288,6 +288,16 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		ssagen.AddAux(&p.From, v)
 		p.To.Type = obj.TYPE_REG
 		p.To.Reg = v.Reg()
+	case ssa.OpMIPS64LoadOnce8,
+		ssa.OpMIPS64LoadOnce16,
+		ssa.OpMIPS64LoadOnce32,
+		ssa.OpMIPS64LoadOnce64:
+		p := s.Prog(v.Op.Asm())
+		p.From.Type = obj.TYPE_MEM
+		p.From.Reg = v.Args[0].Reg()
+		p.From.Offset = v.AuxInt
+		p.To.Type = obj.TYPE_REG
+		p.To.Reg = v.Reg0()
 	case ssa.OpMIPS64MOVBstore,
 		ssa.OpMIPS64MOVHstore,
 		ssa.OpMIPS64MOVWstore,
@@ -300,6 +310,18 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p.To.Type = obj.TYPE_MEM
 		p.To.Reg = v.Args[0].Reg()
 		ssagen.AddAux(&p.To, v)
+	case ssa.OpMIPS64StoreOnce8,
+		ssa.OpMIPS64StoreOnce16,
+		ssa.OpMIPS64StoreOnce32,
+		ssa.OpMIPS64StoreOnce64:
+		p := s.Prog(v.Op.Asm())
+		p.From.Type = obj.TYPE_REG
+		p.From.Reg = v.Args[1].Reg()
+		p.To.Type = obj.TYPE_MEM
+		p.To.Reg = v.Args[0].Reg()
+		p.To.Offset = v.AuxInt
+	case ssa.OpMIPS64SYNC:
+		s.Prog(mips.ASYNC)
 	case ssa.OpMIPS64MOVBstorezero,
 		ssa.OpMIPS64MOVHstorezero,
 		ssa.OpMIPS64MOVWstorezero,

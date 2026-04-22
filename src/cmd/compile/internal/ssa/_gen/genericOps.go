@@ -656,9 +656,11 @@ var genericOps = []opData{
 
 	// MMIO operations need for semantically inlining functions in embedded/mmio
 	// package. Both load and store operations on I/O memory can cause side effects.
+	{name: "MMIOLoad64", argLength: 2, typ: "(UInt64,Mem)", hasSideEffects: true},
 	{name: "MMIOLoad32", argLength: 2, typ: "(UInt32,Mem)", hasSideEffects: true},
 	{name: "MMIOLoad16", argLength: 2, typ: "(UInt16,Mem)", hasSideEffects: true},
 	{name: "MMIOLoad8", argLength: 2, typ: "(UInt8,Mem)", hasSideEffects: true},
+	{name: "MMIOStore64", argLength: 3, typ: "Mem", hasSideEffects: true},
 	{name: "MMIOStore32", argLength: 3, typ: "Mem", hasSideEffects: true},
 	{name: "MMIOStore16", argLength: 3, typ: "Mem", hasSideEffects: true},
 	{name: "MMIOStore8", argLength: 3, typ: "Mem", hasSideEffects: true},

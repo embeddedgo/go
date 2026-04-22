@@ -2220,6 +2220,15 @@ const (
 	OpMIPS64LoweredAtomicAddconst64
 	OpMIPS64LoweredAtomicCas32
 	OpMIPS64LoweredAtomicCas64
+	OpMIPS64LoadOnce8
+	OpMIPS64LoadOnce16
+	OpMIPS64LoadOnce32
+	OpMIPS64LoadOnce64
+	OpMIPS64StoreOnce8
+	OpMIPS64StoreOnce16
+	OpMIPS64StoreOnce32
+	OpMIPS64StoreOnce64
+	OpMIPS64SYNC
 	OpMIPS64LoweredNilCheck
 	OpMIPS64FPFlagTrue
 	OpMIPS64FPFlagFalse
@@ -3630,9 +3639,11 @@ const (
 	OpAtomicAnd8valueVariant
 	OpAtomicOr8valueVariant
 	OpPubBarrier
+	OpMMIOLoad64
 	OpMMIOLoad32
 	OpMMIOLoad16
 	OpMMIOLoad8
+	OpMMIOStore64
 	OpMMIOStore32
 	OpMMIOStore16
 	OpMMIOStore8
@@ -29751,6 +29762,133 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
+		name:           "LoadOnce8",
+		auxType:        auxInt64,
+		argLen:         2,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVBU,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+			outputs: []outputInfo{
+				{0, 167772158}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 R31
+			},
+		},
+	},
+	{
+		name:           "LoadOnce16",
+		auxType:        auxInt64,
+		argLen:         2,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVHU,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+			outputs: []outputInfo{
+				{0, 167772158}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 R31
+			},
+		},
+	},
+	{
+		name:           "LoadOnce32",
+		auxType:        auxInt64,
+		argLen:         2,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVWU,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+			outputs: []outputInfo{
+				{0, 167772158}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 R31
+			},
+		},
+	},
+	{
+		name:           "LoadOnce64",
+		auxType:        auxInt64,
+		argLen:         2,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVV,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+			outputs: []outputInfo{
+				{0, 167772158}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 R31
+			},
+		},
+	},
+	{
+		name:           "StoreOnce8",
+		auxType:        auxInt64,
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVB,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 234881022},           // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 g R31
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+		},
+	},
+	{
+		name:           "StoreOnce16",
+		auxType:        auxInt64,
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 234881022},           // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 g R31
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+		},
+	},
+	{
+		name:           "StoreOnce32",
+		auxType:        auxInt64,
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVW,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 234881022},           // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 g R31
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+		},
+	},
+	{
+		name:           "StoreOnce64",
+		auxType:        auxInt64,
+		argLen:         3,
+		faultOnNilArg0: true,
+		hasSideEffects: true,
+		asm:            mips.AMOVV,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 234881022},           // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 g R31
+				{0, 4611686018695823358}, // R1 R2 R3 R4 R5 R6 R7 R8 R9 R10 R11 R12 R13 R14 R15 R16 R17 R18 R19 R20 R21 R22 R24 R25 SP g R31 SB
+			},
+		},
+	},
+	{
+		name:           "SYNC",
+		argLen:         1,
+		hasSideEffects: true,
+		asm:            mips.ASYNC,
+		reg:            regInfo{},
+	},
+	{
 		name:           "LoweredNilCheck",
 		argLen:         2,
 		nilCheck:       true,
@@ -45885,6 +46023,12 @@ var opcodeTable = [...]opInfo{
 		generic:        true,
 	},
 	{
+		name:           "MMIOLoad64",
+		argLen:         2,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
 		name:           "MMIOLoad32",
 		argLen:         2,
 		hasSideEffects: true,
@@ -45899,6 +46043,12 @@ var opcodeTable = [...]opInfo{
 	{
 		name:           "MMIOLoad8",
 		argLen:         2,
+		hasSideEffects: true,
+		generic:        true,
+	},
+	{
+		name:           "MMIOStore64",
+		argLen:         3,
 		hasSideEffects: true,
 		generic:        true,
 	},
