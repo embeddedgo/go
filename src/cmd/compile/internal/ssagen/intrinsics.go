@@ -1553,51 +1553,64 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 		sys.AMD64)
 
 	/******** embedded/mmio ********/
+	addF("embedded/mmio", "load64",
+		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+			v := s.newValue2(ssa.OpMMIOLoad64, types.NewTuple(types.Types[types.TUINT64], types.TypeMem), args[0], s.mem())
+			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
+			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT64], v)
+		},
+		sys.MIPS64)
 	addF("embedded/mmio", "load8",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			v := s.newValue2(ssa.OpMMIOLoad8, types.NewTuple(types.Types[types.TUINT8], types.TypeMem), args[0], s.mem())
 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
 			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT8], v)
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
 	addF("embedded/mmio", "load16",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			v := s.newValue2(ssa.OpMMIOLoad16, types.NewTuple(types.Types[types.TUINT16], types.TypeMem), args[0], s.mem())
 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
 			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT16], v)
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
 	addF("embedded/mmio", "load32",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			v := s.newValue2(ssa.OpMMIOLoad32, types.NewTuple(types.Types[types.TUINT32], types.TypeMem), args[0], s.mem())
 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
 			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT32], v)
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
+	addF("embedded/mmio", "store64",
+		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+			s.vars[memVar] = s.newValue3(ssa.OpMMIOStore64, types.TypeMem, args[0], args[1], s.mem())
+			return nil
+		},
+		sys.MIPS64)
 	addF("embedded/mmio", "store8",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			s.vars[memVar] = s.newValue3(ssa.OpMMIOStore8, types.TypeMem, args[0], args[1], s.mem())
 			return nil
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
 	addF("embedded/mmio", "store16",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			s.vars[memVar] = s.newValue3(ssa.OpMMIOStore16, types.TypeMem, args[0], args[1], s.mem())
 			return nil
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
 	addF("embedded/mmio", "store32",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			s.vars[memVar] = s.newValue3(ssa.OpMMIOStore32, types.TypeMem, args[0], args[1], s.mem())
 			return nil
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
 	addF("embedded/mmio", "MB",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			s.vars[memVar] = s.newValue1(ssa.OpMMIOMB, types.TypeMem, s.mem())
 			return nil
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
 
 	/******** embedded/rtos ********/
 	addF("embedded/rtos", "publicationBarrier",
@@ -1605,7 +1618,7 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 			s.vars[memVar] = s.newValue1(ssa.OpPubBarrier, types.TypeMem, s.mem())
 			return nil
 		},
-		sys.Thumb)
+		sys.Thumb, sys.MIPS64)
 }
 
 // findIntrinsic returns a function which builds the SSA equivalent of the

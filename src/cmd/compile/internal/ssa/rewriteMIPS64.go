@@ -308,6 +308,14 @@ func rewriteValueMIPS64(v *Value) bool {
 		return rewriteValueMIPS64_OpMIPS64AND(v)
 	case OpMIPS64ANDconst:
 		return rewriteValueMIPS64_OpMIPS64ANDconst(v)
+	case OpMIPS64LoadOnce16:
+		return rewriteValueMIPS64_OpMIPS64LoadOnce16(v)
+	case OpMIPS64LoadOnce32:
+		return rewriteValueMIPS64_OpMIPS64LoadOnce32(v)
+	case OpMIPS64LoadOnce64:
+		return rewriteValueMIPS64_OpMIPS64LoadOnce64(v)
+	case OpMIPS64LoadOnce8:
+		return rewriteValueMIPS64_OpMIPS64LoadOnce8(v)
 	case OpMIPS64LoweredAtomicAdd32:
 		return rewriteValueMIPS64_OpMIPS64LoweredAtomicAdd32(v)
 	case OpMIPS64LoweredAtomicAdd64:
@@ -404,10 +412,37 @@ func rewriteValueMIPS64(v *Value) bool {
 		return rewriteValueMIPS64_OpMIPS64SUBV(v)
 	case OpMIPS64SUBVconst:
 		return rewriteValueMIPS64_OpMIPS64SUBVconst(v)
+	case OpMIPS64StoreOnce16:
+		return rewriteValueMIPS64_OpMIPS64StoreOnce16(v)
+	case OpMIPS64StoreOnce32:
+		return rewriteValueMIPS64_OpMIPS64StoreOnce32(v)
+	case OpMIPS64StoreOnce64:
+		return rewriteValueMIPS64_OpMIPS64StoreOnce64(v)
+	case OpMIPS64StoreOnce8:
+		return rewriteValueMIPS64_OpMIPS64StoreOnce8(v)
 	case OpMIPS64XOR:
 		return rewriteValueMIPS64_OpMIPS64XOR(v)
 	case OpMIPS64XORconst:
 		return rewriteValueMIPS64_OpMIPS64XORconst(v)
+	case OpMMIOLoad16:
+		return rewriteValueMIPS64_OpMMIOLoad16(v)
+	case OpMMIOLoad32:
+		return rewriteValueMIPS64_OpMMIOLoad32(v)
+	case OpMMIOLoad64:
+		return rewriteValueMIPS64_OpMMIOLoad64(v)
+	case OpMMIOLoad8:
+		return rewriteValueMIPS64_OpMMIOLoad8(v)
+	case OpMMIOMB:
+		v.Op = OpMIPS64SYNC
+		return true
+	case OpMMIOStore16:
+		return rewriteValueMIPS64_OpMMIOStore16(v)
+	case OpMMIOStore32:
+		return rewriteValueMIPS64_OpMMIOStore32(v)
+	case OpMMIOStore64:
+		return rewriteValueMIPS64_OpMMIOStore64(v)
+	case OpMMIOStore8:
+		return rewriteValueMIPS64_OpMMIOStore8(v)
 	case OpMod16:
 		return rewriteValueMIPS64_OpMod16(v)
 	case OpMod16u:
@@ -502,6 +537,9 @@ func rewriteValueMIPS64(v *Value) bool {
 		return true
 	case OpPanicBounds:
 		return rewriteValueMIPS64_OpPanicBounds(v)
+	case OpPubBarrier:
+		v.Op = OpMIPS64SYNC
+		return true
 	case OpRotateLeft16:
 		return rewriteValueMIPS64_OpRotateLeft16(v)
 	case OpRotateLeft32:
@@ -2666,6 +2704,102 @@ func rewriteValueMIPS64_OpMIPS64ANDconst(v *Value) bool {
 		v.reset(OpMIPS64ANDconst)
 		v.AuxInt = int64ToAuxInt(c & d)
 		v.AddArg(x)
+		return true
+	}
+	return false
+}
+func rewriteValueMIPS64_OpMIPS64LoadOnce16(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoadOnce16 [off1] (ADDVconst [off2] ptr) mem)
+	// cond: is32Bit(off1+off2)
+	// result: (LoadOnce16 [off1+off2] ptr mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		mem := v_1
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64LoadOnce16)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg2(ptr, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueMIPS64_OpMIPS64LoadOnce32(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoadOnce32 [off1] (ADDVconst [off2] ptr) mem)
+	// cond: is32Bit(off1+off2)
+	// result: (LoadOnce32 [off1+off2] ptr mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		mem := v_1
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64LoadOnce32)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg2(ptr, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueMIPS64_OpMIPS64LoadOnce64(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoadOnce64 [off1] (ADDVconst [off2] ptr) mem)
+	// cond: is32Bit(off1+off2)
+	// result: (LoadOnce64 [off1+off2] ptr mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		mem := v_1
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64LoadOnce64)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg2(ptr, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueMIPS64_OpMIPS64LoadOnce8(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (LoadOnce8 [off1] (ADDVconst [off2] ptr) mem)
+	// cond: is32Bit(off1+off2)
+	// result: (LoadOnce8 [off1+off2] ptr mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		mem := v_1
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64LoadOnce8)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg2(ptr, mem)
 		return true
 	}
 	return false
@@ -5366,6 +5500,110 @@ func rewriteValueMIPS64_OpMIPS64SUBVconst(v *Value) bool {
 	}
 	return false
 }
+func rewriteValueMIPS64_OpMIPS64StoreOnce16(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (StoreOnce16 [off1] (ADDVconst [off2] ptr) val mem)
+	// cond: is32Bit(off1+off2)
+	// result: (StoreOnce16 [off1+off2] ptr val mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		val := v_1
+		mem := v_2
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64StoreOnce16)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueMIPS64_OpMIPS64StoreOnce32(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (StoreOnce32 [off1] (ADDVconst [off2] ptr) val mem)
+	// cond: is32Bit(off1+off2)
+	// result: (StoreOnce32 [off1+off2] ptr val mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		val := v_1
+		mem := v_2
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64StoreOnce32)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueMIPS64_OpMIPS64StoreOnce64(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (StoreOnce64 [off1] (ADDVconst [off2] ptr) val mem)
+	// cond: is32Bit(off1+off2)
+	// result: (StoreOnce64 [off1+off2] ptr val mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		val := v_1
+		mem := v_2
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64StoreOnce64)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
+	return false
+}
+func rewriteValueMIPS64_OpMIPS64StoreOnce8(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (StoreOnce8 [off1] (ADDVconst [off2] ptr) val mem)
+	// cond: is32Bit(off1+off2)
+	// result: (StoreOnce8 [off1+off2] ptr val mem)
+	for {
+		off1 := auxIntToInt64(v.AuxInt)
+		if v_0.Op != OpMIPS64ADDVconst {
+			break
+		}
+		off2 := auxIntToInt64(v_0.AuxInt)
+		ptr := v_0.Args[0]
+		val := v_1
+		mem := v_2
+		if !(is32Bit(off1 + off2)) {
+			break
+		}
+		v.reset(OpMIPS64StoreOnce8)
+		v.AuxInt = int64ToAuxInt(off1 + off2)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
+	return false
+}
 func rewriteValueMIPS64_OpMIPS64XOR(v *Value) bool {
 	v_1 := v.Args[1]
 	v_0 := v.Args[0]
@@ -5457,6 +5695,126 @@ func rewriteValueMIPS64_OpMIPS64XORconst(v *Value) bool {
 		return true
 	}
 	return false
+}
+func rewriteValueMIPS64_OpMMIOLoad16(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOLoad16 ptr mem)
+	// result: (LoadOnce16 [0] ptr mem)
+	for {
+		ptr := v_0
+		mem := v_1
+		v.reset(OpMIPS64LoadOnce16)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg2(ptr, mem)
+		return true
+	}
+}
+func rewriteValueMIPS64_OpMMIOLoad32(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOLoad32 ptr mem)
+	// result: (LoadOnce32 [0] ptr mem)
+	for {
+		ptr := v_0
+		mem := v_1
+		v.reset(OpMIPS64LoadOnce32)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg2(ptr, mem)
+		return true
+	}
+}
+func rewriteValueMIPS64_OpMMIOLoad64(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOLoad64 ptr mem)
+	// result: (LoadOnce64 [0] ptr mem)
+	for {
+		ptr := v_0
+		mem := v_1
+		v.reset(OpMIPS64LoadOnce64)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg2(ptr, mem)
+		return true
+	}
+}
+func rewriteValueMIPS64_OpMMIOLoad8(v *Value) bool {
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOLoad8 ptr mem)
+	// result: (LoadOnce8 [0] ptr mem)
+	for {
+		ptr := v_0
+		mem := v_1
+		v.reset(OpMIPS64LoadOnce8)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg2(ptr, mem)
+		return true
+	}
+}
+func rewriteValueMIPS64_OpMMIOStore16(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOStore16 ptr val mem)
+	// result: (StoreOnce16 [0] ptr val mem)
+	for {
+		ptr := v_0
+		val := v_1
+		mem := v_2
+		v.reset(OpMIPS64StoreOnce16)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
+}
+func rewriteValueMIPS64_OpMMIOStore32(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOStore32 ptr val mem)
+	// result: (StoreOnce32 [0] ptr val mem)
+	for {
+		ptr := v_0
+		val := v_1
+		mem := v_2
+		v.reset(OpMIPS64StoreOnce32)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
+}
+func rewriteValueMIPS64_OpMMIOStore64(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOStore64 ptr val mem)
+	// result: (StoreOnce64 [0] ptr val mem)
+	for {
+		ptr := v_0
+		val := v_1
+		mem := v_2
+		v.reset(OpMIPS64StoreOnce64)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
+}
+func rewriteValueMIPS64_OpMMIOStore8(v *Value) bool {
+	v_2 := v.Args[2]
+	v_1 := v.Args[1]
+	v_0 := v.Args[0]
+	// match: (MMIOStore8 ptr val mem)
+	// result: (StoreOnce8 [0] ptr val mem)
+	for {
+		ptr := v_0
+		val := v_1
+		mem := v_2
+		v.reset(OpMIPS64StoreOnce8)
+		v.AuxInt = int64ToAuxInt(0)
+		v.AddArg3(ptr, val, mem)
+		return true
+	}
 }
 func rewriteValueMIPS64_OpMod16(v *Value) bool {
 	v_1 := v.Args[1]

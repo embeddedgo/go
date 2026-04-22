@@ -439,6 +439,16 @@ func init() {
 		{name: "LoweredAtomicCas32", argLength: 4, reg: gpcas, resultNotInArgs: true, faultOnNilArg0: true, hasSideEffects: true, unsafePoint: true},
 		{name: "LoweredAtomicCas64", argLength: 4, reg: gpcas, resultNotInArgs: true, faultOnNilArg0: true, hasSideEffects: true, unsafePoint: true},
 
+		{name: "LoadOnce8", argLength: 2, reg: gpload, aux: "Int64", asm: "MOVBU", typ: "(UInt8,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce16", argLength: 2, reg: gpload, aux: "Int64", asm: "MOVHU", typ: "(UInt16,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce32", argLength: 2, reg: gpload, aux: "Int64", asm: "MOVWU", typ: "(UInt32,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "LoadOnce64", argLength: 2, reg: gpload, aux: "Int64", asm: "MOVV", typ: "(UInt64,Mem)", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce8", argLength: 3, reg: gpstore, aux: "Int64", asm: "MOVB", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce16", argLength: 3, reg: gpstore, aux: "Int64", asm: "MOVH", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce32", argLength: 3, reg: gpstore, aux: "Int64", asm: "MOVW", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "StoreOnce64", argLength: 3, reg: gpstore, aux: "Int64", asm: "MOVV", typ: "Mem", hasSideEffects: true, faultOnNilArg0: true},
+		{name: "SYNC", argLength: 1, typ: "Mem", asm: "SYNC", hasSideEffects: true},
+
 		// pseudo-ops
 		{name: "LoweredNilCheck", argLength: 2, reg: regInfo{inputs: []regMask{gpg}}, nilCheck: true, faultOnNilArg0: true}, // panic if arg0 is nil.  arg1=mem.
 

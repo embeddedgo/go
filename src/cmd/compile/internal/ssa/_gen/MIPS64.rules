@@ -460,6 +460,20 @@
 (AtomicAnd32 ...) => (LoweredAtomicAnd32 ...)
 (AtomicOr32  ...) => (LoweredAtomicOr32  ...)
 
+// mmio intrinsics
+(MMIOLoad8 ptr mem) => (LoadOnce8 [0] ptr mem)
+(MMIOLoad16 ptr mem) => (LoadOnce16 [0] ptr mem)
+(MMIOLoad32 ptr mem) => (LoadOnce32 [0] ptr mem)
+(MMIOLoad64 ptr mem) => (LoadOnce64 [0] ptr mem)
+(MMIOStore8 ptr val mem) => (StoreOnce8 [0] ptr val mem)
+(MMIOStore16 ptr val mem) => (StoreOnce16 [0] ptr val mem)
+(MMIOStore32 ptr val mem) => (StoreOnce32 [0] ptr val mem)
+(MMIOStore64 ptr val mem) => (StoreOnce64 [0] ptr val mem)
+(MMIOMB ...) => (SYNC ...)
+
+// publication barrier
+(PubBarrier ...) => (SYNC ...)
+
 // checks
 (NilCheck ...) => (LoweredNilCheck ...)
 (IsNonNil ptr) => (SGTU ptr (MOVVconst [0]))
@@ -527,6 +541,11 @@
 (MOVDload  [off1] {sym} (ADDVconst [off2] ptr) mem) && is32Bit(int64(off1)+off2)
 	 && (ptr.Op != OpSB || !config.ctxt.Flag_shared) => (MOVDload  [off1+int32(off2)] {sym} ptr mem)
 
+(LoadOnce8 [off1] (ADDVconst [off2] ptr) mem) && is32Bit(off1+off2) => (LoadOnce8 [off1+off2] ptr mem)
+(LoadOnce16 [off1] (ADDVconst [off2] ptr) mem) && is32Bit(off1+off2) => (LoadOnce16 [off1+off2] ptr mem)
+(LoadOnce32 [off1] (ADDVconst [off2] ptr) mem) && is32Bit(off1+off2) => (LoadOnce32 [off1+off2] ptr mem)
+(LoadOnce64 [off1] (ADDVconst [off2] ptr) mem) && is32Bit(off1+off2) => (LoadOnce64 [off1+off2] ptr mem)
+
 (MOVBstore [off1] {sym} (ADDVconst [off2] ptr) val mem) && is32Bit(int64(off1)+off2)
 	 && (ptr.Op != OpSB || !config.ctxt.Flag_shared) => (MOVBstore [off1+int32(off2)] {sym} ptr val mem)
 (MOVHstore [off1] {sym} (ADDVconst [off2] ptr) val mem) && is32Bit(int64(off1)+off2)
@@ -539,6 +558,11 @@
 	 && (ptr.Op != OpSB || !config.ctxt.Flag_shared) => (MOVFstore [off1+int32(off2)] {sym} ptr val mem)
 (MOVDstore [off1] {sym} (ADDVconst [off2] ptr) val mem) && is32Bit(int64(off1)+off2)
 	 && (ptr.Op != OpSB || !config.ctxt.Flag_shared) => (MOVDstore [off1+int32(off2)] {sym} ptr val mem)
+
+(StoreOnce8 [off1] (ADDVconst [off2] ptr) val mem) && is32Bit(off1+off2) => (StoreOnce8 [off1+off2] ptr val mem)
+(StoreOnce16 [off1] (ADDVconst [off2] ptr) val mem) && is32Bit(off1+off2) => (StoreOnce16 [off1+off2] ptr val mem)
+(StoreOnce32 [off1] (ADDVconst [off2] ptr) val mem) && is32Bit(off1+off2) => (StoreOnce32 [off1+off2] ptr val mem)
+(StoreOnce64 [off1] (ADDVconst [off2] ptr) val mem) && is32Bit(off1+off2) => (StoreOnce64 [off1+off2] ptr val mem)
 (MOVBstorezero [off1] {sym} (ADDVconst [off2] ptr) mem) && is32Bit(int64(off1)+off2)
 	 && (ptr.Op != OpSB || !config.ctxt.Flag_shared) => (MOVBstorezero [off1+int32(off2)] {sym} ptr mem)
 (MOVHstorezero [off1] {sym} (ADDVconst [off2] ptr) mem) && is32Bit(int64(off1)+off2)
