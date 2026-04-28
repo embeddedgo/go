@@ -317,7 +317,7 @@ type MemStats struct {
 	// BySize[N-1].Size < S ≤ BySize[N].Size.
 	//
 	// This does not report allocations larger than BySize[60].Size.
-	BySize [61*_OS + _NumSizeClasses*(1-_OS)]struct {
+	BySize [61*_OS + gc.NumSizeClasses*(1-_OS)]struct {
 		// Size is the maximum byte size of an object in this
 		// size class.
 		Size uint32
