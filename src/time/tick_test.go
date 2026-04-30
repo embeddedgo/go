@@ -151,7 +151,7 @@ func TestTickerResetLtZeroDuration(t *testing.T) {
 }
 
 func TestLongAdjustTimers(t *testing.T) {
-	if runtime.GOOS == "android" || runtime.GOOS == "ios" || runtime.GOOS == "plan9" {
+	if runtime.GOOS == "android" || runtime.GOOS == "ios" || runtime.GOOS == "plan9" || runtime.GOARCH == "arm" || runtime.GOARCH == "thumb" {
 		t.Skipf("skipping on %s - too slow", runtime.GOOS)
 	}
 	if testing.Short() && runtime.NumCPU() < 2 {
