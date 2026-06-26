@@ -146,7 +146,7 @@ loop4cont:
 	// unroll 4X
 	MOVW.W -4(R2), R6
 	MOVW.W -4(R2), R7
-	MOVW.W -4(R2), R11
+	MOVW.W -4(R2), R8
 	MOVW.W -4(R2), R9
 	MOVW R6>>R5, R0
 	ORR R0, R4
@@ -156,10 +156,10 @@ loop4cont:
 	ORR R0, R4
 	MOVW.W R4, -4(R3)
 	MOVW R7<<R1, R4
-	MOVW R11>>R5, R0
+	MOVW R8>>R5, R0
 	ORR R0, R4
 	MOVW.W R4, -4(R3)
-	MOVW R11<<R1, R4
+	MOVW R8<<R1, R4
 	MOVW R9>>R5, R0
 	ORR R0, R4
 	MOVW.W R4, -4(R3)
