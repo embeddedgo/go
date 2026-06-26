@@ -880,6 +880,9 @@ func TestFuncAlignOption(t *testing.T) {
 					continue
 				}
 			}
+			if runtime.GOARCH == "thumb" {
+				s.Addr &^= 1
+			}
 			if s.Addr%align != 0 {
 				t.Fatalf("unaligned function: %s %x. Expected alignment: %d\n", fn, s.Addr, align)
 			}
