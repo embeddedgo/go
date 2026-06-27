@@ -1,6 +1,6 @@
 // errorcheckandrundir -0 -d=ssa/intrinsics/debug
 
-//go:build amd64 || arm64 || arm || s390x
+//go:build amd64 || arm64 || arm || s390x || thumb
 
 // Copyright 2016 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
