@@ -38,11 +38,7 @@ func dumpregs(c *sigctxt) {
 //go:nosplit
 //go:nowritebarrierrec
 func (c *sigctxt) sigpc() uintptr {
-	pc := c.pc()
-	if pc != 0 {
-		pc |= 1
-	}
-	return uintptr(pc)
+	return uintptr(c.pc() | (c.cpsr() >> 5 & 1)) // add Thumb bit
 }
 
 func (c *sigctxt) sigsp() uintptr { return uintptr(c.sp()) }
@@ -69,7 +65,7 @@ func (c *sigctxt) preparePanic(sig uint32, gp *g) {
 
 	// In case we are panicking from external C code
 	c.set_r10(uint32(uintptr(unsafe.Pointer(gp))))
-	c.set_pc(uint32(abi.FuncPCABIInternal(sigpanic) &^ 1))
+	c.set_pc(uint32(abi.FuncPCABIInternal(sigpanic)))
 }
 
 func (c *sigctxt) pushCall(targetPC, resumePC uintptr) {
@@ -83,5 +79,5 @@ func (c *sigctxt) pushCall(targetPC, resumePC uintptr) {
 	// Set up PC and LR to pretend the function being signaled
 	// calls targetPC at the faulting PC.
 	c.set_lr(uint32(resumePC))
-	c.set_pc(uint32(targetPC) &^ 1)
+	c.set_pc(uint32(targetPC))
 }
