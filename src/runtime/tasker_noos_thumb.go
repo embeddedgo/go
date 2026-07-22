@@ -75,7 +75,7 @@ func archnewm(m *m) {
 	sf.PC = abi.FuncPCABI0(mstart)
 	m.tls[msp] = sp | thrSmallCtx | thrPrivLevel
 	m.tls[mer] = armm.ExcReturnSecureThreadPSP
-	m.libcall.fn = uintptr(unsafe.Pointer(m.g0))
+	m.libcallpc = uintptr(unsafe.Pointer(m.g0))
 }
 
 //go:nosplit

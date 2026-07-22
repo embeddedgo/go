@@ -65,7 +65,7 @@ func (m *pamem) alloc(size, align uintptr) unsafe.Pointer {
 }
 
 //go:nosplit
-func sysReserveOS(v unsafe.Pointer, size uintptr) unsafe.Pointer {
+func sysReserveOS(v unsafe.Pointer, size uintptr, _ string) unsafe.Pointer {
 	if v != nil {
 		// The address space of NOOS memory is contiguous,
 		// so requesting specific addresses is not supported. We could use
@@ -80,7 +80,7 @@ func sysReserveOS(v unsafe.Pointer, size uintptr) unsafe.Pointer {
 }
 
 //go:nosplit
-func sysAllocOS(size uintptr) unsafe.Pointer {
+func sysAllocOS(size uintptr, _ string) unsafe.Pointer {
 	lock(&noosMem.mx)
 	p := noosRawAlloc(size, 8)
 	unlock(&noosMem.mx)
@@ -101,7 +101,7 @@ func sysUsedOS(v unsafe.Pointer, n uintptr) {
 }
 
 func sysFreeOS(v unsafe.Pointer, n uintptr)             {}
-func sysMapOS(v unsafe.Pointer, n uintptr)              {}
+func sysMapOS(v unsafe.Pointer, n uintptr, _ string)              {}
 func sysUnusedOS(v unsafe.Pointer, n uintptr)           {}
 func sysFaultOS(v unsafe.Pointer, n uintptr)            {}
 func sysHugePageOS(v unsafe.Pointer, n uintptr)         {}
@@ -148,4 +148,8 @@ func noosPersistentAlloc(size, align uintptr, sysStat *sysMemStat) (p *notInHeap
 	sysStat.add(int64(size))
 	gcController.mappedReady.Add(int64(size))
 	return
+}
+
+func needZeroAfterSysUnusedOS() bool {
+	return true
 }

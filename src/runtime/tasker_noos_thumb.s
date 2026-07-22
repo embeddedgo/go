@@ -197,7 +197,7 @@ TEXT ·svcallHandler(SB),NOSPLIT|NOFRAME,$0-0
 	ADD   $const_thrSmallCtx, R7  // set thrSmallCtx (only g saved)
 	MOVW  R7, (m_tls+const_msp*4)(R3)
 	MOVW  R5, (m_tls+const_mer*4)(R3)
-	MOVW  g, (m_libcall)(R3)
+	MOVW  g, (m_libcallpc)(R3)
 
 fast:
 	// call the service routine
@@ -249,8 +249,8 @@ TEXT ·pendsvHandler(SB),NOSPLIT|NOFRAME,$0-0
 	ORR      R2, R1
 	MOVW     R1, (m_tls+const_msp*4)(R3)
 	MOVW     R12, (m_tls+const_mer*4)(R3)
-	ADD      $m_libcall, R3
-	MOVM.IA  [R4-R11], (R3)  // save to m.libcall, m.libcallpc, m.libcallsp
+	ADD      $m_libcallpc, R3
+	MOVM.IA  [R4-R11], (R3)  // save to m.libcallpc, m.libcallsp, m.libcallg, m.vdsoSP, m.vdsoPC, m.mOS
 
 contextSaved:
 	MOVW  $0, R3
@@ -277,9 +277,9 @@ contextSaved:
 
 	// fast path if exe did not changed (cpuctx.newexe == false)
 	TST      $const_thrSmallCtx, R0
-	MOVW.NE  (m_libcall)(R3), g
+	MOVW.NE  (m_libcallpc)(R3), g
 	B.NE     (R1)
-	ADD      $m_libcall, R3
+	ADD      $m_libcallpc, R3
 	MOVM.IA  (R3), [R4-R11]
 	B        (R1)
 
@@ -301,15 +301,15 @@ newexe:
 
 	// fast path in case of small context (only g saved in libcall)
 	TST      $const_thrSmallCtx, R0
-	MOVW.NE  (m_libcall)(R3), g
+	MOVW.NE  (m_libcallpc)(R3), g
 	B.NE     (R1)
 
-	// restore registers saved in m.libcall, m.libcallpc, m.libcallsp
-	ADD        $m_libcall, R3
+	// restore registers saved in m.libcallpc, m.libcallsp, m.libcallg, m.vdsoSP, m.vdsoPC, m.mOS
+	ADD        $m_libcallpc, R3
 	MOVM.IA.W  (R3), [R4-R11]
 	TST        $0x10, R1
 	BNE        3(PC)
-	// restore registers saved in m.libcallg, m.winsyscall, m.vdsoSP, m.vdsoPC, mOS
+	// restore FP registers saved in mOS
 	HWORD  $0xEC93  // VLDM R3
 	HWORD  $0x8B10  // [D8-D15]
 	B      (R1)
@@ -326,7 +326,7 @@ TEXT ·curcpuSavectxSched(SB),NOSPLIT|NOFRAME,$0-0
 	TST   $0x10, R1
 	RET.NE
 
-	ADD   $(m_libcall+8*4), R0
+	ADD   $(m_libcallpc+8*4), R0
 	MOVW  CONTROL, R1
 	CPSID
 	HWORD  $0xEC80      // VSTM R0

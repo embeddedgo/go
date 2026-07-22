@@ -4,7 +4,10 @@
 
 package runtime
 
-import "unsafe"
+import (
+	"unsafe"
+)
+
 
 const (
 	// The number of levels in the radix tree.
@@ -52,7 +55,7 @@ func (p *pageAlloc) sysInit(test bool) {
 	totalSize = alignUp(totalSize, physPageSize)
 
 	// Reserve memory for all levels in one go.
-	reservation := sysAlloc(totalSize, p.sysStat)
+	reservation := sysAlloc(totalSize, p.sysStat, "")
 	if reservation == nil {
 		throw("failed to reserve page summary memory")
 	}

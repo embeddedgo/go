@@ -58,7 +58,7 @@ func (_ traceLocker) HeapGoal()                                  {}
 func (_ traceLocker) GCSweepSpan(bytesSwept uintptr)             {}
 func (_ traceLocker) STWStart(reason stwReason)                  {}
 func (_ traceLocker) GoSysBlock(pp *p)                           {}
-func (_ traceLocker) ProcSteal(pp *p, forMe bool)                {}
+func (_ traceLocker) ProcSteal(pp *p)                            {}
 func (_ traceLocker) STWDone()                                   {}
 func (_ traceLocker) GoCreateSyscall(gp *g)                      {}
 func (_ traceLocker) OneNewExtraM(gp *g)                         {}

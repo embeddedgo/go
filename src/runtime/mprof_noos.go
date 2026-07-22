@@ -13,7 +13,6 @@ import (
 
 const (
 	blockprofilerate = 0
-	mutexprofilerate = 0
 )
 
 const (
@@ -34,6 +33,7 @@ var (
 	profMemActiveLock      mutex
 	profMemFutureLock      [len(memRecord{}.future)]mutex
 	goroutineProfile       struct{ active bool }
+	mutexprofilerate       uint64
 )
 
 type bucket struct{}
@@ -113,7 +113,12 @@ type mLockProfile struct {
 	stack    []uintptr
 }
 
-func (prof *mLockProfile) recordUnlock(l *mutex) {}
+func (prof *mLockProfile) recordUnlock(cycles int64) {}
+func (prof *mLockProfile) start() int64              { return 0 }
+func (prof *mLockProfile) end(start int64)           {}
+
+//go:nowritebarrierrec
+func (prof *mLockProfile) store() {}
 
 type BlockProfileRecord struct {
 	Count  int64

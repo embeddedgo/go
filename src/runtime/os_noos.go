@@ -244,3 +244,8 @@ func reset(level int, addr unsafe.Pointer) bool
 var faketime int64
 
 //go:linkname ncpu
+var ncpu int32
+
+func getCPUCount() int32 {
+	return atomic.Loadint32(&ncpu)
+}

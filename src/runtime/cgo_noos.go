@@ -15,10 +15,12 @@ var cgoAlwaysFalse bool
 var (
 	_cgo_thread_start             unsafe.Pointer
 	_cgo_notify_runtime_init_done unsafe.Pointer
-	_cgo_set_context_function     unsafe.Pointer
 	_cgo_yield                    unsafe.Pointer
 	_cgo_pthread_key_created      unsafe.Pointer
 	_cgo_bindm                    unsafe.Pointer
+	_cgo_set_traceback_functions  unsafe.Pointer
+	_cgo_call_traceback_function  unsafe.Pointer
+	_cgo_call_symbolizer_function unsafe.Pointer
 )
 
 var (
