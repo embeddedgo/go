@@ -39,7 +39,7 @@ TEXT runtime·initRAMfromROM(SB),NOSPLIT|NOFRAME,$0
 	MOVW  R1, 8(R13)
 	BL    runtime·memclrNoHeapPointers(SB)  // clear non-DMA RAM
 
-	MOVW  $runtime·noptrdata(SB), R0
+	MOVW  $runtime·ramdata(SB), R0
 	MOVW  $runtime·romdata(SB), R1
 	MOVW  $runtime·edata(SB), R2
 	SUB   R0, R2  // R2 = dataSize = dataStart - dataEnd

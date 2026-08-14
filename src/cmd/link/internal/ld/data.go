@@ -2225,6 +2225,7 @@ func (state *dodataState) allocateDataSections(ctxt *Link) {
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.ramstart", 0), sect)
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.ramend", 0), sect)
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.romdata", 0), sect)
+		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.ramdata", 0), sect)
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.nodmastart", 0), sect)
 		ldr.SetSymSect(ldr.LookupOrCreateSym("runtime.nodmaend", 0), sect)
 	}
@@ -3077,6 +3078,8 @@ func (ctxt *Link) address() []*sym.Segment {
 		case ".noptrdata":
 			noptr = s
 			la += uint64(vlen)
+		case ".go.module":
+			la += uint64(vlen)
 		case ".bss":
 			bss = s
 		case ".noptrbss":
@@ -3307,6 +3310,7 @@ func (ctxt *Link) address() []*sym.Segment {
 		ctxt.xdefine("runtime.ramstart", sym.SRODATA, ramstart)
 		ctxt.xdefine("runtime.ramend", sym.SRODATA, ramend)
 		ctxt.xdefine("runtime.romdata", sym.SRODATA, int64(Segdata.Laddr))
+		ctxt.xdefine("runtime.ramdata", sym.SRODATA, int64(Segdata.Vaddr))
 		nodmastart := int64(NoDMA.Base)
 		nodmaend := int64(NoDMA.Base + NoDMA.Size)
 		if nodmastart == 0 && nodmaend == 0 {
