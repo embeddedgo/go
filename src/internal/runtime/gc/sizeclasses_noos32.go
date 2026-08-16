@@ -26,29 +26,40 @@ package gc
 //    18        384        1536        4           0     16.41%        128
 //    19        416        2560        6          64      9.77%         32
 //    20        512         512        1           0     18.55%        512
+//    21        640        2560        4           0     19.84%        128
+//    22        640        2048        3         128      6.10%        128
+//    23        768        1536        2           0     16.54%        256
+//    24        832        2560        3          64      9.88%         64
+//    25       1024        1024        1           0     18.65%        512
+//    26       1280        2560        2           0     19.92%        256
+//    27       1536        1536        1           0     16.60%        512
+//    28       1792        3584        2           0     14.23%        256
+//    29       2048        2048        1           0     12.45%        512
 
 // alignment  bits  min obj size
 //         8     3             8
 //        16     4            32
 //        32     5           256
-//       512     9           512
+//        64     6           512
+//       256     8          1024
+//       512     9          2048
 
 const (
 	MinHeapAlign       = 8
-	MaxSmallSize       = 512
+	MaxSmallSize       = 2048
 	SmallSizeDiv       = 8
 	SmallSizeMax       = 256
 	LargeSizeDiv       = 128
-	NumSizeClasses     = 21
+	NumSizeClasses     = 30
 	PageShift          = 9
 	MaxObjsPerSpan     = 64
-	MaxSizeClassNPages = 5
+	MaxSizeClassNPages = 7
 	TinySize           = 16
 	TinySizeClass      = 2
 )
 
-var SizeClassToSize = [NumSizeClasses]uint16{0, 8, 16, 24, 32, 48, 64, 80, 96, 128, 144, 160, 176, 192, 208, 256, 288, 320, 384, 416, 512}
-var SizeClassToNPages = [NumSizeClasses]uint8{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 2, 3, 1, 3, 2, 3, 5, 1}
-var SizeClassToDivMagic = [NumSizeClasses]uint32{0, ^uint32(0)/8 + 1, ^uint32(0)/16 + 1, ^uint32(0)/24 + 1, ^uint32(0)/32 + 1, ^uint32(0)/48 + 1, ^uint32(0)/64 + 1, ^uint32(0)/80 + 1, ^uint32(0)/96 + 1, ^uint32(0)/128 + 1, ^uint32(0)/144 + 1, ^uint32(0)/160 + 1, ^uint32(0)/176 + 1, ^uint32(0)/192 + 1, ^uint32(0)/208 + 1, ^uint32(0)/256 + 1, ^uint32(0)/288 + 1, ^uint32(0)/320 + 1, ^uint32(0)/384 + 1, ^uint32(0)/416 + 1, ^uint32(0)/512 + 1}
+var SizeClassToSize = [NumSizeClasses]uint16{0, 8, 16, 24, 32, 48, 64, 80, 96, 128, 144, 160, 176, 192, 208, 256, 288, 320, 384, 416, 512, 640, 640, 768, 832, 1024, 1280, 1536, 1792, 2048}
+var SizeClassToNPages = [NumSizeClasses]uint8{0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 3, 2, 3, 1, 3, 2, 3, 5, 1, 5, 4, 3, 5, 2, 5, 3, 7, 4}
+var SizeClassToDivMagic = [NumSizeClasses]uint32{0, ^uint32(0)/8 + 1, ^uint32(0)/16 + 1, ^uint32(0)/24 + 1, ^uint32(0)/32 + 1, ^uint32(0)/48 + 1, ^uint32(0)/64 + 1, ^uint32(0)/80 + 1, ^uint32(0)/96 + 1, ^uint32(0)/128 + 1, ^uint32(0)/144 + 1, ^uint32(0)/160 + 1, ^uint32(0)/176 + 1, ^uint32(0)/192 + 1, ^uint32(0)/208 + 1, ^uint32(0)/256 + 1, ^uint32(0)/288 + 1, ^uint32(0)/320 + 1, ^uint32(0)/384 + 1, ^uint32(0)/416 + 1, ^uint32(0)/512 + 1, ^uint32(0)/640 + 1, ^uint32(0)/640 + 1, ^uint32(0)/768 + 1, ^uint32(0)/832 + 1, ^uint32(0)/1024 + 1, ^uint32(0)/1280 + 1, ^uint32(0)/1536 + 1, ^uint32(0)/1792 + 1, ^uint32(0)/2048 + 1}
 var SizeToSizeClass8 = [SmallSizeMax/SmallSizeDiv + 1]uint8{0, 1, 2, 3, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 15, 15, 15, 15}
-var SizeToSizeClass128 = [(MaxSmallSize-SmallSizeMax)/LargeSizeDiv + 1]uint8{15, 18, 20}
+var SizeToSizeClass128 = [(MaxSmallSize-SmallSizeMax)/LargeSizeDiv + 1]uint8{15, 18, 20, 21, 23, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29}

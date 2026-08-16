@@ -33,7 +33,7 @@ var build = "!noos"
 func constsNoos() {
 	switch *noos {
 	case 32:
-		maxSmallSize = 1 << 9
+		maxSmallSize = 1 << 11
 		smallSizeMax = 256
 		pageShift    = 9
 		build = "noos && thumb"
@@ -41,7 +41,7 @@ func constsNoos() {
 		maxSmallSize = 1 << 12
 		smallSizeMax = 512
 		pageShift    = 11
-		build = "noss && (riscv64 || mips64)"
+		build = "noos && (riscv64 || mips64)"
 	}
 	pageSize = 1 << pageShift
 }
