@@ -253,7 +253,7 @@ func hostname() (name string, err error) {
 	return "", syscall.ENOTSUP
 }
 
-func NewFile(fd uintptr, name string) *File {
+func newFileFromNewFile(fd uintptr, name string) *File {
 	return nil
 }
 
@@ -296,10 +296,14 @@ func (f *File) Truncate(size int64) (err error) {
 	return f.wrapErr("truncate", err)
 }
 
-func (f *File) Fd() uintptr {
+func (f *File) fd() uintptr {
 	return ^uintptr(0)
 }
 
 func (f *File) Chdir() error {
 	return f.wrapErr("chdir", syscall.ENOTSUP)
 }
+
+func Chown(name string, uid, gid int) error                       { return syscall.ENOTSUP }
+func Lchown(name string, uid, gid int) error                      { return syscall.ENOTSUP }
+func Chtimes(name string, atime time.Time, mtime time.Time) error { return syscall.ENOTSUP }

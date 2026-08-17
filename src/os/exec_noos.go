@@ -21,10 +21,11 @@ func startProcess(name string, argv []string, attr *ProcAttr) (p *Process, err e
 	return nil, &PathError{"fork/exec", name, syscall.ENOTSUP}
 }
 
-func (p *Process) release() error               { return syscall.ENOTSUP }
-func (p *Process) kill() error                  { return syscall.ENOTSUP }
-func (p *Process) wait() (*ProcessState, error) { return nil, syscall.ENOTSUP }
-func (p *Process) signal(sig Signal) error      { return syscall.ENOTSUP }
+func (p *Process) release() error                   { return syscall.ENOTSUP }
+func (p *Process) kill() error                      { return syscall.ENOTSUP }
+func (p *Process) wait() (*ProcessState, error)     { return nil, syscall.ENOTSUP }
+func (p *Process) signal(sig Signal) error          { return syscall.ENOTSUP }
+func (p *Process) withHandle(f func(uintptr)) error { return syscall.ENOTSUP }
 
 func (p *ProcessState) userTime() time.Duration   { return 0 }
 func (p *ProcessState) systemTime() time.Duration { return 0 }
