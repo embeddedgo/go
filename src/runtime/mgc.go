@@ -212,7 +212,7 @@ func gcenable() {
 	// Kick off sweeping and scavenging.
 	c := make(chan int, 2)
 	go bgsweep(c)
-	if !noos {
+	if GOOS != "noos" {
 		go bgscavenge(c)
 		<-c
 	}
@@ -1607,7 +1607,7 @@ func gcMarkTermination(stw worldStop) {
 			}
 			print(string(fmtNSAsMS(sbuf[:], uint64(ns))))
 		}
-		if noos {
+		if GOOS == "noos" {
 			print(" ms cpu, ",
 				work.heap0>>10, "->", work.heap1>>10, "->", work.heap2>>10, " KB, ",
 				gcController.lastHeapGoal>>10, " KB goal, ",
@@ -1656,7 +1656,7 @@ func gcMarkTermination(stw worldStop) {
 	}
 
 	// Enable huge pages on some metadata if we cross a heap threshold.
-	if !noos && gcController.heapGoal() > minHeapForMetadataHugePages {
+	if GOOS != "noos" && gcController.heapGoal() > minHeapForMetadataHugePages {
 		systemstack(func() {
 			mheap_.enableMetadataHugePages()
 		})

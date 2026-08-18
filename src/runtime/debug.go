@@ -157,7 +157,7 @@ func NumCPU() int {
 
 // NumCgoCall returns the number of cgo calls made by the current process.
 func NumCgoCall() int64 {
-	if noos {
+	if GOOS == "noos" {
 		return 0
 	}
 	var n = int64(atomic.Load64(&ncgocall))

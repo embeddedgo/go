@@ -274,7 +274,7 @@ func stkobjinit() {
 			break
 		}
 	}
-	if noos && mod == nil {
+	if GOOS == "noos" && mod == nil {
 		// In case of GOOS=noos gofunc may point to Flash but ptr always
 		// points to RAM so the above datap.gofunc <= ptr may be always false.
 		mod = &firstmoduledata

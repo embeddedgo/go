@@ -592,7 +592,7 @@ func (u *unwinder) symPC() uintptr {
 // If the current frame is not a cgo frame or if there's no registered cgo
 // unwinder, it returns 0.
 func (u *unwinder) cgoCallers(pcBuf []uintptr) int {
-	if noos {
+	if GOOS == "noos" {
 		return 0
 	}
 	if !cgoTracebackAvailable() || u.frame.fn.funcID != abi.FuncID_cgocallback || u.cgoCtxt < 0 {
@@ -816,7 +816,7 @@ func traceback(pc, sp, lr uintptr, gp *g) {
 // If gp.m.libcall{g,pc,sp} information is available, it uses that information in preference to
 // the pc/sp/lr passed in.
 func tracebacktrap(pc, sp, lr uintptr, gp *g) {
-	if !noos && gp.m.libcallsp != 0 {
+	if GOOS != "noos" && gp.m.libcallsp != 0 {
 		// We're in C code somewhere, traceback from the saved position.
 		traceback1(gp.m.libcallpc, gp.m.libcallsp, 0, gp.m.libcallg.ptr(), 0)
 		return

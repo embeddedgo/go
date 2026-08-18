@@ -8,7 +8,6 @@ package runtime
 
 const (
 	_OS                             = 1
-	noos                            = false
 	noosScaleDown                   = 1
 	noosStackCacheSize              = 0
 	noosNumStackOrders              = 0

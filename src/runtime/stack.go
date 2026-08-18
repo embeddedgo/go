@@ -1273,7 +1273,7 @@ func shrinkstack(gp *g) {
 	// Check for self-shrinks while in a libcall. These may have
 	// pointers into the stack disguised as uintptrs, but these
 	// code paths should all be nosplit.
-	if !noos && gp == getg().m.curg && gp.m.libcallsp != 0 {
+	if GOOS != "noos" && gp == getg().m.curg && gp.m.libcallsp != 0 {
 		throw("shrinking stack in libcall")
 	}
 
@@ -1368,7 +1368,7 @@ func (r *stackObjectRecord) gcdata() (uintptr, *byte) {
 			break
 		}
 	}
-	if noos && mod == nil {
+	if GOOS == "noos" && mod == nil {
 		// In case of GOOS=noos gofunc may be point to Flash but ptr always
 		// points to RAM so the above datap.gofunc <= ptr may be always false.
 		mod = &firstmoduledata

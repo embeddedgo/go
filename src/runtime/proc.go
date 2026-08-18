@@ -156,7 +156,7 @@ func main() {
 	// Max stack size is 1 GB on 64-bit, 250 MB on 32-bit.
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
-	if noos {
+	if GOOS == "noos" {
 		maxstacksize = 512 * 1024 / noosScaleDown
 	} else if goarch.PtrSize == 8 {
 		maxstacksize = 1000000000
@@ -1983,7 +1983,7 @@ func mPark() {
 func mexit(osStack bool) {
 	mp := getg().m
 
-	if !noos && mp == &m0 {
+	if GOOS != "noos" && mp == &m0 {
 		// This is the main thread. Just wedge it.
 		//
 		// On Linux, exiting the main thread puts the process
@@ -2339,7 +2339,7 @@ func allocm(pp *p, fn func(), id int64) *m {
 	// Windows and Plan 9 will layout sched stack on OS stack.
 	if iscgo || mStackIsSystemAllocated() {
 		mp.g0 = malg(-1)
-	} else if noos {
+	} else if GOOS == "noos" {
 		mp.g0 = malg(2 * stackMin)
 	} else {
 		mp.g0 = malg(16384 * sys.StackGuardMultiplier)
@@ -6603,7 +6603,7 @@ func sysmon() {
 			sysmonUpdateGOMAXPROCS()
 			lastgomaxprocs = now
 		}
-		if !noos && scavenger.sysmonWake.Load() != 0 {
+		if GOOS != "noos" && scavenger.sysmonWake.Load() != 0 {
 			// Kick the scavenger awake if someone requested it.
 			scavenger.wake()
 		}

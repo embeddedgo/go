@@ -11,7 +11,6 @@ package runtime
 
 const (
 	_OS                             = 0
-	noos                            = true
 	noosScaleDown                   = 16 // must be power of 2
 	noosStackCacheSize              = 4 * 1024
 	noosNumStackOrders              = 2

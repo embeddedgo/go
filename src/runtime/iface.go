@@ -259,7 +259,7 @@ imethods:
 func itabsinit() {
 	lockInit(&itabLock, lockRankItab)
 	lock(&itabLock)
-	if noos {
+	if GOOS == "noos" {
 		// allocate starter table
 		const n = 512 / noosScaleDown // always a power of 2
 		itabTable = (*itabTableType)(mallocgc((2+n)*goarch.PtrSize, nil, true))

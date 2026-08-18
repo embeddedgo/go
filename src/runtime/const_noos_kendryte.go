@@ -11,12 +11,11 @@ package runtime
 
 const (
 	_OS                             = 0
-	noos                            = true
 	noosScaleDown                   = 2 // must be power of 2
 	noosStackCacheSize              = 16 * 1024
 	noosNumStackOrders              = 3
 	noosHeapAddrBits                = 23 // enough for 8 MiB K210 SRAM
-	noosLogHeapArenaBytes           = 17 // 128 KiB
+	noosLogHeapArenaBytes           = 18 // 256 KiB
 	noosArenaBaseOffset             = 0x80000000
 	noosMinPhysPageSize             = 256
 	noosSpanSetInitSpineCap         = 64

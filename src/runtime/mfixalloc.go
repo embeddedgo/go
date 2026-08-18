@@ -65,7 +65,7 @@ func (f *fixalloc) init(size uintptr, first func(arg, p unsafe.Pointer), arg uns
 	f.list = nil
 	f.chunk = 0
 	f.nchunk = 0
-	if noos {
+	if GOOS == "noos" {
 		nalloc := size
 		if size == unsafe.Sizeof(mspan{}) {
 			nalloc *= 16 * (1 + _64bit) // more for mspan{} allocator

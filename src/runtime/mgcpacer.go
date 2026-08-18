@@ -1368,7 +1368,7 @@ func setGCPercent(in int32) (out int32) {
 }
 
 func readGOGC() int32 {
-	if noos {
+	if GOOS == "noos" {
 		return noosGOGC
 	}
 	p := gogetenv("GOGC")
@@ -1417,7 +1417,7 @@ func setMemoryLimit(in int64) (out int64) {
 }
 
 func readGOMEMLIMIT() int64 {
-	if noos {
+	if GOOS == "noos" {
 		_, _, n := noosMemory()
 		return int64(n)
 	}

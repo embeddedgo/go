@@ -1327,7 +1327,7 @@ HaveSpan:
 	// to do this before calling sysUsed because that may commit address space.
 	bytesToScavenge := uintptr(0)
 	forceScavenge := false
-	if noos {
+	if GOOS == "noos" {
 		goto noosSkipScavenge
 	}
 	if limit := gcController.memoryLimit.Load(); !gcCPULimiter.limiting() {
@@ -1369,7 +1369,7 @@ noosSkipScavenge:
 	// It's OK to simply skip scavenging in these cases. Something else will notice
 	// and pick up the tab.
 	var now int64
-	if !noos && pp != nil && bytesToScavenge > 0 {
+	if GOOS != "noos" && pp != nil && bytesToScavenge > 0 {
 		// Measure how long we spent scavenging and add that measurement to the assist
 		// time so we can track it for the GC CPU limiter.
 		//
@@ -1816,7 +1816,7 @@ func (h *mheap) scavengeAll() {
 //go:linkname runtime_debug_freeOSMemory runtime/debug.freeOSMemory
 func runtime_debug_freeOSMemory() {
 	GC()
-	if noos {
+	if GOOS == "noos" {
 		return
 	}
 	systemstack(func() { mheap_.scavengeAll() })
