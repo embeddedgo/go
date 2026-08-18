@@ -352,7 +352,7 @@ const (
 
 	// randomizeHeapBase indicates if the heap base address should be randomized.
 	// See comment in mallocinit for how the randomization is performed.
-	randomizeHeapBase = goexperiment.RandomizedHeapBase64 && goarch.PtrSize == 8 && !isSbrkPlatform && !raceenabled && !msanenabled && !asanenabled
+	randomizeHeapBase = goexperiment.RandomizedHeapBase64 && goarch.PtrSize == 8 && !isSbrkPlatform && !raceenabled && !msanenabled && !asanenabled && GOOS != "noos"
 
 	// randHeapBasePrefixMask is used to extract the top byte of the randomized
 	// heap base address.
@@ -502,7 +502,7 @@ func mallocinit() {
 	lockInit(&globalAlloc.mutex, lockRankGlobalAlloc)
 
 	// Create initial arena growth hints.
-	if noos {
+	if GOOS == "noos" {
 		arenaBase, arenaSize, _ := noosMemory()
 		mheap_.arena.init(arenaBase, arenaSize, false)
 	} else if isSbrkPlatform {
@@ -758,7 +758,7 @@ func (h *mheap) sysAlloc(n uintptr, hintList **arenaHint, arenaList *[]arenaIdx)
 			goto mapped
 		}
 	}
-	if noos {
+	if GOOS == "noos" {
 		return nil, 0
 	}
 
@@ -2397,7 +2397,7 @@ func persistentalloc(size, align uintptr, sysStat *sysMemStat) unsafe.Pointer {
 //
 //go:systemstack
 func persistentalloc1(size, align uintptr, sysStat *sysMemStat) *notInHeap {
-	if noos {
+	if GOOS == "noos" {
 		return noosPersistentAlloc(size, align, sysStat)
 	}
 
