@@ -227,8 +227,10 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME,$0
 	CSRW  (a1, mscratch)
 
 	// switch to the user mode
+	PCALIGN $4
 	AUIPC  $0, A0
 	ADD    $16, A0  // A0 must point just after MRET
+	PCALIGN $4      // the above ADD may be a compressed instruction
 	CSRW   (a0, mepc)
 	MRET
 
