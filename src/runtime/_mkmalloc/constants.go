@@ -40,7 +40,7 @@ func constsNoos() {
 	case 64:
 		maxSmallSize = 1 << 12
 		smallSizeMax = 512
-		pageShift    = 11
+		pageShift    = 12
 		build = "noos && (riscv64 || mips64)"
 	}
 	pageSize = 1 << pageShift
