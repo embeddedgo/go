@@ -34,4 +34,5 @@ const (
 	noosSemTabSize                  = 113
 	noosGOGC                        = 50
 	noosTimeHistMaxBucketBits       = 47
+	noosMPaddedSize                 = 2048
 )

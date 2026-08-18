@@ -29,4 +29,5 @@ const (
 	noosSemTabSize                  = 0
 	noosGOGC                        = 0
 	noosTimeHistMaxBucketBits       = 0
+	noosMPaddedSize                 = 0
 )

@@ -17,8 +17,8 @@ const (
 	noosScaleDown                   = 2 // must be power of 2
 	noosStackCacheSize              = 16 * 1024
 	noosNumStackOrders              = 3
-	noosHeapAddrBits                = 25 // enough for 32 MiB RAM
-	noosLogHeapArenaBytes           = 17 // 128 KiB
+	noosHeapAddrBits                = 25         // enough for 32 MiB RAM
+	noosLogHeapArenaBytes           = 17         // 128 KiB
 	noosArenaBaseOffset             = 0x80000000 // the beginning of RAM
 	noosMinPhysPageSize             = 256
 	noosSpanSetInitSpineCap         = 64
@@ -34,4 +34,5 @@ const (
 	noosSemTabSize                  = 113
 	noosGOGC                        = 50
 	noosTimeHistMaxBucketBits       = 47
+	noosMPaddedSize                 = 4096
 )
