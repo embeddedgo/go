@@ -352,7 +352,7 @@ TEXT ·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 	BEQ  ZERO, A0, currentStack
 
 	// saved stack (called from thread)
-	MOV   (g_sched+gobuf_sp)(g), S8 // duffcopy src
+	MOV   (g_sched+gobuf_sp)(g), S8 // copy src
 	BGEU  S0, A3, continue  // fast syscall
 	// save thread context (small): LR, SP, g, thrSmallCtx+prio, mepc
 	MOV  (g_sched+gobuf_g)(g), A1
@@ -372,18 +372,21 @@ TEXT ·environmentCallHandler(SB),NOSPLIT|NOFRAME,$0
 
 currentStack: // called from handler
 	BLTU  S0, A3, slowSyscallFromHandler  // handlers can use fast syscalls only
-	ADD   $trapCtxSize, X2, S8 // duffcopy src
+	ADD   $trapCtxSize, X2, S8 // copy src
 
 continue:
 	// make a space on the stack for arguments + 3 registers
 	ADD  $-envCallFrameSize, X2
 
-	// copy arguments from the caller's stack
-	MOV   $·duffcopy<ABIInternal>+2048(SB), A2
-	SLL   $1, A4
-	SUB   A4, A2
-	MOV   X2, S9 // duffcopy dst
-	CALL  A2
+	// copy arguments from the caller's stack (src in S8, size in A4)
+	BEQ  ZERO, A4, 8(PC)
+	MOV  X2, S9 // dst
+	ADD  S8, A4
+	MOV  (S8), A2
+	ADD  $8, S8
+	MOV  A2, (S9)
+	ADD  $8, S9
+	BNE  S8, A4, -4(PC)
 
 	// save data needed to copy the return values back to the caller's stack
 	MOV  S8, (sysMaxArgs+0*8)(X2)
@@ -398,15 +401,17 @@ continue:
 	CALL  A0
 
 	// copy the return values back to the caller's stack
-	MOV   (sysMaxArgs+2*8)(X2), A4
-	BEQ   ZERO, A4, nothingToCopy
-	MOV   (sysMaxArgs+0*8)(X2), S9 // duffcopy dst
-	MOV   (sysMaxArgs+1*8)(X2), S8 // duffcopy src
-	MOV   $·duffcopy<ABIInternal>+2048(SB), A2
-	SLL   $1, A4
-	SUB   A4, A2
-	CALL  A2
-nothingToCopy:
+	MOV  (sysMaxArgs+2*8)(X2), A4
+	BEQ  ZERO, A4, 9(PC)
+	MOV  (sysMaxArgs+1*8)(X2), S8 // src
+	MOV  (sysMaxArgs+0*8)(X2), S9 // dst
+	ADD  S8, A4
+	MOV  (S8), A2
+	ADD  $8, S8
+	MOV  A2, (S9)
+	ADD  $8, S9
+	BNE  S8, A4, -4(PC)
+
 	ADD  $envCallFrameSize, X2
 
 	// run the scheduler if the syscall wants it
