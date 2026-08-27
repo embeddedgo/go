@@ -4,7 +4,10 @@
 
 package runtime
 
-import "internal/abi"
+import (
+	"internal/abi"
+	_ "unsafe"
+)
 
 const (
 	traceBlockGeneric traceBlockReason = iota
@@ -96,7 +99,6 @@ func traceReaderAvailable() *g                         { return nil }
 func traceExitingSyscall()                             {}
 func traceExitedSyscall()                              {}
 func traceCPUSample(gp *g, _ *m, pp *p, stk []uintptr) {}
-func traceAdvance(stopTrace bool)                      {}
 
 //go:nosplit
 func traceAcquire() traceLocker { return traceLocker{} }
@@ -122,3 +124,6 @@ func traceAllocFreeEnabled() bool { return false }
 func StartTrace() error { return nil }
 func ReadTrace() []byte { return nil }
 func StopTrace()        {}
+
+//go:linkname traceAdvance
+func traceAdvance(stopTrace bool) {}

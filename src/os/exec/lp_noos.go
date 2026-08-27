@@ -4,8 +4,13 @@
 
 package exec
 
-import "syscall"
+import (
+	"errors"
+	"syscall"
+)
+
+var ErrNotFound = errors.New("executables not supported")
 
 func lookExtensions(path, dir string) (string, error) { return "", syscall.ENOTSUP }
 
-func LookPath(file string) (string, error) { return "", syscall.ENOTSUP }
+func lookPath(file string) (string, error) { return "", syscall.ENOTSUP }
