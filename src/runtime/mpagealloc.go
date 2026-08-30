@@ -48,6 +48,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/goarch"
 	"internal/runtime/atomic"
 	"internal/runtime/gc"
@@ -61,7 +62,7 @@ const (
 	// size (see heapArenaBytes).
 	pallocChunkPages    = 1 << logPallocChunkPages
 	pallocChunkBytes    = pallocChunkPages * pageSize
-	logPallocChunkPages = 9*(1-goarch.IsWasm)*_OS + 6*goarch.IsWasm + (logHeapArenaBytes-gc.PageShift)*(1-_OS)
+	logPallocChunkPages = 9*(1-goarch.IsWasm)*noos.OS + 6*goarch.IsWasm + (logHeapArenaBytes-gc.PageShift)*(1-noos.OS)
 	logPallocChunkBytes = logPallocChunkPages + gc.PageShift
 
 	// The number of radix bits for each level.

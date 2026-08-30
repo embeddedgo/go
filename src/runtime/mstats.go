@@ -7,6 +7,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/runtime/atomic"
 	"internal/runtime/gc"
 	"unsafe"
@@ -35,8 +36,8 @@ type mstats struct {
 	// Protected by mheap or worldsema during GC.
 	last_gc_unix    uint64 // last gc (in unix time)
 	pause_total_ns  uint64
-	pause_ns        [256 / noosScaleDown]uint64 // circular buffer of recent gc pause lengths
-	pause_end       [256 / noosScaleDown]uint64 // circular buffer of recent gc end times (nanoseconds since 1970)
+	pause_ns        [256 / noos.ScaleDown]uint64 // circular buffer of recent gc pause lengths
+	pause_end       [256 / noos.ScaleDown]uint64 // circular buffer of recent gc end times (nanoseconds since 1970)
 	numgc           uint32
 	numforcedgc     uint32  // number of user-forced GCs
 	gc_cpu_fraction float64 // fraction of CPU time used by GC
@@ -272,7 +273,7 @@ type MemStats struct {
 	// general, PauseNs[N%256] records the time paused in the most
 	// recent N%256th GC cycle. There may be multiple pauses per
 	// GC cycle; this is the sum of all pauses during a cycle.
-	PauseNs [256 / noosScaleDown]uint64
+	PauseNs [256 / noos.ScaleDown]uint64
 
 	// PauseEnd is a circular buffer of recent GC pause end times,
 	// as nanoseconds since 1970 (the UNIX epoch).
@@ -280,7 +281,7 @@ type MemStats struct {
 	// This buffer is filled the same way as PauseNs. There may be
 	// multiple pauses per GC cycle; this records the end of the
 	// last pause in a cycle.
-	PauseEnd [256 / noosScaleDown]uint64
+	PauseEnd [256 / noos.ScaleDown]uint64
 
 	// NumGC is the number of completed GC cycles.
 	NumGC uint32
@@ -317,7 +318,7 @@ type MemStats struct {
 	// BySize[N-1].Size < S ≤ BySize[N].Size.
 	//
 	// This does not report allocations larger than BySize[60].Size.
-	BySize [61*_OS + gc.NumSizeClasses*(1-_OS)]struct {
+	BySize [61*noos.OS + gc.NumSizeClasses*(1-noos.OS)]struct {
 		// Size is the maximum byte size of an object in this
 		// size class.
 		Size uint32

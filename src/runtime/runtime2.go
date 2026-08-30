@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"internal/abi"
+	"internal/buildcfg/noos"
 	"internal/chacha8rand"
 	"internal/goarch"
 	"internal/runtime/atomic"
@@ -736,7 +737,7 @@ type mPadded struct {
 	// not in the next-smallest (1792-byte) size class. That leaves the 11 low
 	// bits of muintptr values available for flags, as required by
 	// lock_spinbit.go.
-	_ [(1 - goarch.IsWasm) * (2048*_OS + noosMPaddedSize - mallocHeaderSize - mRedZoneSize - unsafe.Sizeof(m{}))]byte
+	_ [(1 - goarch.IsWasm) * (2048*noos.OS + noos.MPaddedSize - mallocHeaderSize - mRedZoneSize - unsafe.Sizeof(m{}))]byte
 }
 
 // mWeakPointer is a "weak" pointer to an M. A weak pointer for each M is
@@ -794,7 +795,7 @@ type p struct {
 	oldm mWeakPointer
 
 	deferpool    []*_defer // pool of available defer structs (see panic.go)
-	deferpoolbuf [32 / noosScaleDown]*_defer
+	deferpoolbuf [32 / noos.ScaleDown]*_defer
 
 	// Cache of goroutine ids, amortizes accesses to runtime·sched.goidgen.
 	goidcache    uint64
@@ -803,7 +804,7 @@ type p struct {
 	// Queue of runnable goroutines. Accessed without lock.
 	runqhead uint32
 	runqtail uint32
-	runq     [256 / noosScaleDown]guintptr
+	runq     [256 / noos.ScaleDown]guintptr
 	// runnext, if non-nil, is a runnable G that was ready'd by
 	// the current G and should be run next instead of what's in
 	// runq if there's time remaining in the running G's time
@@ -822,7 +823,7 @@ type p struct {
 	gFree gList
 
 	sudogcache []*sudog
-	sudogbuf   [128 / noosScaleDown]*sudog
+	sudogbuf   [128 / noos.ScaleDown]*sudog
 
 	// Cache of mspan objects from the heap.
 	mspancache struct {
@@ -832,7 +833,7 @@ type p struct {
 		// slice updates is tricky, more so than just managing the length
 		// ourselves.
 		len int
-		buf [128 / noosScaleDown]*mspan
+		buf [128 / noos.ScaleDown]*mspan
 	}
 
 	// Cache of a single pinner object to reduce allocations from repeated

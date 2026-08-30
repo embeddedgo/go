@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"internal/abi"
+	"internal/buildcfg/noos"
 	"internal/cpu"
 	"internal/goarch"
 	"internal/goexperiment"
@@ -157,7 +158,7 @@ func main() {
 	// Using decimal instead of binary GB and MB because
 	// they look nicer in the stack overflow failure message.
 	if GOOS == "noos" {
-		maxstacksize = 512 * 1024 / noosScaleDown
+		maxstacksize = 512 * 1024 / noos.ScaleDown
 	} else if goarch.PtrSize == 8 {
 		maxstacksize = 1000000000
 	} else {
@@ -5497,12 +5498,12 @@ func gfput(pp *p, gp *g) {
 	}
 
 	pp.gFree.push(gp)
-	if pp.gFree.size >= 64*_OS+5*16/noosScaleDown {
+	if pp.gFree.size >= 64*noos.OS+5*16/noos.ScaleDown {
 		var (
 			stackQ   gQueue
 			noStackQ gQueue
 		)
-		for pp.gFree.size >= 32*_OS+3*16/noosScaleDown {
+		for pp.gFree.size >= 32*noos.OS+3*16/noos.ScaleDown {
 			gp := pp.gFree.pop()
 			if gp.stack.lo == 0 {
 				noStackQ.push(gp)
@@ -5524,7 +5525,7 @@ retry:
 	if pp.gFree.empty() && (!sched.gFree.stack.empty() || !sched.gFree.noStack.empty()) {
 		lock(&sched.gFree.lock)
 		// Move a batch of free Gs to the P.
-		for pp.gFree.size < 32*_OS+3*16/noosScaleDown {
+		for pp.gFree.size < 32*noos.OS+3*16/noos.ScaleDown {
 			// Prefer Gs with stacks.
 			gp := sched.gFree.stack.pop()
 			if gp == nil {
@@ -7674,7 +7675,7 @@ retry:
 // Batch is a ring buffer starting at batchHead.
 // Returns number of grabbed goroutines.
 // Can be executed by any P.
-func runqgrab(pp *p, batch *[256 / noosScaleDown]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
+func runqgrab(pp *p, batch *[256 / noos.ScaleDown]guintptr, batchHead uint32, stealRunNextG bool) uint32 {
 	for {
 		h := atomic.LoadAcq(&pp.runqhead) // load-acquire, synchronize with other consumers
 		t := atomic.LoadAcq(&pp.runqtail) // load-acquire, synchronize with the producer

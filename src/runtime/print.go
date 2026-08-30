@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/strconv"
 	"unsafe"
 )
@@ -29,7 +30,7 @@ func bytes(s string) (ret []byte) {
 var (
 	// printBacklog is a circular buffer of messages written with the builtin
 	// print* functions, for use in postmortem analysis of core dumps.
-	printBacklog      [256 * (1 + _OS)]byte
+	printBacklog      [256 * (1 + noos.OS)]byte
 	printBacklogIndex int
 )
 

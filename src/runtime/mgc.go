@@ -129,6 +129,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/cpu"
 	"internal/goarch"
 	"internal/goexperiment"
@@ -151,7 +152,7 @@ const (
 	// sweepMinHeapDistance is a lower bound on the heap distance
 	// (in bytes) reserved for concurrent sweeping between GC
 	// cycles.
-	sweepMinHeapDistance = 1024*1024*_OS + noosSweepMinHeapDistance
+	sweepMinHeapDistance = 1024*1024*noos.OS + noos.SweepMinHeapDistance
 )
 
 // heapObjectsCanMove always returns false in the current garbage collector.

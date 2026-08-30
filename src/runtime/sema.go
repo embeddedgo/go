@@ -20,6 +20,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/cpu"
 	"internal/runtime/atomic"
 	"unsafe"
@@ -46,7 +47,7 @@ type semaRoot struct {
 var semtable semTable
 
 // Prime to not correlate with any user patterns.
-const semTabSize = 251*_OS + noosSemTabSize
+const semTabSize = 251*noos.OS + noos.SemTabSize
 
 type semTable [semTabSize]struct {
 	root semaRoot

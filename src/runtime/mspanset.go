@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/cpu"
 	"internal/goarch"
 	"internal/runtime/atomic"
@@ -52,8 +53,8 @@ type spanSet struct {
 }
 
 const (
-	spanSetBlockEntries = 512 / noosScaleDown // 4KB on 64-bit
-	spanSetInitSpineCap = 256 / noosScaleDown // Enough for 1GB heap on 64-bit
+	spanSetBlockEntries = 512 / noos.ScaleDown // 4KB on 64-bit
+	spanSetInitSpineCap = 256 / noos.ScaleDown // Enough for 1GB heap on 64-bit
 )
 
 type spanSetBlockHeader struct {

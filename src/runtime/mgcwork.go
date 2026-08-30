@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/goarch"
 	"internal/goexperiment"
 	"internal/runtime/atomic"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	_WorkbufSize = 2048*_OS + _PageSize*(1-_OS) // in bytes; larger values result in less contention
+	_WorkbufSize = 2048*noos.OS + _PageSize*(1-noos.OS) // in bytes; larger values result in less contention
 
 	// workbufAlloc is the number of bytes to allocate at a time
 	// for new workbufs. This must be a multiple of pageSize and
@@ -22,7 +23,7 @@ const (
 	//
 	// Larger values reduce workbuf allocation overhead. Smaller
 	// values reduce heap fragmentation.
-	workbufAlloc = 32<<10*_OS + 2*_WorkbufSize*(1-_OS)
+	workbufAlloc = 32<<10*noos.OS + 2*_WorkbufSize*(1-noos.OS)
 )
 
 func init() {

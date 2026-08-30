@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"internal/abi"
+	"internal/buildcfg/noos"
 	"internal/cpu"
 	"internal/goarch"
 	"internal/goexperiment"
@@ -72,10 +73,10 @@ const (
 	// to each stack below the usual guard area for OS-specific
 	// purposes like signal handling. Used on Windows, Plan 9,
 	// and iOS because they do not use a separate stack.
-	stackSystem = goos.IsWindows*4096 + goos.IsPlan9*512 + goos.IsIos*goarch.IsArm64*1024 + noosStackSystem
+	stackSystem = goos.IsWindows*4096 + goos.IsPlan9*512 + goos.IsIos*goarch.IsArm64*1024 + noos.StackSystem
 
 	// The minimum size of stack used by Go code
-	stackMin = 2048*_OS + noosStackMin
+	stackMin = 2048*noos.OS + noos.StackMin
 
 	// The minimum stack size to allocate.
 	// The hackery here rounds fixedStack0 up to a power of 2.

@@ -101,6 +101,7 @@
 package runtime
 
 import (
+	"internal/buildcfg/noos"
 	"internal/goarch"
 	"internal/goexperiment"
 	"internal/goos"
@@ -133,7 +134,7 @@ const (
 	_FixAllocChunk = 16 << 10 // Chunk size for FixAlloc
 
 	// Per-P, per order stack segment cache size.
-	_StackCacheSize = 32*1024*_OS + noosStackCacheSize
+	_StackCacheSize = 32*1024*noos.OS + noos.StackCacheSize
 
 	// Number of orders that get caching. Order 0 is FixedStack
 	// and each successive order is twice as large.
@@ -147,7 +148,7 @@ const (
 	//   windows/32       | 4KB        | 3
 	//   windows/64       | 8KB        | 2
 	//   plan9            | 4KB        | 3
-	_NumStackOrders = 4 - goarch.PtrSize/4*goos.IsWindows - 1*goos.IsPlan9 - noosNumStackOrders
+	_NumStackOrders = 4 - goarch.PtrSize/4*goos.IsWindows - 1*goos.IsPlan9 - noos.NumStackOrders
 
 	// heapAddrBits is the number of bits in a heap address. On
 	// amd64, addresses are sign-extended beyond heapAddrBits. On
@@ -210,7 +211,7 @@ const (
 	// to a 48-bit address space like every other arm64 platform.
 	//
 	// WebAssembly currently has a limit of 4GB linear memory.
-	heapAddrBits = (_64bit*(1-goarch.IsWasm)*(1-goos.IsIos*goarch.IsArm64))*48*_OS + (1-_64bit+goarch.IsWasm)*(32-(goarch.IsMips+goarch.IsMipsle))*_OS + 40*goos.IsIos*goarch.IsArm64*_OS + noosHeapAddrBits
+	heapAddrBits = (_64bit*(1-goarch.IsWasm)*(1-goos.IsIos*goarch.IsArm64))*48*noos.OS + (1-_64bit+goarch.IsWasm)*(32-(goarch.IsMips+goarch.IsMipsle))*noos.OS + 40*goos.IsIos*goarch.IsArm64*noos.OS + noos.HeapAddrBits
 
 	// maxAlloc is the maximum size of an allocation. On 64-bit,
 	// it's theoretically possible to allocate 1<<heapAddrBits bytes. On
@@ -256,7 +257,7 @@ const (
 	// logHeapArenaBytes is log_2 of heapArenaBytes. For clarity,
 	// prefer using heapArenaBytes where possible (we need the
 	// constant to compute some other constants).
-	logHeapArenaBytes = (6+20)*(_64bit*(1-goos.IsWindows)*(1-goarch.IsWasm)*(1-goos.IsIos*goarch.IsArm64))*_OS + (2+20)*(_64bit*goos.IsWindows)*_OS + (2+20)*(1-_64bit)*_OS + (2+20)*goarch.IsWasm*_OS + (2+20)*goos.IsIos*goarch.IsArm64*_OS + noosLogHeapArenaBytes
+	logHeapArenaBytes = (6+20)*(_64bit*(1-goos.IsWindows)*(1-goarch.IsWasm)*(1-goos.IsIos*goarch.IsArm64))*noos.OS + (2+20)*(_64bit*goos.IsWindows)*noos.OS + (2+20)*(1-_64bit)*noos.OS + (2+20)*goarch.IsWasm*noos.OS + (2+20)*goos.IsIos*goarch.IsArm64*noos.OS + noos.LogHeapArenaBytes
 
 	// heapArenaBitmapWords is the size of each heap arena's bitmap in uintptrs.
 	heapArenaBitmapWords = heapArenaWords / (8 * goarch.PtrSize)
@@ -311,7 +312,7 @@ const (
 	//
 	// On other platforms, the user address space is contiguous
 	// and starts at 0, so no offset is necessary.
-	arenaBaseOffset = 0xffff800000000000*goarch.IsAmd64*_OS + 0x0a00000000000000*goos.IsAix + noosArenaBaseOffset
+	arenaBaseOffset = 0xffff800000000000*goarch.IsAmd64*noos.OS + 0x0a00000000000000*goos.IsAix + noos.ArenaBaseOffset
 	// A typed version of this constant that will make it into DWARF (for viewcore).
 	arenaBaseOffsetUintptr = uintptr(arenaBaseOffset)
 

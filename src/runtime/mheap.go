@@ -10,6 +10,7 @@ package runtime
 
 import (
 	"internal/abi"
+	"internal/buildcfg/noos"
 	"internal/cpu"
 	"internal/goarch"
 	"internal/goexperiment"
@@ -23,7 +24,7 @@ const (
 	// minPhysPageSize is a lower-bound on the physical page size. The
 	// true physical page size may be larger than this. In contrast,
 	// sys.PhysPageSize is an upper-bound on the physical page size.
-	minPhysPageSize = 4096*_OS + noosMinPhysPageSize
+	minPhysPageSize = 4096*noos.OS + noos.MinPhysPageSize
 
 	// maxPhysPageSize is the maximum page size the runtime supports.
 	maxPhysPageSize = 512 << 10
@@ -47,7 +48,7 @@ const (
 	//
 	// Must be a multiple of the pageInUse bitmap element size and
 	// must also evenly divide pagesPerArena.
-	pagesPerReclaimerChunk = min(512, pagesPerArena)*_OS + pagesPerArena*(1-_OS)
+	pagesPerReclaimerChunk = min(512, pagesPerArena)*noos.OS + pagesPerArena*(1-noos.OS)
 
 	// physPageAlignedStacks indicates whether stack allocations must be
 	// physical page aligned. This is a requirement for MAP_STACK on
@@ -2882,7 +2883,7 @@ func (b *gcBits) bitp(n uintptr) (bytep *uint8, mask uint8) {
 	return b.bytep(n / 8), 1 << (n % 8)
 }
 
-const gcBitsChunkBytes = uintptr(64<<10)*_OS + noosGCBitsChunkBytes
+const gcBitsChunkBytes = uintptr(64<<10)*noos.OS + noos.GCBitsChunkBytes
 const gcBitsHeaderBytes = unsafe.Sizeof(gcBitsHeader{})
 
 type gcBitsHeader struct {

@@ -8,6 +8,7 @@ package runtime
 
 import (
 	"internal/abi"
+	"internal/buildcfg/noos"
 	"internal/goarch"
 	"internal/goexperiment"
 	"internal/runtime/atomic"
@@ -50,7 +51,7 @@ const (
 	//
 	// Must be a multiple of the pageInUse bitmap element size and
 	// must also evenly divide pagesPerArena.
-	pagesPerSpanRoot = min(512, pagesPerArena)*_OS + pagesPerArena/2*(1-_OS)
+	pagesPerSpanRoot = min(512, pagesPerArena)*noos.OS + pagesPerArena/2*(1-noos.OS)
 )
 
 // internalBlocked returns true if the goroutine is blocked due to an

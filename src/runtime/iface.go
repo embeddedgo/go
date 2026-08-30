@@ -6,13 +6,14 @@ package runtime
 
 import (
 	"internal/abi"
+	"internal/buildcfg/noos"
 	"internal/goarch"
 	"internal/runtime/atomic"
 	"internal/runtime/sys"
 	"unsafe"
 )
 
-const itabInitSize = 512 * _OS // avoid wasting of no GC memory on noos
+const itabInitSize = 512 * noos.OS // avoid wasting of no GC memory on noos
 
 var (
 	itabLock      mutex                               // lock for accessing itab table
@@ -261,7 +262,7 @@ func itabsinit() {
 	lock(&itabLock)
 	if GOOS == "noos" {
 		// allocate starter table
-		const n = 512 / noosScaleDown // always a power of 2
+		const n = 512 / noos.ScaleDown // always a power of 2
 		itabTable = (*itabTableType)(mallocgc((2+n)*goarch.PtrSize, nil, true))
 		itabTable.size = n
 	}
