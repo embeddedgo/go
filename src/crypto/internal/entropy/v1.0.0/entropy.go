@@ -8,6 +8,7 @@ package entropy
 import (
 	"crypto/internal/fips140deps/time"
 	"errors"
+	"internal/buildcfg/noos"
 	"sync/atomic"
 	"unsafe"
 )
@@ -22,7 +23,7 @@ func Version() string {
 
 // ScratchBuffer is a large buffer that will be written to using atomics, to
 // generate noise from memory access timings. Its contents do not matter.
-type ScratchBuffer [1 << 25]byte
+type ScratchBuffer [noos.OS<<25 + (1<<noos.HeapAddrBits)/4]byte
 
 // Seed returns a 384-bit seed with full entropy.
 //
