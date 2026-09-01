@@ -3096,7 +3096,7 @@ func (ctxt *Link) address() []*sym.Segment {
 	}
 
 	if MaxTextAddr != -1 && la > uint64(MaxTextAddr) {
-		Exitf("text segment to big by %d bytes", la-uint64(MaxTextAddr))
+		ctxt.Logf("link: text segment to big by %d bytes", la-uint64(MaxTextAddr))
 	}
 
 	// Assign Segdata's Filelen omitting the BSS. We do this here
@@ -3131,6 +3131,10 @@ func (ctxt *Link) address() []*sym.Segment {
 			va += s.Length
 		}
 		Segxdata.Length = va - Segxdata.Vaddr
+	}
+
+	if ramMax := uint64(RAM.Base + RAM.Size); RAM.Size != 0 && va > ramMax {
+		ctxt.Logf("link: data segment to big by %d bytes", va-ramMax)
 	}
 
 	va = uint64(Rnd(int64(la), *FlagRound))
