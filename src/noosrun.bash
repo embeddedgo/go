@@ -12,35 +12,48 @@ declare -A skipTests=(
 	[bytes]='Grow'
 	[cmd/addr2line]=-
 	[cmd/api]=-
+	[cmd/asm/internal/lex]=-
 	[cmd/cgo/internal/swig]=-
 	[cmd/cgo/internal/testcarchive]=-
 	[cmd/cgo/internal/testcshared]=-
 	[cmd/cgo/internal/testerrors]=-
 	[cmd/cgo/internal/testgodefs]=-
 	[cmd/cgo/internal/testlife]=-
+	[cmd/cgo/internal/testnocgo]=-
 	[cmd/cgo/internal/testplugin]=-
 	[cmd/cgo/internal/testsanitizers]=-
 	[cmd/cgo/internal/testshared]=-
 	[cmd/cgo/internal/teststdio]=-
 	[cmd/compile]=-
 	[cmd/compile/internal/amd64]=-
+	[cmd/compile/internal/base]=-
 	[cmd/compile/internal/dwarfgen]=-
 	[cmd/compile/internal/importer]=-
 	[cmd/compile/internal/inline/inlheur]='DumpCallSiteScoreDump|FuncProperties'
+	[cmd/go/internal/lockedfile]=-
+	[cmd/go/internal/modfetch]=-
+	[cmd/compile/internal/ir]=-
+	[cmd/go/internal/lockedfile/internal/filelock]=-
+	[cmd/compile/internal/loopvar]=-
 	[cmd/compile/internal/noder]=-
 	[cmd/compile/internal/rangefunc]=-
-	[cmd/compile/internal/ssa]=-
 	[cmd/compile/internal/reflectdata]=-
 	[cmd/compile/internal/syntax]='StdLib'
+	[cmd/compile/internal/ssa]=-
 	[cmd/compile/internal/test]=-
+	[cmd/compile/internal/types]=-
 	[cmd/compile/internal/types2]=-
 	[cmd/covdata]=-
 	[cmd/cover]=-
 	[cmd/doc]=-
 	[cmd/go]=-
-	[cmd/gofmt]='Rewrite|BackupFile|All'
+	[cmd/go/internal/cache]=-
+	[cmd/go/internal/doc]=-
+	[cmd/go/internal/fips140]='Sums'
+	[cmd/gofmt]='Rewrite|BackupFile|All|Diff'
 	[cmd/internal/bootstrap_test]=-
 	[cmd/internal/buildid]=-
+	[cmd/go/internal/fsys]=-
 	[cmd/internal/notsha256]='BlockGeneric'
 	[cmd/internal/obj/arm64]='NoRet'
 	[cmd/internal/obj/loong64]='NoRet'
@@ -141,7 +154,7 @@ declare -A skipTests=(
 pkgs=()
 skips=()
 
-for d in $(find -type d |cut -c3- |sort); do
+for d in $(find -type d -not '(' -path '*/testdata' -prune ')' |cut -c3- |sort); do
 	skip=${skipTests["$d"]}
 	if [ "$skip" != '-' ]; then
 		if compgen -G $d/*_test.go >/dev/null; then
@@ -156,15 +169,15 @@ for d in $(find -type d |cut -c3- |sort); do
 	fi
 done
 
-for goenv in ../noos_riscv64.env ../noos_thumb.env; do
-	export GOENV=$goenv
+for goenv in ../noos_thumb.env ../noos_riscv64.env; do
+	export GOENV=$(realpath $goenv)
 	echo
 	echo "#### GOENV=$GOENV ####"
 	echo
 	for i in "${!pkgs[@]}"; do
 		pkg=${pkgs[$i]}
 		skip=${skips[$i]}
-		echo $pkg
+		echo "$pkg skip: $skip"
 		egtool test -v -parallel 1 -timeout 5m -skip $skip $pkg
 	done
 done
