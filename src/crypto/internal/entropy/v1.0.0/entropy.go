@@ -23,7 +23,7 @@ func Version() string {
 
 // ScratchBuffer is a large buffer that will be written to using atomics, to
 // generate noise from memory access timings. Its contents do not matter.
-type ScratchBuffer [noos.OS<<25 + (1<<noos.HeapAddrBits)/8]byte
+type ScratchBuffer [noos.OS<<25 + (1<<noos.HeapAddrBits)/64]byte
 
 // Seed returns a 384-bit seed with full entropy.
 //
