@@ -8,6 +8,9 @@ import (
 	"context"
 	"errors"
 	"internal/bytealg"
+	"internal/strconv"
+	"io"
+	"net/netip"
 	"os"
 	"syscall"
 	"time"
@@ -366,13 +369,74 @@ type KeepAliveConfig struct {
 	Count int
 }
 
-type conn interface {
+type tcpConn interface {
 	Conn
+
 	CloseWrite() error
 	SetKeepAliveConfig(config KeepAliveConfig) error
+	ReadFrom(r io.Reader) (int64, error)
 }
 
 // TCPConn is a stub on GOOS=noos.
 type TCPConn struct {
-	conn
+	tcpConn
 }
+
+type tcpListener interface {
+	Listener
+
+	AcceptTCP() (*TCPConn, error)
+	File() (f *os.File, err error)
+}
+
+// TCPListener is a stub on GOOS=noos.
+type TCPListener struct {
+	tcpListener
+}
+
+func FileListener(f *os.File) (ln Listener, err error) { return nil, syscall.ENOTSUP }
+
+// TCPAddr represents the address of a TCP end point.
+type TCPAddr struct {
+	IP   IP
+	Port int
+	Zone string // IPv6 scoped addressing zone
+}
+
+func TCPAddrFromAddrPort(addr netip.AddrPort) *TCPAddr {
+	return &TCPAddr{
+		IP:   addr.Addr().AsSlice(),
+		Zone: addr.Addr().Zone(),
+		Port: int(addr.Port()),
+	}
+}
+
+// AddrPort returns the [TCPAddr] a as a [netip.AddrPort].
+//
+// If a.Port does not fit in a uint16, it's silently truncated.
+//
+// If a is nil, a zero value is returned.
+func (a *TCPAddr) AddrPort() netip.AddrPort {
+	if a == nil {
+		return netip.AddrPort{}
+	}
+	na, _ := netip.AddrFromSlice(a.IP)
+	na = na.WithZone(a.Zone)
+	return netip.AddrPortFrom(na, uint16(a.Port))
+}
+
+// Network returns the address's network name, "tcp".
+func (a *TCPAddr) Network() string { return "tcp" }
+
+func (a *TCPAddr) String() string {
+	if a == nil {
+		return "<nil>"
+	}
+	ip := ipEmptyString(a.IP)
+	if a.Zone != "" {
+		return JoinHostPort(ip+"%"+a.Zone, strconv.Itoa(a.Port))
+	}
+	return JoinHostPort(ip, strconv.Itoa(a.Port))
+}
+
+func LookupHost(host string) (addrs []string, err error) { return nil, nil }

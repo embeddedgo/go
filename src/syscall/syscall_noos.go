@@ -36,6 +36,7 @@ var (
 	ECANCELED    = &Error{"operation canceled"}
 	EINTR        = &Error{"interrupt"} // for os package only
 	ENOMEM       = &Error{"cannot allocate memory"}
+	ETIMEDOUT    = &Error{"timed out"}
 	//ENOPROTOOPT  = &Error{"protocol not available"} // for net package only
 )
 
