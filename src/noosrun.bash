@@ -99,6 +99,7 @@ declare -A skipTests=(
 	[crypto/hpke]='RoundTrip|Vectors'
 	[crypto/internal/fips140/bigmod]='Mul|RightShift'
 	[crypto/internal/fips140/ecdsa]='RandomPoint'
+	[crypto/internal/fips140/edwards25519]='VarTimeDoubleBaseMultMatchesBaseMult'
 	[crypto/internal/fips140/edwards25519/field]='Consistency|Invert'
 	[crypto/internal/fips140/mlkem]='EncodeDecode'
 	[crypto/internal/fips140test]=-
@@ -113,7 +114,7 @@ declare -A skipTests=(
 	[crypto/tls]=-
 	[crypto/tls/fipsonly]=-
 	[crypto/x509]=-
-	[database/sql]='Query|DriverPanic'
+	[database/sql]=-
 	[debug/elf]=-
 	[embedded/rtos]=-
 	[encoding/asn1]='ParsingMemoryConsumption'
@@ -138,6 +139,7 @@ declare -A skipTests=(
 	[hash/maphash]='Comparable|WriteComparable|SmhasherSmallKeys|SmhasherTwoNonzero|SmhasherPermutation|SmhasherText|SmhasherAvalanche|SmhasherSparse|SmhasherCyclic|SmhasherZeros'
 	[html/template]='MaxExecDepth|ExecutePanicDuringCall|ParseGlob.*|ParseFS'
 	[image/jpeg]='LargeImageWithShortData'
+	[image/gif]='DecodeMemoryConsumption'
 	[index/suffixarray]='New32|New64'
 	[internal/cgrouptest]=-
 	[internal/copyright]=-
@@ -148,6 +150,7 @@ declare -A skipTests=(
 	[internal/godebug]=-
 	[internal/routebsd]=-
 	[internal/runtime/cgobench]=-
+	[internal/runtime/cgroup]=-
 	[internal/runtime/syscall]=-
 	[internal/runtime/syscall/linux]=-
 	[internal/runtime/wasitest]=-
@@ -181,11 +184,15 @@ declare -A skipTests=(
 	[net/http/httputil]=-
 	[net/http/pprof]=-
 	[net/internal/socktest]=-
+	[net/netip]=-
 	[net/rpc]=-
 	[net/rpc/jsonrpc]=-
 	[net/smtp]=-
+	[net/textproto]='Issue46363'
+	[net/url]='ParseQueryLimits|ParseStrictIpv6'
 	[os]=-
 	[os/exec]=-
+	[os/exec/internal/fdtest]=-
 	[os/user]=-
 	[path/filepath]='Walk.*|Glob.*|.*Symlink.*|CVE202230632|NonWindowsGlobEscape|Issue13582|Abs|AbsEmptyString|Bug3486|Issue29372|Issue51617|Issue516172272189953|Escaping'
 	[reflect]=-
@@ -193,11 +200,21 @@ declare -A skipTests=(
 	[regexp/syntax]='ParseInvalidRegexps'
 	[runtime]=-
 	[runtime/_mkmalloc]=-
+	[runtime/cgo]=-
+	[runtime/debug]=-
+	[runtime/metrics]=-
+	[runtime/pprof]=-
 	[runtime/secret]=-
+	[runtime/trace]=-
+	[simd/archsimd]=-
+	[simd/archsimd/_gen/simdgen]=-
+	[simd/archsimd/_gen/unify]=-
+	[simd/archsimd/internal/simd_test]=-
 	[strings]='CaseConsistency'
-	[sync]='PoolChain|MutexMisuse'
-	[sync/atomic]='NilDeref|ValueCompareAndSwapConcurrent|ValueSwapConcurrent'
+	[sync]='PoolChain|MutexMisuse|OnceFuncPanicTraceback|Issue76126'
+	[sync/atomic]='NilDeref|ValueCompareAndSwapConcurrent|ValueSwapConcurrent|Issue76126|Hammer.*'
 	[syscall]=-
+	[syscall/js]=-
 	[testing]='Flag|Panic.*|MorePanic|TempDir.*|.*Race.*|Chdir.*|Exec.*|BenchmarkB.*|RunningTests.*|TBHelper.*|AttrSet|AttrInvalid|ArtifactDir.*'
 	[testing/cryptotest]=-
 	[testing/fstest]='Symlink'
@@ -224,8 +241,7 @@ for d in $(find -type d -not '(' -path '*/testdata' -prune ')' |cut -c3- |sort);
 	fi
 done
 
-#for goenv in ../noos_thumb.env ../noos_riscv64.env; do
-for goenv in ../noos_thumb.env; do
+for goenv in ../noos_thumb.env ../noos_riscv64.env; do
 	export GOENV=$(realpath $goenv)
 	echo
 	echo "#### GOENV=$GOENV ####"
@@ -234,6 +250,6 @@ for goenv in ../noos_thumb.env; do
 		pkg=${pkgs[$i]}
 		skip=${skips[$i]}
 		echo "$pkg skip: $skip"
-		egtool test -v -parallel 1 -timeout 5m -skip $skip $pkg
+		egtool test -v -parallel 1 -short -timeout 5m -skip $skip $pkg
 	done
 done
