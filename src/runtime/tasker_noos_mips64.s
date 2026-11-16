@@ -419,10 +419,6 @@ fatal:
 
 TEXT runtime·exceptionReturn(SB),NOSPLIT|NOFRAME,$0
 	MOVV  _mstatus(R29), R26
-	AND   $~INTR_EXT, R26
-	MOVW  ·globalIRQMask(SB), R27
-	AND   $INTR_EXT, R27
-	OR    R27, R26
 	MOVV  R26, M(C0_SR)
 	MOVV  _lr(R29), R31
 	AND   $~1, R31 // Remove smallCtx flag from lr
