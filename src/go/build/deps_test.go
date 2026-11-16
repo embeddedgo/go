@@ -43,6 +43,7 @@ var depsRules = `
 	  container/list,
 	  container/ring,
 	  internal/byteorder,
+	  internal/buildcfg/noos,
 	  internal/cfg,
 	  internal/coverage,
 	  internal/coverage/rtcov,
@@ -99,6 +100,7 @@ var depsRules = `
 
 	# RUNTIME is the core runtime group of packages, all of them very light-weight.
 	internal/abi,
+	internal/buildcfg/noos,
 	internal/chacha8rand,
 	internal/coverage/rtcov,
 	internal/cpu,
