@@ -85,7 +85,7 @@ func ParseGOEXPERIMENT(goos, goarch, goexp string) (*ExperimentFlags, error) {
 		RegabiArgs:            regabiSupported,
 		Dwarf5:                dwarf5Supported,
 		RandomizedHeapBase64:  GOOS != "noos",
-		SizeSpecializedMalloc: GOOS != "noos",
+		SizeSpecializedMalloc: false && GOOS != "noos",
 		GreenTeaGC:            true,
 	}
 	flags := &ExperimentFlags{
