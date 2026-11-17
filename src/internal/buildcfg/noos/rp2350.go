@@ -31,5 +31,5 @@ const (
 	SemTabSize                  = 31
 	GOGC                        = 30
 	TimeHistMaxBucketBits       = 45
-	MSize                       = 2048
+	MPaddedSize                 = 2048
 )
