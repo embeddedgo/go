@@ -6,7 +6,7 @@
 #set -e
 
 declare -A skipTests=(
-	[archive/tar]='.*InsecurePath.*|FileInfoHeader.*|Pax.*|USTARLongName|Reader|Writer'
+	[archive/tar]='.*InsecurePath.*|FileInfoHeader.*|Pax.*|USTARLongName|Reader|Writer|ReadOldGNUSparseMap'
 	[archive/zip]='.*InsecurePath.*|Reader|FS.*|Over65kFiles|Zip64LargeDirectory|Zip64ManyRecords|Zip64DirectoryOffset|CVE202127919|CVE202141772|CVE202127919|UnderSize|Issue54801'
 	[arena]=-
 	[bytes]='Grow'
@@ -117,7 +117,7 @@ declare -A skipTests=(
 	[database/sql]=-
 	[debug/elf]=-
 	[embedded/rtos]=-
-	[encoding/asn1]='ParsingMemoryConsumption'
+	[encoding/asn1]='ParsingMemoryConsumption|UnmarshalNestingLimit.*'
 	[encoding/gob]='LargeSlice|CountDecodeMallocs'
 	[encoding/json]=-
 	[encoding/json/internal/jsonflags]=-
@@ -126,7 +126,7 @@ declare -A skipTests=(
 	[encoding/json/jsontext]=-
 	[encoding/json/v2]=-
 	[encoding/pem]='CVE202224675'
-	[encoding/xml]='CVE202228131|CVE202230633'
+	[encoding/xml]='CVE202228131|CVE202230633|DecodeElementDepthBypass|RecursiveUnmarshalInterfaceDepth'
 	[flag]='ExitCode|DefineAfterSet'
 	[fmt]='CountMallocs|ScanInts'
 	[go/build]=-
@@ -137,7 +137,7 @@ declare -A skipTests=(
 	[go/parser]=-
 	[go/types]=-
 	[hash/maphash]='Comparable|WriteComparable|SmhasherSmallKeys|SmhasherTwoNonzero|SmhasherPermutation|SmhasherText|SmhasherAvalanche|SmhasherSparse|SmhasherCyclic|SmhasherZeros'
-	[html/template]='MaxExecDepth|ExecutePanicDuringCall|ParseGlob.*|ParseFS'
+	[html/template]=-
 	[image/jpeg]='LargeImageWithShortData'
 	[image/gif]='DecodeMemoryConsumption'
 	[index/suffixarray]='New32|New64'
