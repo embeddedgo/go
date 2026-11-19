@@ -1683,6 +1683,101 @@ func (state *dodataState) setSymType(s loader.Sym, kind sym.SymKind) {
 	}
 }
 
+func noosIsConst(name string) bool {
+	if len(name) > 8 && strings.HasPrefix(name, "unicode.") {
+		uname := name[8:]
+		if unicode.IsUpper(rune(uname[0])) || strings.HasPrefix(uname, ".stmp_") || strings.HasPrefix(uname, "fold") {
+			return true
+		}
+	}
+	if len(name) == 31 && (name[:30] == "crypto/internal/fips140/aes.te" || name[:30] == "crypto/internal/fips140/aes.td") {
+		return true
+	}
+	if strings.HasPrefix(name, "math.") {
+		mn := name[5:]
+		switch len(mn) {
+		case 4:
+			switch mn[:3] {
+			case "p0R", "p0S", "q0R", "q0S", "p1R", "p1S", "q1R", "q1S":
+				return true
+			}
+		case 5:
+			if mn[:4] == "_gam" {
+				return true
+			}
+		case 6:
+			if mn[:5] == "_lgam" {
+				return true
+			}
+		}
+		switch mn {
+		case "mPi4", "_tanP", "_tanQ", "_sin", "_cos", "pow10tab", "pow10postab32", "pow10negtab32", "tanhP", "tanhQ":
+			return true
+		}
+	}
+	switch name {
+	case "embedded/rtos.errorsByNumber",
+		"crypto/internal/fips140/aes.powx",
+		"crypto/internal/fips140/aes.sbox0",
+		"crypto/internal/fips140/aes.sbox1",
+		"crypto/des.sBoxes", "crypto/des.permutationFunction",
+		"crypto/des.permutedChoice1", "crypto/des.permutedChoice2",
+		"crypto/des.initialPermutation", "crypto/des.finalPermutation",
+		"crypto/des.ksRotations", "crypto/des.expansionFunction",
+		"internal/strconv.powtab", "internal/strconv.float64pow10",
+		"internal/strconv.float32pow10", "internal/strconv.leftcheats",
+		"internal/strconv.float32info", "internal/strconv.float64info",
+		"internal/strconv.uint64pow10", "internal/strconv.div5Tab",
+		"internal/strconv.pow10Tab",
+		"math/big.pow5tab", "math/big._Accuracy_index",
+		"math/big._RoundingMode_index",
+		"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
+		"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
+		"runtime.staticuint64s", "runtime.oneptrmask",
+		"runtime.fastlog2Table", "runtime.waitReasonStrings",
+		"runtime.boundsErrorFmts", "runtime.boundsNegErrorFmts",
+		"runtime.finalizer1", "runtime.gcMarkWorkerModeStrings",
+		"runtime.gStatusStrings", "runtime.emptymspan", "runtime.levelBits",
+		"runtime.levelShift", "runtime.stwReasonStrings",
+		"runtime.levelLogPages",
+		"internal/runtime/gc.SizeClassToSize",
+		"internal/runtime/gc.SizeClassToNPages",
+		"internal/runtime/gc.SizeClassToDivMagic",
+		"internal/runtime/gc.SizeToSizeClass8",
+		"internal/runtime/gc.SizeToSizeClass128",
+		"internal/runtime/sys.deBruijn32tab",
+		"internal/runtime/sys.deBruijn64tab",
+		"strconv.isPrint32", "strconv.isPrint16",
+		"strconv.isNotPrint32", "strconv.isNotPrint16",
+		"strconv.isGraphic",
+		"strings.asciiSpace",
+		"time.std0x", "time.longDayNames", "time.shortDayNames",
+		"time.shortMonthNames", "time.longMonthNames", "time.utcLoc",
+		"unicode.properties", "unicode.asciiFold", "unicode.caseOrbit",
+		"unicode/utf8.first", "unicode/utf8.acceptRanges",
+		"vendor/golang.org/x/net/http/httpguts.validHostByte",
+		"vendor/golang.org/x/net/http/httpguts.isTokenTable",
+		"vendor/golang.org/x/net/http2/hpack.huffmanCodeLen",
+		"vendor/golang.org/x/net/http2/hpack.huffmanCodes",
+		"vendor/golang.org/x/net/idna.idnaIndex",
+		"vendor/golang.org/x/net/idna.idnaSparseValues",
+		"vendor/golang.org/x/net/idna.idnaValues",
+		"vendor/golang.org/x/text/unicode/bidi.bidiIndex",
+		"vendor/golang.org/x/text/unicode/bidi.bidiValues",
+		"vendor/golang.org/x/text/unicode/bidi.controlByteToClass",
+		"vendor/golang.org/x/text/unicode/norm.nfcIndex",
+		"vendor/golang.org/x/text/unicode/norm.nfkcIndex",
+		"vendor/golang.org/x/text/unicode/norm.nfcSparseValues",
+		"vendor/golang.org/x/text/unicode/norm.nfkcSparseValues",
+		"vendor/golang.org/x/text/unicode/norm.nfcValues",
+		"vendor/golang.org/x/text/unicode/norm.nfkcValues",
+		"vendor/golang.org/x/text/unicode/norm.decomps":
+
+		return true
+	}
+	return false
+}
+
 func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 
 	// Give zeros sized symbols space if necessary.
@@ -1698,80 +1793,7 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 			if t := state.symType(s); t != sym.SDATA && t != sym.SNOPTRDATA {
 				continue
 			}
-			name := ldr.SymName(s)
-			if len(name) > 8 && strings.HasPrefix(name, "unicode.") {
-				uname := name[8:]
-				if unicode.IsUpper(rune(uname[0])) || strings.HasPrefix(uname, ".stmp_") || strings.HasPrefix(uname, "fold") {
-					state.setSymType(s, sym.SRODATA)
-					continue
-				}
-			}
-			if len(name) == 14 && (name[:13] == "crypto/aes.te" || name[:13] == "crypto/aes.td") {
-				state.setSymType(s, sym.SRODATA)
-				continue
-			}
-			switch name {
-			case "embedded/rtos.errorsByNumber",
-				"crypto/aes.sbox0", "crypto/aes.sbox1",
-				"crypto/des.sBoxes", "crypto/des.permutationFunction",
-				"crypto/des.permutedChoice1", "crypto/des.permutedChoice2",
-				"crypto/des.initialPermutation", "crypto/des.finalPermutation",
-				"crypto/des.ksRotations", "crypto/des.expansionFunction",
-				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
-				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
-				"math._lgamV", "math._lgamW", "math._sin", "math._cos",
-				"math.pow10tab", "math.pow10postab32", "math.pow10negtab32",
-				"math.tanhP", "math.tanhQ", "math._gamP", "math._gamQ",
-				"math._gamS",
-				"math/big.pow5tab", "math/big._Accuracy_index",
-				"math/big._RoundingMode_index",
-				"math/rand.rngCooked", "math/rand.ke", "math/rand.we",
-				"math/rand.fe", "math/rand.kn", "math/rand.wn", "math/rand.fn",
-				"runtime.staticuint64s", "runtime.oneptrmask",
-				"runtime.fastlog2Table", "runtime.class_to_size",
-				"runtime.class_to_allocnpages", "runtime.class_to_divmagic",
-				"runtime.size_to_class8", "runtime.size_to_class128",
-				"runtime.waitReasonStrings", "runtime.boundsErrorFmts",
-				"runtime.boundsNegErrorFmts", "runtime.finalizer1",
-				"runtime.gcMarkWorkerModeStrings", "runtime.gStatusStrings",
-				"runtime.emptymspan", "runtime.levelBits",
-				"runtime.levelShift", "runtime.stwReasonStrings",
-				"runtime.levelLogPages", "runtime.consec8tab",
-				"runtime/internal/sys.len8tab", "runtime/internal/sys.ntz8tab",
-				"runtime/internal/sys.deBruijn64tab",
-				"runtime/internal/sys.deBruijnIdx64ctz",
-				"runtime/internal/sys.deBruijnIdx32ctz",
-				"strconv.detailedPowersOfTen",
-				"strconv.uint64pow10", "strconv.leftcheats",
-				"strconv.isPrint32", "strconv.isPrint16",
-				"strconv.isNotPrint32", "strconv.isNotPrint16",
-				"strconv.isGraphic", "strconv.float64info",
-				"strconv.float32info",
-				"strings.asciiSpace",
-				"syscall.errors",
-				"time.std0x", "time.longDayNames", "time.shortDayNames",
-				"time.shortMonthNames", "time.longMonthNames", "time.",
-				"time.daysBefore", "time.utcLoc",
-				"unicode.properties", "unicode.asciiFold", "unicode.caseOrbit",
-				"unicode/utf8.first", "unicode/utf8.acceptRanges",
-				"vendor/golang.org/x/net/http/httpguts.validHostByte",
-				"vendor/golang.org/x/net/http/httpguts.isTokenTable",
-				"vendor/golang.org/x/net/http2/hpack.huffmanCodeLen",
-				"vendor/golang.org/x/net/http2/hpack.huffmanCodes",
-				"vendor/golang.org/x/net/idna.idnaIndex",
-				"vendor/golang.org/x/net/idna.idnaSparseValues",
-				"vendor/golang.org/x/net/idna.idnaValues",
-				"vendor/golang.org/x/text/unicode/bidi.bidiIndex",
-				"vendor/golang.org/x/text/unicode/bidi.bidiValues",
-				"vendor/golang.org/x/text/unicode/bidi.controlByteToClass",
-				"vendor/golang.org/x/text/unicode/norm.nfcIndex",
-				"vendor/golang.org/x/text/unicode/norm.nfkcIndex",
-				"vendor/golang.org/x/text/unicode/norm.nfcSparseValues",
-				"vendor/golang.org/x/text/unicode/norm.nfkcSparseValues",
-				"vendor/golang.org/x/text/unicode/norm.nfcValues",
-				"vendor/golang.org/x/text/unicode/norm.nfkcValues",
-				"vendor/golang.org/x/text/unicode/norm.decomps":
-
+			if noosIsConst(ldr.SymName(s)) {
 				state.setSymType(s, sym.SRODATA)
 			}
 		}
