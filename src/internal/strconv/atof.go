@@ -306,7 +306,7 @@ loop:
 }
 
 // decimal power of ten to binary power of two.
-var powtab = []int{1, 3, 6, 9, 13, 16, 19, 23, 26}
+var powtab = [...]int{1, 3, 6, 9, 13, 16, 19, 23, 26}
 
 func (d *decimal) floatBits(flt *floatInfo) (b uint64, overflow bool) {
 	var exp int
@@ -407,7 +407,7 @@ out:
 }
 
 // Exact powers of 10.
-var float64pow10 = []float64{
+var float64pow10 = [...]float64{
 	1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9,
 	1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 	1e20, 1e21, 1e22,
