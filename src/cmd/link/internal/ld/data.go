@@ -1717,6 +1717,11 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 				"crypto/des.permutedChoice1", "crypto/des.permutedChoice2",
 				"crypto/des.initialPermutation", "crypto/des.finalPermutation",
 				"crypto/des.ksRotations", "crypto/des.expansionFunction",
+				"internal/strconv.powtab", "internal/strconv.float64pow10",
+				"internal/strconv.float32pow10", "internal/strconv.leftcheats",
+				"internal/strconv.float32info", "internal/strconv.float64info",
+				"internal/strconv.uint64pow10", "internal/strconv.div5Tab",
+				"internal/strconv.pow10Tab", "internal/strconv.",
 				"math.mPi4", "math._tanP", "math._tanQ", "math._lgamA",
 				"math._lgamR", "math._lgamS", "math._lgamT", "math._lgamU",
 				"math._lgamV", "math._lgamW", "math._sin", "math._cos",
@@ -1741,12 +1746,9 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 				"runtime/internal/sys.deBruijn64tab",
 				"runtime/internal/sys.deBruijnIdx64ctz",
 				"runtime/internal/sys.deBruijnIdx32ctz",
-				"strconv.detailedPowersOfTen",
-				"strconv.uint64pow10", "strconv.leftcheats",
 				"strconv.isPrint32", "strconv.isPrint16",
 				"strconv.isNotPrint32", "strconv.isNotPrint16",
-				"strconv.isGraphic", "strconv.float64info",
-				"strconv.float32info",
+				"strconv.isGraphic",
 				"strings.asciiSpace",
 				"syscall.errors",
 				"time.std0x", "time.longDayNames", "time.shortDayNames",
@@ -1772,6 +1774,7 @@ func (ctxt *Link) dodata(symGroupType []sym.SymKind) {
 				"vendor/golang.org/x/text/unicode/norm.nfkcValues",
 				"vendor/golang.org/x/text/unicode/norm.decomps":
 
+				fmt.Println(name)
 				state.setSymType(s, sym.SRODATA)
 			}
 		}
