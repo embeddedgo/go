@@ -440,3 +440,39 @@ func (a *TCPAddr) String() string {
 }
 
 func LookupHost(host string) (addrs []string, err error) { return nil, nil }
+
+type Flags uint
+
+const (
+	FlagUp           Flags = 1 << iota // interface is administratively up
+	FlagBroadcast                      // interface supports broadcast access capability
+	FlagLoopback                       // interface is a loopback interface
+	FlagPointToPoint                   // interface belongs to a point-to-point link
+	FlagMulticast                      // interface supports multicast access capability
+	FlagRunning                        // interface is in running state
+)
+
+var flagNames = []string{
+	"up",
+	"broadcast",
+	"loopback",
+	"pointtopoint",
+	"multicast",
+	"running",
+}
+
+func (f Flags) String() string {
+	s := ""
+	for i, name := range flagNames {
+		if f&(1<<uint(i)) != 0 {
+			if s != "" {
+				s += "|"
+			}
+			s += name
+		}
+	}
+	if s == "" {
+		s = "0"
+	}
+	return s
+}
