@@ -227,9 +227,6 @@ func netpolldeadline(arg any, seq uintptr, delay int64) {
 
 //go:linkname rtos_condwait
 func rtos_condwait(n *pollDesc, timeout int64) bool {
-	if inheap(uintptr(unsafe.Pointer(n))) {
-		throw("runtime: rtos.Cond in heap")
-	}
 	return netpollblock(n, timeout)
 }
 
